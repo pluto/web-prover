@@ -9,7 +9,7 @@ cargo run -p notary-server
 to run the go server:
 
 ```
-cd tlsn/notary-server/
+cd vanilla-go-app/
 go run main.go
 ```
 
