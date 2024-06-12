@@ -1,7 +1,10 @@
 [workspace]
-members = [
-    "client/",
-    "tlsn/notary-server/",
-]
+members = ["client/", "tlsn/notary-server/"]
 resolver = "2"
 
+[package]
+name = "tester"
+
+[[bin]]
+name = "tester"
+path = "tester.rs"
