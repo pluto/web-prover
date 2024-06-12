@@ -1,10 +1,10 @@
 # tlsn-monorepo
 
-<!-- to run the notary server:
+to run the notary server:
 
 ```
 cargo run -p notary-server
-``` -->
+```
 
 to run the go server:
 

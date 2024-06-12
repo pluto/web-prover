@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "client/",
+    "tlsn/notary-server/",
 ]
 resolver = "2"
 
