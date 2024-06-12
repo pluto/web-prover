@@ -47,7 +47,7 @@ async fn main() {
         target_body: "".to_string(),
         max_sent_data: Some(4096),
         max_recv_data: Some(16384),
-        notary_ca_cert_path: "../tlsn/notary-server/fixture/tls/rootCA.crt".to_string(), // prod: ./tlsnotary.pluto.xyz-rootca.crt
+        notary_ca_cert_path: "tlsn/notary-server/fixture/tls/rootCA.crt".to_string(), // prod: ./tlsnotary.pluto.xyz-rootca.crt
         notary_ca_cert_server_name: "tlsnotaryserver.io".to_string(), // prod: tlsnotary.pluto.xyz
     };
 
