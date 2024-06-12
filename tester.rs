@@ -8,18 +8,16 @@ fn main() {
         run_command(
             "cargo",
             &["run", "-p", "notary-server"],
-            "notary-server.log",
+            "logs/notary-server.log",
         );
     });
 
     let go_thread = thread::spawn(|| {
-        std::env::set_current_dir("vanilla-go-app/").expect("Failed to change directory");
-        run_command("go", &["run", "main.go"], "go-server.log");
+        run_command("go", &["run", "-mod=mod", "main.go"], "logs/go-server.log");
     });
 
     let client_thread = thread::spawn(|| {
-        std::env::set_current_dir("../").expect("Failed to change directory");
-        run_command("cargo", &["run", "-p", "client"], "client.log");
+        run_command("cargo", &["run", "-p", "client"], "logs/client.log");
     });
 
     notary_thread.join().unwrap();
