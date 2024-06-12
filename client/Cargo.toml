@@ -37,3 +37,6 @@ tokio = {version = "1", features = [
 tlsn-prover = { git = "https://github.com/tlsnotary/tlsn.git", features = ["tracing"] }
 tlsn-core = { git = "https://github.com/tlsnotary/tlsn.git" }
 tlsn-tls-client = { git = "https://github.com/tlsnotary/tlsn.git" }
+
+webpki-roots = "0.26.1"
+pki-types = { package = "rustls-pki-types", version = "1.7" }
