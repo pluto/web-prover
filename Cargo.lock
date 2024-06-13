@@ -865,6 +865,7 @@ dependencies = [
  "hyper-util",
  "rustls",
  "rustls-pemfile",
+ "rustls-pki-types",
  "serde",
  "serde_json",
  "tlsn-core",
@@ -876,6 +877,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "webpki-roots",
 ]
 
 [[package]]

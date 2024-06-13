@@ -9,7 +9,7 @@ cargo run -p notary-server
 to run the go server:
 
 ```sh
-go run -mod=mod vanilla-go-app/main.go
+go run -mod=mod vanilla-go-app/main.go -tls-cert-path ./certs/server-cert.pem -tls-key-path ./certs/server-key.pem
 ```
 
 to run the client:

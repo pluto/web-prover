@@ -2,6 +2,7 @@ use base64::prelude::*;
 use http_body_util::Full;
 use hyper::{body::Bytes, Request};
 use hyper_util::rt::TokioIo;
+use pki_types::CertificateDer;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tlsn_core::commitment::CommitmentKind;
@@ -14,16 +15,20 @@ use url::Url;
 
 mod notary;
 
+const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../../vanilla-go-app/certs/ca-cert.cer");
+
 #[derive(Deserialize, Clone)]
 struct Config {
-    notary_host: String,
-    notary_port: u16,
     target_method: String,
     target_url: String,
     target_headers: HashMap<String, Vec<String>>,
     target_body: String,
+
     max_sent_data: Option<usize>,
     max_recv_data: Option<usize>,
+
+    notary_host: String,
+    notary_port: u16,
     notary_ca_cert_path: String,
     notary_ca_cert_server_name: String,
 }
@@ -39,14 +44,16 @@ async fn main() {
     tracing_subscriber::fmt::init(); // RUST_LOG=TRACE outputs to stdout
 
     let config = Config {
-        notary_host: "localhost".into(), // prod: tlsnotary.pluto.xyz
-        notary_port: 7047,               // prod: 443
         target_method: "GET".into(),
-        target_url: "https://example.com".into(),
+        target_url: "https://localhost:8065/health".into(),
         target_headers: Default::default(),
         target_body: "".to_string(),
+
         max_sent_data: Some(4096),
         max_recv_data: Some(16384),
+
+        notary_host: "localhost".into(), // prod: tlsnotary.pluto.xyz
+        notary_port: 7047,               // prod: 443
         notary_ca_cert_path: "tlsn/notary-server/fixture/tls/rootCA.crt".to_string(), // prod: ./tlsnotary.pluto.xyz-rootca.crt
         notary_ca_cert_server_name: "tlsnotaryserver.io".to_string(), // prod: tlsnotary.pluto.xyz
     };
@@ -76,10 +83,24 @@ async fn prover(config: Config) -> TlsProof {
     )
     .await;
 
+    let mut root_store = tls_client::RootCertStore::empty();
+    root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
+        tls_client::OwnedTrustAnchor::from_subject_spki_name_constraints(
+            ta.subject.as_ref(),
+            ta.subject_public_key_info.as_ref(),
+            ta.name_constraints.as_ref().map(|nc| nc.as_ref()),
+        )
+    }));
+
+    let cert = CertificateDer::from(LOCALHOST_DEBUG_CA_CERT.to_vec());
+    let (added, _) = root_store.add_parsable_certificates(&[cert.to_vec()]);
+    assert_eq!(added, 1);
+
     // Basic default prover config using the session_id returned from /session endpoint just now
     let pconfig = ProverConfig::builder()
         .id(session_id)
         .server_dns(server_domain)
+        .root_cert_store(root_store)
         .build()
         .unwrap();
 
@@ -89,9 +110,15 @@ async fn prover(config: Config) -> TlsProof {
         .await
         .unwrap();
 
-    let client_socket = tokio::net::TcpStream::connect((server_domain, 443))
-        .await
-        .unwrap();
+    let client_socket = tokio::net::TcpStream::connect((
+        server_domain,
+        match parsed_url.port() {
+            Some(port) => port,
+            _ => 443,
+        },
+    ))
+    .await
+    .unwrap();
 
     // Bind the Prover to server connection
     let (tls_connection, prover_fut) = prover.connect(client_socket.compat()).await.unwrap();
