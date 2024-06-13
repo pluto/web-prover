@@ -6,12 +6,22 @@ use std::{
     thread,
 };
 
+use clap::{command, Parser};
 use tui::PaneType;
 
 pub mod tui;
 
+#[derive(Parser)]
+#[command(name = "Tester for TLSN WebProofs")]
+#[command(about = "Control panel for testing TLSN Webproofs", long_about = None)]
+struct Args {
+    /// TCP KeepAlive Timeout for the Go server (default: 1m0s)
+    #[arg(long, default_value = "1m0s")]
+    tcp_idle_timeout: String,
+}
+
 fn main() {
-    // Ensure the logs directory exists
+    let args = Args::parse();
     create_dir_all("logs").expect("Failed to create logs directory");
 
     let (tx, rx) = mpsc::channel();
@@ -41,7 +51,12 @@ fn main() {
             run_command(
                 PaneType::Go,
                 "go",
-                &["run", "-mod=mod", "vanilla-go-app/main.go"],
+                &[
+                    "run",
+                    "-mod=mod",
+                    "vanilla-go-app/main.go",
+                    &format!("-tcp-idle-timeout={}", args.tcp_idle_timeout),
+                ],
                 "logs/go-server.log",
                 tx,
                 Some(go_ready_tx),
@@ -122,11 +137,9 @@ fn run_command(
                             format!("Sending ready message for {:?}", pane_type),
                         ))
                         .unwrap();
-                    ready_tx
-                        .clone()
-                        .unwrap()
-                        .send(())
-                        .expect("Failed to send ready message");
+                    if let Some(ref ready_tx) = ready_tx {
+                        ready_tx.send(()).expect("Failed to send ready message");
+                    }
                 }
             }
         }
