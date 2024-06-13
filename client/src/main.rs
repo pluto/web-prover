@@ -3,7 +3,7 @@ use http_body_util::Full;
 use hyper::{body::Bytes, Request};
 use hyper_util::rt::TokioIo;
 use pki_types::CertificateDer;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::HashMap;
 use tlsn_core::commitment::CommitmentKind;
 use tlsn_core::proof::TlsProof;
@@ -12,6 +12,7 @@ use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::debug;
 use url::Url;
+use anyhow::Result;
 
 mod notary;
 
@@ -33,19 +34,14 @@ struct Config {
     notary_ca_cert_server_name: String,
 }
 
-#[derive(Serialize, Clone)]
-struct Output {
-    proof: Option<String>,
-    error: Option<String>,
-}
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     tracing_subscriber::fmt::init(); // RUST_LOG=TRACE outputs to stdout
 
     let config = Config {
         target_method: "GET".into(),
-        target_url: "https://localhost:8065/health".into(),
+        target_url: "https://localhost:8065/bin/10KB".into(),
         target_headers: Default::default(),
         target_body: "".to_string(),
 
@@ -58,17 +54,14 @@ async fn main() {
         notary_ca_cert_server_name: "tlsnotaryserver.io".to_string(), // prod: tlsnotary.pluto.xyz
     };
 
-    let proof = prover(config).await;
-    std::fs::write(
-        "webproof.json",
-        serde_json::to_string_pretty(&proof).unwrap(),
-    )
-    .unwrap();
-
+    let proof = prover(config).await?;
+    let proof_json = serde_json::to_string_pretty(&proof)?;
+    std::fs::write("webproof.json", proof_json)?;
     println!("Done");
+    Ok(())
 }
 
-async fn prover(config: Config) -> TlsProof {
+async fn prover(config: Config) -> Result<TlsProof> {
     let parsed_url = Url::parse(&config.target_url).expect("Failed to parse target_url");
     let server_domain = parsed_url.host_str().unwrap();
     assert!(parsed_url.scheme() == "https");
@@ -81,7 +74,7 @@ async fn prover(config: Config) -> TlsProof {
         &config.notary_ca_cert_path,
         &config.notary_ca_cert_server_name,
     )
-    .await;
+    .await?;
 
     let mut root_store = tls_client::RootCertStore::empty();
     root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
@@ -101,14 +94,12 @@ async fn prover(config: Config) -> TlsProof {
         .id(session_id)
         .server_dns(server_domain)
         .root_cert_store(root_store)
-        .build()
-        .unwrap();
+        .build()?;
 
     // Create a new prover and set up the MPC backend.
     let prover = Prover::new(pconfig)
         .setup(notary_tls_socket.compat())
-        .await
-        .unwrap();
+        .await?;
 
     let client_socket = tokio::net::TcpStream::connect((
         server_domain,
@@ -117,11 +108,10 @@ async fn prover(config: Config) -> TlsProof {
             _ => 443,
         },
     ))
-    .await
-    .unwrap();
+    .await?;
 
     // Bind the Prover to server connection
-    let (tls_connection, prover_fut) = prover.connect(client_socket.compat()).await.unwrap();
+    let (tls_connection, prover_fut) = prover.connect(client_socket.compat()).await?;
     let tls_connection = TokioIo::new(tls_connection.compat());
 
     // Grab a control handle to the Prover
@@ -147,37 +137,37 @@ async fn prover(config: Config) -> TlsProof {
     for (key, values) in config.target_headers {
         for value in values {
             headers.append(
-                hyper::header::HeaderName::from_bytes(key.as_bytes()).unwrap(),
-                value.parse().unwrap(),
+                hyper::header::HeaderName::from_bytes(key.as_bytes())?,
+                value.parse()?,
             );
         }
     }
 
     // Using "identity" instructs the Server not to use compression for its HTTP response.
     // TLSNotary tooling does not support compression.
-    headers.insert("Host", server_domain.parse().unwrap());
-    headers.insert("Accept-Encoding", "identity".parse().unwrap());
-    headers.insert("Connection", "close".parse().unwrap());
+    headers.insert("Host", server_domain.parse()?);
+    headers.insert("Accept-Encoding", "identity".parse()?);
+    headers.insert("Connection", "close".parse()?);
 
     if headers.get("Accept").is_none() {
-        headers.insert("Accept", "*/*".parse().unwrap());
+        headers.insert("Accept", "*/*".parse()?);
     }
 
     let body = if config.target_body.is_empty() {
         Full::new(Bytes::from(vec![])) // TODO Empty::<Bytes>::new()
     } else {
         Full::new(Bytes::from(
-            BASE64_STANDARD.decode(config.target_body).unwrap(),
+            BASE64_STANDARD.decode(config.target_body)?,
         ))
     };
 
-    let request = request.body(body).unwrap();
+    let request = request.body(body)?;
 
     debug!("Sending request");
 
     // Because we don't need to decrypt the response right away, we can defer decryption
     // until after the connection is closed. This will speed up the proving process!
-    prover_ctrl.defer_decryption().await.unwrap();
+    prover_ctrl.defer_decryption().await?;
 
     match request_sender.send_request(request).await {
         Ok(response) => {
@@ -196,16 +186,16 @@ async fn prover(config: Config) -> TlsProof {
     // debug!("{}", serde_json::to_string_pretty(&parsed).unwrap());
 
     // The Prover task should be done now, so we can grab it.
-    let prover = prover_task.await.unwrap().unwrap();
+    let prover = prover_task.await??;
 
     // Upgrade the prover to an HTTP prover, and start notarization.
-    let mut prover = prover.to_http().unwrap().start_notarize();
+    let mut prover = prover.to_http()?.start_notarize();
 
     // Commit to the transcript with the default committer, which will commit using BLAKE3.
-    prover.commit().unwrap();
+    prover.commit()?;
 
     // Finalize, returning the notarized HTTP session
-    let notarized_session = prover.finalize().await.unwrap();
+    let notarized_session = prover.finalize().await?;
 
     debug!("Notarization complete!");
 
@@ -218,22 +208,22 @@ async fn prover(config: Config) -> TlsProof {
 
     proof_builder
         .reveal_sent(&request.without_data(), CommitmentKind::Blake3)
-        .unwrap();
+        ?;
 
     proof_builder
         .reveal_sent(&request.request.target, CommitmentKind::Blake3)
-        .unwrap();
+        ?;
 
     for header in &request.headers {
         // Only reveal the host header
         if header.name.as_str().eq_ignore_ascii_case("Host") {
             proof_builder
                 .reveal_sent(header, CommitmentKind::Blake3)
-                .unwrap();
+                ?;
         } else {
             proof_builder
                 .reveal_sent(&header.without_value(), CommitmentKind::Blake3)
-                .unwrap();
+                ?;
         }
     }
 
@@ -242,13 +232,13 @@ async fn prover(config: Config) -> TlsProof {
 
     proof_builder
         .reveal_recv(response, CommitmentKind::Blake3)
-        .unwrap();
+        ?;
 
     // Build the proof
-    let substrings_proof = proof_builder.build().unwrap();
+    let substrings_proof = proof_builder.build()?;
 
-    TlsProof {
+    Ok(TlsProof {
         session: session_proof,
         substrings: substrings_proof,
-    }
+    })
 }
