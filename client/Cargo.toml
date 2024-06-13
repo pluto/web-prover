@@ -5,6 +5,10 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[patch.'https://github.com/tlsnotary/tlsn.git']
+tlsn-prover = { path = "../tlsn/tlsn/tlsn-prover" }
+tlsn-core = { path = "../tlsn/tlsn/tlsn-core" }
+tlsn-tls-client = { path = "../tlsn/components/tls/tls-client" }
 
 [dependencies]
 serde = {version = "1.0.147", features = ["derive"]}
