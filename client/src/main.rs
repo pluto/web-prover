@@ -41,7 +41,7 @@ async fn main() -> Result<()> {
 
     let config = Config {
         target_method: "GET".into(),
-        target_url: "https://localhost:8065".into(),
+        target_url: "https://localhost:8065/bin/10KB".into(),
         target_headers: Default::default(),
         target_body: "".to_string(),
 
