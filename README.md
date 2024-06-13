@@ -21,6 +21,6 @@ cargo run -p client
 ## Tester
 Alternatively, to run the tester you can just do:
 ```sh
-cargo run
+cargo run -p tester
 ```
 in the root directory of the project.
