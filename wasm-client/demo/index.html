@@ -1,0 +1,23 @@
+<html>
+  <head></head>
+  <body>
+    <script type="module">
+      import init, { prover } from "./pkg/wasm_client.js";
+      await init();
+      console.log(await prover(
+        "https://localhost:8065/health", // target url str
+       {
+          "method": "GET",
+          "headers": {
+            "Accept": "text/plain"
+          },
+          "body": "",
+          "notaryUrl": "https://localhost:7047",
+          "websocketProxyUrl": "wss://localhost:8050",
+       }, [], []
+      ));
+    </script>
+
+    <p>Open Console to watch logs ...</p>
+  </body>
+</html>

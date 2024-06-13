@@ -10,6 +10,10 @@ version = "0.1.0"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[patch.'https://github.com/tlsnotary/tlsn.git']
+tlsn-prover = { path = "../tlsn/tlsn/tlsn-prover" }
+tlsn-core = { path = "../tlsn/tlsn/tlsn-core" }
+
 [dependencies]
 chrono = "0.4"
 elliptic-curve = { version = "0.13.5", features = ["pkcs8"] }
@@ -44,9 +48,8 @@ time = { version = "0.3.34", features = ["wasm-bindgen"] }
 # Used to calculate elapsed time.
 web-time = "1.0"
 
-# https://github.com/pluto/tlsn-private/tree/dev
-tlsn-prover = { path = "../tlsn/tlsn/tlsn-prover", features = ["tracing"] }
-tlsn-core = { path = "../tlsn/tlsn/tlsn-core" }
+tlsn-prover = { git = "https://github.com/tlsnotary/tlsn.git", features = ["tracing"] }
+tlsn-core = { git = "https://github.com/tlsnotary/tlsn.git" }
 
 web-sys = { version = "0.3.4", features = [
   "BinaryType",
