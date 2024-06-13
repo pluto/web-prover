@@ -55,6 +55,7 @@ fn main() {
                     "run",
                     "-mod=mod",
                     "vanilla-go-app/main.go",
+                    "-shutdown-delay=0",
                     &format!("-tcp-idle-timeout={}", args.tcp_idle_timeout),
                 ],
                 "logs/go-server.log",
