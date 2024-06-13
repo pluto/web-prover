@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -78,7 +79,7 @@ func main() {
 	}
 
 	go func() {
-		log.Println("Start listening", *listenFlag)
+		fmt.Fprintln(os.Stdout, "Start listening", *listenFlag)
 		lx := server.NewTcpKeepAliveListener(l.(*net.TCPListener), *tcpKeepAliveFlag, *tcpIdleTimeoutFlag)
 
 		var err error

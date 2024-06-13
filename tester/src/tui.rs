@@ -1,23 +1,14 @@
-use std::{
-    io::Write,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc, Arc,
-    },
-    thread,
-};
+use std::{io::Write, sync::mpsc, thread};
 
 use crossterm::{
-    event::{poll, read, Event, KeyCode, KeyModifiers},
     style::{Color, Print, ResetColor, SetForegroundColor},
     terminal::{self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
     {cursor, execute},
 };
 
 pub fn split_and_view_logs(rx: mpsc::Receiver<(PaneType, String)>) {
-    // terminal::enable_raw_mode().unwrap();
     let mut stdout = std::io::stdout();
-    execute!(stdout, EnterAlternateScreen).unwrap();
+    execute!(stdout, Clear(ClearType::All), EnterAlternateScreen).unwrap();
 
     let terminal_size = terminal::size().unwrap();
     let pane_width = terminal_size.0 / 3;
@@ -36,7 +27,6 @@ pub fn split_and_view_logs(rx: mpsc::Receiver<(PaneType, String)>) {
 
     let handle = thread::spawn(move || {
         while let Ok((pane_type, line)) = rx.recv() {
-            // println!("Received line: {}", line);
             for pane in &mut panes {
                 if pane.pane_type == pane_type {
                     pane.lines.push(line.clone());
@@ -46,13 +36,8 @@ pub fn split_and_view_logs(rx: mpsc::Receiver<(PaneType, String)>) {
             }
         }
 
-        // for pane in &mut panes {
-        //     pane.render(&mut stdout);
-        // }
-
         // Ensure terminal cleanup after breaking from loop
         execute!(stdout, LeaveAlternateScreen).unwrap();
-        // terminal::disable_raw_mode().unwrap();
     });
 
     handle.join().unwrap();
@@ -106,13 +91,12 @@ impl Pane {
             .rev()
             .collect::<Vec<_>>();
 
-        for (i, line) in self.lines.iter().enumerate() {
+        for (i, line) in lines.iter().enumerate() {
             let line = line.trim_end();
 
             execute!(
                 stdout,
                 cursor::MoveTo(self.x + 1, i as u16 + 2),
-                Clear(ClearType::CurrentLine),
                 Print(line)
             )
             .unwrap();
