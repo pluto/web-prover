@@ -17,6 +17,8 @@ import (
 )
 
 func main() {
+	log.SetOutput(os.Stdout)
+	
 	listenFlag := flag.String("listen", ":8080", "Listen for connections on host:port")
 	httpKeepAliveFlag := flag.Bool("http-keep-alive", true, "Enable HTTP KeepAlive")
 	httpReadTimeoutFlag := flag.Duration("http-read-timeout", 10*time.Second, "ReadTimeout is the maximum duration for reading the entire request, including the body.")
@@ -79,7 +81,7 @@ func main() {
 	}
 
 	go func() {
-		fmt.Fprintln(os.Stdout, "Start listening", *listenFlag)
+		log.Println("Start listening", *listenFlag)
 		lx := server.NewTcpKeepAliveListener(l.(*net.TCPListener), *tcpKeepAliveFlag, *tcpIdleTimeoutFlag)
 
 		var err error
