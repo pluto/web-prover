@@ -76,7 +76,7 @@ fn main() {
             run_command(
                 PaneType::Client,
                 "cargo",
-                &["run", "-p", "client", "--release"],
+                &["run", "-p", "client", "--release", "--", "-vvvv"],
                 "logs/client.log",
                 tx,
                 None,
@@ -119,10 +119,8 @@ fn run_command(
 
     let stdout_thread = thread::spawn(move || {
         let stdout = child.stdout.take().expect("Failed to get stdout");
-        let stderr = child.stderr.take().expect("Failed to get stderr");
-        let combined = stdout.chain(stderr);
 
-        let reader = BufReader::new(combined);
+        let reader = BufReader::new(stdout);
 
         for line in reader.lines() {
             let line = line.expect("Failed to read line from stdout");
