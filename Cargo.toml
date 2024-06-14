@@ -1,7 +1,3 @@
 [workspace]
-members = [
-    "client/",
-    "tlsn/notary-server/",
-]
+members = ["client/", "tlsn/notary-server/", "tester/"]
 resolver = "2"
-
