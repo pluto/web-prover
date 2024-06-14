@@ -21,3 +21,12 @@ Session Proof
 Body (aka substrings) proof
 - substring: merkle tree inclusion proofs
 ```
+
+
+you can now specify endpoints as command line arguments for example:
+
+```shell
+cargo run --release -p client -- --endpoint /bin/100KB
+```
+
+The default endpoint is `/health`

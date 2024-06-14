@@ -46,3 +46,4 @@ tlsn-tls-client = { git = "https://github.com/tlsnotary/tlsn.git" }
 
 webpki-roots = "0.26.1"
 pki-types = { package = "rustls-pki-types", version = "1.7" }
+clap = { version = "4.5.7", features = ["derive"] }

@@ -1,4 +1,5 @@
 use base64::prelude::*;
+use clap::Parser;
 use http_body_util::Full;
 use hyper::{body::Bytes, Request};
 use hyper_util::rt::TokioIo;
@@ -34,14 +35,22 @@ struct Config {
     notary_ca_cert_server_name: String,
 }
 
+#[derive(Parser)]
+struct Args {
+    #[arg(long, default_value = "/health")]
+    endpoint: String,
+}
+
 
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init(); // RUST_LOG=TRACE outputs to stdout
 
+    let args = Args::parse();
+
     let config = Config {
         target_method: "GET".into(),
-        target_url: "https://localhost:8065/bin/10KB".into(),
+        target_url: format!("https://localhost:8080{}", args.endpoint),
         target_headers: Default::default(),
         target_body: "".to_string(),
 
