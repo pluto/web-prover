@@ -12,8 +12,8 @@ use crate::requests::{ClientType, NotarizationSessionRequest, NotarizationSessio
 
 pub use wasm_bindgen_rayon::init_thread_pool;
 
+use crate::fetch_as_json_string;
 pub use crate::request_opt::VerifyResult;
-use crate::{fetch_as_json_string, setup_tracing_web};
 use futures::AsyncWriteExt;
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
@@ -25,9 +25,7 @@ use url::Url;
 use wasm_bindgen::prelude::*;
 use web_sys::{Headers, RequestInit, RequestMode};
 
-use tracing::{debug, info};
-
-use std::panic;
+use tracing::{debug, info, trace};
 
 #[derive(strum_macros::EnumMessage, Debug, Clone, Copy)]
 #[allow(dead_code)]
@@ -79,14 +77,13 @@ pub async fn prover(
     secret_headers: JsValue,
     secret_body: JsValue,
 ) -> Result<String, JsValue> {
-    // https://github.com/rustwasm/console_error_panic_hook
-    panic::set_hook(Box::new(console_error_panic_hook::hook));
+    crate::setup_tracing_web("DEBUG");
 
-    info!("target_url: {}", target_url_str);
+    debug!("target_url: {}", target_url_str);
     let target_url = Url::parse(target_url_str)
         .map_err(|e| JsValue::from_str(&format!("Could not parse target_url: {:?}", e)))?;
 
-    info!(
+    debug!(
         "target_url.host: {}",
         target_url
             .host()
@@ -94,7 +91,7 @@ pub async fn prover(
     );
     let options: RequestOptions = serde_wasm_bindgen::from_value(val)
         .map_err(|e| JsValue::from_str(&format!("Could not deserialize options: {:?}", e)))?;
-    info!("options.notary_url: {}", options.notary_url.as_str());
+    debug!("options.notary_url: {}", options.notary_url.as_str());
 
     let start_time = Instant::now();
 
@@ -153,7 +150,7 @@ pub async fn prover(
             .map_err(|e| JsValue::from_str(&format!("Could not deserialize response: {:?}", e)))?;
     debug!("Response: {}", rust_string);
 
-    info!("Notarization response: {:?}", notarization_response,);
+    debug!("Notarization response: {:?}", notarization_response,);
     let notary_wss_url = format!(
         "{}://{}{}/notarize?sessionId={}",
         if notary_ssl { "wss" } else { "ws" },
@@ -172,20 +169,26 @@ pub async fn prover(
         .host_str()
         .ok_or(JsValue::from_str("Could not get target host"))?;
 
-    // Basic default prover config
-    let mut builder = ProverConfig::builder();
+    let target_port = match target_url
+        .port() {
+            Some(p) => p,
+            _ => 443,
+        };
 
-    if let Some(max_sent_data) = options.max_sent_data {
-        builder.max_sent_data(max_sent_data);
-    }
-    if let Some(max_recv_data) = options.max_recv_data {
-        builder.max_recv_data(max_recv_data);
-    }
-    let config = builder
-        .id(notarization_response.session_id)
-        .server_dns(target_host)
-        .build()
-        .map_err(|e| JsValue::from_str(&format!("Could not build prover config: {:?}", e)))?;
+        // Basic default prover config
+        let mut builder = ProverConfig::builder();
+
+        if let Some(max_sent_data) = options.max_sent_data {
+            builder.max_sent_data(max_sent_data);
+        }
+        if let Some(max_recv_data) = options.max_recv_data {
+            builder.max_recv_data(max_recv_data);
+        }
+        let config = builder
+            .id(notarization_response.session_id)
+            .server_dns(target_host)
+            .build()
+            .map_err(|e| JsValue::from_str(&format!("Could not build prover config: {:?}", e)))?;
 
     // Create a Prover and set it up with the Notary
     // This will set up the MPC backend prior to connecting to the server.
@@ -201,15 +204,13 @@ pub async fn prover(
     log_phase(ProverPhases::ConnectWsProxy);
 
     let ws_query = url::form_urlencoded::Serializer::new(String::new())
-        .extend_pairs([("target", target_host)])
+        .extend_pairs([("target", format!("{}:{}", target_host, target_port))])
         .finish();
 
     let (_, client_ws_stream) = WsMeta::connect(
-        format!("{}?{}", options.websocket_proxy_url, ws_query),
-        None,
-    )
-    .await
-    .expect_throw("assume the client ws connection succeeds");
+        format!("{}?{}", options.websocket_proxy_url, ws_query), None)
+        .await
+        .expect_throw("assume the client ws connection succeeds");
 
     // Bind the Prover to the server connection.
     // The returned `mpc_tls_connection` is an MPC TLS connection to the Server: all data written
@@ -276,40 +277,32 @@ pub async fn prover(
         .map_err(|e| JsValue::from_str(&format!("failed to enable deferred decryption: {}", e)))?;
 
     // Send the request to the Server and get a response via the MPC TLS connection
-    match request_sender.send_request(unwrapped_request).await {
-        Ok(response) => {
-            log_phase(ProverPhases::ReceivedResponse);
+    let response = request_sender
+        .send_request(unwrapped_request)
+        .await
+        .map_err(|e| JsValue::from_str(&format!("Could not send request: {:?}", e)))?;
 
-            if !response.status().is_success() {
-                // status is 200-299
-                return Err(JsValue::from_str(&format!(
-                    "Response status is not OK: {:?}",
-                    response.status()
-                )));
-            }
-        }
-        Err(e) if e.is_incomplete_message() => info!("Response: IncompleteMessage (ignored)"),
-        Err(e) => {
-            return Err(JsValue::from_str(&format!(
-                "Could not send request: {:?}",
-                e
-            )))
-        }
-    };
+    log_phase(ProverPhases::ReceivedResponse);
+    if response.status() != StatusCode::OK {
+        return Err(JsValue::from_str(&format!(
+            "Response status is not OK: {:?}",
+            response.status()
+        )));
+    }
 
     log_phase(ProverPhases::ParseResponse);
     // Pretty printing :)
-    // let payload = response
-    //     .into_body()
-    //     .collect()
-    //     .await
-    //     .map_err(|e| JsValue::from_str(&format!("Could not get response body: {:?}", e)))?
-    //     .to_bytes();
-    // let parsed = serde_json::from_str::<serde_json::Value>(&String::from_utf8_lossy(&payload))
-    //     .map_err(|e| JsValue::from_str(&format!("Could not parse response: {:?}", e)))?;
-    // let response_pretty = serde_json::to_string_pretty(&parsed)
-    //     .map_err(|e| JsValue::from_str(&format!("Could not serialize response: {:?}", e)))?;
-    // info!("Response: {}", response_pretty);
+    let payload = response
+        .into_body()
+        .collect()
+        .await
+        .map_err(|e| JsValue::from_str(&format!("Could not get response body: {:?}", e)))?
+        .to_bytes();
+    let parsed = serde_json::from_str::<serde_json::Value>(&String::from_utf8_lossy(&payload))
+        .map_err(|e| JsValue::from_str(&format!("Could not parse response: {:?}", e)))?;
+    let response_pretty = serde_json::to_string_pretty(&parsed)
+        .map_err(|e| JsValue::from_str(&format!("Could not serialize response: {:?}", e)))?;
+    info!("Response: {}", response_pretty);
 
     // Close the connection to the server
     log_phase(ProverPhases::CloseConnection);

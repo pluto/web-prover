@@ -1,19 +1,14 @@
 use tracing::info;
 use wasm_bindgen::prelude::*;
 
-use crate::{request_opt::VerifyResult, setup_tracing_web};
+use crate::request_opt::VerifyResult;
 
 use elliptic_curve::pkcs8::DecodePublicKey;
 use std::time::Duration;
 use tlsn_core::proof::{SessionProof, TlsProof};
 
-use std::panic;
-
 #[wasm_bindgen]
 pub async fn verify(proof: &str, notary_pubkey_str: &str) -> Result<String, JsValue> {
-    // https://github.com/rustwasm/console_error_panic_hook
-    panic::set_hook(Box::new(console_error_panic_hook::hook));
-
     let proof: TlsProof = serde_json::from_str(proof)
         .map_err(|e| JsValue::from_str(&format!("Could not deserialize proof: {:?}", e)))?;
 

@@ -21,23 +21,32 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{Request, RequestInit, Response};
 
 use std::panic;
+use tracing::debug;
 use tracing_subscriber::fmt::format::Pretty;
 use tracing_subscriber::fmt::time::UtcTime;
 use tracing_subscriber::prelude::*;
+use tracing_subscriber::EnvFilter;
+
 use tracing_web::{performance_layer, MakeWebConsoleWriter};
 
 extern crate console_error_panic_hook;
 
-#[wasm_bindgen(start)]
-pub fn setup_tracing_web() {
+#[wasm_bindgen]
+pub fn setup_tracing_web(logging_filter: &str) {
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_ansi(false) // Only partially supported across browsers
         .with_timer(UtcTime::rfc_3339()) // std::time is not available in browsers
+        // .with_thread_ids(true)
+        // .with_thread_names(true)
         .with_writer(MakeWebConsoleWriter::new()); // write events to the console
     let perf_layer = performance_layer().with_details_from_fields(Pretty::default());
 
+    let filter_layer = EnvFilter::builder()
+        .parse(logging_filter)
+        .unwrap_or_default();
+
     tracing_subscriber::registry()
-        .with(tracing_subscriber::filter::LevelFilter::DEBUG)
+        .with(filter_layer)
         .with(fmt_layer)
         .with(perf_layer)
         .init(); // Install these as subscribers to tracing events
@@ -47,6 +56,8 @@ pub fn setup_tracing_web() {
         error!("panic occurred: {:?}", info);
         console_error_panic_hook::hook(info);
     }));
+
+    debug!("🪵 Logging set up 🪵")
 }
 
 pub async fn fetch_as_json_string(url: &str, opts: &RequestInit) -> Result<String, JsValue> {

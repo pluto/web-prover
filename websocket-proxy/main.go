@@ -23,7 +23,6 @@ func main() {
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-
 		target := strings.TrimSpace(r.URL.Query().Get("target"))
 		if target == "" {
 			w.WriteHeader(400)
@@ -32,7 +31,7 @@ func main() {
 			return
 		}
 
-		ips, err := net.LookupIP(target)
+		ips, err := net.LookupIP(hostname(target))
 		if err != nil {
 			log.Println(err)
 			return
@@ -44,7 +43,7 @@ func main() {
 			}
 		}
 
-		log.Printf("New request to %v:443", target)
+		log.Printf("New request to %v", target)
 
 		upgrader := websocket.Upgrader{
 			ReadBufferSize:  2048,
@@ -65,7 +64,7 @@ func main() {
 		defer conn.Close()
 
 		// We are creating an open proxy here. what can possibly go wrong.
-		sock, err := net.Dial("tcp", target+":443")
+		sock, err := net.Dial("tcp", target)
 		if err != nil {
 			log.Println(err)
 			return
@@ -153,4 +152,11 @@ func main() {
 			panic(err)
 		}
 	}
+}
+
+func hostname(address string) string {
+	if colon := strings.Index(address, ":"); colon != -1 {
+		return address[:colon]
+	}
+	return address
 }
