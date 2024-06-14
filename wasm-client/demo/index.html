@@ -5,7 +5,7 @@
       import init, { prover } from "./pkg/wasm_client.js";
       await init();
       console.log(await prover(
-        "https://localhost:8065/health", // target url str
+        "https://example.com", // target url str
        {
           "method": "GET",
           "headers": {

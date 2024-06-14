@@ -136,7 +136,7 @@ func main() {
 		<-done
 	})
 
-	listenFlag := flag.String("listen", ":8050", "Listen for connections on host:port")
+	listenFlag := flag.String("listen", "0.0.0.0:8050", "Listen for connections on host:port")
 	certFilePathFlag := flag.String("tls-cert-path", "", "Serve TLS (cert file)")
 	keyFilePathFlag := flag.String("tls-key-path", "", "Serve TLS (key file)")
 	flag.Parse()

@@ -10,11 +10,16 @@ version = "0.1.0"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[patch.'https://github.com/tlsnotary/tlsn.git']
-tlsn-core = { path = "../tlsn/tlsn/tlsn-core" }
-tlsn-prover = { path = "../tlsn/tlsn/tlsn-prover" }
+#[patch.'https://github.com/tlsnotary/tlsn.git']
+# tlsn-core = { path = "../tlsn/tlsn/tlsn-core" }
+#tlsn-prover = { path = "../tlsn/tlsn/tlsn-prover" }
 
 [dependencies]
+tlsn-core = { git = "https://github.com/tlsnotary/tlsn.git", tag = "v0.1.0-alpha.5", package = "tlsn-core" }
+tlsn-prover = { git = "https://github.com/tlsnotary/tlsn.git", tag = "v0.1.0-alpha.5", package = "tlsn-prover", features = [
+  "tracing",
+] }
+
 chrono = "0.4"
 elliptic-curve = { version = "0.13.5", features = ["pkcs8"] }
 futures = "0.3"
@@ -47,11 +52,6 @@ ring = { version = "0.17", features = ["wasm32_unknown_unknown_js"] }
 time = { version = "0.3.34", features = ["wasm-bindgen"] }
 # Used to calculate elapsed time.
 web-time = "1.0"
-
-tlsn-core = { git = "https://github.com/tlsnotary/tlsn.git", tag = "v0.1.0-alpha.5", package = "tlsn-core" }
-tlsn-prover = { git = "https://github.com/tlsnotary/tlsn.git", tag = "v0.1.0-alpha.5", package = "tlsn-prover", features = [
-  "tracing",
-] }
 
 web-sys = { version = "0.3.4", features = [
   "BinaryType",
