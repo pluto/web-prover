@@ -34,7 +34,7 @@ fn main() {
             run_command(
                 PaneType::Notary,
                 "cargo",
-                &["run", "-p", "notary-server"],
+                &["run", "-p", "notary-server", "--release"],
                 "logs/notary-server.log",
                 tx,
                 Some(notary_ready_tx),
@@ -56,6 +56,9 @@ fn main() {
                     "-mod=mod",
                     "vanilla-go-app/main.go",
                     "-shutdown-delay=0",
+                    "-tls-cert-path=vanilla-go-app/certs/server-cert.pem",
+                    "-tls-key-path=vanilla-go-app/certs/server-key.pem",
+                    "-listen=:8065",
                     &format!("-tcp-idle-timeout={}", args.tcp_idle_timeout),
                 ],
                 "logs/go-server.log",
@@ -73,7 +76,7 @@ fn main() {
             run_command(
                 PaneType::Client,
                 "cargo",
-                &["run", "-p", "client"],
+                &["run", "-p", "client", "--release"],
                 "logs/client.log",
                 tx,
                 None,
