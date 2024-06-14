@@ -7,6 +7,7 @@ use std::{
 };
 
 use clap::{command, Parser};
+use strip_ansi_escapes::strip;
 use tui::PaneType;
 
 pub mod tui;
@@ -18,6 +19,9 @@ struct Args {
     /// TCP KeepAlive Timeout for the Go server (default: 1m0s)
     #[arg(long, default_value = "1m0s")]
     tcp_idle_timeout: String,
+
+    #[clap(short, long, global = true, required = false, default_value = "health")]
+    endpoint: String,
 }
 
 fn main() {
@@ -76,7 +80,16 @@ fn main() {
             run_command(
                 PaneType::Client,
                 "cargo",
-                &["run", "-p", "client", "--release", "--", "-vvvv"],
+                &[
+                    "run",
+                    "-p",
+                    "client",
+                    "--release",
+                    "--",
+                    "-vvvv",
+                    "--endpoint",
+                    &args.endpoint,
+                ],
                 "logs/client.log",
                 tx,
                 None,
@@ -124,11 +137,13 @@ fn run_command(
 
         for line in reader.lines() {
             let line = line.expect("Failed to read line from stdout");
+            let cleaned_line = strip(&line);
+            let cleaned_line = String::from_utf8_lossy(&cleaned_line);
             stdout_tx
                 .send((pane_type, line.clone()))
                 .expect("Failed to send log line");
             log_file
-                .write_all(line.as_bytes())
+                .write_all(cleaned_line.as_bytes())
                 .expect("Failed to write to log file");
             log_file.write_all(b"\n").expect("Failed to write newline");
             if let Some(ready_indicator) = &ready_indicator {

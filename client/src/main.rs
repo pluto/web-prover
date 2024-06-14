@@ -11,14 +11,15 @@ use serde::Deserialize;
 use tlsn_core::{commitment::CommitmentKind, proof::TlsProof};
 use tlsn_prover::tls::{Prover, ProverConfig};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
-use tracing::{debug, Level};
+use tracing::{debug, info, instrument, trace, warn, Level};
+use tracing_subscriber::EnvFilter;
 use url::Url;
 
 mod notary;
 
 const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../../vanilla-go-app/certs/ca-cert.cer");
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 struct Config {
     target_method: String,
     target_url: String,
@@ -40,8 +41,12 @@ struct Config {
 struct Args {
     #[clap(short, long, global = true, required = false, action = ArgAction::Count, value_parser = clap::value_parser!(u8))]
     verbose: Option<u8>,
+
+    #[clap(short, long, global = true, required = false, default_value = "health")]
+    endpoint: String,
 }
 
+#[instrument(level = "info")]
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
@@ -53,11 +58,16 @@ async fn main() -> Result<()> {
         3 => Level::DEBUG,
         _ => Level::TRACE,
     };
-    tracing_subscriber::fmt().with_max_level(log_level).init();
+    let crate_name = env!("CARGO_PKG_NAME");
+
+    let env_filter =
+        EnvFilter::builder().parse_lossy(&format!("{}={},info", crate_name, log_level));
+
+    tracing_subscriber::fmt().with_env_filter(env_filter).init();
 
     let config = Config {
         target_method: "GET".into(),
-        target_url: "https://localhost:8065/bin/10KB".into(),
+        target_url: format!("https://localhost:8065/{}", args.endpoint),
         target_headers: Default::default(),
         target_body: "".to_string(),
 
@@ -69,14 +79,16 @@ async fn main() -> Result<()> {
         notary_ca_cert_path: "tlsn/notary-server/fixture/tls/rootCA.crt".to_string(), /* prod: ./tlsnotary.pluto.xyz-rootca.crt */
         notary_ca_cert_server_name: "tlsnotaryserver.io".to_string(), // prod: tlsnotary.pluto.xyz
     };
+    info!("client config: {:#?}", config);
 
     let proof = prover(config).await?;
     let proof_json = serde_json::to_string_pretty(&proof)?;
     std::fs::write("webproof.json", proof_json)?;
-    println!("Done");
+    info!("Proof written to `webproof.json`");
     Ok(())
 }
 
+#[instrument(skip(config), level = "debug")]
 async fn prover(config: Config) -> Result<TlsProof> {
     let parsed_url = Url::parse(&config.target_url).expect("Failed to parse target_url");
     let server_domain = parsed_url.host_str().unwrap();
