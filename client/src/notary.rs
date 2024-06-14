@@ -7,7 +7,6 @@ use serde::Serialize;
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 use tokio_util::bytes::Bytes;
-use tracing::trace_span;
 
 use super::*;
 
