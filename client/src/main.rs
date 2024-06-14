@@ -11,7 +11,7 @@ use serde::Deserialize;
 use tlsn_core::{commitment::CommitmentKind, proof::TlsProof};
 use tlsn_prover::tls::{Prover, ProverConfig};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
-use tracing::{debug, info, instrument, trace, trace_span, warn, Level};
+use tracing::{debug, info, instrument, trace, trace_span, Level};
 use tracing_subscriber::EnvFilter;
 use url::Url;
 
@@ -39,8 +39,8 @@ struct Config {
 #[clap(name = "TLSN Client")]
 #[clap(about = "A dummy client for Pluto TLSN WebProofs.", long_about = None)]
 struct Args {
-    #[clap(short, long, global = true, required = false, action = ArgAction::Count, value_parser = clap::value_parser!(u8))]
-    verbose: Option<u8>,
+    #[clap(short, long, global = true, required = false, default_value = "TRACE")]
+    log_level: String,
 
     #[clap(short, long, global = true, required = false, default_value = "health")]
     endpoint: String,
@@ -51,11 +51,11 @@ struct Args {
 async fn main() -> Result<()> {
     let args = Args::parse();
 
-    let log_level = match args.verbose.unwrap_or(0) {
-        0 => Level::ERROR,
-        1 => Level::WARN,
-        2 => Level::INFO,
-        3 => Level::DEBUG,
+    let log_level = match args.log_level.to_lowercase().as_str() {
+        "error" => Level::ERROR,
+        "warn" => Level::WARN,
+        "info" => Level::INFO,
+        "debug" => Level::DEBUG,
         _ => Level::TRACE,
     };
     let crate_name = env!("CARGO_PKG_NAME");

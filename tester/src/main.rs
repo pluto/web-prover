@@ -1,6 +1,6 @@
 use std::{
     fs::{create_dir_all, OpenOptions},
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufRead, BufReader, Write},
     process::{Command, Stdio},
     sync::mpsc,
     thread,
@@ -22,6 +22,9 @@ struct Args {
 
     #[clap(short, long, global = true, required = false, default_value = "health")]
     endpoint: String,
+
+    #[clap(short, long, global = true, required = false, default_value = "TRACE")]
+    log_level: String,
 }
 
 fn main() {
@@ -50,7 +53,6 @@ fn main() {
     let go_thread = {
         let tx = tx.clone();
         thread::spawn(move || {
-            println!("waiting for notary to be ready");
             while notary_ready_rx.recv().is_err() {}
             run_command(
                 PaneType::Go,
@@ -86,7 +88,8 @@ fn main() {
                     "client",
                     "--release",
                     "--",
-                    "-vvvv",
+                    "--log-level",
+                    &args.log_level,
                     "--endpoint",
                     &args.endpoint,
                 ],
