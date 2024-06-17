@@ -11,7 +11,7 @@ use serde::Deserialize;
 use tlsn_core::{commitment::CommitmentKind, proof::TlsProof};
 use tlsn_prover::tls::{Prover, ProverConfig};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
-use tracing::{debug, info, instrument, trace, trace_span, Level};
+use tracing::{debug, error, info, instrument, trace, trace_span, Level};
 use tracing_subscriber::EnvFilter;
 use url::Url;
 
@@ -247,7 +247,14 @@ async fn prover(config: Config) -> Result<TlsProof> {
     let notarized_session = {
         let span = trace_span!("notarize_transcript");
         let _enter = span.enter();
-        let mut prover = prover.to_http()?.start_notarize();
+        let prover_result = prover.to_http();
+        let mut prover = match prover_result {
+            Ok(prover) => prover.start_notarize(),
+            Err(e) => {
+                error!("Notarization failed: {:?}", e);
+                return Err(e.into());
+            }
+        };
 
         // Commit to the transcript with the default committer, which will commit using
         // BLAKE3.
