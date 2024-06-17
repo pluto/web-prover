@@ -1,12 +1,13 @@
 use std::{
     fs::{create_dir_all, OpenOptions},
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufRead, BufReader, Write},
     process::{Command, Stdio},
     sync::mpsc,
     thread,
 };
 
 use clap::{command, Parser};
+use strip_ansi_escapes::strip;
 use tui::PaneType;
 
 pub mod tui;
@@ -18,6 +19,12 @@ struct Args {
     /// TCP KeepAlive Timeout for the Go server (default: 1m0s)
     #[arg(long, default_value = "1m0s")]
     tcp_idle_timeout: String,
+
+    #[clap(short, long, global = true, required = false, default_value = "health")]
+    endpoint: String,
+
+    #[clap(short, long, global = true, required = false, default_value = "TRACE")]
+    log_level: String,
 }
 
 fn main() {
@@ -46,7 +53,6 @@ fn main() {
     let go_thread = {
         let tx = tx.clone();
         thread::spawn(move || {
-            println!("waiting for notary to be ready");
             while notary_ready_rx.recv().is_err() {}
             run_command(
                 PaneType::Go,
@@ -76,7 +82,17 @@ fn main() {
             run_command(
                 PaneType::Client,
                 "cargo",
-                &["run", "-p", "client", "--release"],
+                &[
+                    "run",
+                    "-p",
+                    "client",
+                    "--release",
+                    "--",
+                    "--log-level",
+                    &args.log_level,
+                    "--endpoint",
+                    &args.endpoint,
+                ],
                 "logs/client.log",
                 tx,
                 None,
@@ -119,18 +135,18 @@ fn run_command(
 
     let stdout_thread = thread::spawn(move || {
         let stdout = child.stdout.take().expect("Failed to get stdout");
-        let stderr = child.stderr.take().expect("Failed to get stderr");
-        let combined = stdout.chain(stderr);
 
-        let reader = BufReader::new(combined);
+        let reader = BufReader::new(stdout);
 
         for line in reader.lines() {
             let line = line.expect("Failed to read line from stdout");
+            let cleaned_line = strip(&line);
+            let cleaned_line = String::from_utf8_lossy(&cleaned_line);
             stdout_tx
                 .send((pane_type, line.clone()))
                 .expect("Failed to send log line");
             log_file
-                .write_all(line.as_bytes())
+                .write_all(cleaned_line.as_bytes())
                 .expect("Failed to write to log file");
             log_file.write_all(b"\n").expect("Failed to write newline");
             if let Some(ready_indicator) = &ready_indicator {

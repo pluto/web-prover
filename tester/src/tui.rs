@@ -1,9 +1,9 @@
 use std::{io::Write, sync::mpsc, thread};
 
 use crossterm::{
+    cursor, execute,
     style::{Color, Print, ResetColor, SetForegroundColor},
     terminal::{self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
-    {cursor, execute},
 };
 
 pub fn split_and_view_logs(rx: mpsc::Receiver<(PaneType, String)>) {
@@ -107,13 +107,22 @@ impl Pane {
 
     fn draw_border(&self, stdout: &mut std::io::Stdout) {
         for y in 0..self.height {
-            if y == 0 || y == self.height - 1 {
+            if y == 0 {
                 execute!(
                     stdout,
                     cursor::MoveTo(self.x, y),
                     Print("┌"),
                     Print("─".repeat((self.width - 2) as usize)),
                     Print("┐")
+                )
+                .unwrap();
+            } else if y == self.height - 1 {
+                execute!(
+                    stdout,
+                    cursor::MoveTo(self.x, y),
+                    Print("└"),
+                    Print("─".repeat((self.width - 2) as usize)),
+                    Print("┘")
                 )
                 .unwrap();
             } else {
