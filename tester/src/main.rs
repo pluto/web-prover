@@ -16,15 +16,34 @@ pub mod tui;
 #[command(name = "Tester for TLSN WebProofs")]
 #[command(about = "Control panel for testing TLSN Webproofs", long_about = None)]
 struct Args {
+    /// Endpoint to test (default: health)
+    #[clap(short, long, global = true, required = false, default_value = "health")]
+    endpoint: String,
+
+    /// Log level for all the components (default: TRACE)
+    #[clap(short, long, global = true, required = false, default_value = "TRACE")]
+    log_level: String,
+
+    /// Enable TCP KeepAlive for the Go server (default: false)
+    #[clap(long, global = true, required = false, default_value = "false")]
+    tcp_keep_alive: bool,
+
     /// TCP KeepAlive Timeout for the Go server (default: 1m0s)
     #[arg(long, default_value = "1m0s")]
     tcp_idle_timeout: String,
 
-    #[clap(short, long, global = true, required = false, default_value = "health")]
-    endpoint: String,
+    /// Enable HTTP KeepAlive for the Go server (default: false)
+    #[clap(long, global = true, required = false, default_value = "false")]
+    http_keep_alive: bool,
 
-    #[clap(short, long, global = true, required = false, default_value = "TRACE")]
-    log_level: String,
+    #[clap(long, global = true, required = false, default_value = "30s")]
+    http_idle_timeout: String,
+
+    #[clap(long, global = true, required = false, default_value = "10s")]
+    http_read_timeout: String,
+
+    #[clap(long, global = true, required = false, default_value = "10s")]
+    http_write_timeout: String,
 }
 
 fn main() {
@@ -61,11 +80,16 @@ fn main() {
                     "run",
                     "-mod=mod",
                     "vanilla-go-app/main.go",
-                    "-shutdown-delay=0",
+                    "-shutdown-delay0",
                     "-tls-cert-path=vanilla-go-app/certs/server-cert.pem",
                     "-tls-key-path=vanilla-go-app/certs/server-key.pem",
                     "-listen=:8065",
+                    &format!("-tcp-keep-alive={}", args.tcp_keep_alive),
                     &format!("-tcp-idle-timeout={}", args.tcp_idle_timeout),
+                    &format!("-http-keep-alive={}", args.http_keep_alive),
+                    &format!("-http-idle-timeout={}", args.http_idle_timeout),
+                    &format!("-http-read-timeout={}", args.http_read_timeout),
+                    &format!("-http-write-timeout={}", args.http_write_timeout),
                 ],
                 "logs/go-server.log",
                 tx,
