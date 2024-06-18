@@ -46,6 +46,13 @@ curl http://localhost:8080/bin/10KB
 curl http://localhost:8080/bin/100KB
 curl http://localhost:8080/bin/1000KB
 
+# Returns 200 and fixed size text body
+curl http://localhost:8080/plain/0KB
+curl http://localhost:8080/plain/1KB
+curl http://localhost:8080/plain/10KB
+curl http://localhost:8080/plain/100KB
+curl http://localhost:8080/plain/1000KB
+
 # Read and discard the body, returns 204
 curl http://localhost:8080/readall -X POST -d 'foobar'
 
