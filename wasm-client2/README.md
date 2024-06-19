@@ -1,5 +1,0 @@
-# WASM Client
-
-```
-make build
-```
