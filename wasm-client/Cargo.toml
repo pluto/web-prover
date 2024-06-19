@@ -12,10 +12,16 @@ crate-type = ["cdylib", "rlib"]
 # This makes the compiled code faster and smaller, but it makes compiling slower,
 # so it's only enabled in release mode.
 lto = true
+# opt-level = "z" # Optimize for size
 
 [features]
 # If you uncomment this line, it will enable `wee_alloc`:
 #default = ["wee_alloc"]
+
+[patch.'https://github.com/tlsnotary/tlsn.git']
+tlsn-core = { path = "../tlsn/tlsn/tlsn-core" }
+tlsn-prover = { path = "../tlsn/tlsn/tlsn-prover" }
+tls-client = { path = "../tlsn/components/tls/tls-client" }
 
 [dependencies]
 chrono = "0.4"
@@ -96,3 +102,6 @@ pki-types = { package = "rustls-pki-types", version = "1.7" }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.42"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = true
