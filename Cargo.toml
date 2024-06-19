@@ -1,8 +1,7 @@
 [workspace]
-members = [
-    "client/",
-    "tlsn/notary-server/",
-    "wasm-client/",
-]
+members = ["client/", "wasm-client/", "tlsn/notary-server/", "tester/"]
 resolver = "2"
 
+[workspace.dependencies]
+# CLI
+clap = { version = "4.5.7", features = ["derive"] }

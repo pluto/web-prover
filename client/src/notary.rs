@@ -1,21 +1,22 @@
-use http_body_util::{BodyExt as _, Either, Empty, Full};
-use hyper::{client::conn::http1::Parts, Request, StatusCode};
-use hyper_util::rt::TokioIo;
+use std::{io::BufReader, sync::Arc};
+
+use http_body_util::{BodyExt as _, Either, Empty};
+use hyper::{client::conn::http1::Parts, StatusCode};
 use rustls::{Certificate, ClientConfig, RootCertStore};
-use serde::{Deserialize, Serialize};
-use std::io::BufReader;
-use std::sync::Arc;
+use serde::Serialize;
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 use tokio_util::bytes::Bytes;
-use tracing::debug;
+
+use super::*;
 
 /// Types of client that the prover is using
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ClientType {
     /// Client that has access to the transport layer
     Tcp,
-    /// Client that cannot directly access transport layer, e.g. browser extension
+    /// Client that cannot directly access transport layer, e.g. browser
+    /// extension
     Websocket,
 }
 
@@ -38,7 +39,18 @@ pub struct NotarizationSessionResponse {
     pub session_id: String,
 }
 
-/// Requests notarization from the Notary server.
+/// Requests notarization from the Notary server
+#[instrument(
+    level = "trace",
+    skip(
+        host,
+        port,
+        max_sent_data,
+        max_recv_data,
+        notary_ca_cert_path,
+        notary_ca_cert_server_name
+    )
+)]
 pub async fn request_notarization(
     host: &str,
     port: u16,
@@ -46,129 +58,160 @@ pub async fn request_notarization(
     max_recv_data: Option<usize>,
     notary_ca_cert_path: &str,
     notary_ca_cert_server_name: &str,
-) -> (tokio_rustls::client::TlsStream<TcpStream>, String) {
-    // Connect to the Notary via TLS-TCP
-    let mut certificate_file_reader = read_pem_file(&notary_ca_cert_path).await;
-    let mut certificates: Vec<Certificate> = rustls_pemfile::certs(&mut certificate_file_reader)
-        .unwrap()
-        .into_iter()
-        .map(Certificate)
-        .collect();
-    let certificate = certificates.remove(0);
+) -> Result<(tokio_rustls::client::TlsStream<TcpStream>, String)> {
+    // Read notary CA certificate
+    let certificate = {
+        let span = trace_span!("read_certificate");
+        let _enter = span.enter();
+        trace!(path = ?notary_ca_cert_path, "Reading certificate");
+        let mut certificate_file_reader = read_pem_file(notary_ca_cert_path).await?;
+        let mut certificates: Vec<Certificate> =
+            rustls_pemfile::certs(&mut certificate_file_reader)?
+                .into_iter()
+                .map(Certificate)
+                .collect();
+        certificates.remove(0)
+    };
 
-    let mut root_store = RootCertStore::empty();
-    root_store.add(&certificate).unwrap();
+    // Configure root store
+    let root_store = {
+        let span = trace_span!("configure_root_store");
+        let _enter = span.enter();
+        trace!("Configuring root store with certificate: {:?}", certificate);
+        let mut root_store = RootCertStore::empty();
+        root_store.add(&certificate)?;
+        root_store
+    };
 
-    let client_notary_config = ClientConfig::builder()
-        .with_safe_defaults()
-        .with_root_certificates(root_store)
-        .with_no_client_auth();
-    let notary_connector = TlsConnector::from(Arc::new(client_notary_config));
+    // Configure client
+    let client_notary_config = {
+        let span = trace_span!("configure_client");
+        let _enter = span.enter();
+        trace!("Configuring client with root store: {:?}", root_store);
+        ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(root_store)
+            .with_no_client_auth()
+    };
 
-    let notary_socket = tokio::net::TcpStream::connect((host, port)).await.unwrap();
+    // Connect to notary server with TLS handshake
+    let (mut request_sender, connection) = {
+        let span = trace_span!("connect_notary_server");
+        let _enter = span.enter();
+        trace!(
+            "Connecting to notary server with client notary config: {:?}",
+            client_notary_config
+        );
+        let notary_connector = TlsConnector::from(Arc::new(client_notary_config));
 
-    let notary_tls_socket = notary_connector
-        // Require the domain name of notary server to be the same as that in the server cert
-        .connect(
-            notary_ca_cert_server_name.try_into().unwrap(),
-            notary_socket,
-        )
-        .await
-        .unwrap();
+        let notary_socket = tokio::net::TcpStream::connect((host, port)).await?;
 
-    // Attach the hyper HTTP client to the notary TLS connection to send request to the /session endpoint to configure notarization and obtain session id
-    let (mut request_sender, connection) =
-        hyper::client::conn::http1::handshake(TokioIo::new(notary_tls_socket))
-            .await
-            .unwrap();
+        // Require the domain name of notary server to be the same as that in the server
+        // cert
+        let notary_tls_socket = notary_connector
+            .connect(notary_ca_cert_server_name.try_into()?, notary_socket)
+            .await?;
+
+        // Attach the hyper HTTP client to the notary TLS connection to send request to
+        // the /session endpoint to configure notarization and obtain session id
+        hyper::client::conn::http1::handshake(TokioIo::new(notary_tls_socket)).await?
+    };
+
+    info!("Connected to notary server with TLS!");
 
     // Spawn the HTTP task to be run concurrently
     let connection_task = tokio::spawn(connection.without_shutdown());
 
-    // Build the HTTP request to configure notarization
-    let payload = serde_json::to_string(&NotarizationSessionRequest {
-        client_type: ClientType::Tcp,
-        max_sent_data,
-        max_recv_data,
-    })
-    .unwrap();
-
-    let request = Request::builder()
-        .uri(format!("https://{host}:{port}/session"))
-        .method("POST")
-        .header("Host", host)
-        // Need to specify application/json for axum to parse it as json
-        .header("Content-Type", "application/json")
-        .body(Either::Left(Full::new(Bytes::from(payload))))
+    // Build the HTTP request to configure notarization session
+    let notarization_response = {
+        let span = trace_span!("send_configuration_request");
+        let _enter = span.enter();
+        trace!(
+            "Sending configuration for notarization session request with max_sent_data: {:?}, max_recv_data: {:?}",
+            max_sent_data,
+            max_recv_data
+        );
+        let payload = serde_json::to_string(&NotarizationSessionRequest {
+            client_type: ClientType::Tcp,
+            max_sent_data,
+            max_recv_data,
+        })
         .unwrap();
 
-    debug!("Sending configuration request");
+        let request = Request::builder()
+            .uri(format!("https://{host}:{port}/session"))
+            .method("POST")
+            .header("Host", host)
+            // Need to specify application/json for axum to parse it as json
+            .header("Content-Type", "application/json")
+            .body(Either::Left(Full::new(Bytes::from(payload))))?;
 
-    let configuration_response = request_sender.send_request(request).await.unwrap();
+        trace!("Sending configuration request: {:?}", request);
 
-    debug!("Sent configuration request");
+        let configuration_response = request_sender.send_request(request).await?;
 
-    assert!(configuration_response.status() == StatusCode::OK);
+        trace!(
+            "Received configuration response: {:?}",
+            configuration_response
+        );
 
-    debug!("Response OK");
+        debug!("Notary configuration response: OK");
 
-    // Pretty printing :)
-    let payload = configuration_response
-        .into_body()
-        .collect()
-        .await
-        .unwrap()
-        .to_bytes();
-    let notarization_response =
-        serde_json::from_str::<NotarizationSessionResponse>(&String::from_utf8_lossy(&payload))
-            .unwrap();
+        assert!(configuration_response.status() == StatusCode::OK);
 
-    debug!("Notarization response: {:?}", notarization_response,);
+        let payload = configuration_response
+            .into_body()
+            .collect()
+            .await?
+            .to_bytes();
+        serde_json::from_str::<NotarizationSessionResponse>(&String::from_utf8_lossy(&payload))?
+    };
 
-    // Send notarization request via HTTP, where the underlying TCP connection will be extracted later
-    let request = Request::builder()
-        // Need to specify the session_id so that notary server knows the right configuration to use
-        // as the configuration is set in the previous HTTP call
-        .uri(format!(
-            "https://{host}:{port}/notarize?sessionId={}",
-            notarization_response.session_id.clone()
-        ))
-        .method("GET")
-        .header("Host", host)
-        .header("Connection", "Upgrade")
-        // Need to specify this upgrade header for server to extract tcp connection later
-        .header("Upgrade", "TCP")
-        .body(Either::Right(Empty::<Bytes>::new()))
-        .unwrap();
+    // Send notarization request via HTTP, where the underlying TCP connection will
+    // be extracted later
+    let notary_tls_socket = {
+        let span = trace_span!("send_notarization_request");
+        let _enter = span.enter();
+        let request = Request::builder()
+            // Need to specify the session_id so that notary server knows the right configuration to
+            // use as the configuration is set in the previous HTTP call
+            .uri(format!(
+                "https://{host}:{port}/notarize?sessionId={}",
+                notarization_response.session_id.clone()
+            ))
+            .method("GET")
+            .header("Host", host)
+            .header("Connection", "Upgrade")
+            // Need to specify this upgrade header for server to extract tcp connection later
+            .header("Upgrade", "TCP")
+            .body(Either::Right(Empty::<Bytes>::new()))?;
 
-    debug!("Sending notarization request");
+        trace!("Sending notarization request: {:?}", request);
 
-    let response = request_sender.send_request(request).await.unwrap();
+        let response = request_sender.send_request(request).await?;
 
-    debug!("Sent notarization request");
+        trace!("Received notarization response: {:?}", response);
 
-    assert!(response.status() == StatusCode::SWITCHING_PROTOCOLS);
+        assert!(response.status() == StatusCode::SWITCHING_PROTOCOLS);
 
-    debug!("Switched protocol OK");
+        debug!("Switched to TCP protocol: OK");
 
-    // Claim back the TLS socket after HTTP exchange is done
-    let Parts {
-        io: notary_tls_socket,
-        ..
-    } = connection_task.await.unwrap().unwrap();
+        // Claim back the TLS socket after HTTP exchange is done
+        let Parts {
+            io: notary_tls_socket,
+            ..
+        } = connection_task.await??;
+        notary_tls_socket
+    };
 
-    (
+    Ok((
         notary_tls_socket.into_inner(),
         notarization_response.session_id,
-    )
+    ))
 }
 
 /// Read a PEM-formatted file and return its buffer reader
-async fn read_pem_file(file_path: &str) -> BufReader<std::fs::File> {
-    let key_file = tokio::fs::File::open(file_path)
-        .await
-        .unwrap()
-        .into_std()
-        .await;
-    BufReader::new(key_file)
+async fn read_pem_file(file_path: &str) -> Result<BufReader<std::fs::File>> {
+    let key_file = tokio::fs::File::open(file_path).await?.into_std().await;
+    Ok(BufReader::new(key_file))
 }

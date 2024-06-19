@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
@@ -40,6 +41,14 @@ func Server() *http.ServeMux {
 				w.Header().Set("Content-Type", "application/octet-stream")
 				w.WriteHeader(200) // OK
 				w.Write(b)
+			})
+
+		b64 := base64.StdEncoding.EncodeToString(b)[0 : v*1000]
+		mux.HandleFunc("/plain/"+strconv.Itoa(v)+"KB",
+			func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/plain")
+				w.WriteHeader(200) // OK
+				w.Write([]byte(b64))
 			})
 	}
 
