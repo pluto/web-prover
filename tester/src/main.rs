@@ -11,6 +11,8 @@ use strip_ansi_escapes::strip;
 use tui::PaneType;
 
 pub mod tui;
+// TODO: Allow scrollable TUI
+// TODO: Can we cut down on the verbosity a bit
 
 #[derive(Parser)]
 #[command(name = "Tester for TLSN WebProofs")]

@@ -105,6 +105,7 @@ func Server() *http.ServeMux {
 	})
 
 	// Route that will timeout the underlying TCP connection some time
+	// TODO: Close session after timeout
 	mux.HandleFunc("/timeout", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		msParam := r.URL.Query().Get("ms")
