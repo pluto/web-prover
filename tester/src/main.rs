@@ -80,7 +80,7 @@ fn main() {
                     "run",
                     "-mod=mod",
                     "vanilla-go-app/main.go",
-                    "-shutdown-delay0",
+                    "-shutdown-delay=0s",
                     "-tls-cert-path=vanilla-go-app/certs/server-cert.pem",
                     "-tls-key-path=vanilla-go-app/certs/server-key.pem",
                     "-listen=:8065",
