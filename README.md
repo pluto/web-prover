@@ -1,7 +1,7 @@
 # tlsn-monorepo
 This repository is used to do end-to-end testing on the TLSN protocol.
 There are two end to end flows we test here. 
-- a rust binary that (TODO describe what is done, there are several binaries)
+- a rust binary that represents the mobile SDK target
 - a web assembly client (`wasm-client`) 
 
 In `tlsn-monorepo` you can think of there being three distinct asynchronus processes:
@@ -11,11 +11,11 @@ In `tlsn-monorepo` you can think of there being three distinct asynchronus proce
 
 When testing this flow there are a number of endpoints we have set up on the mock go server that are documented [here](/vanilla-go-app/README.md). Our goal is 
 
-## End to End testing
+## End to End testing for Mobile Target
 The specific binaries for this test are:
 - `notary-server` : Representing the notary
 - `vanilla-go-app` : Representing a mock server
-- `client : representing a user
+- `client`: representing a user
 
 You can test the binary mobile target with a simple tui.
 ```
@@ -47,3 +47,6 @@ and the client with :
 ```sh
 cargo run --release -p client 
 ```
+
+## End to End testing wasm target
+TODO
