@@ -1,97 +1,51 @@
+# You must change these to your own details.
 [package]
-authors = ["The tlsn-extension Developers"]
-description = "tlsn-js library for using TLSNotary in browsers"
-edition = "2018"
-license = "MIT OR Apache-2.0"
-name = "wasm-client"
-rust-version = "1.56"
+name = "rust-webpack-template"
+description = "My super awesome Rust, WebAssembly, and Webpack project!"
 version = "0.1.0"
+authors = ["You <you@example.com>"]
+categories = ["wasm"]
+readme = "README.md"
+edition = "2018"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
-#[patch.'https://github.com/tlsnotary/tlsn.git']
-# tlsn-core = { path = "../tlsn/tlsn/tlsn-core" }
-#tlsn-prover = { path = "../tlsn/tlsn/tlsn-prover" }
+[profile.release]
+# This makes the compiled code faster and smaller, but it makes compiling slower,
+# so it's only enabled in release mode.
+lto = true
+
+[features]
+# If you uncomment this line, it will enable `wee_alloc`:
+#default = ["wee_alloc"]
 
 [dependencies]
-tlsn-core = { git = "https://github.com/tlsnotary/tlsn.git", tag = "v0.1.0-alpha.5", package = "tlsn-core" }
-tlsn-prover = { git = "https://github.com/tlsnotary/tlsn.git", tag = "v0.1.0-alpha.5", package = "tlsn-prover", features = [
-  "tracing",
-] }
+# The `wasm-bindgen` crate provides the bare minimum functionality needed
+# to interact with JavaScript.
+wasm-bindgen = "0.2.45"
 
-chrono = "0.4"
-elliptic-curve = { version = "0.13.5", features = ["pkcs8"] }
-futures = "0.3"
-futures-util = "0.3.28"
-getrandom = { version = "0.2", features = ["js"] }
-js-sys = "0.3.64"
-p256 = { version = "0.13", features = ["pem", "ecdsa"] }
-rayon = "1.5"
-serde = { version = "1.0.147", features = ["derive"] }
-serde-wasm-bindgen = "0.6.1"
-serde_json = "1.0"
-tracing = "0.1"
-url = { version = "2.0", features = ["serde"] }
-wasm-bindgen = "0.2.87"
-wasm-bindgen-futures = "0.4.37"
-wasm-bindgen-rayon = "1.0"
-pin-project-lite = "0.2.4"
+# `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size
+# compared to the default allocator's ~10K. However, it is slower than the default
+# allocator, so it's not enabled by default.
+wee_alloc = { version = "0.4.2", optional = true }
 
-http-body-util = "0.1"
-hyper = { version = "1.1", features = ["client", "http1"] }
-hyper-util = { version = "0.1", features = ["http1"] }
-tracing-subscriber = { version = "0.3", features = ["time","env-filter"] }
-tracing-web = "0.1.2"
-
-ring = { version = "0.17", features = ["wasm32_unknown_unknown_js"] }
-
-# time crate: https://crates.io/crates/time
-# NOTE: It is required, otherwise "time not implemented on this platform" error happens right after "!@# 2".
-# Probably due to tokio's time feature is used in tlsn-prover?
-time = { version = "0.3.34", features = ["wasm-bindgen"] }
-# Used to calculate elapsed time.
-web-time = "1.0"
-
-web-sys = { version = "0.3.4", features = [
-  "BinaryType",
-  "Blob",
-  "ErrorEvent",
-  "FileReader",
-  "MessageEvent",
-  "ProgressEvent",
-  "WebSocket",
-  "console",
-  'Document',
-  'HtmlElement',
-  'HtmlInputElement',
-  'Window',
-  'Worker',
-  'Headers',
-  'Request',
-  'RequestInit',
-  'RequestMode',
-  'Response',
-] }
-
-# Use the patched ws_stream_wasm to fix the issue https://github.com/najamelan/ws_stream_wasm/issues/12#issuecomment-1711902958
-ws_stream_wasm = { version = "0.7.4", git = "https://github.com/tlsnotary/ws_stream_wasm", rev = "2ed12aad9f0236e5321f577672f309920b2aef51" }
+# The `web-sys` crate allows you to interact with the various browser APIs,
+# like the DOM.
+[dependencies.web-sys]
+version = "0.3.22"
+features = ["console"]
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
-# all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
-# code size when deploying.
-console_error_panic_hook = { version = "0.1.7" }
+# all the `std::fmt` and `std::panicking` infrastructure, so it's only enabled
+# in debug mode.
+[target."cfg(debug_assertions)".dependencies]
+console_error_panic_hook = "0.1.5"
 
-strum = { version = "0.26.1" }
-strum_macros = "0.26.1"
-
+# These crates are used for running unit tests.
 [dev-dependencies]
-wasm-bindgen-test = "0.3.34"
-
-[profile.release]
-lto = true      # Enable Link Time Optimization
-opt-level = "z" # Optimize for size
-
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = true
+wasm-bindgen-test = "0.2.45"
+futures = "0.1.27"
+js-sys = "0.3.22"
+wasm-bindgen-futures = "0.3.22"

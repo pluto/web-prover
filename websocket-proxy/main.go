@@ -31,17 +31,17 @@ func main() {
 			return
 		}
 
-		ips, err := net.LookupIP(hostname(target))
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		for _, ip := range ips {
-			if ip.IsLoopback() || ip.IsPrivate() {
-				log.Println("target is loopback or private")
-				return
-			}
-		}
+		// ips, err := net.LookupIP(hostname(target))
+		// if err != nil {
+		// 	log.Println(err)
+		// 	return
+		// }
+		// for _, ip := range ips {
+		// 	if ip.IsLoopback() || ip.IsPrivate() {
+		// 		log.Println("target is loopback or private")
+		// 		return
+		// 	}
+		// }
 
 		log.Printf("New request to %v", target)
 
