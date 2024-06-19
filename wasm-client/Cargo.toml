@@ -1,14 +1,12 @@
 [package]
-name = "rust-webpack-template"
-description = "My super awesome Rust, WebAssembly, and Webpack project!"
-version = "0.1.0"
-authors = ["You <you@example.com>"]
-categories = ["wasm"]
-readme = "README.md"
+name = "tlsn-wasm"
+description = "TLSN WASM Demo"
+version = "1.0.0"
+authors = [""]
 edition = "2018"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [profile.release]
 # This makes the compiled code faster and smaller, but it makes compiling slower,

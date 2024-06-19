@@ -29,9 +29,9 @@ module.exports = {
     server: {
       type: 'https',
       options: {
-        key: fs.readFileSync("/home/matt/dev/21-tlsn-monorepo/tlsn-monorepo/vanilla-go-app/certs/server-key.pem"),
-        cert: fs.readFileSync("/home/matt/dev/21-tlsn-monorepo/tlsn-monorepo/vanilla-go-app/certs/server-cert.pem"),
-        ca: fs.readFileSync("/home/matt/dev/21-tlsn-monorepo/tlsn-monorepo/vanilla-go-app/certs/ca-cert.pem")
+        key: fs.readFileSync("../vanilla-go-app/certs/server-key.pem"),
+        cert: fs.readFileSync("../vanilla-go-app/certs/server-cert.pem"),
+        ca: fs.readFileSync("../vanilla-go-app/certs/ca-cert.pem")
       }
     }
   },
