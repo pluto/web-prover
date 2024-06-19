@@ -1,18 +1,22 @@
 # tlsn-monorepo
 
-to run the notary server:
+To run the notary server:
 
 ```sh
 cargo run -p notary-server
 ```
 
-to run the go server:
+To run the go server:
 
 ```sh
-go run -mod=mod vanilla-go-app/main.go -tls-cert-path vanilla-go-app/certs/server-cert.pem -tls-key-path vanilla-go-app/certs/server-key.pem
+cd vanilla-go-app
+go run main.go -listen 0.0.0.0:8065 \
+  -tls-cert-path certs/server-cert.pem \
+  -tls-key-path certs/server-key.pem \
+  -http-read-timeout 5m -http-write-timeout 5m
 ```
 
-to run the client:
+To run the client:
 
 ```sh
 cargo run -p client 
