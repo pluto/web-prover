@@ -28,7 +28,7 @@ func Server() *http.ServeMux {
 	})
 
 	// Routes that return fixed KB of binary data
-	kb := []int{0, 1, 10, 100, 1000}
+	kb := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 16, 100, 1000}
 	for _, v := range kb {
 		b := make([]byte, v*1000)
 		_, err := rand.Read(b)
@@ -39,6 +39,7 @@ func Server() *http.ServeMux {
 		mux.HandleFunc("/bin/"+strconv.Itoa(v)+"KB",
 			func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/octet-stream")
+				w.Header().Set("Content-Length", strconv.Itoa(len(b)))
 				w.WriteHeader(200) // OK
 				w.Write(b)
 			})
@@ -47,6 +48,7 @@ func Server() *http.ServeMux {
 		mux.HandleFunc("/plain/"+strconv.Itoa(v)+"KB",
 			func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "text/plain")
+				w.Header().Set("Content-Length", strconv.Itoa(len(b64)))
 				w.WriteHeader(200) // OK
 				w.Write([]byte(b64))
 			})
@@ -114,6 +116,8 @@ func Server() *http.ServeMux {
 			w.WriteHeader(400) // Bad Request
 			return
 		}
+		
+		w.WriteHeader(200)
 		time.Sleep(time.Duration(ms) * time.Millisecond)
 
 		hj, ok := w.(http.Hijacker)
