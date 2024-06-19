@@ -4,7 +4,7 @@ use anyhow::Result;
 use base64::prelude::*;
 use clap::{ArgAction, Parser};
 use http_body_util::Full;
-use hyper::{body::Bytes, Request};
+use hyper::{body::Bytes, Request, Version};
 use hyper_util::rt::TokioIo;
 use pki_types::CertificateDer;
 use serde::Deserialize;
@@ -187,7 +187,8 @@ async fn prover(config: Config) -> Result<TlsProof> {
         let _enter = span.enter();
         let mut request = Request::builder()
             .method(config.target_method.as_str())
-            .uri(config.target_url);
+            .uri(config.target_url)
+            .version(Version::HTTP_10);
 
         let headers = request.headers_mut().unwrap();
         for (key, values) in config.target_headers {
