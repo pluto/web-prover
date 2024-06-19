@@ -227,6 +227,7 @@ async fn prover(config: Config) -> Result<TlsProof> {
 
         match request_sender.send_request(request).await {
             Ok(response) => {
+                debug!("Response: {:?}", response.status());
                 assert!(response.status().is_success()); // status is 200-299
                 debug!("Respose: OK");
             }
