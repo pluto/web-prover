@@ -17,13 +17,12 @@ The specific binaries for this test are:
 - `vanilla-go-app` : Representing a mock server
 - `client`: representing a user
 
-You can test the binary mobile target with a simple tui.
+You can test the binary mobile target with a simple TUI.
 ```
 cargo run -p tester
 ```
 This will test and end to end web proof against a mock go server with the with the default `health` endpoint on the go server which just returns a status OK.
-To 
-run with other endpoints you can pass the `--endpoint` flag  followed by the endpoint partameters for example: `cargo run -p notary-tester -- --endpoint bin/10KB`. 
+To run with other endpoints you can pass the `--endpoint` flag followed by the endpoint parameters for example: `cargo run -p notary-tester -- --endpoint bin/10KB`. 
 
 ## Running Processes Manually
 You also have the option to run these processes manaully if you like.
@@ -42,11 +41,17 @@ go run main.go -listen 0.0.0.0:8065 \
   -http-read-timeout 5m -http-write-timeout 5m
 ```
 
-and the client with :
+and the client with:
 
 ```sh
 cargo run --release -p client 
 ```
 
-## End to End testing wasm target
+## End to End testing WASM target
 TODO
+
+## Known Reproducible Failures
+There have a been a number of reproducible failures we have discovered.
+
+1. [Exceed Transcript Size](https://github.com/pluto/tlsn-monorepo/issues/15)
+2. [Transfer-Encoding](https://github.com/pluto/tlsn-monorepo/issues/14)

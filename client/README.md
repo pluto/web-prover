@@ -1,7 +1,7 @@
 # client
 
 ```shell
-cargo run # to create webproof.json
+cargo run -p client # to create webproof.json
 ```
 
 ---
