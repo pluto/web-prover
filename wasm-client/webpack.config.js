@@ -6,6 +6,13 @@ const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin");
 const dist = path.resolve(__dirname, "dist");
 
 module.exports = {
+  ignoreWarnings: [
+    /Circular dependency between chunks with runtime/,
+    /ResizeObserver loop completed with undelivered notifications/,
+  ],
+  performance: {
+    hints: false,
+  },
   mode: "production",
   entry: {
     index: "./js/index.js"
@@ -35,6 +42,7 @@ module.exports = {
 
     new WasmPackPlugin({
       crateDirectory: __dirname,
+      extraArgs: "--target web"
     }),
   ],
   experiments: {
