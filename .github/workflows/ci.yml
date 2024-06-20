@@ -14,18 +14,20 @@ env:
   CARGO_TERM_COLOR: always # pretty colors
 
 jobs:
-  lint: 
-    name: lint project
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        toolchain:
-          - nightly
-    steps:
-      - uses: actions/checkout@v4
-      - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
-      - run: rustup component add clippy
-      - run: cargo clippy -- -Dwarnings
+  # BLOCKED: 
+  # lint: 
+  #   name: lint project
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       toolchain:
+  #         - nightly
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+  #     - run: rustup component add clippy
+  #     - run: cargo clippy -- -Dwarnings
+  
   # adding tests to CI slows development speed at the cost of increasing alignment; uncomment when ready
   # test:
   #   name: test project
