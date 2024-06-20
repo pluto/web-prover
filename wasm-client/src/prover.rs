@@ -72,7 +72,8 @@ fn log_phase(phase: ProverPhases) {
     info!("tlsn-js {}: {}", phase as u8, phase.get_message().unwrap());
 }
 
-const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("/home/matt/dev/21-tlsn-monorepo/tlsn-monorepo/vanilla-go-app/certs/ca-cert.cer");
+const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../../vanilla-go-app/certs/ca-cert.cer");
+// const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("/home/matt/dev/21-tlsn-monorepo/tlsn-monorepo/vanilla-go-app/certs/ca-cert.cer");
 
 #[wasm_bindgen]
 pub async fn prover(
