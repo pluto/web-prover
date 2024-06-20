@@ -1,11 +1,11 @@
+use std::time::Duration;
+
+use elliptic_curve::pkcs8::DecodePublicKey;
+use tlsn_core::proof::{SessionProof, TlsProof};
 use tracing::info;
 use wasm_bindgen::prelude::*;
 
 use crate::request_opt::VerifyResult;
-
-use elliptic_curve::pkcs8::DecodePublicKey;
-use std::time::Duration;
-use tlsn_core::proof::{SessionProof, TlsProof};
 
 #[wasm_bindgen]
 pub async fn verify(proof: &str, notary_pubkey_str: &str) -> Result<String, JsValue> {
@@ -31,9 +31,11 @@ pub async fn verify(proof: &str, notary_pubkey_str: &str) -> Result<String, JsVa
         .map_err(|e| JsValue::from_str(&format!("Session verification failed: {:?}", e)))?;
 
     let SessionProof {
-        // The session header that was signed by the Notary is a succinct commitment to the TLS transcript.
+        // The session header that was signed by the Notary is a succinct commitment to the TLS
+        // transcript.
         header,
-        // This is the server name, checked against the certificate chain shared in the TLS handshake.
+        // This is the server name, checked against the certificate chain shared in the TLS
+        // handshake.
         session_info,
         ..
     } = session;

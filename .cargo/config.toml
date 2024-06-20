@@ -1,0 +1,7 @@
+# [target.'cfg(target_arch = "wasm32")']
+# rustflags = ["-C", "target-feature=+atomics,+bulk-memory"]
+
+[alias]
+# cargo aliases to check and build the wasm client separately
+wasm-check = "check --target wasm32-unknown-unknown -p wasm-client"
+wasm-build = "wasm-pack build --target web"
