@@ -1,4 +1,16 @@
 # TLSN WASM Demo
+## To run this module
+
+```
+# install wasm-pack wasm compilation toolchain if not already installed
+#wasm-pack docs https://rustwasm.github.io/wasm-pack/book/quickstart.html
+curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+# build this module with wasm-pack
+wasm-pack build --target web
+```
+
+## To run the Golang vanilla server:
 
 ```shell
 cd websocket-proxy
