@@ -1,33 +1,29 @@
-use futures::channel::oneshot;
 use std::ops::Range;
-use tlsn_prover::tls::{Prover, ProverConfig};
-use wasm_bindgen_futures::spawn_local;
-use web_time::Instant;
 
-use ws_stream_wasm::*;
-
-use crate::hyper_io::FuturesIo;
-use crate::request_opt::RequestOptions;
-use crate::requests::{ClientType, NotarizationSessionRequest, NotarizationSessionResponse};
-
-pub use wasm_bindgen_rayon::init_thread_pool;
-
-use crate::fetch_as_json_string;
-pub use crate::request_opt::VerifyResult;
-use futures::AsyncWriteExt;
+use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
-
 use js_sys::Array;
+use pki_types::CertificateDer;
 use strum::EnumMessage;
 use tlsn_core::proof::TlsProof;
+use tlsn_prover::tls::{Prover, ProverConfig};
+use tracing::{debug, info, trace};
 use url::Url;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::spawn_local;
+pub use wasm_bindgen_rayon::init_thread_pool;
 use web_sys::{Headers, RequestInit, RequestMode};
+use web_time::Instant;
+use ws_stream_wasm::*;
 
-use tracing::{debug, info, trace};
-
-use pki_types::CertificateDer;
+pub use crate::request_opt::VerifyResult;
+use crate::{
+    fetch_as_json_string,
+    hyper_io::FuturesIo,
+    request_opt::RequestOptions,
+    requests::{ClientType, NotarizationSessionRequest, NotarizationSessionResponse},
+};
 
 #[derive(strum_macros::EnumMessage, Debug, Clone, Copy)]
 #[allow(dead_code)]
@@ -73,7 +69,9 @@ fn log_phase(phase: ProverPhases) {
 }
 
 const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../../vanilla-go-app/certs/ca-cert.cer");
-// const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("/home/matt/dev/21-tlsn-monorepo/tlsn-monorepo/vanilla-go-app/certs/ca-cert.cer");
+// const LOCALHOST_DEBUG_CA_CERT: &[u8] =
+// include_bytes!("/home/matt/dev/21-tlsn-monorepo/tlsn-monorepo/vanilla-go-app/
+// certs/ca-cert.cer");
 
 #[wasm_bindgen]
 pub async fn prover(
@@ -98,9 +96,7 @@ pub async fn prover(
 
     let start_time = Instant::now();
 
-    /*
-     * Connect Notary with websocket
-     */
+    // Connect Notary with websocket
 
     let mut opts = RequestInit::new();
     opts.method("POST");
@@ -172,37 +168,34 @@ pub async fn prover(
         .host_str()
         .ok_or(JsValue::from_str("Could not get target host"))?;
 
-        let mut root_store = tls_client::RootCertStore::empty();
-        root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
-            tls_client::OwnedTrustAnchor::from_subject_spki_name_constraints(
-                ta.subject.as_ref(),
-                ta.subject_public_key_info.as_ref(),
-                ta.name_constraints.as_ref().map(|nc| nc.as_ref()),
-            )
-        }));
-    
-        let cert = CertificateDer::from(LOCALHOST_DEBUG_CA_CERT.to_vec());
-        let (added, _) = root_store.add_parsable_certificates(&[cert.to_vec()]);
-        assert_eq!(added, 1);
+    let mut root_store = tls_client::RootCertStore::empty();
+    root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
+        tls_client::OwnedTrustAnchor::from_subject_spki_name_constraints(
+            ta.subject.as_ref(),
+            ta.subject_public_key_info.as_ref(),
+            ta.name_constraints.as_ref().map(|nc| nc.as_ref()),
+        )
+    }));
 
+    let cert = CertificateDer::from(LOCALHOST_DEBUG_CA_CERT.to_vec());
+    let (added, _) = root_store.add_parsable_certificates(&[cert.to_vec()]);
+    assert_eq!(added, 1);
 
-        // Basic default prover config
-        let mut builder = ProverConfig::builder();
+    // Basic default prover config
+    let mut builder = ProverConfig::builder();
 
-        if let Some(max_sent_data) = options.max_sent_data {
-            builder.max_sent_data(max_sent_data);
-        }
-        if let Some(max_recv_data) = options.max_recv_data {
-            builder.max_recv_data(max_recv_data);
-        }
-        let config = builder
-            .id(notarization_response.session_id)
-            .server_dns(target_host)
-            .root_cert_store(root_store)
-            .build()
-            .map_err(|e| JsValue::from_str(&format!("Could not build prover config: {:?}", e)))?;
-
-
+    if let Some(max_sent_data) = options.max_sent_data {
+        builder.max_sent_data(max_sent_data);
+    }
+    if let Some(max_recv_data) = options.max_recv_data {
+        builder.max_recv_data(max_recv_data);
+    }
+    let config = builder
+        .id(notarization_response.session_id)
+        .server_dns(target_host)
+        .root_cert_store(root_store)
+        .build()
+        .map_err(|e| JsValue::from_str(&format!("Could not build prover config: {:?}", e)))?;
 
     // Create a Prover and set it up with the Notary
     // This will set up the MPC backend prior to connecting to the server.
@@ -212,9 +205,7 @@ pub async fn prover(
         .await
         .map_err(|e| JsValue::from_str(&format!("Could not set up prover: {:?}", e)))?;
 
-    /*
-       Connect Application Server with websocket proxy
-    */
+    // Connect Application Server with websocket proxy
     log_phase(ProverPhases::ConnectWsProxy);
 
     let (_, client_ws_stream) = WsMeta::connect(options.websocket_proxy_url, None)
@@ -222,8 +213,9 @@ pub async fn prover(
         .expect_throw("assume the client ws connection succeeds");
 
     // Bind the Prover to the server connection.
-    // The returned `mpc_tls_connection` is an MPC TLS connection to the Server: all data written
-    // to/read from it will be encrypted/decrypted using MPC with the Notary.
+    // The returned `mpc_tls_connection` is an MPC TLS connection to the Server: all
+    // data written to/read from it will be encrypted/decrypted using MPC with
+    // the Notary.
     log_phase(ProverPhases::BindProverToConnection);
     let (mpc_tls_connection, prover_fut) =
         prover.connect(client_ws_stream.into_io()).await.unwrap();
@@ -357,7 +349,8 @@ pub async fn prover(
     let secret_body_slices: Vec<&[u8]> =
         secret_body_vecs.iter().map(|vec| vec.as_slice()).collect();
 
-    // Identify the ranges in the transcript that contain the only data we want to reveal later
+    // Identify the ranges in the transcript that contain the only data we want to
+    // reveal later
     let (recv_public_ranges, recv_private_ranges) = find_ranges(
         prover.recv_transcript().data(),
         secret_body_slices.as_slice(),
@@ -369,7 +362,8 @@ pub async fn prover(
 
     let builder = prover.commitment_builder();
 
-    // Commit to the outbound and inbound transcript, isolating the data that contain secrets
+    // Commit to the outbound and inbound transcript, isolating the data that
+    // contain secrets
     let sent_pub_commitment_ids = sent_public_ranges
         .iter()
         .map(|range| {
@@ -421,7 +415,8 @@ pub async fn prover(
 
     let mut proof_builder = notarized_session.data().build_substrings_proof();
 
-    // Reveal everything except the redacted stuff (which for the response it's everything except the screen_name)
+    // Reveal everything except the redacted stuff (which for the response it's
+    // everything except the screen_name)
     sent_pub_commitment_ids
         .iter()
         .chain(recv_pub_commitment_ids.iter())

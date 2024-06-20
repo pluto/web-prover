@@ -6,28 +6,23 @@ pub mod prover;
 pub use prover::prover;
 
 pub mod verify;
-use tracing::error;
-pub use verify::verify;
-
-use wasm_bindgen::prelude::*;
-
-pub use crate::request_opt::{RequestOptions, VerifyResult};
-
-pub use wasm_bindgen_rayon::init_thread_pool;
+use std::panic;
 
 use js_sys::JSON;
-
+use tracing::{debug, error};
+use tracing_subscriber::{
+    fmt::{format::Pretty, time::UtcTime},
+    prelude::*,
+    EnvFilter,
+};
+use tracing_web::{performance_layer, MakeWebConsoleWriter};
+pub use verify::verify;
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
+pub use wasm_bindgen_rayon::init_thread_pool;
 use web_sys::{Request, RequestInit, Response};
 
-use std::panic;
-use tracing::debug;
-use tracing_subscriber::fmt::format::Pretty;
-use tracing_subscriber::fmt::time::UtcTime;
-use tracing_subscriber::prelude::*;
-use tracing_subscriber::EnvFilter;
-
-use tracing_web::{performance_layer, MakeWebConsoleWriter};
+pub use crate::request_opt::{RequestOptions, VerifyResult};
 
 extern crate console_error_panic_hook;
 
