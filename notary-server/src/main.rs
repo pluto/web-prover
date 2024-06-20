@@ -1,11 +1,10 @@
 use eyre::{eyre, Result};
-use structopt::StructOpt;
-use tracing::debug;
-
 use notary_server::{
     init_tracing, parse_config_file, run_server, CliFields, NotaryServerError,
     NotaryServerProperties,
 };
+use structopt::StructOpt;
+use tracing::debug;
 
 #[tokio::main]
 async fn main() -> Result<(), NotaryServerError> {

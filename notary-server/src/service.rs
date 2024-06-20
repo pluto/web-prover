@@ -30,8 +30,9 @@ use crate::{
     },
 };
 
-/// A wrapper enum to facilitate extracting TCP connection for either WebSocket or TCP clients,
-/// so that we can use a single endpoint and handler for notarization for both types of clients
+/// A wrapper enum to facilitate extracting TCP connection for either WebSocket
+/// or TCP clients, so that we can use a single endpoint and handler for
+/// notarization for both types of clients
 pub enum ProtocolUpgrade {
     Tcp(TcpUpgrade),
     Ws(WebSocketUpgrade),
@@ -65,9 +66,10 @@ where
     }
 }
 
-/// Handler to upgrade protocol from http to either websocket or underlying tcp depending on the type of client
-/// the session_id parameter is also extracted here to fetch the configuration parameters
-/// that have been submitted in the previous request to /session made by the same client
+/// Handler to upgrade protocol from http to either websocket or underlying tcp
+/// depending on the type of client the session_id parameter is also extracted
+/// here to fetch the configuration parameters that have been submitted in the
+/// previous request to /session made by the same client
 pub async fn upgrade_protocol(
     protocol_upgrade: ProtocolUpgrade,
     State(notary_globals): State<NotaryGlobals>,
@@ -76,7 +78,8 @@ pub async fn upgrade_protocol(
     info!("Received upgrade protocol request");
     let session_id = params.session_id;
     // Fetch the configuration data from the store using the session_id
-    // This also removes the configuration data from the store as each session_id can only be used once
+    // This also removes the configuration data from the store as each session_id
+    // can only be used once
     let (max_sent_data, max_recv_data) = match notary_globals.store.lock().await.remove(&session_id)
     {
         Some(data) => (data.max_sent_data, data.max_recv_data),
@@ -86,7 +89,8 @@ pub async fn upgrade_protocol(
             return NotaryServerError::BadProverRequest(err_msg).into_response();
         }
     };
-    // This completes the HTTP Upgrade request and returns a successful response to the client, meanwhile initiating the websocket or tcp connection
+    // This completes the HTTP Upgrade request and returns a successful response to
+    // the client, meanwhile initiating the websocket or tcp connection
     match protocol_upgrade {
         ProtocolUpgrade::Ws(ws) => ws.on_upgrade(move |socket| {
             websocket_notarize(
@@ -109,7 +113,8 @@ pub async fn upgrade_protocol(
     }
 }
 
-/// Handler to initialize and configure notarization for both TCP and WebSocket clients
+/// Handler to initialize and configure notarization for both TCP and WebSocket
+/// clients
 #[debug_handler(state = NotaryGlobals)]
 pub async fn initialize(
     State(notary_globals): State<NotaryGlobals>,
@@ -129,7 +134,8 @@ pub async fn initialize(
         }
     };
 
-    // Ensure that the max_transcript_size submitted is not larger than the global max limit configured in notary server
+    // Ensure that the max_transcript_size submitted is not larger than the global
+    // max limit configured in notary server
     if payload.max_sent_data.is_some() || payload.max_recv_data.is_some() {
         let requested_transcript_size =
             payload.max_sent_data.unwrap_or_default() + payload.max_recv_data.unwrap_or_default();

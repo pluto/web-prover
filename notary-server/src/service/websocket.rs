@@ -15,7 +15,8 @@ pub async fn websocket_notarize(
     max_recv_data: Option<usize>,
 ) {
     debug!(?session_id, "Upgraded to websocket connection");
-    // Wrap the websocket in WsStream so that we have AsyncRead and AsyncWrite implemented
+    // Wrap the websocket in WsStream so that we have AsyncRead and AsyncWrite
+    // implemented
     let stream = WsStream::new(socket.into_inner());
     match notary_service(
         stream,

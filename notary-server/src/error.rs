@@ -1,10 +1,10 @@
+use std::error::Error;
+
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
 use eyre::Report;
-use std::error::Error;
-
 use tlsn_verifier::tls::{VerifierConfigBuilderError, VerifierError};
 
 #[derive(Debug, thiserror::Error)]

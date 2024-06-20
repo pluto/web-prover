@@ -1,9 +1,11 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use chrono::{DateTime, Utc};
 use p256::ecdsa::SigningKey;
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
 use tokio::sync::Mutex as AsyncMutex;
 
 use crate::{config::NotarizationProperties, domain::auth::AuthorizationWhitelistRecord};
@@ -40,7 +42,8 @@ pub struct NotarizationRequestQuery {
 pub enum ClientType {
     /// Client that has access to the transport layer
     Tcp,
-    /// Client that cannot directly access transport layer, e.g. browser extension
+    /// Client that cannot directly access transport layer, e.g. browser
+    /// extension
     Websocket,
 }
 
@@ -58,7 +61,8 @@ pub struct SessionData {
 pub struct NotaryGlobals {
     pub notary_signing_key: SigningKey,
     pub notarization_config: NotarizationProperties,
-    /// A temporary storage to store configuration data, mainly used for WebSocket client
+    /// A temporary storage to store configuration data, mainly used for
+    /// WebSocket client
     pub store: Arc<AsyncMutex<HashMap<String, SessionData>>>,
     /// Whitelist of API keys for authorization purpose
     pub authorization_whitelist: Option<Arc<Mutex<HashMap<String, AuthorizationWhitelistRecord>>>>,

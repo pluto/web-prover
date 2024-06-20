@@ -1,3 +1,9 @@
+use std::{
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+    time::Duration,
+};
+
 use async_tungstenite::{
     tokio::connect_async_with_tls_connector_and_config, tungstenite::protocol::WebSocketConfig,
 };
@@ -8,13 +14,13 @@ use hyper::{
     Body, Client, Request, StatusCode,
 };
 use hyper_tls::HttpsConnector;
+use notary_server::{
+    read_pem_file, run_server, AuthorizationProperties, LoggingProperties, NotarizationProperties,
+    NotarizationSessionRequest, NotarizationSessionResponse, NotaryServerProperties,
+    NotarySigningKeyProperties, ServerProperties, TLSProperties,
+};
 use rstest::rstest;
 use rustls::{Certificate, ClientConfig, RootCertStore};
-use std::{
-    net::{IpAddr, SocketAddr},
-    sync::Arc,
-    time::Duration,
-};
 use tls_server_fixture::{bind_test_server_hyper, CA_CERT_DER, SERVER_DOMAIN};
 use tlsn_prover::tls::{Prover, ProverConfig};
 use tokio::{
@@ -25,12 +31,6 @@ use tokio_rustls::{client::TlsStream, TlsConnector};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 use ws_stream_tungstenite::WsStream;
-
-use notary_server::{
-    read_pem_file, run_server, AuthorizationProperties, LoggingProperties, NotarizationProperties,
-    NotarizationSessionRequest, NotarizationSessionResponse, NotaryServerProperties,
-    NotarySigningKeyProperties, ServerProperties, TLSProperties,
-};
 
 const NOTARY_CA_CERT_PATH: &str = "./fixture/tls/rootCA.crt";
 const NOTARY_CA_CERT_BYTES: &[u8] = include_bytes!("../fixture/tls/rootCA.crt");
@@ -161,7 +161,8 @@ async fn test_tcp_prover<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
         "http"
     };
 
-    // Attach the hyper HTTP client to the notary connection to send request to the /session endpoint to configure notarization and obtain session id
+    // Attach the hyper HTTP client to the notary connection to send request to the
+    // /session endpoint to configure notarization and obtain session id
     let (mut request_sender, connection) =
         hyper::client::conn::handshake(notary_socket).await.unwrap();
 
@@ -204,7 +205,8 @@ async fn test_tcp_prover<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 
     debug!("Notarization response: {:?}", notarization_response,);
 
-    // Send notarization request via HTTP, where the underlying TCP connection will be extracted later
+    // Send notarization request via HTTP, where the underlying TCP connection will
+    // be extracted later
     let request = Request::builder()
         // Need to specify the session_id so that notary server knows the right configuration to use
         // as the configuration is set in the previous HTTP call
@@ -232,7 +234,8 @@ async fn test_tcp_prover<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 
     debug!("Switched protocol OK");
 
-    // Claim back the socket after HTTP exchange is done so that client can use it for notarization
+    // Claim back the socket after HTTP exchange is done so that client can use it
+    // for notarization
     let Parts {
         io: notary_socket, ..
     } = connection_task.await.unwrap().unwrap();
@@ -323,7 +326,8 @@ async fn test_websocket_prover() {
     let notary_port = notary_config.server.port;
 
     // Connect to the notary server via TLS-WebSocket
-    // Try to avoid dealing with transport layer directly to mimic the limitation of a browser extension that uses websocket
+    // Try to avoid dealing with transport layer directly to mimic the limitation of
+    // a browser extension that uses websocket
     //
     // Establish TLS setup for connections later
     let certificate =
@@ -380,10 +384,12 @@ async fn test_websocket_prover() {
 
     // Connect to the Notary via TLS-Websocket
     //
-    // Note: This will establish a new TLS-TCP connection instead of reusing the previous TCP connection
-    // used in the previous HTTP POST request because we cannot claim back the tcp connection used in hyper
-    // client while using its high level request function — there does not seem to have a crate that can let you
-    // make a request without establishing TCP connection where you can claim the TCP connection later after making the request
+    // Note: This will establish a new TLS-TCP connection instead of reusing the
+    // previous TCP connection used in the previous HTTP POST request because we
+    // cannot claim back the tcp connection used in hyper client while using its
+    // high level request function — there does not seem to have a crate that can
+    // let you make a request without establishing TCP connection where you can
+    // claim the TCP connection later after making the request
     let request = http::Request::builder()
         // Need to specify the session_id so that notary server knows the right configuration to use
         // as the configuration is set in the previous HTTP call
@@ -409,7 +415,8 @@ async fn test_websocket_prover() {
     .await
     .unwrap();
 
-    // Wrap the socket with the adapter so that we get AsyncRead and AsyncWrite implemented
+    // Wrap the socket with the adapter so that we get AsyncRead and AsyncWrite
+    // implemented
     let notary_ws_socket = WsStream::new(notary_ws_stream);
 
     // Connect to the Server

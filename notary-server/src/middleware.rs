@@ -1,7 +1,8 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use axum::http::{header, request::Parts};
 use axum_core::extract::{FromRef, FromRequestParts};
-use std::collections::HashMap;
 use tracing::{error, trace};
 
 use crate::{
@@ -62,11 +63,12 @@ fn api_key_is_valid(
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
+
     use super::{api_key_is_valid, HashMap};
     use crate::domain::auth::{
         authorization_whitelist_vec_into_hashmap, AuthorizationWhitelistRecord,
     };
-    use std::sync::Arc;
 
     fn get_whitelist_fixture() -> HashMap<String, AuthorizationWhitelistRecord> {
         authorization_whitelist_vec_into_hashmap(vec![

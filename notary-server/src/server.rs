@@ -1,3 +1,13 @@
+use std::{
+    collections::HashMap,
+    fs::File as StdFile,
+    io::BufReader,
+    net::{IpAddr, SocketAddr},
+    path::Path,
+    pin::Pin,
+    sync::{Arc, Mutex},
+};
+
 use axum::{
     http::{Request, StatusCode},
     middleware::from_extractor_with_state,
@@ -16,20 +26,10 @@ use notify::{
 };
 use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
 use rustls::{Certificate, PrivateKey, ServerConfig};
-use std::{
-    collections::HashMap,
-    fs::File as StdFile,
-    io::BufReader,
-    net::{IpAddr, SocketAddr},
-    path::Path,
-    pin::Pin,
-    sync::{Arc, Mutex},
-};
-use tower_http::cors::CorsLayer;
-
 use tokio::{fs::File, net::TcpListener};
 use tokio_rustls::TlsAcceptor;
 use tower::MakeService;
+use tower_http::cors::CorsLayer;
 use tracing::{debug, error, info};
 
 use crate::{
@@ -45,7 +45,8 @@ use crate::{
     util::parse_csv_file,
 };
 
-/// Start a TCP server (with or without TLS) to accept notarization request for both TCP and WebSocket clients
+/// Start a TCP server (with or without TLS) to accept notarization request for
+/// both TCP and WebSocket clients
 #[tracing::instrument(skip(config))]
 pub async fn run_server(config: &NotaryServerProperties) -> Result<(), NotaryServerError> {
     // Load the private key for notarized transcript signing
@@ -163,7 +164,8 @@ pub async fn run_server(config: &NotaryServerProperties) -> Result<(), NotarySer
     let mut app = router.into_make_service();
 
     loop {
-        // Poll and await for any incoming connection, ensure that all operations inside are infallible to prevent bringing down the server
+        // Poll and await for any incoming connection, ensure that all operations inside
+        // are infallible to prevent bringing down the server
         let (_, stream) = match poll_fn(|cx| Pin::new(&mut listener).poll_accept(cx)).await {
             Some(Ok(connection)) => (connection.remote_addr(), connection),
             Some(Err(err)) => {
@@ -189,8 +191,9 @@ pub async fn run_server(config: &NotaryServerProperties) -> Result<(), NotarySer
                         let _ = protocol
                             // Can unwrap because it's infallible
                             .serve_connection(stream, service.await.unwrap())
-                            // use with_upgrades to upgrade connection to websocket for websocket clients
-                            // and to extract tcp connection for tcp clients
+                            // use with_upgrades to upgrade connection to websocket for websocket
+                            // clients and to extract tcp connection for
+                            // tcp clients
                             .with_upgrades()
                             .await;
                     }
@@ -278,7 +281,8 @@ fn load_authorization_whitelist(
 
 // Setup a watcher to detect any changes to authorization whitelist
 // When the list file is modified, the watcher thread will reload the whitelist
-// The watcher is setup in a separate thread by the notify library which is synchronous
+// The watcher is setup in a separate thread by the notify library which is
+// synchronous
 fn watch_and_reload_authorization_whitelist(
     config: NotaryServerProperties,
     authorization_whitelist: Option<Arc<Mutex<HashMap<String, AuthorizationWhitelistRecord>>>>,
@@ -286,7 +290,8 @@ fn watch_and_reload_authorization_whitelist(
     // Only setup the watcher if auth whitelist is loaded
     let watcher = if let Some(authorization_whitelist) = authorization_whitelist {
         let cloned_config = config.clone();
-        // Setup watcher by giving it a function that will be triggered when an event is detected
+        // Setup watcher by giving it a function that will be triggered when an event is
+        // detected
         let mut watcher = RecommendedWatcher::new(
             move |event: Result<Event, Error>| {
                 match event {
@@ -329,7 +334,8 @@ fn watch_and_reload_authorization_whitelist(
         // Skip setup the watcher if auth whitelist is not loaded
         None
     };
-    // Need to return the watcher to parent function, else it will be dropped and stop listening
+    // Need to return the watcher to parent function, else it will be dropped and
+    // stop listening
     Ok(watcher)
 }
 
@@ -339,9 +345,8 @@ mod test {
 
     use csv::WriterBuilder;
 
-    use crate::AuthorizationProperties;
-
     use super::*;
+    use crate::AuthorizationProperties;
 
     #[tokio::test]
     async fn test_load_notary_key_and_cert() {

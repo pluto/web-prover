@@ -1,5 +1,6 @@
-use eyre::Result;
 use std::str::FromStr;
+
+use eyre::Result;
 use tracing::Level;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 

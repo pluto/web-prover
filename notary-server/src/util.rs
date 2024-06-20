@@ -23,12 +23,11 @@ pub fn parse_csv_file<T: DeserializeOwned>(location: &str) -> Result<Vec<T>> {
 #[cfg(test)]
 mod test {
 
+    use super::{parse_config_file, Result};
     use crate::{
         config::NotaryServerProperties, domain::auth::AuthorizationWhitelistRecord,
         util::parse_csv_file,
     };
-
-    use super::{parse_config_file, Result};
 
     #[test]
     fn test_parse_config_file() {
