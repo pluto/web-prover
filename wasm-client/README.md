@@ -1,14 +1,19 @@
 # TLSN WASM Demo
-## To run this module
+## To build this module:
 
 ```
 # install wasm-pack wasm compilation toolchain if not already installed
 #wasm-pack docs https://rustwasm.github.io/wasm-pack/book/quickstart.html
 curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
+# install wasm as a compilation target if not already installed
+rustup target add wasm32-unknown-unknown
+
 # build this module with wasm-pack
 wasm-pack build --target web
 ```
+
+This module may be simply checked as usual with `cargo check`.
 
 ## To run the Golang vanilla server:
 

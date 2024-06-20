@@ -8,7 +8,7 @@ use pki_types::CertificateDer;
 use strum::EnumMessage;
 use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::{Prover, ProverConfig};
-use tracing::{debug, info, trace};
+use tracing::{debug, info};
 use url::Url;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
