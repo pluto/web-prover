@@ -1,0 +1,20 @@
+[workspace]
+members = ["hmac-sha256-circuits", "hmac-sha256"]
+resolver = "2"
+
+[workspace.dependencies]
+# tlsn
+mpz-circuits = { git = "https://github.com/pluto/mpz", rev = "9f7403b" }
+mpz-garble = { git = "https://github.com/pluto/mpz", rev = "9f7403b" }
+
+# async
+async-trait = "0.1"
+futures = "0.3"
+tokio = "1"
+
+# error/log
+thiserror = "1"
+tracing = "0.1"
+
+# testing
+criterion = "0.5"
