@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use base64::prelude::*;
-use clap::{ArgAction, Parser};
+use clap::Parser;
 use http_body_util::Full;
 use hyper::{body::Bytes, Request, Version};
 use hyper_util::rt::TokioIo;
