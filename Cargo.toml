@@ -1,6 +1,6 @@
 [workspace]
-members = ["client/", "wasm-client/", "tlsn/notary-server/", "tester/"]
-# members = ["client/", "tlsn/notary-server/", "tester/"]
+# members = ["client/", "wasm-client/", "tlsn/notary-server/", "tester/"]
+members = ["client/", "tlsn/notary-server/", "tester/"]
 resolver = "2"
 
 [workspace.dependencies]
