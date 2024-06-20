@@ -1,0 +1,57 @@
+[package]
+name = "tlsnotary"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "tlsnotary"
+crate-type = ["staticlib"]
+
+# try to get the final file size to be as small as possible
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "unwind" # abort helps decrease file size, but makes the mobile app crash on panic
+
+
+[patch.'https://github.com/tlsnotary/tlsn.git']
+tlsn-prover = { path = "../tlsn/tlsn/tlsn-prover" }
+tlsn-core = { path = "../tlsn/tlsn/tlsn-core" }
+
+[dependencies]
+serde = {version = "1.0.147", features = ["derive"]}
+serde_json = "1.0"
+url = "2.5.0"
+base64 = "0.22.0"
+
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+hyper = {version = "1.1", features = ["client", "http1"]}
+hyper-util = {version = "0.1", features = ["full"]}
+http-body-util = "0.1"
+
+rustls = {version = "0.21"}
+rustls-pemfile = {version = "1.0.2"}
+
+futures = "0.3"
+tokio-util = "0.7"
+tokio-rustls = {version = "0.24.1"}
+tokio = {version = "1", features = [
+  "rt",
+  "rt-multi-thread",
+  "macros",
+  "net",
+  "io-std",
+  "fs",
+]}
+
+tlsn-prover = { git = "https://github.com/tlsnotary/tlsn.git", features = [
+  "tracing",
+] }
+tlsn-core = { git = "https://github.com/tlsnotary/tlsn.git" }
