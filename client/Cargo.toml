@@ -3,13 +3,6 @@ name = "client"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[patch.'https://github.com/tlsnotary/tlsn.git']
-tlsn-prover = { path = "../tlsn/tlsn/tlsn-prover" }
-tlsn-core = { path = "../tlsn/tlsn/tlsn-core" }
-tlsn-tls-client = { path = "../tlsn/components/tls/tls-client" }
-
 [dependencies]
 # CLI
 clap.workspace = true
@@ -45,11 +38,12 @@ tokio = { version = "1", features = [
   "fs",
 ] }
 
-tlsn-prover = { git = "https://github.com/tlsnotary/tlsn.git", features = [
+
+tlsn-prover = { git = "https://github.com/pluto/tlsn.git", features = [
   "tracing",
 ] }
-tlsn-core = { git = "https://github.com/tlsnotary/tlsn.git" }
-tlsn-tls-client = { git = "https://github.com/tlsnotary/tlsn.git" }
+tlsn-core = { git = "https://github.com/pluto/tlsn.git" }
+tlsn-tls-client = { git = "https://github.com/pluto/tlsn.git" }
 
 webpki-roots = "0.26.1"
 pki-types = { package = "rustls-pki-types", version = "1.7" }

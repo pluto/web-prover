@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
 
         notary_host: "localhost".into(), // prod: tlsnotary.pluto.xyz
         notary_port: 7047,               // prod: 443
-        notary_ca_cert_path: "tlsn/notary-server/fixture/tls/rootCA.crt".to_string(), /* prod: ./tlsnotary.pluto.xyz-rootca.crt */
+        notary_ca_cert_path: "../tlsn/notary-server/fixture/tls/rootCA.crt".to_string(), /* prod: ./tlsnotary.pluto.xyz-rootca.crt */
         notary_ca_cert_server_name: "tlsnotaryserver.io".to_string(), // prod: tlsnotary.pluto.xyz
     };
     info!("Client config: {:?}", config);
