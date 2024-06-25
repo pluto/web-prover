@@ -13,6 +13,19 @@ rustup target add wasm32-unknown-unknown
 wasm-pack build --target web
 ```
 
+## Special instructions for OSX Build
+Double check clang support for wasm
+```clang --print-targets | grep -i wasm```
+
+If not, install llvm for wasm build target with clang on OSX
+```brew install llvm```
+
+Then, check again.
+```PATH="/opt/homebrew/opt/llvm/bin:$PATH" clang --print-targets | grep -i wasm```
+
+Now, build with the new clang
+```PATH="/opt/homebrew/opt/llvm/bin:$PATH" wasm-pack build --target web```
+
 This module may be simply checked as usual with `cargo check`.
 
 ## To run the Golang vanilla server:
