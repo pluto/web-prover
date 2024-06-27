@@ -1,14 +1,13 @@
+use std::{convert::Infallible, fs, io, sync::Arc};
+
 use http_body_util::Full;
-use hyper::body::Bytes;
-use hyper::service::service_fn;
-use hyper::{Request, Response};
-use hyper_util::rt::{TokioExecutor, TokioIo};
-use hyper_util::server::conn::auto::Builder;
+use hyper::{body::Bytes, service::service_fn, Request, Response};
+use hyper_util::{
+    rt::{TokioExecutor, TokioIo},
+    server::conn::auto::Builder,
+};
 use pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::ServerConfig;
-use std::convert::Infallible;
-use std::sync::Arc;
-use std::{fs, io};
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 
