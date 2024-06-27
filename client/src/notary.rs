@@ -1,15 +1,15 @@
 use std::{io::BufReader, sync::Arc};
 
+use anyhow::Result;
 use http_body_util::{BodyExt as _, Either, Empty, Full};
 use hyper::{client::conn::http1::Parts, Request, StatusCode};
 use hyper_util::rt::TokioIo;
 use rustls::{Certificate, ClientConfig, RootCertStore};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 use tokio_util::bytes::Bytes;
 use tracing::{debug, info, instrument, trace, trace_span};
-use anyhow::Result;
 
 /// Types of client that the prover is using
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

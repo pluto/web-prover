@@ -1,4 +1,5 @@
 use std::panic;
+
 use url::Url;
 use wasm_bindgen::prelude::*;
 use ws_stream_wasm::WsMeta;
@@ -6,7 +7,6 @@ pub(crate) mod hyper_io;
 macro_rules! console_log {
     ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
 }
-
 
 #[wasm_bindgen]
 pub async fn connect(
@@ -16,7 +16,7 @@ pub async fn connect(
 ) -> Result<JsValue, JsValue> {
     // https://github.com/rustwasm/console_error_panic_hook
     panic::set_hook(Box::new(console_error_panic_hook::hook));
-    
+
     console_log!(
         "Connecting to {}:{} via proxy {}",
         target_host,
@@ -42,30 +42,30 @@ pub async fn connect(
     // stream.read_exact(&mut buf).await.unwrap();
     // console_log!("Received: {}", String::from_utf8_lossy(&buf));
 
-    use pki_types::CertificateDer;
-    use tls_client::{ClientConnection, ServerName, RustCryptoBackend};
     use std::sync::Arc;
-    use crate::hyper_io::FuturesIo;
+
     use futures::{channel::oneshot, AsyncWriteExt};
-    use wasm_bindgen_futures::spawn_local;
-    use tls_client_async::bind_client;
-    use hyper::{body::Bytes, Request, StatusCode};
     use http_body_util::{BodyExt, Full};
+    use hyper::{body::Bytes, Request, StatusCode};
+    use pki_types::CertificateDer;
+    use tls_client::{ClientConnection, RustCryptoBackend, ServerName};
+    use tls_client_async::bind_client;
+    use wasm_bindgen_futures::spawn_local;
+
+    use crate::hyper_io::FuturesIo;
 
     // === 1. Setup a websocket
     let (_, ws_stream) = WsMeta::connect(url.to_string(), None)
         .await
         .map_err(|e| JsValue::from_str(&format!("Could not connect to proxy: {:?}", e)))?;
 
-
     // === 2.  Setup a TLS Connection
     let target = format!("https://{}:{}", target_host, target_port);
     let target_url = Url::parse(&target)
         .map_err(|e| JsValue::from_str(&format!("Could not parse target_url: {:?}", e)))?;
-    
+
     console_log!("target_url: {:?}", target_url);
     console_log!("target_url: {:?}", target_url.host_str());
-    
 
     let target_host = target_url
         .host_str()
@@ -90,7 +90,6 @@ pub async fn connect(
         .with_root_certificates(root_store)
         .with_no_client_auth();
 
-
     let client = ClientConnection::new(
         Arc::new(config),
         Box::new(RustCryptoBackend::new()),
@@ -101,23 +100,22 @@ pub async fn connect(
 
     // TODO: Is this really needed?
     let client_tls_conn = unsafe { FuturesIo::new(client_tls_conn) };
-    
+
     // TODO: What do with tls_fut? what do with tls_receiver?
     let (tls_sender, tls_receiver) = oneshot::channel();
     let handled_tls_fut = async {
         let result = tls_fut.await;
-        // Triggered when the server shuts the connection. 
+        // Triggered when the server shuts the connection.
         console_log!("tls_sender.send({:?})", result);
         let _ = tls_sender.send(result);
     };
     spawn_local(handled_tls_fut);
 
-    // === 3. Do HTTP over the TLS Connection    
-    let (mut request_sender, connection) =
-         hyper::client::conn::http1::handshake(client_tls_conn)
-                .await
-                .map_err(|e| JsValue::from_str(&format!("Could not handshake: {:?}", e)))?;
-    
+    // === 3. Do HTTP over the TLS Connection
+    let (mut request_sender, connection) = hyper::client::conn::http1::handshake(client_tls_conn)
+        .await
+        .map_err(|e| JsValue::from_str(&format!("Could not handshake: {:?}", e)))?;
+
     let (connection_sender, connection_receiver) = oneshot::channel();
     let connection_fut = connection.without_shutdown();
     let handled_connection_fut = async {
@@ -129,8 +127,7 @@ pub async fn connect(
 
     let mut req_with_header = Request::builder()
         .uri(target_url.to_string())
-        .method("POST");  // TODO: test 
-
+        .method("POST"); // TODO: test
 
     console_log!("empty body");
     let unwrapped_request = req_with_header
@@ -171,13 +168,12 @@ pub async fn connect(
         .map_err(|e| JsValue::from_str(&format!("Could not get TlsConnection: {:?}", e)))?
         .io
         .into_inner();
-    
+
     client_socket
         .close()
         .await
         .map_err(|e| JsValue::from_str(&format!("Could not close socket: {:?}", e)))?;
     console_log!("closed client_socket");
-
 
     Ok("".into()) // TODO
 }
@@ -199,16 +195,16 @@ extern "C" {
 // - Using this, proxy derives the SHTK to decrypt the handshake
 // - Now that handshake is decrypted, verify certificate chain (out of circuit)
 
-
 // Client Side Proof
 // - Prove that the client derived the handshake key in a predictable manner
-// - i.e. the symmetric key is "proven" to be the mix of predictable local randomness
+// - i.e. the symmetric key is "proven" to be the mix of predictable local
+//   randomness
 // - compute "h7" => H(ClientHello||...||ServerCertVerify)
 // - compute "h2" => H(ClientHello||ServerHello)
 
 // In-circuit Verification (key derivation)
-// Goal: Prove that keys are derived legitimately 
-// 
+// Goal: Prove that keys are derived legitimately
+//
 // Witness (HS, H2, H3, SHTS)
 // SHTS <= HKDF.expand (HS,“s hs traffic” || H2)
 // dhs <= HKDF.expand (HS,“derived”, H(“ ”))
@@ -220,12 +216,13 @@ extern "C" {
 
 // Notes:
 // h7, h2, h3, h0 => all computed by the proxy
-// only private key must be hashed in circuit  (because proxy can check the rest)
-// 
+// only private key must be hashed in circuit  (because proxy can check the
+// rest)
+//
 
 // Out-of-circuit Verification
-// 
-// Witness SHTS, H7, SF 
+//
+// Witness SHTS, H7, SF
 // Fk <= HKDF expand (shts, finished) => TODO: What is this algorithm
 // SF' <= HMAC (Fk, H7)
 // SF1 == SF

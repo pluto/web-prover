@@ -1,19 +1,18 @@
+use std::{convert::Infallible, fs, io, sync::Arc};
+
 use http_body_util::combinators::BoxBody;
-use hyper::body::Bytes;
-use hyper::service::service_fn;
-use hyper::{body::Incoming, server::conn::http1};
-use hyper::{Method, Request, Response};
+use hyper::{
+    body::{Bytes, Incoming},
+    server::conn::http1,
+    service::service_fn,
+    Method, Request, Response,
+};
 use hyper_util::rt::TokioIo;
+use notary::routes;
 use pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::ServerConfig;
-use std::convert::Infallible;
-use std::sync::Arc;
-use std::{fs, io};
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
-
-use notary::routes;
-
 
 #[tokio::main]
 async fn main() {
@@ -92,6 +91,5 @@ fn load_private_key(filename: &str) -> io::Result<PrivateKeyDer<'static>> {
 fn error(err: String) -> io::Error {
     io::Error::new(io::ErrorKind::Other, err)
 }
-
 
 // TODO: Start exploring inner memory ciphertext logging

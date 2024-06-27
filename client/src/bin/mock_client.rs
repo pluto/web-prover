@@ -1,10 +1,12 @@
-//! This is a mock client for local testing that should have some degree of logic parity with the mobile target
+//! This is a mock client for local testing that should have some degree of
+//! logic parity with the mobile target
 
 use std::collections::HashMap;
 
 use anyhow::Result;
 use base64::prelude::*;
 use clap::Parser;
+use client::notary;
 use http_body_util::Full;
 use hyper::{body::Bytes, Request, Version};
 use hyper_util::rt::TokioIo;
@@ -16,8 +18,6 @@ use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::{debug, error, info, instrument, trace, trace_span, Level};
 use tracing_subscriber::EnvFilter;
 use url::Url;
-
-use client::notary;
 
 const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../../../vanilla-go-app/certs/ca-cert.cer");
 
@@ -78,7 +78,8 @@ async fn main() -> Result<()> {
 
         notary_host: "localhost".into(), // prod: tlsnotary.pluto.xyz
         notary_port: 7047,               // prod: 443
-        notary_ca_cert_path: "../fixture/tls/rootCA.crt".to_string(), /* prod: ./tlsnotary.pluto.xyz-rootca.crt */
+        notary_ca_cert_path: "../fixture/tls/rootCA.crt".to_string(), /* prod: ./tlsnotary.pluto.
+                                                                       * xyz-rootca.crt */
         notary_ca_cert_server_name: "tlsnotaryserver.io".to_string(), // prod: tlsnotary.pluto.xyz
     };
     info!("Client config: {:?}", config);

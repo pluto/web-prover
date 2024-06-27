@@ -1,17 +1,16 @@
+use std::{collections::HashMap, convert::Infallible};
+
 use http_body_util::{combinators::BoxBody, BodyExt, Empty, Full};
-use hyper::body::Bytes;
 use hyper::{
-    body::Incoming,
+    body::{Bytes, Incoming},
     header::{
         HeaderValue, CONNECTION, SEC_WEBSOCKET_ACCEPT, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION,
         UPGRADE,
     },
     upgrade::Upgraded,
+    Request, Response, StatusCode,
 };
-use hyper::{Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
-use std::collections::HashMap;
-use std::convert::Infallible;
 use tokio_tungstenite::{
     tungstenite::{handshake::derive_accept_key, protocol::Role},
     WebSocketStream,
@@ -176,23 +175,28 @@ async fn v1_websocket_handler(
     in_socket: WebSocketStream<TokioIo<Upgraded>>,
 ) {
     // let mut stream = ws_stream_tungstenite::WsStream::new(ws_stream);
-    
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio_tungstenite::tungstenite::protocol::Message;
-    use tokio::net::TcpStream;
+
     use std::net::SocketAddr;
-    use futures_util::{StreamExt, SinkExt};
+
+    use futures_util::{SinkExt, StreamExt};
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpStream,
+    };
+    use tokio_tungstenite::tungstenite::protocol::Message;
 
     let target_host = if target_host == "localhost" {
         "127.0.0.1"
     } else {
         &target_host
     };
-        
+
     let target_url = format!("{}:{}", target_host, target_port);
     println!("target: {}", target_url);
     let target_addr: SocketAddr = target_url.parse().expect("Invalid address");
-    let mut tcp_stream = TcpStream::connect(target_addr).await.expect("Failed to connect to TCP server");
+    let mut tcp_stream = TcpStream::connect(target_addr)
+        .await
+        .expect("Failed to connect to TCP server");
 
     let mut tcp_buf = [0; 4096];
 
