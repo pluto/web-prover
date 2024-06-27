@@ -7,10 +7,6 @@ edition = "2021"
 name = "mock_client"
 path = "src/bin/mock_client.rs"
 
-[[bin]]
-name = "wasm_proxy"
-path = "src/bin/wasm_proxy.rs"
-
 [dependencies]
 # CLI
 clap = { workspace = true }
