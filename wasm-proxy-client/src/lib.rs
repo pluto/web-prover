@@ -80,7 +80,7 @@ pub async fn connect(
         )
     }));
 
-    const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../../vanilla-go-app/certs/ca-cert.cer");
+    const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../../fixture/mock_server/ca-cert.cer");
     let cert = CertificateDer::from(LOCALHOST_DEBUG_CA_CERT.to_vec());
     let (added, _) = root_store.add_parsable_certificates(&[cert.to_vec()]);
     assert_eq!(added, 1);
@@ -96,13 +96,13 @@ pub async fn connect(
         ServerName::try_from(target_host).unwrap(),
     )
     .unwrap();
-    let (mut client_tls_conn, tls_fut) = bind_client(ws_stream.into_io(), client);
+    let (client_tls_conn, tls_fut) = bind_client(ws_stream.into_io(), client);
 
     // TODO: Is this really needed?
     let client_tls_conn = unsafe { FuturesIo::new(client_tls_conn) };
 
     // TODO: What do with tls_fut? what do with tls_receiver?
-    let (tls_sender, tls_receiver) = oneshot::channel();
+    let (tls_sender, _tls_receiver) = oneshot::channel();
     let handled_tls_fut = async {
         let result = tls_fut.await;
         // Triggered when the server shuts the connection.
@@ -125,7 +125,7 @@ pub async fn connect(
     };
     spawn_local(handled_connection_fut);
 
-    let mut req_with_header = Request::builder()
+    let req_with_header = Request::builder()
         .uri(target_url.to_string())
         .method("POST"); // TODO: test
 
