@@ -3,6 +3,14 @@ name = "client"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "mock_client"
+path = "src/bin/mock_client.rs"
+
+[[bin]]
+name = "wasm_proxy"
+path = "src/bin/wasm_proxy.rs"
+
 [dependencies]
 # CLI
 clap = { workspace = true }
@@ -39,9 +47,10 @@ tokio = { version = "1", features = [
 ] }
 
 
-tlsn-prover = { git = "https://github.com/pluto/tlsn.git" }
-tlsn-core = {  git = "https://github.com/pluto/tlsn.git" }
-tlsn-tls-client = {  git = "https://github.com/pluto/tlsn.git" }
+tlsn-prover = { git = "https://github.com/tlsnotary/tlsn.git" }
+tlsn-core = {  git = "https://github.com/tlsnotary/tlsn.git" }
+tlsn-tls-client = {  git = "https://github.com/tlsnotary/tlsn.git" }
+tlsn-tls-client-async = { git = "https://github.com/tlsnotary/tlsn.git" }
 
 webpki-roots = "0.26.1"
 pki-types = { package = "rustls-pki-types", version = "1.7" }

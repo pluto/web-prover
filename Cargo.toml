@@ -1,5 +1,5 @@
 [workspace]
-members = ["client/", "notary/", "tests/tester"]
+members = ["client/", "notary/", "tests/tester", "wasm"]
 resolver = "2"
 
 [workspace.dependencies]

@@ -1,3 +1,5 @@
+//! This is a mock client for local testing that should have some degree of logic parity with the mobile target
+
 use std::collections::HashMap;
 
 use anyhow::Result;
@@ -15,9 +17,9 @@ use tracing::{debug, error, info, instrument, trace, trace_span, Level};
 use tracing_subscriber::EnvFilter;
 use url::Url;
 
-mod notary;
+use client::notary;
 
-const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../../vanilla-go-app/certs/ca-cert.cer");
+const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../../../vanilla-go-app/certs/ca-cert.cer");
 
 #[derive(Deserialize, Clone, Debug)]
 struct Config {
@@ -76,7 +78,7 @@ async fn main() -> Result<()> {
 
         notary_host: "localhost".into(), // prod: tlsnotary.pluto.xyz
         notary_port: 7047,               // prod: 443
-        notary_ca_cert_path: "../tlsn/notary-server/fixture/tls/rootCA.crt".to_string(), /* prod: ./tlsnotary.pluto.xyz-rootca.crt */
+        notary_ca_cert_path: "../fixture/tls/rootCA.crt".to_string(), /* prod: ./tlsnotary.pluto.xyz-rootca.crt */
         notary_ca_cert_server_name: "tlsnotaryserver.io".to_string(), // prod: tlsnotary.pluto.xyz
     };
     info!("Client config: {:?}", config);

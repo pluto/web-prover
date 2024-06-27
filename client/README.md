@@ -1,7 +1,7 @@
-# client
+# Mock client
 
 ```shell
-cargo run -p client # to create webproof.json
+cargo run --bin mock_client
 ```
 
 ---
