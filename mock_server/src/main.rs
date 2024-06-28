@@ -44,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             };
 
             if let Err(err) = Builder::new(TokioExecutor::new())
-                .serve_connection(TokioIo::new(tls_stream), service_fn(hello))
+                .serve_connection(TokioIo::new(tls_stream), service_fn(response))
                 .await
             {
                 println!("failed to serve connection: {err:#}");
@@ -53,9 +53,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 }
 
-async fn hello(req: Request<hyper::body::Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
-    println!("Request: {:?}, Responding.", req.body());
-    Ok(Response::new(Full::new(Bytes::from("Hello, World!\n"))))
+async fn response(
+    req: Request<hyper::body::Incoming>,
+) -> Result<Response<Full<Bytes>>, Infallible> {
+    match req.uri().path() {
+        "/health" => Ok(Response::default()),
+        "/bin/1KB" => Ok(Response::new(Full::new(Bytes::from(vec![0; 1024])))),
+        "/bin/2KB" => Ok(Response::new(Full::new(Bytes::from(vec![0; 2048])))),
+        "/bin/4KB" => Ok(Response::new(Full::new(Bytes::from(vec![0; 4096])))),
+        "/bin/8KB" => Ok(Response::new(Full::new(Bytes::from(vec![0; 8192])))),
+        "/bin/10KB" => Ok(Response::new(Full::new(Bytes::from(vec![0; 10240])))),
+        "/bin/20KB" => Ok(Response::new(Full::new(Bytes::from(vec![0; 20480])))),
+        "/timeout" => {
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            Ok(Response::new(Full::new(Bytes::from(
+                "Timeout response after 5 seconds",
+            ))))
+        }
+        _ => {
+            let mut not_found = Response::new(Full::new(Bytes::from("Not Found")));
+            *not_found.status_mut() = hyper::StatusCode::NOT_FOUND;
+            Ok(not_found)
+        }
+    }
 }
 
 fn load_certs(filename: &str) -> io::Result<Vec<CertificateDer<'static>>> {
