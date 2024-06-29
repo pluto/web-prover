@@ -69,7 +69,7 @@ async fn main() -> Result<()> {
 
     let config = Config {
         target_method: "GET".into(),
-        target_url: format!("https://localhost:8065/{}", args.endpoint),
+        target_url: format!("https://localhost:8080/{}", args.endpoint),
         target_headers: Default::default(),
         target_body: "".to_string(),
 
@@ -78,7 +78,7 @@ async fn main() -> Result<()> {
 
         notary_host: "localhost".into(), // prod: tlsnotary.pluto.xyz
         notary_port: 7047,               // prod: 443
-        notary_ca_cert_path: "../fixture/tls/rootCA.crt".to_string(), /* prod: ./tlsnotary.pluto.
+        notary_ca_cert_path: "fixture/tls/rootCA.crt".to_string(), /* prod: ./tlsnotary.pluto.
                                           * xyz-rootca.crt */
         notary_ca_cert_server_name: "tlsnotaryserver.io".to_string(), // prod: tlsnotary.pluto.xyz
     };
