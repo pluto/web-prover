@@ -13,7 +13,7 @@ use hyper_util::rt::TokioIo;
 use rustls::ServerConfig;
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
-use webprover::{load_certs, load_private_key, routes};
+use web_prover::{load_certs, load_private_key, routes};
 
 #[tokio::main]
 async fn main() {

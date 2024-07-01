@@ -3,9 +3,8 @@
 # may require developer to install toolchain:
 # rustup component add rust-src --toolchain nightly-2024-06-19-x86_64-unknown-linux-gnu
 
-
 [toolchain]
-channel = "nightly-2024-06-19"
+channel="nightly-2024-06-19"
 # components = [ "rustfmt", "rustc-dev" ]
 # targets = [ "wasm32-unknown-unknown", "thumbv2-none-eabi" ]
 # profile = "minimal"

@@ -17,9 +17,9 @@ use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::{debug, error, info, instrument, trace, trace_span, Level};
 use tracing_subscriber::EnvFilter;
 use url::Url;
-use webprover::notary;
+use web_prover::notary;
 
-const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../../../fixture/mock_server/ca-cert.cer");
+const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../fixture/mock_server/ca-cert.cer");
 
 #[derive(Deserialize, Clone, Debug)]
 struct Config {
