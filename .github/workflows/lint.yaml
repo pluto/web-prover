@@ -38,12 +38,15 @@ jobs:
 
       - name: install rust toolchain
         run: rustup toolchain install nightly-2024-06-10
+    
+      - name: set nightly as default
+        run: rustup default nightly-2024-06-10    
 
       - name: install udeps
         run: cargo install --git https://github.com/est31/cargo-udeps --locked
 
       - name: cargo udeps
-        run: cargo udeps
+        run: cargo +nightly-2024-06-10 udeps
 
   fmt:
     name: fmt project
