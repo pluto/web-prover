@@ -26,6 +26,9 @@ jobs:
     - name: Install target for iOS
       run: rustup target add aarch64-apple-ios
 
+    - name: Install bindgen-cli
+      run: cargo install --force --locked bindgen-cli
+
     - name: Build IOS Client
       run:  cargo build -p webprover --bin mock_client --target aarch64-apple-ios  
     
