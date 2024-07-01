@@ -19,10 +19,7 @@ tlsn-tls-client-async = { git = "https://github.com/tlsnotary/tlsn.git" }
 
 pin-project-lite = "0.2.4"
 hyper = { version = "1.1", features = ["client", "http1"] }
-hyper-util = { version = "0.1", features = ["http1"] }
 serde = { version = "1.0.147", features = ["derive"] }
-serde-wasm-bindgen = "0.6.5"
-serde_json = "1.0"
 http-body-util = "0.1"
 
 webpki-roots = "0.26.1"

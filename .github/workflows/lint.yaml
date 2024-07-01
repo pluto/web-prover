@@ -14,32 +14,34 @@ env:
   CARGO_TERM_COLOR: always # pretty colors
 
 jobs:
-  # BLOCKED: 
-  # lint: 
-  #   name: lint project
-  #   runs-on: ubuntu-latest
-  #   strategy:
-  #     matrix:
-  #       toolchain:
-  #         - nightly
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
-  #     - run: rustup component add clippy
-  #     - run: cargo clippy -- -Dwarnings
+  clippy: 
+    name: clippy
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain:
+          - nightly
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup component add clippy
+      - run: cargo clippy -- -Dwarnings
   
   # adding tests to CI slows development speed at the cost of increasing alignment; uncomment when ready
-  # test:
-  #   name: test project
-  #   runs-on: ubuntu-latest
-  #   strategy:
-  #     matrix:
-  #       toolchain:
-  #         - nightly
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
-  #     - run: cargo test --all-features --verbose
+  udeps:
+    name: udeps
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        toolchain:
+          - nightly
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: install udeps
+        run: cargo install --git https://github.com/est31/cargo-udeps --locked
+
+      - name: cargo udeps
+        run: cargo udeps
 
   fmt:
     name: fmt project
@@ -51,8 +53,6 @@ jobs:
     steps:
       - name: checkout repo
         uses: actions/checkout@v4
-        with:
-          submodules: true
       - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
       - run: rustup component add rustfmt
       - run: cargo fmt --all -- --check
