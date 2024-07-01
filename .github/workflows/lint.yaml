@@ -3,7 +3,7 @@
 # Examples: https://github.com/actions/starter-workflows
 # Process: make small changes, push them, check the Actions tab on github
 # also see templates https://github.com/rust-github/template/tree/main/.github/workflows
-name: Rust
+name: Lint
 on:
   push:
     branches: [ "main" ]
@@ -14,28 +14,30 @@ env:
   CARGO_TERM_COLOR: always # pretty colors
 
 jobs:
-  clippy: 
+  clippy:
     name: clippy
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        toolchain:
-          - nightly
+
     steps:
-      - uses: actions/checkout@v4
-      - run: rustup component add clippy
-      - run: cargo clippy -- -Dwarnings
+      - uses: actions/checkout@v3
+
+      - name: install rust toolchain
+        run: rustup toolchain install nightly-2024-06-10
+
+      - name: Install Clippy
+        run: rustup component add --toolchain nightly-2024-06-10 clippy
+      
+      - name: cargo clippy
+        run: cargo clippy --all
   
-  # adding tests to CI slows development speed at the cost of increasing alignment; uncomment when ready
   udeps:
     name: udeps
     runs-on: macos-latest
-    strategy:
-      matrix:
-        toolchain:
-          - nightly
     steps:
       - uses: actions/checkout@v3
+
+      - name: install rust toolchain
+        run: rustup toolchain install nightly-2024-06-10
 
       - name: install udeps
         run: cargo install --git https://github.com/est31/cargo-udeps --locked
