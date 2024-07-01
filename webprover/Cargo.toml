@@ -1,11 +1,23 @@
 [package]
-name = "client"
+name = "webprover"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
 name = "mock_client"
 path = "src/bin/mock_client.rs"
+
+[[bin]]
+name = "tlsn"
+path = "src/bin/tlsn.rs"
+
+[[bin]]
+name = "proxy"
+path = "src/bin/proxy.rs"
+
+[[bin]]
+name = "mock_target"
+path = "src/bin/mock_target.rs"
 
 [dependencies]
 # CLI
@@ -23,16 +35,16 @@ anyhow = "1.0.86"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
-hyper = { version = "1.1", features = ["client", "http1"] }
+hyper = { version = "1.1", features = ["client", "http1", "full"] }
 hyper-util = { version = "0.1", features = ["full"] }
 http-body-util = "0.1"
 
-rustls = { version = "0.21" }
-rustls-pemfile = { version = "1.0.2" }
+rustls = { version = "0.23.10" }
+rustls-pemfile = { version = "2.0.0" }
 
 futures = "0.3"
 tokio-util = "0.7"
-tokio-rustls = { version = "0.24.1" }
+tokio-rustls = { version = "0.26.0" }
 tokio = { version = "1", features = [
   "rt",
   "rt-multi-thread",
@@ -41,6 +53,14 @@ tokio = { version = "1", features = [
   "io-std",
   "fs",
 ] }
+
+notary-server = { git = "https://github.com/tlsnotary/tlsn.git "}
+eyre = "0.6.8"
+structopt = "0.3.26"
+
+futures-util = "0.3"
+form_urlencoded = "1.2.1"
+tokio-tungstenite = "0.23.0"
 
 
 tlsn-prover = { git = "https://github.com/tlsnotary/tlsn.git" }

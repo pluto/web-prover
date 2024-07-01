@@ -4,32 +4,23 @@ There are two end to end flows we test here.
 - a rust binary that represents the mobile SDK target
 - a web assembly client (`wasm-client`) 
 
-In `web-prover` you can think of there being three distinct asynchronus processes for every notarization:
-- The `notary/` directory which has our different notaries. For example there is the `tlsn` who performs garbled-circuit 2-party computation with the client to compute TLS session ciphertext and authentication messages
-- The `client/`, i.e. a user wanting to make a web proof of some their TLS session with some server
-- a mock server, `mock_target`, that responds to client request with a dummy response.
-
 ## Client Abstraction
 
 The client is designed to be egnostic both over build targets, the underlying networking protocol, and the underlying notarization scheme. 
 
 ## End to End testing for Mobile Target
-The specific binaries for this test are:
-- `notary/src/bin/tlsn` : Representing the notary server
-- `mock_target` : Representing a mock server (mocking venmo)
-- `clien/src/bin/mock_client`: representing a user
 
 1) Start the notary. From the root directory run:
 ```sh
-cargo run --release -p notary --bin tlsn
+cargo run -p webprover --bin tlsn --release
 ```
 2) Run the mock target.
 ```sh
-cargo run -p mock_target
+cargo run -p webprover --bin mock_target
 ```
 3) Run the mock client
 ```sh
-cargo run --release --bin mock_client
+cargo run -p webprover --bin mock_client
 ```
 
 

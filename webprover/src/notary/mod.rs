@@ -1,15 +1,18 @@
-use std::{io::BufReader, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::Result;
 use http_body_util::{BodyExt as _, Either, Empty, Full};
 use hyper::{client::conn::http1::Parts, Request, StatusCode};
 use hyper_util::rt::TokioIo;
-use rustls::{Certificate, ClientConfig, RootCertStore};
+use rustls::{ClientConfig, RootCertStore};
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 use tokio_util::bytes::Bytes;
 use tracing::{debug, info, instrument, trace, trace_span};
+use pki_types::ServerName;
+
+use crate::load_certs;
 
 /// Types of client that the prover is using
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -61,26 +64,14 @@ pub async fn request_notarization(
     notary_ca_cert_server_name: &str,
 ) -> Result<(tokio_rustls::client::TlsStream<TcpStream>, String)> {
     // Read notary CA certificate
-    let certificate = {
-        let span = trace_span!("read_certificate");
-        let _enter = span.enter();
-        trace!(path = ?notary_ca_cert_path, "Reading certificate");
-        let mut certificate_file_reader = read_pem_file(notary_ca_cert_path).await?;
-        let mut certificates: Vec<Certificate> =
-            rustls_pemfile::certs(&mut certificate_file_reader)?
-                .into_iter()
-                .map(Certificate)
-                .collect();
-        certificates.remove(0)
-    };
-
+    let certificate = load_certs(notary_ca_cert_path)?.remove(0);
     // Configure root store
     let root_store = {
         let span = trace_span!("configure_root_store");
         let _enter = span.enter();
         trace!("Configuring root store with certificate: {:?}", certificate);
         let mut root_store = RootCertStore::empty();
-        root_store.add(&certificate)?;
+        root_store.add(certificate)?;
         root_store
     };
 
@@ -90,7 +81,6 @@ pub async fn request_notarization(
         let _enter = span.enter();
         trace!("Configuring client with root store: {:?}", root_store);
         ClientConfig::builder()
-            .with_safe_defaults()
             .with_root_certificates(root_store)
             .with_no_client_auth()
     };
@@ -110,7 +100,7 @@ pub async fn request_notarization(
         // Require the domain name of notary server to be the same as that in the server
         // cert
         let notary_tls_socket = notary_connector
-            .connect(notary_ca_cert_server_name.try_into()?, notary_socket)
+            .connect(ServerName::try_from(notary_ca_cert_server_name.to_owned())?, notary_socket)
             .await?;
 
         // Attach the hyper HTTP client to the notary TLS connection to send request to
@@ -209,10 +199,4 @@ pub async fn request_notarization(
         notary_tls_socket.into_inner(),
         notarization_response.session_id,
     ))
-}
-
-/// Read a PEM-formatted file and return its buffer reader
-async fn read_pem_file(file_path: &str) -> Result<BufReader<std::fs::File>> {
-    let key_file = tokio::fs::File::open(file_path).await?.into_std().await;
-    Ok(BufReader::new(key_file))
 }
