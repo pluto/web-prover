@@ -16,12 +16,12 @@ notarization:
 
 tls:
   enabled: true
-  private-key-pem-path: "./fixture/tls/notary.key"
-  certificate-pem-path: "./fixture/tls/notary.crt"
+  private-key-pem-path: "./src/fixture/tls/notary.key"
+  certificate-pem-path: "./src/fixture/tls/notary.crt"
 
 notary-key:
-  private-key-pem-path: "./fixture/notary/notary.key"
-  public-key-pem-path: "./fixture/notary/notary.pub"
+  private-key-pem-path: "./src/fixture/notary/notary.key"
+  public-key-pem-path: "./src/fixture/notary/notary.pub"
 
 logging:
   level: DEBUG
