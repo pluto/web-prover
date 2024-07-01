@@ -3,9 +3,8 @@
 
 [toolchain]
 # what toolchain to use. 
-channel="nightly"
-components = ["rustfmt", "clippy", "check"]
-
+channel   ="nightly"
+components=["rustfmt", "clippy", "check"]
 
 # option to specify a date to pin to a particular release 
 # date = "2024-03-19"
@@ -23,6 +22,6 @@ profile="default"
 # targets are additional platforms to support. Most commonly used for WASM or cross-compiling.
 # cross compilation docs: https://rust-lang.github.io/rustup/cross-compilation.html
 # list of platforms: https://doc.rust-lang.org/nightly/rustc/platform-support.html
-targets = ["wasm32-unknown-unknown", "aarch64-apple-ios"]
+targets=["wasm32-unknown-unknown", "aarch64-apple-ios"]
 [profile.release]
-opt-level = "z"
+opt-level="z"

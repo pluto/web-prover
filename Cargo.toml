@@ -1,15 +1,9 @@
 [workspace]
-members = ["webprover/", "wasm-proxy-client/"]
-resolver = "2"
+members =["webprover/", "wasm-proxy-client/"]
+resolver="2"
 
 [workspace.dependencies]
-# CLI
-clap = { version = "4.5.7", features = ["derive"] }
-tlsn-prover = {git = "https://github.com/tlsnotary/tlsn.git"}
-tlsn-core = {git = "https://github.com/tlsnotary/tlsn.git"}
-tlsn-tls-client = {git = "https://github.com/tlsnotary/tlsn.git"}
-
-# [patch."https:/github.com/pluto/tlsn.git"]
-# tlsn-prover = { path = "../tlsn/tlsn/tlsn-prover" }
-# tlsn-core = { path = "../tlsn/tlsn/tlsn-core"}
-# tlsn-tls-client = { path = "../tlsn/components/tls/tls-client" }
+clap           ={ version="4.5.7", features=["derive"] }
+tlsn-prover    ={ git="https://github.com/tlsnotary/tlsn.git" }
+tlsn-core      ={ git="https://github.com/tlsnotary/tlsn.git" }
+tlsn-tls-client={ git="https://github.com/tlsnotary/tlsn.git" }
