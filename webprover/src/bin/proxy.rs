@@ -1,4 +1,6 @@
-use std::{convert::Infallible, fs, io, sync::Arc};
+//! This is a proxy notarization server
+
+use std::{convert::Infallible, sync::Arc};
 
 use http_body_util::combinators::BoxBody;
 use hyper::{
@@ -8,11 +10,10 @@ use hyper::{
     Method, Request, Response,
 };
 use hyper_util::rt::TokioIo;
-use notary::routes;
-use pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::ServerConfig;
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
+use webprover::{load_certs, load_private_key, routes};
 
 #[tokio::main]
 async fn main() {
@@ -73,23 +74,3 @@ async fn handle_request(
         _ => routes::not_found(req).await,
     }
 }
-
-fn load_certs(filename: &str) -> io::Result<Vec<CertificateDer<'static>>> {
-    let certfile = fs::File::open(filename)
-        .map_err(|e| error(format!("failed to open {}: {}", filename, e)))?;
-    let mut reader = io::BufReader::new(certfile);
-    rustls_pemfile::certs(&mut reader).collect()
-}
-
-fn load_private_key(filename: &str) -> io::Result<PrivateKeyDer<'static>> {
-    let keyfile = fs::File::open(filename)
-        .map_err(|e| error(format!("failed to open {}: {}", filename, e)))?;
-    let mut reader = io::BufReader::new(keyfile);
-    rustls_pemfile::private_key(&mut reader).map(|key| key.unwrap())
-}
-
-fn error(err: String) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, err)
-}
-
-// TODO: Start exploring inner memory ciphertext logging
