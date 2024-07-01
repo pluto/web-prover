@@ -32,4 +32,3 @@ rustls = "0.23.9"
 tokio-rustls = "0.26.0"
 form_urlencoded = "1.2.1"
 tokio-tungstenite = "0.23.0"
-ws_stream_tungstenite = { git = "https://github.com/pluto/ws_stream_tungstenite", branch = "tokio-tungstenite", features = ["tokio_io"] }

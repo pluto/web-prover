@@ -1,0 +1,63 @@
+# Rust template: https://github.com/actions/starter-workflows/blob/main/ci/rust.yml
+# Resources: https://docs.github.com/en/actions
+# Examples: https://github.com/actions/starter-workflows
+# Process: make small changes, push them, check the Actions tab on github
+# also see templates https://github.com/rust-github/template/tree/main/.github/workflows
+name: Lint
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always # pretty colors
+
+jobs:
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: install rust toolchain
+        run: rustup toolchain install nightly-2024-06-10
+
+      - name: Install Clippy
+        run: rustup component add --toolchain nightly-2024-06-10 clippy
+      
+      - name: cargo clippy
+        run: cargo clippy --all
+  
+  udeps:
+    name: udeps
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: install rust toolchain
+        run: rustup toolchain install nightly-2024-06-10
+    
+      - name: set nightly as default
+        run: rustup default nightly-2024-06-10    
+
+      - name: install udeps
+        run: cargo install --git https://github.com/est31/cargo-udeps --locked
+
+      - name: cargo udeps
+        run: cargo +nightly-2024-06-10 udeps
+
+  fmt:
+    name: fmt project
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain:
+          - nightly
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v4
+      - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+      - run: rustup component add rustfmt
+      - run: cargo fmt --all -- --check

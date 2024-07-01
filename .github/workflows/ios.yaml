@@ -1,0 +1,31 @@
+name: IOS
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly-aarch64-apple-darwin
+        profile: minimal
+        override: true
+
+    - name: Install target for iOS
+      run: rustup target add aarch64-apple-ios
+
+    - name: Build IOS Client
+      run:  cargo build -p client --target aarch64-apple-ios  
+    

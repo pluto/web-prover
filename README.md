@@ -9,6 +9,10 @@ In `web-prover` you can think of there being three distinct asynchronus processe
 - The `client/`, i.e. a user wanting to make a web proof of some their TLS session with some server
 - a mock server, `mock_target`, that responds to client request with a dummy response.
 
+## Client Abstraction
+
+The client is designed to be egnostic both over build targets, the underlying networking protocol, and the underlying notarization scheme. 
+
 ## End to End testing for Mobile Target
 The specific binaries for this test are:
 - `notary/src/bin/tlsn` : Representing the notary server
@@ -39,7 +43,16 @@ To run with other endpoints you can pass the `--endpoint` flag followed by the e
 ## End to End testing WASM target
 TODO
 
+Run wasm with 
+```sh
+wasm-pack build --target web wasm-proxy-client     
+``` 
+
+
 ## Known Reproducible Failures
+
+- `error: failed to run custom build command for ring v0.17.8`. If you run into this error you machine is not using the right llvm path and you should prefix this command with `PATH="/opt/homebrew/opt/llvm/bin:$PATH"`. If this still doesn't 
+
 There have a been a number of reproducible failures we have discovered.
 
 1. [Exceed Transcript Size](https://github.com/pluto/tlsn-monorepo/issues/15)
