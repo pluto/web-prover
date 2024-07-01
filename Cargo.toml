@@ -1,5 +1,5 @@
 [workspace]
-members = ["webprover/", "tests/tester", "wasm-proxy-client/"]
+members = ["webprover/", "wasm-proxy-client/"]
 resolver = "2"
 
 [workspace.dependencies]

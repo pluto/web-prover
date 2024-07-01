@@ -1,9 +1,9 @@
 pub mod notary;
 pub mod routes;
-use pki_types::{CertificateDer, PrivateKeyDer};
 use std::{fs, io};
-use anyhow::Result;
 
+use anyhow::Result;
+use pki_types::{CertificateDer, PrivateKeyDer};
 
 pub fn load_certs(filename: &str) -> io::Result<Vec<CertificateDer<'static>>> {
     let certfile = fs::File::open(filename)

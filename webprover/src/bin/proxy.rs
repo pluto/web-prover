@@ -2,7 +2,6 @@
 
 use std::{convert::Infallible, sync::Arc};
 
-use webprover::{load_certs, load_private_key};
 use http_body_util::combinators::BoxBody;
 use hyper::{
     body::{Bytes, Incoming},
@@ -11,10 +10,10 @@ use hyper::{
     Method, Request, Response,
 };
 use hyper_util::rt::TokioIo;
-use webprover::routes;
 use rustls::ServerConfig;
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
+use webprover::{load_certs, load_private_key, routes};
 
 #[tokio::main]
 async fn main() {

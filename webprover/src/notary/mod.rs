@@ -4,13 +4,13 @@ use anyhow::Result;
 use http_body_util::{BodyExt as _, Either, Empty, Full};
 use hyper::{client::conn::http1::Parts, Request, StatusCode};
 use hyper_util::rt::TokioIo;
+use pki_types::ServerName;
 use rustls::{ClientConfig, RootCertStore};
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 use tokio_util::bytes::Bytes;
 use tracing::{debug, info, instrument, trace, trace_span};
-use pki_types::ServerName;
 
 use crate::load_certs;
 
@@ -100,7 +100,10 @@ pub async fn request_notarization(
         // Require the domain name of notary server to be the same as that in the server
         // cert
         let notary_tls_socket = notary_connector
-            .connect(ServerName::try_from(notary_ca_cert_server_name.to_owned())?, notary_socket)
+            .connect(
+                ServerName::try_from(notary_ca_cert_server_name.to_owned())?,
+                notary_socket,
+            )
             .await?;
 
         // Attach the hyper HTTP client to the notary TLS connection to send request to

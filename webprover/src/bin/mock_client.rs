@@ -6,7 +6,6 @@ use std::collections::HashMap;
 use anyhow::Result;
 use base64::prelude::*;
 use clap::Parser;
-use webprover::notary;
 use http_body_util::Full;
 use hyper::{body::Bytes, Request, Version};
 use hyper_util::rt::TokioIo;
@@ -18,6 +17,7 @@ use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::{debug, error, info, instrument, trace, trace_span, Level};
 use tracing_subscriber::EnvFilter;
 use url::Url;
+use webprover::notary;
 
 const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../../../fixture/mock_server/ca-cert.cer");
 
