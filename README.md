@@ -42,9 +42,4 @@ wasm-pack build --target web wasm-proxy-client
 
 ## Known Reproducible Failures
 
-- `error: failed to run custom build command for ring v0.17.8`. If you run into this error you machine is not using the right llvm path and you should prefix this command with `PATH="/opt/homebrew/opt/llvm/bin:$PATH"`. If this still doesn't 
-
-There have a been a number of reproducible failures we have discovered.
-
-1. [Exceed Transcript Size](https://github.com/pluto/tlsn-monorepo/issues/15)
-2. [Transfer-Encoding](https://github.com/pluto/tlsn-monorepo/issues/14)
+- `error: failed to run custom build command for ring v0.17.8`. If you run into this error you machine is not using the right llvm path and you should prefix this command with `PATH="/opt/homebrew/opt/llvm/bin:$PATH"`. If this still doesn't work install with `brew install llvm`

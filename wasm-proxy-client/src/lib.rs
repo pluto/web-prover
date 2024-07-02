@@ -80,7 +80,7 @@ pub async fn connect(
         )
     }));
 
-    const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../../fixture/mock_server/ca-cert.cer");
+    const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../../src/fixture/mock_server/ca-cert.cer");
     let cert = CertificateDer::from(LOCALHOST_DEBUG_CA_CERT.to_vec());
     let (added, _) = root_store.add_parsable_certificates(&[cert.to_vec()]);
     assert_eq!(added, 1);
