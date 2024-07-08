@@ -3,6 +3,7 @@ use notary_server::{
   init_tracing, parse_config_file, run_server, CliFields, NotaryServerError, NotaryServerProperties,
 };
 use structopt::StructOpt;
+#[cfg(feature = "tracing")]
 use tracing::debug;
 
 #[tokio::main]
@@ -13,7 +14,7 @@ async fn main() -> Result<(), NotaryServerError> {
 
   // Set up tracing for logging
   init_tracing(&config).map_err(|err| eyre!("Failed to set up tracing: {err}"))?;
-
+  #[cfg(feature = "tracing")]
   debug!(?config, "Server config loaded");
 
   // Run the server

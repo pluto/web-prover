@@ -25,7 +25,6 @@ use {
 type NetworkStream = TlsStream<TcpStream>;
 
 use super::*;
-
 use crate::load_certs;
 
 // TODO: The `ClientType` and  `NotarizationSessionRequest` and `NotarizationSessionResponse` is
@@ -43,16 +42,16 @@ pub async fn request_notarization(
   //---------------------------------------------------------------------------------------------------------------------------------------//
   // Get the certs and add them to the root store
   //---------------------------------------------------------------------------------------------------------------------------------------//
-    #[cfg(feature = "tracing")]
-    let _span = tracing::span!(tracing::Level::TRACE, "add_certs_to_root_store").entered();
-    let certificate = load_certs(notary_ca_cert_path)?.remove(0);
-    let mut root_store = RootCertStore::empty();
-    root_store.add(certificate)?;
-    #[cfg(feature = "tracing")]
-    info!("certs added to root store");
-    #[cfg(feature = "tracing")]
-    drop(_span);
-//---------------------------------------------------------------------------------------------------------------------------------------//
+  #[cfg(feature = "tracing")]
+  let _span = tracing::span!(tracing::Level::TRACE, "add_certs_to_root_store").entered();
+  let certificate = load_certs(notary_ca_cert_path)?.remove(0);
+  let mut root_store = RootCertStore::empty();
+  root_store.add(certificate)?;
+  #[cfg(feature = "tracing")]
+  info!("certs added to root store");
+  #[cfg(feature = "tracing")]
+  drop(_span);
+  //---------------------------------------------------------------------------------------------------------------------------------------//
   // Create and maintain a TLS session between the client and the notary
   //---------------------------------------------------------------------------------------------------------------------------------------//
   #[cfg(feature = "tracing")]

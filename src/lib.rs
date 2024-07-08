@@ -1,14 +1,12 @@
+pub mod client;
+pub mod errors;
 pub mod notary;
 pub mod routes;
-pub mod errors;
-pub mod client;
 pub use errors::ClientErrors;
 
 #[cfg(target_arch = "wasm32")] pub mod verify;
 #[cfg(target_arch = "wasm32")] pub mod wasm_utils;
-use std::{fs, io};
-
-use std::collections::HashMap;
+use std::{collections::HashMap, fs, io};
 
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "tracing")]
@@ -36,7 +34,7 @@ pub struct Config {
   pub target_headers:               HashMap<String, String>,
   pub target_body:                  String,
   #[cfg(feature = "websocket")]
-  _websocket_proxy_url:          String,
+  _websocket_proxy_url:             String,
   pub notarization_session_request: NotarizationSessionRequest,
   pub notary_ca_cert_path:          String,
 }

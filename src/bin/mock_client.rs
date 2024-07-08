@@ -14,10 +14,12 @@ use serde::Deserialize;
 use tlsn_core::{commitment::CommitmentKind, proof::TlsProof};
 use tlsn_prover::tls::{Prover, ProverConfig};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
+#[cfg(feature = "tracing")]
 use tracing::{debug, error, info, instrument, trace, trace_span, Level};
+#[cfg(feature = "tracing")]
 use tracing_subscriber::EnvFilter;
 use url::Url;
-use web_prover::notary;
+use web_prover::{notary, ClientType, NotarizationSessionRequest};
 
 const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../fixture/mock_server/ca-cert.cer");
 
@@ -27,14 +29,10 @@ struct Config {
   target_url:     String,
   target_headers: HashMap<String, Vec<String>>,
   target_body:    String,
-
-  max_sent_data: Option<usize>,
-  max_recv_data: Option<usize>,
-
+  notarization_session_request: NotarizationSessionRequest,
   notary_host:                String,
   notary_port:                u16,
   notary_ca_cert_path:        String,
-  notary_ca_cert_server_name: String,
 }
 
 #[derive(Parser)]
@@ -48,11 +46,12 @@ struct Args {
   endpoint: String,
 }
 
-#[instrument(level = "info")]
+#[cfg_attr(feature = "tracing", tracing::instrument(level = "info", ))]
 #[tokio::main]
 async fn main() -> Result<()> {
   let args = Args::parse();
 
+  #[cfg(feature = "tracing")]
   let log_level = match args.log_level.to_lowercase().as_str() {
     "error" => Level::ERROR,
     "warn" => Level::WARN,
@@ -62,8 +61,10 @@ async fn main() -> Result<()> {
   };
   let crate_name = env!("CARGO_PKG_NAME");
 
+  #[cfg(feature = "tracing")]
   let env_filter = EnvFilter::builder().parse_lossy(&format!("{}={},info", crate_name, log_level));
 
+  #[cfg(feature = "tracing")]
   tracing_subscriber::fmt().with_env_filter(env_filter).init();
 
   let config = Config {
@@ -72,25 +73,29 @@ async fn main() -> Result<()> {
     target_headers: Default::default(),
     target_body:    "".to_string(),
 
-    max_sent_data: Some(4096),
-    max_recv_data: Some(16384),
+    notarization_session_request: NotarizationSessionRequest {
+      client_type:   ClientType::Tcp,
+      max_sent_data: Some(4096),
+      max_recv_data: Some(16384),
+    },
 
     notary_host:                "localhost".into(), // prod: tlsnotary.pluto.xyz
     notary_port:                7047,               // prod: 443
     notary_ca_cert_path:        "fixture/tls/rootCA.crt".to_string(), /* prod: ./tlsnotary.pluto.
                                                      * xyz-rootca.crt */
-    notary_ca_cert_server_name: "tlsnotaryserver.io".to_string(), // prod: tlsnotary.pluto.xyz
   };
+  #[cfg(feature = "tracing")]
   info!("Client config: {:?}", config);
 
   let proof = prover(config).await?;
   let proof_json = serde_json::to_string_pretty(&proof)?;
   std::fs::write("webproof.json", proof_json)?;
+  #[cfg(feature = "tracing")]
   info!("Proof complete. Proof written to `webproof.json`");
   Ok(())
 }
 
-#[instrument(skip(config), level = "debug")]
+#[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(config)))]
 async fn prover(config: Config) -> Result<TlsProof> {
   // Verify the server at the target URL is using HTTPS
   let parsed_url = Url::parse(&config.target_url).expect("Failed to parse target_url");
@@ -101,14 +106,18 @@ async fn prover(config: Config) -> Result<TlsProof> {
   let (notary_tls_socket, session_id) = notary::request_notarization(
     &config.notary_host,
     config.notary_port,
+    &config.notarization_session_request,
     &config.notary_ca_cert_path,
   )
   .await?;
+#[cfg(feature = "tracing")]
   info!("Created a notarization session with session_id: {}", session_id);
 
   // Load the CA certificate for the notary server
   let root_store = {
+    #[cfg(feature = "tracing")]
     let span = trace_span!("load_ca_cert");
+    #[cfg(feature = "tracing")]
     let _enter = span.enter();
     let mut root_store = tls_client::RootCertStore::empty();
     root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
@@ -119,6 +128,7 @@ async fn prover(config: Config) -> Result<TlsProof> {
       )
     }));
     let cert = CertificateDer::from(LOCALHOST_DEBUG_CA_CERT.to_vec());
+    #[cfg(feature = "tracing")]
     trace!("Adding X509 certificate to root store: {:?}", cert);
     let (added, _) = root_store.add_parsable_certificates(&[cert.to_vec()]);
     assert_eq!(added, 1);
@@ -128,7 +138,9 @@ async fn prover(config: Config) -> Result<TlsProof> {
   // Create a basic default prover config using the session_id returned from
   // session endpoint
   let prover = {
+    #[cfg(feature = "tracing")]
     let span = trace_span!("prover_configuration");
+    #[cfg(feature = "tracing")]
     let _enter = span.enter();
 
     let pconfig = ProverConfig::builder()
@@ -136,6 +148,7 @@ async fn prover(config: Config) -> Result<TlsProof> {
       .server_dns(server_domain)
       .root_cert_store(root_store)
       .build()?;
+    #[cfg(feature = "tracing")]
     trace!("Creating prover with config: {:?}", pconfig);
 
     // Create a new prover and set up the MPC backend.
@@ -148,11 +161,13 @@ async fn prover(config: Config) -> Result<TlsProof> {
     _ => 443,
   }))
   .await?;
+  #[cfg(feature = "tracing")]
   trace!("Connected to server via TCP socket: {:?}", client_socket);
 
   // Bind the Prover to server connection
   let (tls_connection, prover_fut) = prover.connect(client_socket.compat()).await?;
   let tls_connection = TokioIo::new(tls_connection.compat());
+  #[cfg(feature = "tracing")]
   debug!("Prover connected to server via TLS: {:?}", tls_connection);
 
   // Grab a control handle to the Prover
@@ -160,6 +175,7 @@ async fn prover(config: Config) -> Result<TlsProof> {
 
   // Spawn the Prover to be run concurrently
   let prover_task = tokio::spawn(prover_fut);
+  #[cfg(feature = "tracing")]
   debug!("Prover task spawned");
 
   // Attach the hyper HTTP client to the TLS connection
@@ -168,12 +184,15 @@ async fn prover(config: Config) -> Result<TlsProof> {
 
   // Spawn the HTTP task to be run concurrently
   tokio::spawn(connection);
+  #[cfg(feature = "tracing")]
   debug!("HTTP task spawned");
 
   // Send the HTTP request to the server
   // TODO: To do what exactly?
   {
+    #[cfg(feature = "tracing")]
     let span = trace_span!("http_request");
+    #[cfg(feature = "tracing")]
     let _enter = span.enter();
     let mut request = Request::builder()
       .method(config.target_method.as_str())
@@ -204,19 +223,22 @@ async fn prover(config: Config) -> Result<TlsProof> {
     };
 
     let request = request.body(body)?;
-
+    #[cfg(feature = "tracing")]
     debug!("Sending request: {:?}", request);
 
     // Because we don't need to decrypt the response right away, we can defer
     // decryption until after the connection is closed. This will speed up the
     // proving process!
     prover_ctrl.defer_decryption().await?;
+    #[cfg(feature = "tracing")]
     trace!("Decryption deferred");
 
     match request_sender.send_request(request).await {
       Ok(response) => {
+        #[cfg(feature = "tracing")]
         debug!("Response: {:?}", response.status());
         assert!(response.status().is_success()); // status is 200-299
+        #[cfg(feature = "tracing")]
         debug!("Respose: OK");
       },
       Err(e) if e.is_incomplete_message() => {
@@ -224,22 +246,26 @@ async fn prover(config: Config) -> Result<TlsProof> {
       }, // TODO
       Err(e) => panic!("{:?}", e),
     };
-
+    #[cfg(feature = "tracing")]
     info!("HTTP request sent!");
   }
 
   // The Prover task should be done now, so we can grab it.
   let prover = prover_task.await??;
+  #[cfg(feature = "tracing")]
   debug!("Prover task complete");
 
   // Notarize the transcript
   let notarized_session = {
+    #[cfg(feature = "tracing")]
     let span = trace_span!("notarize_transcript");
+    #[cfg(feature = "tracing")]
     let _enter = span.enter();
     let prover_result = prover.to_http();
     let mut prover = match prover_result {
       Ok(prover) => prover.start_notarize(),
       Err(e) => {
+        #[cfg(feature = "tracing")]
         error!("Notarization failed: {:?}", e);
         return Err(e.into());
       },
@@ -248,19 +274,24 @@ async fn prover(config: Config) -> Result<TlsProof> {
     // Commit to the transcript with the default committer, which will commit using
     // BLAKE3.
     prover.commit()?;
+    #[cfg(feature = "tracing")]
     trace!("Committed to transcript");
 
     // Finalize, returning the notarized HTTP session
     prover.finalize().await?
   };
+  #[cfg(feature = "tracing")]
   info!("Transcript notarized!");
 
   // Build the proofs
   let tls_proof = {
+    #[cfg(feature = "tracing")]
     let span = trace_span!("build_tls_proof");
+    #[cfg(feature = "tracing")]
     let _enter = span.enter();
 
     let session_proof = notarized_session.session_proof();
+    #[cfg(feature = "tracing")]
     debug!("Session proof created!");
 
     let mut proof_builder = notarized_session.session().data().build_substrings_proof();
@@ -288,6 +319,7 @@ async fn prover(config: Config) -> Result<TlsProof> {
 
     // Build the proof
     let substrings_proof = proof_builder.build()?;
+    #[cfg(feature = "tracing")]
     debug!("Substrings proof created!");
 
     TlsProof { session: session_proof, substrings: substrings_proof }

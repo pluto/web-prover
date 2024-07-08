@@ -16,6 +16,7 @@ fn test_prover_examplecom() {
     target_headers: Default::default(),
     target_body: "".into(),
     notarization_session_request,
+    notary_ca_cert_path: "src/fixture/mock_server/ca-cert.pem".into(),
   };
   let proof = prover(config).unwrap();
   //   assert!(serde.len() > 0);
