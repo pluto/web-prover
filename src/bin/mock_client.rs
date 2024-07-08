@@ -101,10 +101,7 @@ async fn prover(config: Config) -> Result<TlsProof> {
   let (notary_tls_socket, session_id) = notary::request_notarization(
     &config.notary_host,
     config.notary_port,
-    config.max_sent_data,
-    config.max_recv_data,
     &config.notary_ca_cert_path,
-    &config.notary_ca_cert_server_name,
   )
   .await?;
   info!("Created a notarization session with session_id: {}", session_id);

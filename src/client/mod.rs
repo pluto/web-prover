@@ -152,6 +152,7 @@ async fn prover_inner(config: Config) -> Result<TlsProof, ClientErrors> {
     &config.notary_host,
     config.notary_port,
     &config.notarization_session_request,
+    &config.notary_ca_cert_path,
   )
   .await?;
   #[cfg(feature = "tracing")]

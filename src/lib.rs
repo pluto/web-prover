@@ -29,15 +29,16 @@ pub enum ClientType {
 // The `target_headers` was previously `HashMap<String, Vec<String>>`
 #[derive(Deserialize, Clone, Debug)]
 pub struct Config {
-  notary_host:                  String,
-  notary_port:                  u16,
-  target_method:                String,
-  target_url:                   String,
-  target_headers:               HashMap<String, String>,
-  target_body:                  String,
+  pub notary_host:                  String,
+  pub notary_port:                  u16,
+  pub target_method:                String,
+  pub target_url:                   String,
+  pub target_headers:               HashMap<String, String>,
+  pub target_body:                  String,
   #[cfg(feature = "websocket")]
   _websocket_proxy_url:          String,
-   notarization_session_request: NotarizationSessionRequest,
+  pub notarization_session_request: NotarizationSessionRequest,
+  pub notary_ca_cert_path:          String,
 }
 
 /// Request object of the /session API
