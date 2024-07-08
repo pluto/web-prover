@@ -1,9 +1,9 @@
-use std::io::{BufReader, Cursor};
+// use std::io::{BufReader, Cursor};
 
 use http_body_util::{BodyExt, Either, Empty, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use rustls::{
-  pki_types::{CertificateDer, ServerName},
+  pki_types::ServerName,
   ClientConfig, RootCertStore,
 };
 #[cfg(target_arch = "wasm32")]

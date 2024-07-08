@@ -3,8 +3,7 @@ use notary_server::{
   init_tracing, parse_config_file, run_server, CliFields, NotaryServerError, NotaryServerProperties,
 };
 use structopt::StructOpt;
-#[cfg(feature = "tracing")]
-use tracing::debug;
+#[cfg(feature = "tracing")] use tracing::debug;
 
 #[tokio::main]
 async fn main() -> Result<(), NotaryServerError> {

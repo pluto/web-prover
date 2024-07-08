@@ -25,14 +25,14 @@ const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../fixture/mock_server/ca
 
 #[derive(Deserialize, Clone, Debug)]
 struct Config {
-  target_method:  String,
-  target_url:     String,
-  target_headers: HashMap<String, Vec<String>>,
-  target_body:    String,
+  target_method:                String,
+  target_url:                   String,
+  target_headers:               HashMap<String, Vec<String>>,
+  target_body:                  String,
   notarization_session_request: NotarizationSessionRequest,
-  notary_host:                String,
-  notary_port:                u16,
-  notary_ca_cert_path:        String,
+  notary_host:                  String,
+  notary_port:                  u16,
+  notary_ca_cert_path:          String,
 }
 
 #[derive(Parser)]
@@ -46,7 +46,7 @@ struct Args {
   endpoint: String,
 }
 
-#[cfg_attr(feature = "tracing", tracing::instrument(level = "info", ))]
+#[cfg_attr(feature = "tracing", tracing::instrument(level = "info",))]
 #[tokio::main]
 async fn main() -> Result<()> {
   let args = Args::parse();
@@ -59,7 +59,7 @@ async fn main() -> Result<()> {
     "debug" => Level::DEBUG,
     _ => Level::TRACE,
   };
-  let crate_name = env!("CARGO_PKG_NAME");
+  let _crate_name = env!("CARGO_PKG_NAME");
 
   #[cfg(feature = "tracing")]
   let env_filter = EnvFilter::builder().parse_lossy(&format!("{}={},info", crate_name, log_level));
@@ -79,10 +79,10 @@ async fn main() -> Result<()> {
       max_recv_data: Some(16384),
     },
 
-    notary_host:                "localhost".into(), // prod: tlsnotary.pluto.xyz
-    notary_port:                7047,               // prod: 443
-    notary_ca_cert_path:        "fixture/tls/rootCA.crt".to_string(), /* prod: ./tlsnotary.pluto.
-                                                     * xyz-rootca.crt */
+    notary_host:         "localhost".into(), // prod: tlsnotary.pluto.xyz
+    notary_port:         7047,               // prod: 443
+    notary_ca_cert_path: "fixture/tls/rootCA.crt".to_string(), /* prod: ./tlsnotary.pluto.
+                                              * xyz-rootca.crt */
   };
   #[cfg(feature = "tracing")]
   info!("Client config: {:?}", config);
@@ -110,7 +110,7 @@ async fn prover(config: Config) -> Result<TlsProof> {
     &config.notary_ca_cert_path,
   )
   .await?;
-#[cfg(feature = "tracing")]
+  #[cfg(feature = "tracing")]
   info!("Created a notarization session with session_id: {}", session_id);
 
   // Load the CA certificate for the notary server
