@@ -29,9 +29,9 @@ module.exports = {
     server: {
       type: 'https',
       options: {
-        key: fs.readFileSync("../vanilla-go-app/certs/server-key.pem"),
-        cert: fs.readFileSync("../vanilla-go-app/certs/server-cert.pem"),
-        ca: fs.readFileSync("../vanilla-go-app/certs/ca-cert.pem")
+        key: fs.readFileSync("certs/server-key.pem"),
+        cert: fs.readFileSync("certs/server-cert.pem"),
+        ca: fs.readFileSync("certs/ca-cert.pem")
       }
     }
   },

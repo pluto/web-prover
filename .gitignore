@@ -52,3 +52,7 @@ dump
 ### VIM ###
 *.swp
 *.swo
+
+/target
+/wasm-client
+node_modules/
