@@ -1,205 +1,200 @@
-use std::sync::Arc;
+// use std::io::{BufReader, Cursor};
 
-use anyhow::Result;
-use http_body_util::{BodyExt as _, Either, Empty, Full};
-use hyper::{client::conn::http1::Parts, Request, StatusCode};
-use hyper_util::rt::TokioIo;
-use pki_types::ServerName;
-use rustls::{ClientConfig, RootCertStore};
-use serde::{Deserialize, Serialize};
-use tokio::net::TcpStream;
-use tokio_rustls::TlsConnector;
-use tokio_util::bytes::Bytes;
-use tracing::{debug, info, instrument, trace, trace_span};
+use http_body_util::{BodyExt, Either, Empty, Full};
+use hyper::{body::Bytes, Request, StatusCode};
+use rustls::{pki_types::ServerName, ClientConfig, RootCertStore};
+#[cfg(target_arch = "wasm32")]
+use {
+  wasm_bindgen_futures::spawn_local, wasm_utils::WasmAsyncIo as AsyncIo, ws_stream_wasm::WsMeta,
+};
+#[cfg(target_arch = "wasm32")]
+type NetworkStream = ws_stream_wasm::WsStream;
+#[cfg(not(target_arch = "wasm32"))]
+use {
+  hyper::client::conn::http1::Parts,
+  hyper_util::rt::TokioIo as AsyncIo,
+  std::sync::Arc,
+  tokio::net::TcpStream,
+  tokio::spawn,
+  tokio_rustls::{client::TlsStream, TlsConnector},
+};
+#[cfg(not(target_arch = "wasm32"))]
+type NetworkStream = TlsStream<TcpStream>;
 
+use super::*;
 use crate::load_certs;
 
-/// Types of client that the prover is using
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ClientType {
-    /// Client that has access to the transport layer
-    Tcp,
-    /// Client that cannot directly access transport layer, e.g. browser
-    /// extension
-    Websocket,
-}
+// TODO: The `ClientType` and  `NotarizationSessionRequest` and `NotarizationSessionResponse` is
+// redundant with what we had in `request` for the wasm version which was deprecated. May have to be
+// careful with the camelCase used here.
 
-/// Request object of the /session API
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NotarizationSessionRequest {
-    pub client_type: ClientType,
-    /// Maximum data that can be sent by the prover
-    pub max_sent_data: Option<usize>,
-    /// Maximum data that can be received by the prover
-    pub max_recv_data: Option<usize>,
-}
+/// Requests notarization from the Notary server.
+#[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip_all))]
+pub async fn request_notarization(
+  host: &str,
+  port: u16,
+  notarization_session_request: &NotarizationSessionRequest,
+  notary_ca_cert_path: &str,
+) -> Result<(NetworkStream, String), ClientErrors> {
+  //---------------------------------------------------------------------------------------------------------------------------------------//
+  // Get the certs and add them to the root store
+  //---------------------------------------------------------------------------------------------------------------------------------------//
+  #[cfg(feature = "tracing")]
+  let _span = tracing::span!(tracing::Level::TRACE, "add_certs_to_root_store").entered();
+  let certificate = load_certs(notary_ca_cert_path)?.remove(0);
+  let mut root_store = RootCertStore::empty();
+  root_store.add(certificate)?;
+  #[cfg(feature = "tracing")]
+  info!("certs added to root store");
+  #[cfg(feature = "tracing")]
+  drop(_span);
+  //---------------------------------------------------------------------------------------------------------------------------------------//
+  // Create and maintain a TLS session between the client and the notary
+  //---------------------------------------------------------------------------------------------------------------------------------------//
+  #[cfg(feature = "tracing")]
+  let _span = tracing::span!(tracing::Level::TRACE, "create_client_notary_tls_session").entered();
+  let client_notary_config =
+    ClientConfig::builder().with_root_certificates(root_store).with_no_client_auth();
+  #[cfg(feature = "tracing")]
+  trace!("{client_notary_config:#?}");
+  #[cfg(not(target_arch = "wasm32"))]
+  let notary_tls_socket = {
+    let notary_connector = TlsConnector::from(Arc::new(client_notary_config));
+    let notary_socket = TcpStream::connect((host, port)).await?;
+    notary_connector
+    // Require the domain name of notary server to be the same as that in the server cert
+    .connect(ServerName::try_from(host.to_owned()).unwrap(), notary_socket)
+    .await
+    ?
+  };
+  // TODO: Be careful to put this in with the right target arch
+  #[cfg(feature = "tracing")]
+  debug!("TLS socket created with TCP connection");
+  #[cfg(feature = "tracing")]
+  trace!("{notary_tls_socket:#?}");
+  #[cfg(all(feature = "websocket", target_arch = "wasm32"))]
+  let (notary_tls_socket_io, notary_tls_socket) = {
+    let (_ws_meta, ws_stream) = WsMeta::connect(host, None).await?;
+    let (_ws_meta, ws_stream_io) = WsMeta::connect(host, None).await?;
+    (ws_stream_io.into_io(), ws_stream)
+  };
 
-/// Response object of the /session API
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NotarizationSessionResponse {
+  // Attach the hyper HTTP client to the notary TLS connection to send request to the /session
+  // endpoint to configure notarization and obtain session id
+  #[cfg(target_arch = "wasm32")]
+  let (mut request_sender, connection) =
+    hyper::client::conn::http1::handshake(AsyncIo::new(notary_tls_socket_io)).await?;
+  #[cfg(not(target_arch = "wasm32"))]
+  let (mut request_sender, connection) =
+    hyper::client::conn::http1::handshake(AsyncIo::new(notary_tls_socket)).await?;
+
+  // Spawn the HTTP task to be run concurrently
+  #[cfg(not(target_arch = "wasm32"))]
+  let connection_task = spawn(connection.without_shutdown());
+  #[cfg(target_arch = "wasm32")]
+  {
+    let connection = async {
+      // TODO: This error handling here should work, but it is messy. The unwrap is acceptable in
+      // this case.
+      connection
+        .await
+        .map_err(|e| panic!("Connection failed in `request_notarization` due to {:?}", e))
+        .unwrap();
+    };
+    spawn_local(connection);
+  }
+  // TODO: For some reason this span isn't really working properly
+  #[cfg(feature = "tracing")]
+  drop(_span);
+  //---------------------------------------------------------------------------------------------------------------------------------------//
+
+  //---------------------------------------------------------------------------------------------------------------------------------------//
+  // Send the HTTP request to configure notarization
+  //---------------------------------------------------------------------------------------------------------------------------------------//
+  #[cfg(feature = "tracing")]
+  let _span =
+    tracing::span!(tracing::Level::TRACE, "send_notarization_configuration_request").entered();
+  let payload = serde_json::to_string(notarization_session_request)?;
+
+  let request = Request::builder()
+        .uri(format!("https://{host}:{port}/session"))
+        .method("POST")
+        .header("Host", host)
+        // Need to specify application/json for axum to parse it as json
+        .header("Content-Type", "application/json")
+        .body(Either::Left(Full::new(Bytes::from(payload))))?;
+  #[cfg(feature = "tracing")]
+  trace!("configuration request: {request:#?}");
+
+  let configuration_response = request_sender.send_request(request).await?;
+  #[cfg(feature = "tracing")]
+  debug!("sent the HTTP request for notarization configuration");
+
+  #[cfg(feature = "tracing")]
+  // TODO: This should be an error most likely
+  assert!(configuration_response.status() == StatusCode::OK);
+
+  #[cfg(feature = "tracing")]
+  info!("successfully set notarization configuration!");
+  #[cfg(feature = "tracing")]
+  drop(_span);
+  //---------------------------------------------------------------------------------------------------------------------------------------//
+
+  //---------------------------------------------------------------------------------------------------------------------------------------//
+  // Send the HTTP request to begin notarization (I think?)
+  //---------------------------------------------------------------------------------------------------------------------------------------//
+  #[cfg(feature = "tracing")]
+  let _span = tracing::span!(tracing::Level::TRACE, "send_notarization_protocol_request").entered();
+
+  let payload = configuration_response.into_body().collect().await?.to_bytes();
+  #[derive(Debug, Clone, Serialize, Deserialize)]
+  #[serde(rename_all = "camelCase")]
+  pub struct NotarizationSessionResponse {
     /// Unique session id that is generated by notary and shared to prover
     pub session_id: String,
-}
+  }
+  let notarization_response =
+    serde_json::from_str::<NotarizationSessionResponse>(&String::from_utf8_lossy(&payload))
+      .unwrap();
+  #[cfg(feature = "tracing")]
+  trace!("{notarization_response:?}");
 
-/// Requests notarization from the Notary server
-#[instrument(
-    level = "trace",
-    skip(
-        host,
-        port,
-        max_sent_data,
-        max_recv_data,
-        notary_ca_cert_path,
-        notary_ca_cert_server_name
-    )
-)]
-pub async fn request_notarization(
-    host: &str,
-    port: u16,
-    max_sent_data: Option<usize>,
-    max_recv_data: Option<usize>,
-    notary_ca_cert_path: &str,
-    notary_ca_cert_server_name: &str,
-) -> Result<(tokio_rustls::client::TlsStream<TcpStream>, String)> {
-    // Read notary CA certificate
-    let certificate = load_certs(notary_ca_cert_path)?.remove(0);
-    // Configure root store
-    let root_store = {
-        let span = trace_span!("configure_root_store");
-        let _enter = span.enter();
-        trace!("Configuring root store with certificate: {:?}", certificate);
-        let mut root_store = RootCertStore::empty();
-        root_store.add(certificate)?;
-        root_store
-    };
+  // Send notarization request via HTTP, where the underlying TCP connection will be extracted later
+  let request = Request::builder()
+        // Need to specify the session_id so that notary server knows the right configuration to use
+        // as the configuration is set in the previous HTTP call
+        .uri(format!(
+            "https://{host}:{port}/notarize?sessionId={}",
+            notarization_response.session_id
+        ))
+        .method("GET")
+        .header("Host", host)
+        .header("Connection", "Upgrade")
+        // Need to specify this upgrade header for server to extract tcp connection later
+        .header("Upgrade", "TCP")
+        .body(Either::Right(Empty::<Bytes>::new()))?;
+  #[cfg(feature = "tracing")]
+  trace!("notarization request: {request:#?}");
 
-    // Configure client
-    let client_notary_config = {
-        let span = trace_span!("configure_client");
-        let _enter = span.enter();
-        trace!("Configuring client with root store: {:?}", root_store);
-        ClientConfig::builder()
-            .with_root_certificates(root_store)
-            .with_no_client_auth()
-    };
+  let response = request_sender.send_request(request).await?;
 
-    // Connect to notary server with TLS handshake
-    let (mut request_sender, connection) = {
-        let span = trace_span!("connect_notary_server");
-        let _enter = span.enter();
-        trace!(
-            "Connecting to notary server with client notary config: {:?}",
-            client_notary_config
-        );
-        let notary_connector = TlsConnector::from(Arc::new(client_notary_config));
+  #[cfg(feature = "tracing")]
+  debug!("sent notarization request");
 
-        let notary_socket = tokio::net::TcpStream::connect((host, port)).await?;
+  // TODO: This should also likely be an error
+  assert!(response.status() == StatusCode::SWITCHING_PROTOCOLS);
 
-        // Require the domain name of notary server to be the same as that in the server
-        // cert
-        let notary_tls_socket = notary_connector
-            .connect(
-                ServerName::try_from(notary_ca_cert_server_name.to_owned())?,
-                notary_socket,
-            )
-            .await?;
+  #[cfg(feature = "tracing")]
+  info!("successfully switched to notarization protocol!");
+  #[cfg(feature = "tracing")]
+  drop(_span);
+  //---------------------------------------------------------------------------------------------------------------------------------------//
 
-        // Attach the hyper HTTP client to the notary TLS connection to send request to
-        // the /session endpoint to configure notarization and obtain session id
-        hyper::client::conn::http1::handshake(TokioIo::new(notary_tls_socket)).await?
-    };
-
-    info!("Connected to notary server with TLS!");
-
-    // Spawn the HTTP task to be run concurrently
-    let connection_task = tokio::spawn(connection.without_shutdown());
-
-    // Build the HTTP request to configure notarization session
-    let notarization_response = {
-        let span = trace_span!("send_configuration_request");
-        let _enter = span.enter();
-        trace!(
-            "Sending configuration for notarization session request with max_sent_data: {:?}, max_recv_data: {:?}",
-            max_sent_data,
-            max_recv_data
-        );
-        let payload = serde_json::to_string(&NotarizationSessionRequest {
-            client_type: ClientType::Tcp,
-            max_sent_data,
-            max_recv_data,
-        })
-        .unwrap();
-
-        let request = Request::builder()
-            .uri(format!("https://{host}:{port}/session"))
-            .method("POST")
-            .header("Host", host)
-            // Need to specify application/json for axum to parse it as json
-            .header("Content-Type", "application/json")
-            .body(Either::Left(Full::new(Bytes::from(payload))))?;
-
-        trace!("Sending configuration request: {:?}", request);
-
-        let configuration_response = request_sender.send_request(request).await?;
-
-        trace!(
-            "Received configuration response: {:?}",
-            configuration_response
-        );
-
-        debug!("Notary configuration response: OK");
-
-        assert!(configuration_response.status() == StatusCode::OK);
-
-        let payload = configuration_response
-            .into_body()
-            .collect()
-            .await?
-            .to_bytes();
-        serde_json::from_str::<NotarizationSessionResponse>(&String::from_utf8_lossy(&payload))?
-    };
-
-    // Send notarization request via HTTP, where the underlying TCP connection will
-    // be extracted later
-    let notary_tls_socket = {
-        let span = trace_span!("send_notarization_request");
-        let _enter = span.enter();
-        let request = Request::builder()
-            // Need to specify the session_id so that notary server knows the right configuration to
-            // use as the configuration is set in the previous HTTP call
-            .uri(format!(
-                "https://{host}:{port}/notarize?sessionId={}",
-                notarization_response.session_id.clone()
-            ))
-            .method("GET")
-            .header("Host", host)
-            .header("Connection", "Upgrade")
-            // Need to specify this upgrade header for server to extract tcp connection later
-            .header("Upgrade", "TCP")
-            .body(Either::Right(Empty::<Bytes>::new()))?;
-
-        trace!("Sending notarization request: {:?}", request);
-
-        let response = request_sender.send_request(request).await?;
-
-        trace!("Received notarization response: {:?}", response);
-
-        assert!(response.status() == StatusCode::SWITCHING_PROTOCOLS);
-
-        debug!("Switched to TCP protocol: OK");
-
-        // Claim back the TLS socket after HTTP exchange is done
-        let Parts {
-            io: notary_tls_socket,
-            ..
-        } = connection_task.await??;
-        notary_tls_socket
-    };
-
-    Ok((
-        notary_tls_socket.into_inner(),
-        notarization_response.session_id,
-    ))
+  // Claim back the TLS socket after HTTP exchange is done
+  #[cfg(not(target_arch = "wasm32"))]
+  let Parts { io: notary_tls_socket, .. } = connection_task.await??;
+  #[cfg(not(target_arch = "wasm32"))]
+  return Ok((notary_tls_socket.into_inner(), notarization_response.session_id.to_string()));
+  #[cfg(target_arch = "wasm32")]
+  return Ok((notary_tls_socket, session_id.to_string()));
 }

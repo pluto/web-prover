@@ -16,10 +16,10 @@ env:
 jobs:
   clippy:
     name: clippy
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -28,28 +28,14 @@ jobs:
           profile: minimal
           components: clippy
           override: true
+
+      - name: install target
+        run: rustup target add aarch64-apple-darwin
+      - name: Install rust-src component
+        run: rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
       
       - name: cargo clippy
         run: cargo clippy --all
-  
-  udeps:
-    name: udeps
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
-          override: true
-
-      - name: install udeps
-        run: cargo install --git https://github.com/est31/cargo-udeps --locked
-
-      - name: cargo udeps
-        run: cargo +nightly udeps
 
   fmt:
     name: fmt project
