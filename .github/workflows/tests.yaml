@@ -20,9 +20,5 @@ jobs:
         with:
           toolchain: nightly-aarch64-apple-darwin
 
-      - name: toolchain
-        run: rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
-
-
       - name: Run Rust tests
         run: cargo test --all
