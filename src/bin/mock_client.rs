@@ -15,7 +15,7 @@ use tlsn_core::{commitment::CommitmentKind, proof::TlsProof};
 use tlsn_prover::tls::{Prover, ProverConfig};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 #[cfg(feature = "tracing")]
-use tracing::{debug, error, info, instrument, trace, trace_span, Level};
+use tracing::{debug, error, info, trace, trace_span, Level};
 #[cfg(feature = "tracing")]
 use tracing_subscriber::EnvFilter;
 use url::Url;
@@ -62,7 +62,7 @@ async fn main() -> Result<()> {
   let _crate_name = env!("CARGO_PKG_NAME");
 
   #[cfg(feature = "tracing")]
-  let env_filter = EnvFilter::builder().parse_lossy(&format!("{}={},info", crate_name, log_level));
+  let env_filter = EnvFilter::builder().parse_lossy(format!("{}={},info", _crate_name, log_level));
 
   #[cfg(feature = "tracing")]
   tracing_subscriber::fmt().with_env_filter(env_filter).init();

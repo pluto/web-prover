@@ -2,10 +2,7 @@
 
 use http_body_util::{BodyExt, Either, Empty, Full};
 use hyper::{body::Bytes, Request, StatusCode};
-use rustls::{
-  pki_types::ServerName,
-  ClientConfig, RootCertStore,
-};
+use rustls::{pki_types::ServerName, ClientConfig, RootCertStore};
 #[cfg(target_arch = "wasm32")]
 use {
   wasm_bindgen_futures::spawn_local, wasm_utils::WasmAsyncIo as AsyncIo, ws_stream_wasm::WsMeta,

@@ -1,5 +1,3 @@
-use super::*;
-
 #[cfg(all(not(target_arch = "wasm32"), not(target_os = "ios"), not(feature = "websocket")))]
 #[test]
 fn test_prover_examplecom() {
