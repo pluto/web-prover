@@ -31,6 +31,8 @@ jobs:
 
       - name: install target
         run: rustup target add aarch64-apple-darwin
+      - name: Install rust-src component
+        run: rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
       
       - name: cargo clippy
         run: cargo clippy --all

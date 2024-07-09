@@ -20,5 +20,8 @@ jobs:
         with:
           toolchain: nightly-aarch64-apple-darwin
 
+      - name: Install rust-src component
+        run: rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
+
       - name: Run Rust tests
         run: cargo test --all
