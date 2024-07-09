@@ -28,6 +28,9 @@ jobs:
           profile: minimal
           components: clippy
           override: true
+
+      - name: install target
+        run: rustup target add aarch64-apple-darwin
       
       - name: cargo clippy
         run: cargo clippy --all

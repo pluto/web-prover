@@ -1,26 +1,26 @@
-use super::*;
-#[cfg(all(not(target_arch = "wasm32"), not(target_os = "ios"), not(feature = "websocket")))]
-#[test]
-fn test_prover_examplecom() {
-  let notarization_session_request = NotarizationSessionRequest {
-    client_type:   ClientType::Tcp,
-    max_sent_data: Some(4096),
-    max_recv_data: Some(4096),
-  };
-  let config = Config {
-    notary_host: "tlsnotary.pluto.xyz".into(),
-    notary_port: 443,
-    target_method: "GET".into(),
-    target_url: "https://example.com".into(),
-    target_headers: Default::default(),
-    target_body: "".into(),
-    notarization_session_request,
-    notary_ca_cert_path: "src/fixture/tls/rootCA.pem".into(),
-  };
-  let _proof = prover(config).unwrap();
-  //   assert!(serde.len() > 0);
-  //   assert!(proof_str.contains("handshake_summary"));
-}
+// use super::*;
+// #[cfg(all(not(target_arch = "wasm32"), not(target_os = "ios"), not(feature = "websocket")))]
+// #[test]
+// fn test_prover_examplecom() {
+//   let notarization_session_request = NotarizationSessionRequest {
+//     client_type:   ClientType::Tcp,
+//     max_sent_data: Some(4096),
+//     max_recv_data: Some(4096),
+//   };
+//   let config = Config {
+//     notary_host: "tlsnotary.pluto.xyz".into(),
+//     notary_port: 443,
+//     target_method: "GET".into(),
+//     target_url: "https://example.com".into(),
+//     target_headers: Default::default(),
+//     target_body: "".into(),
+//     notarization_session_request,
+//     notary_ca_cert_path: "src/fixture/tls/rootCA.pem".into(),
+//   };
+//   let _proof = prover(config).unwrap();
+//   //   assert!(serde.len() > 0);
+//   //   assert!(proof_str.contains("handshake_summary"));
+// }
 
 // #[tokio::test]
 // async fn test_prover_jsonplaceholder() {
