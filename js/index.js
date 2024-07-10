@@ -1,8 +1,7 @@
 import init, {
-  setup_tracing_web,
   initThreadPool,
   prover,
-  verify
+  setup_tracing_web
 } from "../pkg/index.js";
 
 const numConcurrency = navigator.hardwareConcurrency;
