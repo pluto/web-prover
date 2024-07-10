@@ -17,6 +17,7 @@ jobs:
   clippy:
     name: clippy
     runs-on: macos-latest
+    if: github.event.pull_request.draft == false
 
     steps:
       - uses: actions/checkout@v4
@@ -40,6 +41,7 @@ jobs:
   fmt:
     name: fmt project
     runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
     strategy:
       matrix:
         toolchain:

@@ -11,6 +11,7 @@ on:
 jobs:
   build-ios:
     runs-on: macos-latest
+    if: github.event.pull_request.draft == false
 
     steps:
     - name: Checkout code
