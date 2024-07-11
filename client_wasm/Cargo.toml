@@ -1,0 +1,11 @@
+[package]
+name = "client_wasm"
+version = "0.1.0"
+edition = "2021"
+
+# Docs: https://rustwasm.github.io/docs/wasm-pack/tutorials/npm-browser-packages/template-deep-dive/cargo-toml.html#1-crate-type
+[lib]
+crate-type=["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen="0.2.92"

@@ -23,5 +23,3 @@ profile="default"
 # cross compilation docs: https://rust-lang.github.io/rustup/cross-compilation.html
 # list of platforms: https://doc.rust-lang.org/nightly/rustc/platform-support.html
 targets=["wasm32-unknown-unknown", "aarch64-apple-ios"]
-[profile.release]
-opt-level="z"
