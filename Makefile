@@ -11,8 +11,8 @@ client_wasm_test:
 	# cargo install wasm-pack
 	# cd client_wasm && ~/.cargo/bin/wasm-pack test --firefox
 
-
 .PHONY: \
   check \
   client_wasm client_wasm_test \
-  origo
+  origo \
+  web
