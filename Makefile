@@ -4,7 +4,7 @@ check:
 
 client_wasm:
 	cargo install wasm-pack
-	cd client_wasm && ~/.cargo/bin/wasm-pack build --target web --release --out-dir ./target/wasm32-pkg
+	cd client_wasm && ~/.cargo/bin/wasm-pack build --target web --release --out-dir ./pkg
 
 client_wasm_test:
 	# TODO

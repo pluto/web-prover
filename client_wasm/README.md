@@ -1,4 +1,7 @@
-# WASM in Browser Demo
+## client_wasm
+
+
+## WASM in Browser Demo
 
 TODO: This is only TLS Notary WASM so far
 TODO: test end to end
