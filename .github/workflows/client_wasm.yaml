@@ -3,7 +3,7 @@ name: client_wasm
 on:
   push:
     branches:
-      - main
+      - '**'
   pull_request:
     branches:
       - main
