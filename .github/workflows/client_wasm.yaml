@@ -27,6 +27,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
+          key: ${{ hashFiles('client_wasm/.cargo/config.toml') }}
           cache-directories: |
             /Users/runner/Library/Caches/.wasm-pack
 
