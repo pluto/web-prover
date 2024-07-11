@@ -201,7 +201,7 @@ pub async fn prover(
     log_phase(ProverPhases::ConnectWsProxy);
 
     let ws_query = url::form_urlencoded::Serializer::new(String::new())
-        .extend_pairs([("target", target_host)])
+        .extend_pairs([("target", format!("{}:{}", target_host, target_url.port().unwrap()))])
         .finish();
 
     let (_, client_ws_stream) = WsMeta::connect(

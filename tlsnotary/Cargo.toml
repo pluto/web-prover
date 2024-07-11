@@ -1,6 +1,8 @@
 [package]
-name = "tlsnotary"
-version = "0.1.0"
-edition = "2021"
+name   ="tlsnotary"
+version="0.1.0"
+edition="2021"
 
 [dependencies]
+tokio        ={ version="1.38.0", features=["full"] }
+notary-server={ git="https://github.com/tlsnotary/tlsn.git " } # TODO pin version
