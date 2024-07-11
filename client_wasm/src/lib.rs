@@ -11,3 +11,4 @@ extern {
 pub fn greet() {
     alert("Hello, World!");
 }
+
