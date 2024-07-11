@@ -3,7 +3,7 @@ name: client_wasm
 on:
   push:
     branches:
-      - '**'
+      - "**"
   pull_request:
     branches:
       - main
@@ -26,6 +26,9 @@ jobs:
       - run: rustup toolchain install nightly --profile minimal --no-self-update
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-directories: |
+            /Users/runner/Library/Caches/.wasm-pack
 
       - run: cargo check -p client_wasm
 
