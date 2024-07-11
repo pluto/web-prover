@@ -27,9 +27,6 @@ Cargo.lock
 .vscode/
 .viscode
 
-# transcript
-*.json
-
 # env var
 *.env
 
