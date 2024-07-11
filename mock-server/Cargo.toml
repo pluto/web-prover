@@ -1,0 +1,15 @@
+[package]
+name   ="mock-server"
+version="0.1.0"
+edition="2021"
+
+[dependencies]
+tokio         ={ version="1.38.0", features=["full"] }
+hyper         ="1.4.1"
+hyper-util    ={ version="0.1", features=["full"] }
+rustls        ="0.23.11"
+tokio-rustls  ="0.26.0"
+rustls-pemfile="2.1.2"
+http-body-util="0.1.2"
+webpki-roots  ="0.26.1"
+pki-types     ={ package="rustls-pki-types", version="1.7" }

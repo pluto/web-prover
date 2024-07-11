@@ -6,8 +6,8 @@ make client_wasm
 cargo build -p origo --release
 
 
-
 cargo run -p origo --release
+cargo run -p mock-server --release
 
 ```
 
