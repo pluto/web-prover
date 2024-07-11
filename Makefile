@@ -12,4 +12,7 @@ client_wasm_test:
 	# cd client_wasm && ~/.cargo/bin/wasm-pack test --firefox
 
 
-.PHONY: check client_wasm client_wasm_test
+.PHONY: \
+  check \
+  client_wasm client_wasm_test \
+  origo
