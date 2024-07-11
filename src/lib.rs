@@ -1,8 +1,22 @@
 pub mod client;
 pub mod errors;
 pub mod notary;
+
 pub mod routes;
 pub use errors::ClientErrors;
+
+#[cfg(target_arch = "wasm32")]
+use {
+  crate::wasm_utils::WasmAsyncIo as AsyncIo, futures::channel::oneshot, wasm_bindgen::prelude::*,
+  wasm_bindgen_futures::spawn_local, ws_stream_wasm::*,
+};
+#[cfg(not(target_arch = "wasm32"))]
+use {
+  hyper_util::rt::TokioIo as AsyncIo, // TokioIo is used for TLS connection in the iOS version
+
+  tokio::{net::TcpStream, spawn},
+  tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt},
+};
 
 #[cfg(target_arch = "wasm32")] pub mod verify;
 #[cfg(target_arch = "wasm32")] pub mod wasm_utils;
@@ -34,7 +48,7 @@ pub struct Config {
   pub target_headers:               HashMap<String, String>,
   pub target_body:                  String,
   #[cfg(feature = "websocket")]
-  _websocket_proxy_url:             String,
+  websocket_proxy_url:             String,
   pub notarization_session_request: NotarizationSessionRequest,
   pub notary_ca_cert_path:          String,
 }

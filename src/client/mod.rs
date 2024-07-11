@@ -17,6 +17,7 @@ use url::Url;
 use {
   crate::wasm_utils::WasmAsyncIo as AsyncIo, futures::channel::oneshot, wasm_bindgen::prelude::*,
   wasm_bindgen_futures::spawn_local, ws_stream_wasm::*,
+  std::panic,
 };
 #[cfg(not(target_arch = "wasm32"))]
 use {
@@ -99,7 +100,7 @@ pub async fn prover(config: *mut Config) -> Result<String, JsValue> {
   panic::set_hook(Box::new(console_error_panic_hook::hook));
   #[cfg(feature = "tracing")]
   panic::set_hook(Box::new(|info| {
-    error!("panic occurred: {:?}", info);
+    // error!("panic occurred: {:?}", info);
     console_error_panic_hook::hook(info);
   }));
   let config: Config = unsafe { (*config).clone() };
@@ -134,7 +135,7 @@ async fn prover_inner(config: Config) -> Result<TlsProof, ClientErrors> {
   #[cfg(any(not(feature = "websocket"), not(target_arch = "wasm32")))]
   let target_port = target_url.port_or_known_default().expect("Target has an unknown port!");
   #[cfg(feature = "tracing")]
-  debug!("parsed `target_port`: {target_port:?}");
+  // debug!("parsed `target_port`: {target_port:?}");
   #[cfg(feature = "tracing")]
   info!("target connection data built");
   #[cfg(feature = "tracing")]

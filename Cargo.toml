@@ -3,6 +3,7 @@ name   ="web-prover"
 version="0.1.0"
 edition="2021"
 build  ="build.rs"
+resolver = "2"
 
 [features]
 tracing=["dep:tracing", "dep:tracing-subscriber"]
@@ -48,7 +49,7 @@ serde_json="1.0"
 url           ="2.5.0"
 hyper         ={ version="1.1", features=["client", "http1"] }
 http-body-util="0.1"
-rustls        ={ version="0.23.10", default-features=false }
+rustls        ={ version="0.23.10", default-features=false, features=["std", "logging", "tls12"] }
 rustls-pemfile={ version="2.1.2" }
 # Logging and errors
 tracing           ={ version="0.1", optional=true }
@@ -62,33 +63,21 @@ base64="0.22.0"
 
 anyhow="1.0.86"
 
-# hyper         ={ version="1.1", features=["client", "http1", "full"] }
-hyper-util={ version="0.1", features=["full"] }
 # http-body-util="0.1"
 
 # rustls        ={ version="0.23.10" }
 # rustls-pemfile={ version="2.0.0" }
 
-tokio-util  ="0.7"
-tokio-rustls={ version="0.26.0" }
-tokio       ={ version="1", features=["rt", "rt-multi-thread", "macros", "net", "io-std", "fs"] }
-
-notary-server={ git="https://github.com/tlsnotary/tlsn.git " }
-eyre         ="0.6.8"
+# eyre         ="0.6.8"
 structopt    ="0.3.26"
 
 form_urlencoded  ="1.2.1"
-tokio-tungstenite="0.23.0"
 
-tlsn-prover={ git="https://github.com/tlsnotary/tlsn.git" }
-# tlsn-core            ={ git="https://github.com/tlsnotary/tlsn.git" }
-tlsn-tls-client      ={ git="https://github.com/tlsnotary/tlsn.git" }
-tlsn-tls-client-async={ git="https://github.com/tlsnotary/tlsn.git" }
 
-webpki-roots="0.26.1"
-pki-types   ={ package="rustls-pki-types", version="1.7" }
+# webpki-roots="0.26.1"
+# pki-types   ={ package="rustls-pki-types", version="1.7" }
 
-clap={ version="4.5.8", features=["derive"] }
+# clap={ version="4.5.8", features=["derive"] }
 
 ####################################################################################################
 # Target-specific configuration
@@ -96,6 +85,9 @@ clap={ version="4.5.8", features=["derive"] }
 
 #- Non-wasm target configuration ------------------------------------------------------------------#
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio-tungstenite="0.23.0"
+
+notary-server={ git="https://github.com/tlsnotary/tlsn.git " }
 # Web
 hyper-util={ version="0.1", features=["full"] }
 # Async
@@ -107,11 +99,11 @@ tokio={ version="1", features=["rt", "rt-multi-thread", "macros", "net", "io-std
 # TLSN
 tlsn-prover={ git="https://github.com/tlsnotary/tlsn.git" }
 tlsn-core  ={ git="https://github.com/tlsnotary/tlsn.git" }
+tlsn-tls-client      ={ git="https://github.com/tlsnotary/tlsn.git" }
+tlsn-tls-client-async={ git="https://github.com/tlsnotary/tlsn.git" }
 
 #- Wasm target configuration ----------------------------------------------------------------------#
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-# TLSN
-tls-client={ git="https://github.com/tlsnotary/tlsn.git", package="tlsn-tls-client" }
 # Web
 hyper-util={ version="0.1", features=["http1"] }
 ## Use the patched ws_stream_wasm to fix the issue https://github.com/najamelan/ws_stream_wasm/issues/12#issuecomment-1711902958
@@ -173,6 +165,7 @@ tracing-web         ="0.1.2"
 # TLSN
 tlsn-prover={ git="https://github.com/tlsnotary/tlsn.git" }
 tlsn-core  ={ git="https://github.com/tlsnotary/tlsn.git" }
+tls-client={ git="https://github.com/tlsnotary/tlsn.git", package="tlsn-tls-client" }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test="0.3.42"
