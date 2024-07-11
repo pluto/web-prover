@@ -18,14 +18,49 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f26201604c87b1e01bd3d98f8d5d9a8fcbb815e8cedb41ffccbeb4bf593a35fe"
 
 [[package]]
+name = "aead"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b613b8e1e3cf911a086f53f03bf286f52fd7a7258e4fa606f0ef220d39d8877"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
+name = "aes"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e8b47f52ea9bae42228d07ec09eb676433d7c4ed1ebdf0f1d1c29ed446f1ab8"
+dependencies = [
+ "cfg-if",
+ "cipher 0.3.0",
+ "cpufeatures",
+ "opaque-debug",
+]
+
+[[package]]
 name = "aes"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b169f7a6d4742236a0a00c541b845991d0ac43e546831af1249753ab4c3aa3a0"
 dependencies = [
  "cfg-if",
- "cipher",
+ "cipher 0.4.4",
  "cpufeatures",
+]
+
+[[package]]
+name = "aes-gcm"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc3be92e19a7ef47457b8e6f90707e12b6ac5d20c6f3866584fa3be0787d839f"
+dependencies = [
+ "aead",
+ "aes 0.7.5",
+ "cipher 0.3.0",
+ "ctr 0.7.0",
+ "ghash 0.4.4",
+ "subtle",
 ]
 
 [[package]]
@@ -758,6 +793,15 @@ dependencies = [
 
 [[package]]
 name = "cipher"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ee52072ec15386f770805afd189a01c8841be8696bed250fa2f13c4c0d6dfb7"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
+name = "cipher"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773f3b9af64447d2ce9850330c473515014aa235e6a783b02db81ff39e4a3dad"
@@ -801,6 +845,45 @@ name = "client_ios"
 version = "0.1.0"
 
 [[package]]
+name = "client_wasm"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "console_error_panic_hook",
+ "elliptic-curve",
+ "futures",
+ "futures-util",
+ "getrandom",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "js-sys",
+ "p256",
+ "pin-project-lite",
+ "rayon",
+ "ring",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "strum",
+ "strum_macros",
+ "time",
+ "tlsn-core 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-prover",
+ "tracing",
+ "tracing-subscriber",
+ "tracing-web",
+ "url",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-rayon",
+ "wasm-bindgen-test",
+ "web-sys",
+ "web-time 1.1.0",
+ "ws_stream_wasm",
+]
+
+[[package]]
 name = "clmul"
 version = "0.1.0"
 source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
@@ -826,6 +909,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ca0197aee26d1ae37445ee532fefce43251d24cc7c166799f4d46817f1d3973"
 dependencies = [
  "crossbeam-utils",
+]
+
+[[package]]
+name = "console_error_panic_hook"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
+dependencies = [
+ "cfg-if",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -863,6 +956,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "53fe5e26ff1b7aef8bca9c6080520cfb8d9333c7568e1829cef191a9723e5504"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "crossbeam-channel"
+version = "0.5.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33480d6946193aa8033910124896ca395333cae7e2d1113d1fef6c3272217df2"
+dependencies = [
+ "crossbeam-utils",
 ]
 
 [[package]]
@@ -935,11 +1037,20 @@ dependencies = [
 
 [[package]]
 name = "ctr"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a232f92a03f37dd7d7dd2adc67166c77e9cd88de5b019b9a9eecfaeaf7bfd481"
+dependencies = [
+ "cipher 0.3.0",
+]
+
+[[package]]
+name = "ctr"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0369ee1ad671834580515889b80f2ea915f23b8be8d0daa4bbaf2ac5c7590835"
 dependencies = [
- "cipher",
+ "cipher 0.4.4",
 ]
 
 [[package]]
@@ -1055,6 +1166,15 @@ dependencies = [
  "const-oid",
  "pem-rfc7468",
  "zeroize",
+]
+
+[[package]]
+name = "deranged"
+version = "0.3.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b42b6fa04a440b495c8b04d0e71b707c585f83cb9cb28cf8cd0d976c315e31b4"
+dependencies = [
+ "powerfmt",
 ]
 
 [[package]]
@@ -1512,12 +1632,22 @@ dependencies = [
 
 [[package]]
 name = "ghash"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1583cc1656d7839fd3732b80cf4f38850336cdb9b8ded1cd399ca62958de3c99"
+dependencies = [
+ "opaque-debug",
+ "polyval 0.5.3",
+]
+
+[[package]]
+name = "ghash"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0d8a4362ccb29cb0b265253fb0a2728f592895ee6854fd9bc13f2ffda266ff1"
 dependencies = [
  "opaque-debug",
- "polyval",
+ "polyval 0.6.2",
 ]
 
 [[package]]
@@ -1603,6 +1733,12 @@ name = "heck"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
+
+[[package]]
+name = "heck"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "hermit-abi"
@@ -2200,12 +2336,12 @@ name = "mpz-core"
 version = "0.1.0"
 source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
 dependencies = [
- "aes",
+ "aes 0.8.4",
  "bcs",
  "blake3",
  "bytemuck",
  "cfg-if",
- "cipher",
+ "cipher 0.4.4",
  "clmul",
  "generic-array",
  "itybity",
@@ -2243,9 +2379,9 @@ name = "mpz-garble"
 version = "0.1.0"
 source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
 dependencies = [
- "aes",
+ "aes 0.8.4",
  "async-trait",
- "cipher",
+ "cipher 0.4.4",
  "derive_builder 0.11.2",
  "futures",
  "futures-util",
@@ -2272,9 +2408,9 @@ name = "mpz-garble-core"
 version = "0.1.0"
 source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
 dependencies = [
- "aes",
+ "aes 0.8.4",
  "blake3",
- "cipher",
+ "cipher 0.4.4",
  "derive_builder 0.11.2",
  "itybity",
  "mpz-circuits",
@@ -2351,13 +2487,13 @@ name = "mpz-ot-core"
 version = "0.1.0"
 source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
 dependencies = [
- "aes",
+ "aes 0.8.4",
  "blake3",
  "bytemuck",
  "cfg-if",
- "cipher",
+ "cipher 0.4.4",
  "clmul",
- "ctr",
+ "ctr 0.9.2",
  "curve25519-dalek",
  "derive_builder 0.11.2",
  "enum-try-as-inner",
@@ -2513,6 +2649,12 @@ dependencies = [
  "num-integer",
  "num-traits",
 ]
+
+[[package]]
+name = "num-conv"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51d515d32fb182ee37cda2ccdcb92950d6a3c2893aa280e540671c2cd0f3b1d9"
 
 [[package]]
 name = "num-integer"
@@ -2684,6 +2826,51 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
+name = "pest"
+version = "2.7.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd53dff83f26735fdc1ca837098ccf133605d794cdae66acfc2bfac3ec809d95"
+dependencies = [
+ "memchr",
+ "thiserror",
+ "ucd-trie",
+]
+
+[[package]]
+name = "pest_derive"
+version = "2.7.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a548d2beca6773b1c244554d36fcf8548a8a58e74156968211567250e48e49a"
+dependencies = [
+ "pest",
+ "pest_generator",
+]
+
+[[package]]
+name = "pest_generator"
+version = "2.7.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c93a82e8d145725dcbaf44e5ea887c8a869efdcc28706df2d08c69e17077183"
+dependencies = [
+ "pest",
+ "pest_meta",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.70",
+]
+
+[[package]]
+name = "pest_meta"
+version = "2.7.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a941429fea7e08bedec25e4f6785b6ffaacc6b755da98df5ef3e7dcf4a124c4f"
+dependencies = [
+ "once_cell",
+ "pest",
+ "sha2",
+]
+
+[[package]]
 name = "pharos"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2791,6 +2978,18 @@ checksum = "22686f4785f02a4fcc856d3b3bb19bf6c8160d103f7a99cc258bddd0251dc7f2"
 
 [[package]]
 name = "polyval"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8419d2b623c7c0896ff2d5d96e2cb4ede590fed28fcc34934f4c33c036e620a1"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "opaque-debug",
+ "universal-hash 0.4.0",
+]
+
+[[package]]
+name = "polyval"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d1fe60d06143b2430aa532c94cfe9e29783047f06c0d7fd359a9a51b729fa25"
@@ -2798,8 +2997,14 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "opaque-debug",
- "universal-hash",
+ "universal-hash 0.5.1",
 ]
+
+[[package]]
+name = "powerfmt"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 
 [[package]]
 name = "ppv-lite86"
@@ -2930,6 +3135,7 @@ checksum = "b418a60154510ca1a002a752ca9714984e21e4241e804d32555251faf8b78ffa"
 dependencies = [
  "either",
  "rayon-core",
+ "wasm_sync",
 ]
 
 [[package]]
@@ -2940,6 +3146,7 @@ checksum = "1465873a3dfdaa8ae7cb14b4383657caab0b3e8a0aa9ae8e04b044854c8dfce2"
 dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
+ "wasm_sync",
 ]
 
 [[package]]
@@ -3201,6 +3408,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "scoped-tls"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1cf6437eb19a8f4a6cc0f7dca544973b0b78843adbfeb3683d1a94a0024a294"
+
+[[package]]
 name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3261,12 +3474,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61697e0a1c7e512e84a621326239844a24d8207b4669b41bc18b32ea5cbf988b"
 
 [[package]]
+name = "send_wrapper"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd0b0ec5f1c1ca621c432a25813d8d60c88abe6d3e08a3eb9cf37d97a0fe3d73"
+
+[[package]]
 name = "serde"
 version = "1.0.204"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc76f558e0cbb2a839d37354c575f1dc3fdc6546b5be373ba43d95f231bf7c12"
 dependencies = [
  "serde_derive",
+]
+
+[[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -3468,6 +3698,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "spansy"
+version = "0.1.0"
+source = "git+https://github.com/tlsnotary/tlsn-utils?rev=45370cc#45370ccc6112328615721daad4f4084ff080f157"
+dependencies = [
+ "bytes",
+ "httparse",
+ "pest",
+ "pest_derive",
+ "serde",
+ "thiserror",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=45370cc)",
+]
+
+[[package]]
 name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3529,6 +3773,25 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "strum"
+version = "0.26.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8fec0f0aef304996cf250b31b5a10dee7980c85da9d759361292b8bca5a18f06"
+
+[[package]]
+name = "strum_macros"
+version = "0.26.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c6bee85a5a24955dc440386795aa378cd9cf82acd5f764469152d2270e581be"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "rustversion",
+ "syn 2.0.70",
 ]
 
 [[package]]
@@ -3623,6 +3886,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "time"
+version = "0.3.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5dfd88e563464686c916c7e46e623e520ddc6d79fa6641390f2e3fa86e83e885"
+dependencies = [
+ "deranged",
+ "itoa",
+ "js-sys",
+ "num-conv",
+ "powerfmt",
+ "serde",
+ "time-core",
+ "time-macros",
+]
+
+[[package]]
+name = "time-core"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef927ca75afb808a4d64dd374f00a2adf8d0fcff8e7b184af886c3c87ec4a3f3"
+
+[[package]]
+name = "time-macros"
+version = "0.2.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f252a68540fde3a3877aeea552b832b40ab9a69e318efd078774a01ddee1ccf"
+dependencies = [
+ "num-conv",
+ "time-core",
+]
+
+[[package]]
 name = "tinyvec"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3640,6 +3935,27 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 [[package]]
 name = "tlsn-aead"
 version = "0.1.0-alpha.6"
+source = "git+https://github.com/pluto/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
+dependencies = [
+ "async-trait",
+ "derive_builder 0.12.0",
+ "futures",
+ "mpz-common",
+ "mpz-core",
+ "mpz-garble",
+ "mpz-ot",
+ "serde",
+ "serio",
+ "thiserror",
+ "tlsn-block-cipher 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-stream-cipher 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-universal-hash 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tracing",
+]
+
+[[package]]
+name = "tlsn-aead"
+version = "0.1.0-alpha.6"
 source = "git+https://github.com/tlsnotary/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
 dependencies = [
  "async-trait",
@@ -3652,9 +3968,23 @@ dependencies = [
  "serde",
  "serio",
  "thiserror",
- "tlsn-block-cipher",
- "tlsn-stream-cipher",
- "tlsn-universal-hash",
+ "tlsn-block-cipher 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
+ "tlsn-stream-cipher 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
+ "tlsn-universal-hash 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
+ "tracing",
+]
+
+[[package]]
+name = "tlsn-block-cipher"
+version = "0.1.0-alpha.6"
+source = "git+https://github.com/pluto/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
+dependencies = [
+ "async-trait",
+ "derive_builder 0.12.0",
+ "mpz-circuits",
+ "mpz-garble",
+ "thiserror",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=45370cc)",
  "tracing",
 ]
 
@@ -3675,6 +4005,20 @@ dependencies = [
 [[package]]
 name = "tlsn-common"
 version = "0.1.0-alpha.6"
+source = "git+https://github.com/pluto/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
+dependencies = [
+ "futures",
+ "mpz-common",
+ "mpz-garble",
+ "mpz-ot",
+ "serio",
+ "tracing",
+ "uid-mux",
+]
+
+[[package]]
+name = "tlsn-common"
+version = "0.1.0-alpha.6"
 source = "git+https://github.com/tlsnotary/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
 dependencies = [
  "futures",
@@ -3684,6 +4028,29 @@ dependencies = [
  "serio",
  "tracing",
  "uid-mux",
+]
+
+[[package]]
+name = "tlsn-core"
+version = "0.1.0-alpha.6"
+source = "git+https://github.com/pluto/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
+dependencies = [
+ "bimap",
+ "bytes",
+ "getrandom",
+ "mpz-circuits",
+ "mpz-core",
+ "mpz-garble-core",
+ "opaque-debug",
+ "p256",
+ "ring",
+ "rs_merkle",
+ "serde",
+ "thiserror",
+ "tlsn-tls-core 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=45370cc)",
+ "web-time 0.2.4",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -3703,10 +4070,39 @@ dependencies = [
  "rs_merkle",
  "serde",
  "thiserror",
- "tlsn-tls-core",
+ "tlsn-tls-core 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
  "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=45370cc)",
  "web-time 0.2.4",
  "webpki-roots",
+]
+
+[[package]]
+name = "tlsn-formats"
+version = "0.1.0-alpha.6"
+source = "git+https://github.com/pluto/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
+dependencies = [
+ "bytes",
+ "serde",
+ "spansy",
+ "thiserror",
+ "tlsn-core 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=45370cc)",
+]
+
+[[package]]
+name = "tlsn-hmac-sha256"
+version = "0.1.0-alpha.6"
+source = "git+https://github.com/pluto/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
+dependencies = [
+ "async-trait",
+ "derive_builder 0.12.0",
+ "futures",
+ "mpz-circuits",
+ "mpz-common",
+ "mpz-garble",
+ "thiserror",
+ "tlsn-hmac-sha256-circuits 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tracing",
 ]
 
 [[package]]
@@ -3721,7 +4117,16 @@ dependencies = [
  "mpz-common",
  "mpz-garble",
  "thiserror",
- "tlsn-hmac-sha256-circuits",
+ "tlsn-hmac-sha256-circuits 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
+ "tracing",
+]
+
+[[package]]
+name = "tlsn-hmac-sha256-circuits"
+version = "0.1.0-alpha.6"
+source = "git+https://github.com/pluto/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
+dependencies = [
+ "mpz-circuits",
  "tracing",
 ]
 
@@ -3731,6 +4136,28 @@ version = "0.1.0-alpha.6"
 source = "git+https://github.com/tlsnotary/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
 dependencies = [
  "mpz-circuits",
+ "tracing",
+]
+
+[[package]]
+name = "tlsn-key-exchange"
+version = "0.1.0-alpha.6"
+source = "git+https://github.com/pluto/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
+dependencies = [
+ "async-trait",
+ "derive_builder 0.12.0",
+ "futures",
+ "mpz-circuits",
+ "mpz-common",
+ "mpz-fields",
+ "mpz-garble",
+ "mpz-ot",
+ "mpz-share-conversion",
+ "p256",
+ "rand",
+ "serde",
+ "serio",
+ "thiserror",
  "tracing",
 ]
 
@@ -3757,14 +4184,68 @@ dependencies = [
 ]
 
 [[package]]
+name = "tlsn-prover"
+version = "0.1.0-alpha.6"
+source = "git+https://github.com/pluto/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
+dependencies = [
+ "bytes",
+ "derive_builder 0.12.0",
+ "futures",
+ "getrandom",
+ "mpz-common",
+ "mpz-core",
+ "mpz-garble",
+ "mpz-garble-core",
+ "mpz-ole",
+ "mpz-ot",
+ "mpz-share-conversion",
+ "opaque-debug",
+ "rand",
+ "ring",
+ "serio",
+ "thiserror",
+ "tlsn-common 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-core 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-formats",
+ "tlsn-tls-client",
+ "tlsn-tls-client-async",
+ "tlsn-tls-core 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-tls-mpc 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=45370cc)",
+ "tlsn-utils-aio 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=45370cc)",
+ "tracing",
+ "uid-mux",
+ "web-time 0.2.4",
+ "webpki-roots",
+]
+
+[[package]]
+name = "tlsn-stream-cipher"
+version = "0.1.0-alpha.6"
+source = "git+https://github.com/pluto/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
+dependencies = [
+ "aes 0.8.4",
+ "async-trait",
+ "cipher 0.4.4",
+ "ctr 0.9.2",
+ "derive_builder 0.12.0",
+ "mpz-circuits",
+ "mpz-garble",
+ "opaque-debug",
+ "thiserror",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=45370cc)",
+ "tracing",
+]
+
+[[package]]
 name = "tlsn-stream-cipher"
 version = "0.1.0-alpha.6"
 source = "git+https://github.com/tlsnotary/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
 dependencies = [
- "aes",
+ "aes 0.8.4",
  "async-trait",
- "cipher",
- "ctr",
+ "cipher 0.4.4",
+ "ctr 0.9.2",
  "derive_builder 0.12.0",
  "mpz-circuits",
  "mpz-garble",
@@ -3777,12 +4258,78 @@ dependencies = [
 [[package]]
 name = "tlsn-tls-backend"
 version = "0.1.0-alpha.6"
+source = "git+https://github.com/pluto/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
+dependencies = [
+ "async-trait",
+ "futures",
+ "thiserror",
+ "tlsn-tls-core 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+]
+
+[[package]]
+name = "tlsn-tls-backend"
+version = "0.1.0-alpha.6"
 source = "git+https://github.com/tlsnotary/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
 dependencies = [
  "async-trait",
  "futures",
  "thiserror",
- "tlsn-tls-core",
+ "tlsn-tls-core 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
+]
+
+[[package]]
+name = "tlsn-tls-client"
+version = "0.1.0-alpha.6"
+source = "git+https://github.com/pluto/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
+dependencies = [
+ "aes-gcm",
+ "async-trait",
+ "digest 0.10.7",
+ "futures",
+ "getrandom",
+ "hmac",
+ "log",
+ "p256",
+ "rand",
+ "ring",
+ "sct",
+ "sha2",
+ "tlsn-tls-backend 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-tls-core 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "web-time 0.2.4",
+ "webpki",
+]
+
+[[package]]
+name = "tlsn-tls-client-async"
+version = "0.1.0-alpha.6"
+source = "git+https://github.com/pluto/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
+dependencies = [
+ "bytes",
+ "futures",
+ "thiserror",
+ "tlsn-tls-client",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "tlsn-tls-core"
+version = "0.1.0-alpha.6"
+source = "git+https://github.com/pluto/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
+dependencies = [
+ "futures",
+ "hmac",
+ "rand",
+ "ring",
+ "rustls-pemfile 1.0.4",
+ "sct",
+ "serde",
+ "sha2",
+ "thiserror",
+ "tracing",
+ "web-time 0.2.4",
+ "webpki",
 ]
 
 [[package]]
@@ -3807,6 +4354,40 @@ dependencies = [
 [[package]]
 name = "tlsn-tls-mpc"
 version = "0.1.0-alpha.6"
+source = "git+https://github.com/pluto/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
+dependencies = [
+ "async-trait",
+ "derive_builder 0.12.0",
+ "enum-try-as-inner",
+ "futures",
+ "ludi",
+ "mpz-common",
+ "mpz-core",
+ "mpz-fields",
+ "mpz-garble",
+ "mpz-ole",
+ "mpz-ot",
+ "mpz-share-conversion",
+ "p256",
+ "rand",
+ "serde",
+ "thiserror",
+ "tlsn-aead 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-block-cipher 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-hmac-sha256 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-key-exchange 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-stream-cipher 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-tls-backend 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-tls-core 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-universal-hash 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
+ "tlsn-utils-aio 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=45370cc)",
+ "tracing",
+ "uid-mux",
+]
+
+[[package]]
+name = "tlsn-tls-mpc"
+version = "0.1.0-alpha.6"
 source = "git+https://github.com/tlsnotary/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
 dependencies = [
  "async-trait",
@@ -3825,17 +4406,37 @@ dependencies = [
  "rand",
  "serde",
  "thiserror",
- "tlsn-aead",
- "tlsn-block-cipher",
- "tlsn-hmac-sha256",
- "tlsn-key-exchange",
- "tlsn-stream-cipher",
- "tlsn-tls-backend",
- "tlsn-tls-core",
- "tlsn-universal-hash",
+ "tlsn-aead 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
+ "tlsn-block-cipher 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
+ "tlsn-hmac-sha256 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
+ "tlsn-key-exchange 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
+ "tlsn-stream-cipher 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
+ "tlsn-tls-backend 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
+ "tlsn-tls-core 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
+ "tlsn-universal-hash 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
  "tlsn-utils-aio 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=45370cc)",
  "tracing",
  "uid-mux",
+]
+
+[[package]]
+name = "tlsn-universal-hash"
+version = "0.1.0-alpha.6"
+source = "git+https://github.com/pluto/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
+dependencies = [
+ "async-trait",
+ "derive_builder 0.12.0",
+ "futures",
+ "futures-util",
+ "ghash 0.5.1",
+ "mpz-common",
+ "mpz-core",
+ "mpz-fields",
+ "mpz-share-conversion",
+ "mpz-share-conversion-core",
+ "opaque-debug",
+ "thiserror",
+ "tracing",
 ]
 
 [[package]]
@@ -3847,7 +4448,7 @@ dependencies = [
  "derive_builder 0.12.0",
  "futures",
  "futures-util",
- "ghash",
+ "ghash 0.5.1",
  "mpz-common",
  "mpz-core",
  "mpz-fields",
@@ -3933,10 +4534,10 @@ dependencies = [
  "serio",
  "signature",
  "thiserror",
- "tlsn-common",
- "tlsn-core",
- "tlsn-tls-core",
- "tlsn-tls-mpc",
+ "tlsn-common 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
+ "tlsn-core 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
+ "tlsn-tls-core 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
+ "tlsn-tls-mpc 0.1.0-alpha.6 (git+https://github.com/tlsnotary/tlsn.git)",
  "tlsn-utils-aio 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=45370cc)",
  "tracing",
  "uid-mux",
@@ -4153,9 +4754,23 @@ dependencies = [
  "sharded-slab",
  "smallvec",
  "thread_local",
+ "time",
  "tracing",
  "tracing-core",
  "tracing-log",
+]
+
+[[package]]
+name = "tracing-web"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9e6a141feebd51f8d91ebfd785af50fca223c570b86852166caa3b141defe7c"
+dependencies = [
+ "js-sys",
+ "tracing-core",
+ "tracing-subscriber",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -4210,6 +4825,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
+name = "ucd-trie"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed646292ffc8188ef8ea4d1e0e0150fb15a5c2e12ad9b8fc191ae7a8a7f3c4b9"
+
+[[package]]
 name = "uid-mux"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4261,6 +4882,16 @@ checksum = "0336d538f7abc86d282a4189614dfaa90810dfc2c6f6427eaf88e16311dd225d"
 
 [[package]]
 name = "universal-hash"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8326b2c654932e3e4f9196e69d08fdf7cfd718e1dc6f66b347e6024a0c961402"
+dependencies = [
+ "generic-array",
+ "subtle",
+]
+
+[[package]]
+name = "universal-hash"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc1de2c688dc15305988b563c3854064043356019f97a4b46276fe734c4f07ea"
@@ -4290,6 +4921,7 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]
@@ -4430,10 +5062,58 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasm-bindgen-rayon"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9e02b7785fe15de188657b7d3a234ef042bfd8da10822016915e06d4e29cba7"
+dependencies = [
+ "crossbeam-channel",
+ "js-sys",
+ "rayon",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "wasm-bindgen-shared"
 version = "0.2.92"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af190c94f2773fdb3729c55b007a722abb5384da03bc0986df4c289bf5567e96"
+
+[[package]]
+name = "wasm-bindgen-test"
+version = "0.3.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9bf62a58e0780af3e852044583deee40983e5886da43a271dd772379987667b"
+dependencies = [
+ "console_error_panic_hook",
+ "js-sys",
+ "scoped-tls",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test-macro",
+]
+
+[[package]]
+name = "wasm-bindgen-test-macro"
+version = "0.3.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7f89739351a2e03cb94beb799d47fb2cac01759b40ec441f7de39b00cbf7ef0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.70",
+]
+
+[[package]]
+name = "wasm_sync"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cff360cade7fec41ff0e9d2cda57fe58258c5f16def0e21302394659e6bbb0ea"
+dependencies = [
+ "js-sys",
+ "wasm-bindgen",
+ "web-sys",
+]
 
 [[package]]
 name = "web-sys"
@@ -4693,6 +5373,24 @@ dependencies = [
  "tokio",
  "tracing",
  "tungstenite 0.21.0",
+]
+
+[[package]]
+name = "ws_stream_wasm"
+version = "0.7.4"
+source = "git+https://github.com/tlsnotary/ws_stream_wasm?rev=2ed12aad9f0236e5321f577672f309920b2aef51#2ed12aad9f0236e5321f577672f309920b2aef51"
+dependencies = [
+ "async_io_stream",
+ "futures",
+ "js-sys",
+ "log",
+ "pharos",
+ "rustc_version",
+ "send_wrapper",
+ "thiserror",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

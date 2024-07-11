@@ -37,3 +37,4 @@ open https://localhost:8090 # then watch console
 * add origo proxy implemenation
 * adapt all clients to work with origo proxy
 * abstract common code from client_wasm and client_ios into client
+* it is currently not possible to run `cargo check` in the root directory. maybe that's okay.

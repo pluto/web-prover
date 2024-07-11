@@ -1,5 +1,4 @@
 check:
-	cargo check
 	cd client_wasm && cargo check
 
 client_wasm:
