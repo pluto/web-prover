@@ -1,3 +1,5 @@
 [workspace]
-members =["client_wasm", "client_ios", "client", "origo", "tlsnotary"]
+members =["client_ios", "client", "origo", "tlsnotary"]
 resolver="2"
+
+exclude = ["client_wasm"]

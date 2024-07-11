@@ -14,7 +14,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
 
-    name: Build client_wasm on ${{ matrix.os }}
+    name: client_wasm on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
     env:
@@ -31,9 +31,11 @@ jobs:
           cache-directories: |
             /Users/runner/Library/Caches/.wasm-pack
 
-      - run: cargo check -p client_wasm
+      - run: cargo check
+        working-directory: client_wasm
 
-      - run: cargo test -p client_wasm
+      - run: cargo test
+        working-directory: client_wasm
 
       - run: make client_wasm
 
