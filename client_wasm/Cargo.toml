@@ -43,6 +43,7 @@ web-time="1.0"
 
 tlsn-prover={ git="https://github.com/pluto/tlsn.git" }
 tlsn-core  ={ git="https://github.com/pluto/tlsn.git" }
+tlsn-tls-client = {git="https://github.com/pluto/tlsn.git" }
 
 web-sys={ version="0.3.4", features=[
 	"BinaryType",
@@ -73,6 +74,9 @@ ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wa
 # all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
 # code size when deploying.
 console_error_panic_hook={ version="0.1.7" }
+
+webpki-roots = "0.26.1"
+pki-types = { package = "rustls-pki-types", version = "1.7" }
 
 strum       ={ version="0.26.1" }
 strum_macros="0.26.1"

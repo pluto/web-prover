@@ -862,6 +862,7 @@ dependencies = [
  "pin-project-lite",
  "rayon",
  "ring",
+ "rustls-pki-types",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
@@ -870,6 +871,7 @@ dependencies = [
  "time",
  "tlsn-core 0.1.0-alpha.6 (git+https://github.com/pluto/tlsn.git)",
  "tlsn-prover",
+ "tlsn-tls-client",
  "tracing",
  "tracing-subscriber",
  "tracing-web",
@@ -880,6 +882,7 @@ dependencies = [
  "wasm-bindgen-test",
  "web-sys",
  "web-time 1.1.0",
+ "webpki-roots",
  "ws_stream_wasm",
 ]
 

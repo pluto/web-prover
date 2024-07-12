@@ -16,8 +16,8 @@ async fn main() {
     notarization:  NotarizationProperties { max_transcript_size: 20480 },
     tls:           TLSProperties {
       enabled:              true,
-      private_key_pem_path: "./tests/fixture/notary/server-key.pem".into(), // TODO CLI or ENV
-      certificate_pem_path: "./tests/fixture/notary/server-cert.pem".into(),  // TODO CLI or ENV
+      private_key_pem_path: "./tests/fixture/mock_server/server-key.pem".into(), // TODO CLI or ENV
+      certificate_pem_path: "./tests/fixture/mock_server/server-cert.pem".into(),  // TODO CLI or ENV
     },
     notary_key:    NotarySigningKeyProperties {
       private_key_pem_path: "./tests/fixture/notary/notary.key".into(),

@@ -1,4 +1,5 @@
 use futures::channel::oneshot;
+use pki_types::CertificateDer;
 use std::ops::Range;
 use tlsn_prover::tls::{Prover, ProverConfig};
 use wasm_bindgen_futures::spawn_local;
@@ -172,8 +173,24 @@ pub async fn prover(
         .host_str()
         .ok_or(JsValue::from_str("Could not get target host"))?;
 
+    let mut root_store = tls_client::RootCertStore::empty();
+    root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
+        tls_client::OwnedTrustAnchor::from_subject_spki_name_constraints(
+            ta.subject.as_ref(),
+            ta.subject_public_key_info.as_ref(),
+            ta.name_constraints.as_ref().map(|nc| nc.as_ref()),
+        )
+    }));
+
+    const LOCALHOST_DEBUG_CA_CERT: &[u8] = include_bytes!("../../tests/fixture/mock_server/ca-cert.cer");
+    let cert = CertificateDer::from(LOCALHOST_DEBUG_CA_CERT.to_vec());
+    let (added, _) = root_store.add_parsable_certificates(&[cert.to_vec()]);
+    assert_eq!(added, 1);
+
     // Basic default prover config
     let mut builder = ProverConfig::builder();
+    
+    builder.root_cert_store(root_store);
 
     if let Some(max_sent_data) = options.max_sent_data {
         builder.max_sent_data(max_sent_data);
