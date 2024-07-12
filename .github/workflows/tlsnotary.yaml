@@ -1,0 +1,35 @@
+name: tlsnotary
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    name: tlsnotary on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: rustup toolchain install nightly --profile minimal --no-self-update
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo test -p tlsnotary
+
+      - run: cargo build -p tlsnotary --release
+
+      # TODO: store tlsnotary binary as github artifact?
