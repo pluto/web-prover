@@ -74,13 +74,15 @@ pub async fn request_notarization(
   debug!("TLS socket created with TCP connection");
   // #[cfg(feature = "tracing")]
   // trace!("{notary_tls_socket:#?}"); // TODO not found in this scope
+  // TODO connect to Notary requires notarization_response.session_id
+  //      /notarize?sessionId={}
+  // TODO Second WS connection is to websocket proxy (pass in config into function)
   #[cfg(all(feature = "websocket", target_arch = "wasm32"))]
   let (notary_tls_socket_io, notary_tls_socket) = {
     let (_ws_meta, ws_stream) = WsMeta::connect(format!("wss://{}:{}", host, port), None).await?;
     let (_ws_meta, ws_stream_io) = WsMeta::connect(format!("wss://{}:{}", host, port), None).await?;
     (ws_stream_io.into_io(), ws_stream)
   };
-  panic!("made it here");
   // Attach the hyper HTTP client to the notary TLS connection to send request to the /session
   // endpoint to configure notarization and obtain session id
   #[cfg(target_arch = "wasm32")]
