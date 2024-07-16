@@ -4,6 +4,8 @@ use elliptic_curve::pkcs8::DecodePublicKey;
 use tlsn_core::proof::{SessionProof, TlsProof};
 use wasm_bindgen::prelude::*;
 
+use serde::{Deserialize, Serialize};
+
 #[cfg(feature = "tracing")] use super::*;
 
 #[wasm_bindgen]

@@ -1,6 +1,5 @@
 use core::slice;
 use std::{
-  panic,
   pin::Pin,
   task::{Context, Poll},
 };

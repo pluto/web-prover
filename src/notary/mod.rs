@@ -2,7 +2,7 @@
 
 use http_body_util::{BodyExt, Either, Empty, Full};
 use hyper::{body::Bytes, Request, StatusCode};
-use rustls::{pki_types::ServerName, ClientConfig, RootCertStore};
+// use rustls::{pki_types::ServerName, ClientConfig, RootCertStore};
 #[cfg(target_arch = "wasm32")]
 use {
   wasm_bindgen_futures::spawn_local, wasm_utils::WasmAsyncIo as AsyncIo, ws_stream_wasm::WsMeta,
@@ -22,7 +22,7 @@ use {
 type NetworkStream = TlsStream<TcpStream>;
 
 use super::*;
-use crate::load_certs;
+// use crate::load_certs;
 
 // TODO: The `ClientType` and  `NotarizationSessionRequest` and `NotarizationSessionResponse` is
 // redundant with what we had in `request` for the wasm version which was deprecated. May have to be
@@ -41,9 +41,9 @@ pub async fn request_notarization(
   //---------------------------------------------------------------------------------------------------------------------------------------//
   #[cfg(feature = "tracing")]
   let _span = tracing::span!(tracing::Level::TRACE, "add_certs_to_root_store").entered();
-  let certificate = load_certs(notary_ca_cert_path)?.remove(0);
-  let mut root_store = RootCertStore::empty();
-  root_store.add(certificate)?;
+  // let certificate = load_certs(notary_ca_cert_path)?.remove(0);
+  // let mut root_store = RootCertStore::empty(); // TODO(matt)
+  // root_store.add(certificate)?;
   #[cfg(feature = "tracing")]
   info!("certs added to root store");
   #[cfg(feature = "tracing")]
@@ -53,6 +53,7 @@ pub async fn request_notarization(
   //---------------------------------------------------------------------------------------------------------------------------------------//
   #[cfg(feature = "tracing")]
   let _span = tracing::span!(tracing::Level::TRACE, "create_client_notary_tls_session").entered();
+  #[cfg(not(target_arch = "wasm32"))]
   let client_notary_config =
     ClientConfig::builder().with_root_certificates(root_store).with_no_client_auth();
   #[cfg(feature = "tracing")]
@@ -196,5 +197,5 @@ pub async fn request_notarization(
   #[cfg(not(target_arch = "wasm32"))]
   return Ok((notary_tls_socket.into_inner(), notarization_response.session_id.to_string()));
   #[cfg(target_arch = "wasm32")]
-  return Ok((notary_tls_socket, session_id.to_string()));
+  return Ok((notary_tls_socket, notarization_response.session_id.to_string()));
 }

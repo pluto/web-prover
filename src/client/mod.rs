@@ -6,6 +6,8 @@ use std::{
   os::raw::c_char,
 };
 
+use std::panic;
+
 use base64::prelude::*;
 use http_body_util::Full;
 use hyper::{body::Bytes, Request};
@@ -318,7 +320,8 @@ async fn prover_inner(config: Config) -> Result<TlsProof, ClientErrors> {
   //---------------------------------------------------------------------------------------------------------------------------------------//
   // Complete the prover and notarization
   //---------------------------------------------------------------------------------------------------------------------------------------//
-  let prover = prover_task.await??;
+  // let prover = prover_task.await??; // TODO rustls issues
+  let prover = prover_task.await.unwrap().unwrap();
 
   // Upgrade the prover to an HTTP prover, and start notarization.
   let mut prover = prover.to_http()?.start_notarize();

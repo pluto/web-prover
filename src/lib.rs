@@ -1,12 +1,13 @@
 pub mod client;
 pub mod errors;
 pub mod notary;
-pub mod routes;
+// pub mod routes;
 pub use errors::ClientErrors;
 
 #[cfg(target_arch = "wasm32")] pub mod verify;
 #[cfg(target_arch = "wasm32")] pub mod wasm_utils;
-use std::{collections::HashMap, fs, io};
+// use std::{collections::HashMap, fs, io};
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "tracing")]
@@ -34,7 +35,7 @@ pub struct Config {
   pub target_headers:               HashMap<String, String>,
   pub target_body:                  String,
   #[cfg(feature = "websocket")]
-  _websocket_proxy_url:             String,
+  websocket_proxy_url:              String,
   pub notarization_session_request: NotarizationSessionRequest,
   pub notary_ca_cert_path:          String,
 }
@@ -50,28 +51,28 @@ pub struct NotarizationSessionRequest {
   pub max_recv_data: Option<usize>,
 }
 
-use anyhow::Result;
-use pki_types::{CertificateDer, PrivateKeyDer};
+// use anyhow::Result;
+// use pki_types::{CertificateDer, PrivateKeyDer};
 
-pub fn load_certs(filename: &str) -> io::Result<Vec<CertificateDer<'static>>> {
-  let certfile =
-    fs::File::open(filename).map_err(|e| error(format!("failed to open {}: {}", filename, e)))?;
-  let mut reader = io::BufReader::new(certfile);
-  rustls_pemfile::certs(&mut reader).collect()
-}
+// pub fn load_certs(filename: &str) -> io::Result<Vec<CertificateDer<'static>>> {
+//   let certfile =
+//     fs::File::open(filename).map_err(|e| error(format!("failed to open {}: {}", filename, e)))?;
+//   let mut reader = io::BufReader::new(certfile);
+//   rustls_pemfile::certs(&mut reader).collect()
+// }
 
-pub fn load_private_key(filename: &str) -> io::Result<PrivateKeyDer<'static>> {
-  let keyfile =
-    fs::File::open(filename).map_err(|e| error(format!("failed to open {}: {}", filename, e)))?;
-  let mut reader = io::BufReader::new(keyfile);
-  rustls_pemfile::private_key(&mut reader).map(|key| key.unwrap())
-}
+// pub fn load_private_key(filename: &str) -> io::Result<PrivateKeyDer<'static>> {
+//   let keyfile =
+//     fs::File::open(filename).map_err(|e| error(format!("failed to open {}: {}", filename, e)))?;
+//   let mut reader = io::BufReader::new(keyfile);
+//   rustls_pemfile::private_key(&mut reader).map(|key| key.unwrap())
+// }
 
-pub fn error(err: String) -> io::Error { io::Error::new(io::ErrorKind::Other, err) }
+// pub fn error(err: String) -> io::Error { io::Error::new(io::ErrorKind::Other, err) }
 
-/// Read a PEM-formatted file and return its buffer reader
-#[allow(dead_code)]
-async fn read_pem_file(file_path: &str) -> Result<io::BufReader<std::fs::File>> {
-  let key_file = tokio::fs::File::open(file_path).await?.into_std().await;
-  Ok(io::BufReader::new(key_file))
-}
+// /// Read a PEM-formatted file and return its buffer reader
+// #[allow(dead_code)]
+// async fn read_pem_file(file_path: &str) -> Result<io::BufReader<std::fs::File>> {
+//   let key_file = tokio::fs::File::open(file_path).await?.into_std().await;
+//   Ok(io::BufReader::new(key_file))
+// }
