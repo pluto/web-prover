@@ -8,7 +8,7 @@ import init, {
 const numConcurrency = navigator.hardwareConcurrency;
 
 await init();
-setup_tracing_web("info,tlsn_extension_rs=debug");
+setup_tracing_web("debug,tlsn_extension_rs=debug");
 await initThreadPool(numConcurrency);
 
 const proof = await prover(
@@ -16,7 +16,7 @@ const proof = await prover(
     notary_host: "localhost",
     notary_port: 7074,
     target_method: "GET",
-    target_url: "https://localhost:8065/health",
+    target_url: "https://localhost:8085/health",
     target_headers: {},
     target_body: "",
     websocket_proxy_url: "wss://localhost:8050",
