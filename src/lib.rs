@@ -42,7 +42,6 @@ pub struct Config {
 
 /// Request object of the /session API
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct NotarizationSessionRequest {
   pub client_type:   ClientType,
   /// Maximum data that can be sent by the prover

@@ -27,6 +27,8 @@ use {
   tokio::{net::TcpStream, spawn},
   tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt},
 };
+#[cfg(target_arch = "wasm32")]
+use gloo_utils::format::JsValueSerdeExt;
 
 use super::*;
 
@@ -97,14 +99,14 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
-pub async fn prover(config: *mut Config) -> Result<String, JsValue> {
+pub async fn prover(config: JsValue) -> Result<String, JsValue> {
   panic::set_hook(Box::new(console_error_panic_hook::hook));
   #[cfg(feature = "tracing")]
   panic::set_hook(Box::new(|info| {
     error!("panic occurred: {:?}", info);
     console_error_panic_hook::hook(info);
   }));
-  let config: Config = unsafe { (*config).clone() };
+  let config: Config = config.into_serde().unwrap(); // TODO replace unwrap
   let proof = prover_inner(config)
     .await
     .map_err(|e| JsValue::from_str(&format!("Could not produce proof: {:?}", e)))?;
@@ -123,10 +125,7 @@ async fn prover_inner(config: Config) -> Result<TlsProof, ClientErrors> {
   //---------------------------------------------------------------------------------------------------------------------------------------//
   #[cfg(feature = "tracing")]
   let _span = tracing::span!(tracing::Level::TRACE, "parse_target_url").entered();
-
-  panic!("{:?}", &config);
   let target_url = Url::parse(&config.target_url)?;
-  panic!("here");
   #[cfg(feature = "tracing")]
   trace!("parsed `target_url`: {target_url:?}");
   // TODO: These three lines with target_url should probably throw a well-defined error instead of

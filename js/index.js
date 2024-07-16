@@ -13,16 +13,19 @@ await initThreadPool(numConcurrency);
 
 const proof = await prover(
   {
-    method: "GET",
-    headers: {
-      Host: "localhost",
-      Connection: "close",
+    notary_host: "localhost",
+    notary_port: 7074,
+    target_method: "GET",
+    target_url: "https://localhost:8065/health",
+    target_headers: {},
+    target_body: "",
+    websocket_proxy_url: "wss://localhost:8050",
+    notarization_session_request: {
+      client_type: "Websocket",
+      max_sent_data: 16384,
+      max_recv_data: 16384,
     },
-    body: "",
-    maxTranscriptSize: 16384,
-    notaryUrl: "https://localhost:7047",
-    websocketProxyUrl: "wss://localhost:8050",
-    targetUrl: "https://localhost:8065/health"
+    notary_ca_cert_path: "FIXME"
   }
 );
 console.log(proof);

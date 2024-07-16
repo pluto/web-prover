@@ -173,6 +173,8 @@ wasm-bindgen-rayon  ="1.0"
 tracing-subscriber  ={ version="0.3", features=["time", "env-filter"] }
 tracing-web         ="0.1.2"
 
+gloo-utils = { version = "0.1", features = ["serde"] }
+
 # TLSN
 tlsn-prover={ git="https://github.com/tlsnotary/tlsn.git" }
 tlsn-core  ={ git="https://github.com/tlsnotary/tlsn.git" }
