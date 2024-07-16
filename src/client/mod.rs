@@ -123,7 +123,10 @@ async fn prover_inner(config: Config) -> Result<TlsProof, ClientErrors> {
   //---------------------------------------------------------------------------------------------------------------------------------------//
   #[cfg(feature = "tracing")]
   let _span = tracing::span!(tracing::Level::TRACE, "parse_target_url").entered();
+
+  panic!("{:?}", &config);
   let target_url = Url::parse(&config.target_url)?;
+  panic!("here");
   #[cfg(feature = "tracing")]
   trace!("parsed `target_url`: {target_url:?}");
   // TODO: These three lines with target_url should probably throw a well-defined error instead of
