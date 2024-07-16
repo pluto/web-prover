@@ -1,7 +1,7 @@
 
 [build]
-# target="wasm32-unknown-unknown"
-target="aarch64-apple-darwin"
+target="wasm32-unknown-unknown"
+# target="aarch64-apple-darwin"
 
 [target.'cfg(target_arch = "wasm32")']
 rustflags=[
