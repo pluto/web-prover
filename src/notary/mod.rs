@@ -56,8 +56,8 @@ pub async fn request_notarization(
   #[cfg(not(target_arch = "wasm32"))]
   let client_notary_config =
     ClientConfig::builder().with_root_certificates(root_store).with_no_client_auth();
-  #[cfg(feature = "tracing")]
-  trace!("{client_notary_config:#?}");
+  // #[cfg(feature = "tracing")]
+  // trace!("{client_notary_config:#?}"); // TODO: not found in this scope
   #[cfg(not(target_arch = "wasm32"))]
   let notary_tls_socket = {
     let notary_connector = TlsConnector::from(Arc::new(client_notary_config));
@@ -71,8 +71,8 @@ pub async fn request_notarization(
   // TODO: Be careful to put this in with the right target arch
   #[cfg(feature = "tracing")]
   debug!("TLS socket created with TCP connection");
-  #[cfg(feature = "tracing")]
-  trace!("{notary_tls_socket:#?}");
+  // #[cfg(feature = "tracing")]
+  // trace!("{notary_tls_socket:#?}"); // TODO not found in this scope
   #[cfg(all(feature = "websocket", target_arch = "wasm32"))]
   let (notary_tls_socket_io, notary_tls_socket) = {
     let (_ws_meta, ws_stream) = WsMeta::connect(host, None).await?;

@@ -30,6 +30,9 @@ use {
 #[cfg(target_arch = "wasm32")]
 use gloo_utils::format::JsValueSerdeExt;
 
+#[cfg(feature = "tracing")]
+use tracing::error;
+
 use super::*;
 
 #[cfg(test)] mod tests;
@@ -137,8 +140,8 @@ async fn prover_inner(config: Config) -> Result<TlsProof, ClientErrors> {
   // Only returns none if no port or known protocol used
   #[cfg(any(not(feature = "websocket"), not(target_arch = "wasm32")))]
   let target_port = target_url.port_or_known_default().expect("Target has an unknown port!");
-  #[cfg(feature = "tracing")]
-  debug!("parsed `target_port`: {target_port:?}");
+  // #[cfg(feature = "tracing")]
+  // debug!("parsed `target_port`: {target_port:?}"); // TODO target_port does not exist, fix feature flags
   #[cfg(feature = "tracing")]
   info!("target connection data built");
   #[cfg(feature = "tracing")]
