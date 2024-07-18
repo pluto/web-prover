@@ -24,8 +24,7 @@ const proof = await prover(
       client_type: "Websocket",
       max_sent_data: 10000,
       max_recv_data: 10000,
-    },
-    notary_ca_cert_path: "FIXME"
+    }
   }
 );
 console.log(proof);

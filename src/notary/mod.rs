@@ -22,7 +22,8 @@ use {
 type NetworkStream = TlsStream<TcpStream>;
 
 use super::*;
-// use crate::load_certs;
+
+const NOTARY_CA_CERT: &[u8] = include_bytes!("../fixture/mock_server/ca-cert.cer");
 
 // TODO: The `ClientType` and  `NotarizationSessionRequest` and `NotarizationSessionResponse` is
 // redundant with what we had in `request` for the wasm version which was deprecated. May have to be
@@ -36,16 +37,16 @@ pub async fn request_notarization(
   config_notarization_session_request: &ConfigNotarizationSessionRequest,
   target_host: &str,
   target_port: u16,
-  notary_ca_cert_path: &str,
 ) -> Result<(NetworkStream, String), ClientErrors> {
   //---------------------------------------------------------------------------------------------------------------------------------------//
   // Get the certs and add them to the root store
   //---------------------------------------------------------------------------------------------------------------------------------------//
   #[cfg(feature = "tracing")]
   let _span = tracing::span!(tracing::Level::TRACE, "add_certs_to_root_store").entered();
-  // let certificate = load_certs(notary_ca_cert_path)?.remove(0);
-  // let mut root_store = RootCertStore::empty(); // TODO(matt)
-  // root_store.add(certificate)?;
+  let certificate = pki_types::CertificateDer::from(NOTARY_CA_CERT.to_vec());
+  let mut root_store = tls_client::RootCertStore::empty();
+  let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
+  assert_eq!(added, 1); // TODO there is probably a better way
   #[cfg(feature = "tracing")]
   info!("certs added to root store");
   #[cfg(feature = "tracing")]
