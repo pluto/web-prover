@@ -39,7 +39,7 @@ pub fn setup_tracing_web(logging_filter: &str) {
   debug!("🪵 Logging set up 🪵")
 }
 
-#[deprecated]
+#[cfg(target_arch = "wasm32")]
 pub async fn fetch_as_json_string(url: &str, opts: &RequestInit) -> Result<String, JsValue> {
   let request = Request::new_with_str_and_init(url, opts)?;
   let window = web_sys::window().expect("Window object");

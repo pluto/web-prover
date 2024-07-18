@@ -138,7 +138,6 @@ async fn prover_inner(config: Config) -> Result<TlsProof, ClientErrors> {
   #[cfg(feature = "tracing")]
   debug!("parsed `target_host`: {target_host:?}; IS HTTPS!");
   // Only returns none if no port or known protocol used
-  #[cfg(any(not(feature = "websocket"), not(target_arch = "wasm32")))]
   let target_port = target_url.port_or_known_default().expect("Target has an unknown port!");
   // #[cfg(feature = "tracing")]
   // debug!("parsed `target_port`: {target_port:?}"); // TODO target_port does not exist, fix feature flags
@@ -159,6 +158,8 @@ async fn prover_inner(config: Config) -> Result<TlsProof, ClientErrors> {
     &config.notary_host,
     config.notary_port,
     &config.notarization_session_request,
+    target_host,
+    target_port,
     &config.notary_ca_cert_path,
   )
   .await?;
