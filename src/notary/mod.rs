@@ -37,6 +37,7 @@ pub async fn request_notarization(
   config_notarization_session_request: &ConfigNotarizationSessionRequest,
   target_host: &str,
   target_port: u16,
+  websocket_proxy_url: &str,
 ) -> Result<(NetworkStream, String), ClientErrors> {
   //---------------------------------------------------------------------------------------------------------------------------------------//
   // Get the certs and add them to the root store
@@ -96,21 +97,21 @@ pub async fn request_notarization(
   //---------------------------------------------------------------------------------------------------------------------------------------//
   #[cfg(feature = "tracing")]
   let _span = tracing::span!(tracing::Level::TRACE, "create_client_notary_tls_session").entered();
-  #[cfg(not(target_arch = "wasm32"))]
-  let client_notary_config =
-    ClientConfig::builder().with_root_certificates(root_store).with_no_client_auth();
+  // #[cfg(not(target_arch = "wasm32"))]
+  // let client_notary_config =
+  // ClientConfig::builder().with_root_certificates(root_store).with_no_client_auth();
   // #[cfg(feature = "tracing")]
   // trace!("{client_notary_config:#?}"); // TODO: not found in this scope
-  #[cfg(not(target_arch = "wasm32"))]
-  let notary_tls_socket = {
-    let notary_connector = TlsConnector::from(Arc::new(client_notary_config));
-    let notary_socket = TcpStream::connect((host, port)).await?;
-    notary_connector
-    // Require the domain name of notary server to be the same as that in the server cert
-    .connect(ServerName::try_from(host.to_owned()).unwrap(), notary_socket)
-    .await
-    ?
-  };
+  // #[cfg(not(target_arch = "wasm32"))]
+  // let notary_tls_socket = {
+  //   let notary_connector = TlsConnector::from(Arc::new(client_notary_config));
+  //   let notary_socket = TcpStream::connect((host, port)).await?;
+  //   notary_connector
+  //   // Require the domain name of notary server to be the same as that in the server cert
+  //   .connect(ServerName::try_from(host.to_owned()).unwrap(), notary_socket)
+  //   .await
+  //   ?
+  // };
 
   // TODO: Be careful to put this in with the right target arch
   #[cfg(feature = "tracing")]
@@ -122,10 +123,19 @@ pub async fn request_notarization(
   // TODO Second WS connection is to websocket proxy (pass in config into function)
   #[cfg(all(feature = "websocket", target_arch = "wasm32"))]
   let (notary_tls_socket_io, notary_tls_socket) = {
-    let (_ws_meta, ws_stream) =
-      WsMeta::connect(format!("wss://{}:{}", notary_host, notary_port), None).await?;
-    let (_ws_meta, ws_stream_io) =
-      WsMeta::connect(format!("wss://{}:{}", notary_host, notary_port), None).await?;
+    let ws_target_query = url::form_urlencoded::Serializer::new(String::new())
+      .extend_pairs([("target", format!("{}:{}", target_host, target_port))])
+      .finish();
+    let (_, ws_stream) =
+      WsMeta::connect(format!("{}?{}", websocket_proxy_url, ws_target_query), None).await?;
+    let (_, ws_stream_io) = WsMeta::connect(
+      format!(
+        "wss://{}:{}/notarize?sessionId={}",
+        notary_host, notary_port, notarization_response.session_id
+      ),
+      None,
+    )
+    .await?;
     (ws_stream_io.into_io(), ws_stream)
   };
   // Attach the hyper HTTP client to the notary TLS connection to send request to the /session
