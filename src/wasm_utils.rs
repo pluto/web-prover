@@ -67,6 +67,8 @@ impl<T> WasmAsyncIo<T> {
   /// This wrapper is only safe to use if the inner I/O object does not under any circumstance
   /// read from the buffer passed to `poll_read` in the `futures::AsyncRead` implementation.
   pub(crate) fn new(inner: T) -> Self { Self { inner } }
+
+  pub(crate) fn into_inner(self) -> T { self.inner }
 }
 
 impl<T> hyper::rt::Write for WasmAsyncIo<T>

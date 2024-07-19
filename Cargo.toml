@@ -114,7 +114,7 @@ http-body-util="0.1"
 #- Wasm target configuration ----------------------------------------------------------------------#
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # TLSN
-tls-client={ git="https://github.com/tlsnotary/tlsn.git", package="tlsn-tls-client" }
+tls-client={ git="https://github.com/pluto/tlsn.git", package="tlsn-tls-client" }
 # Web
 # hyper-util={ version="0.1", features=["http1"] }
 ## Use the patched ws_stream_wasm to fix the issue https://github.com/najamelan/ws_stream_wasm/issues/12#issuecomment-1711902958
@@ -176,8 +176,8 @@ tracing-web         ="0.1.2"
 gloo-utils = { version = "0.1", features = ["serde"] }
 
 # TLSN
-tlsn-prover={ git="https://github.com/tlsnotary/tlsn.git" }
-tlsn-core  ={ git="https://github.com/tlsnotary/tlsn.git" }
+tlsn-prover={ git="https://github.com/pluto/tlsn.git" }
+tlsn-core  ={ git="https://github.com/pluto/tlsn.git" }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test="0.3.42"

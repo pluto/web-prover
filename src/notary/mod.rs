@@ -23,8 +23,6 @@ type NetworkStream = TlsStream<TcpStream>;
 
 use super::*;
 
-const NOTARY_CA_CERT: &[u8] = include_bytes!("../fixture/mock_server/ca-cert.cer");
-
 // TODO: The `ClientType` and  `NotarizationSessionRequest` and `NotarizationSessionResponse` is
 // redundant with what we had in `request` for the wasm version which was deprecated. May have to be
 // careful with the camelCase used here.
@@ -42,16 +40,16 @@ pub async fn request_notarization(
   //---------------------------------------------------------------------------------------------------------------------------------------//
   // Get the certs and add them to the root store
   //---------------------------------------------------------------------------------------------------------------------------------------//
-  #[cfg(feature = "tracing")]
-  let _span = tracing::span!(tracing::Level::TRACE, "add_certs_to_root_store").entered();
-  let certificate = pki_types::CertificateDer::from(NOTARY_CA_CERT.to_vec());
-  let mut root_store = tls_client::RootCertStore::empty();
-  let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
-  assert_eq!(added, 1); // TODO there is probably a better way
-  #[cfg(feature = "tracing")]
-  info!("certs added to root store");
-  #[cfg(feature = "tracing")]
-  drop(_span);
+  // #[cfg(feature = "tracing")]
+  // let _span = tracing::span!(tracing::Level::TRACE, "add_certs_to_root_store").entered();
+  // let certificate = pki_types::CertificateDer::from(NOTARY_CA_CERT.to_vec());
+  // let mut root_store = tls_client::RootCertStore::empty();
+  // let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there
+  // is probably a nicer way assert_eq!(added, 1); // TODO there is probably a better way
+  // #[cfg(feature = "tracing")]
+  // info!("certs added to root store");
+  // #[cfg(feature = "tracing")]
+  // drop(_span);
   //---------------------------------------------------------------------------------------------------------------------------------------//
 
   //---------------------------------------------------------------------------------------------------------------------------------------//
@@ -121,23 +119,43 @@ pub async fn request_notarization(
   // TODO connect to Notary requires notarization_response.session_id
   //      /notarize?sessionId={}
   // TODO Second WS connection is to websocket proxy (pass in config into function)
-  #[cfg(all(feature = "websocket", target_arch = "wasm32"))]
-  let (notary_tls_socket_io, notary_tls_socket) = {
-    let ws_target_query = url::form_urlencoded::Serializer::new(String::new())
-      .extend_pairs([("target", format!("{}:{}", target_host, target_port))])
-      .finish();
-    let (_, ws_stream) =
-      WsMeta::connect(format!("{}?{}", websocket_proxy_url, ws_target_query), None).await?;
-    let (_, ws_stream_io) = WsMeta::connect(
-      format!(
-        "wss://{}:{}/notarize?sessionId={}",
-        notary_host, notary_port, notarization_response.session_id
-      ),
-      None,
-    )
-    .await?;
-    (ws_stream_io.into_io(), ws_stream)
-  };
+  // #[cfg(all(feature = "websocket", target_arch = "wasm32"))]
+  // let (notary_tls_socket_io, client_ws_stream) = {
+  //   // let ws_target_query = url::form_urlencoded::Serializer::new(String::new())
+  //   //   .extend_pairs([("target", format!("{}:{}", target_host, target_port))])
+  //   //   .finish();
+  //   // let (_, ws_stream) =
+  //   //   WsMeta::connect(format!("{}?{}", websocket_proxy_url, ws_target_query), None).await?;
+  //   let (_, ws_stream_io) = WsMeta::connect(
+  //     format!(
+  //       "wss://{}:{}/notarize?sessionId={}",
+  //       notary_host, notary_port, notarization_response.session_id
+  //     ),
+  //     None,
+  //   )
+  //   .await?;
+  //   (ws_stream_io.into_io(), ws_stream)
+  // };
+  let (_, ws_stream_io) = WsMeta::connect(
+    format!(
+      "wss://{}:{}/notarize?sessionId={}",
+      notary_host, notary_port, notarization_response.session_id
+    ),
+    None,
+  )
+  .await?;
+  let notary_tls_socket = ws_stream_io;
+
+  // Bind the Prover to the server connection.
+  // The returned `mpc_tls_connection` is an MPC TLS connection to the Server: all data written
+  // to/read from it will be encrypted/decrypted using MPC with the Notary.
+  // log_phase(ProverPhases::BindProverToConnection);
+  // let (mpc_tls_connection, prover_fut) =
+  //     prover.connect(client_ws_stream.into_io()).await.unwrap();
+  // let mpc_tls_connection = unsafe { FuturesIo::new(mpc_tls_connection) };
+
+  // let prover_ctrl = prover_fut.control();
+
   // Attach the hyper HTTP client to the notary TLS connection to send request to the /session
   // endpoint to configure notarization and obtain session id
   // #[cfg(target_arch = "wasm32")]
