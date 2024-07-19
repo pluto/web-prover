@@ -1,8 +1,15 @@
 wasm:
+	@# TODO use `-- --crate-type=cdylib --crate-type=rlib` in wasm-pack command below
+	@# once https://github.com/rustwasm/wasm-pack/pull/1329 has been merged.
+	@# Docs: https://doc.rust-lang.org/reference/linkage.html
+	@# For now, manually add [lib] section to Cargo.toml for WASM compilation.
 	cargo install wasm-pack
+	cp Cargo.toml Cargo.toml.backup
+	echo '\n\n[lib]\ncrate-type = ["cdylib", "rlib"]' >> Cargo.toml
 	~/.cargo/bin/wasm-pack build --release --target web ./ -- \
 	  -Z build-std=panic_abort,std \
 	  --features=websocket,tracing
+	mv Cargo.toml.backup Cargo.toml
 
 ios:
 	# TODO

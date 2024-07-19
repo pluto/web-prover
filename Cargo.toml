@@ -14,10 +14,6 @@ websocket=[]
 # default = ["websocket", "tracing"]
 # default = ["websocket", "tracing"]
 
-# Crate type is really only needed for wasm, but I don't know how to specify it only for wasm.
-[lib]
-crate-type=["cdylib", "rlib"]
-
 # [[bin]]
 # name="mock_client"
 # path="src/bin/mock_client.rs"
