@@ -158,9 +158,6 @@ async fn prover_inner(config: Config) -> Result<TlsProof, ClientErrors> {
     &config.notary_host,
     config.notary_port,
     &config.notarization_session_request,
-    target_host,
-    target_port,
-    &config.websocket_proxy_url,
   )
   .await?;
   #[cfg(feature = "tracing")]
@@ -257,21 +254,15 @@ async fn prover_inner(config: Config) -> Result<TlsProof, ClientErrors> {
   };
 
   // Attach the hyper HTTP client to the TLS connection
-  let (mut request_sender, mpc_tls_connection_connection) =
+  let (mut request_sender, mpc_tls_connection) =
     hyper::client::conn::http1::handshake(mpc_tls_connection).await?;
 
   // Spawn the HTTP task to be run concurrently
   #[cfg(not(target_arch = "wasm32"))]
-  let _mpc_tls_connection_connection_task = spawn(mpc_tls_connection_connection);
+  let _mpc_tls_connection_task = spawn(mpc_tls_connection);
   #[cfg(target_arch = "wasm32")]
-  // let _mpc_tls_connection_connection_task = {
-  //   let mpc_tls_connection_connection = async {
-  //     mpc_tls_connection_connection.await.unwrap();
-  //   };
-  //   spawn_local(mpc_tls_connection_connection);
-  // };
   let (connection_sender, connection_receiver) = oneshot::channel();
-  let connection_fut = mpc_tls_connection_connection.without_shutdown();
+  let connection_fut = mpc_tls_connection.without_shutdown();
   let handled_connection_fut = async {
     let result = connection_fut.await;
     let _ = connection_sender.send(result);
@@ -354,12 +345,10 @@ async fn prover_inner(config: Config) -> Result<TlsProof, ClientErrors> {
   //---------------------------------------------------------------------------------------------------------------------------------------//
   // Complete the prover and notarization
   //---------------------------------------------------------------------------------------------------------------------------------------//
-  // let prover = prover_task.await??; // TODO rustls issues
-  let prover = prover_task.await.unwrap().unwrap();
+  let prover = prover_task.await.unwrap().unwrap(); // TODO fix unwrap
 
   // Upgrade the prover to an HTTP prover, and start notarization.
   let mut prover = prover.to_http()?.start_notarize();
-  // let mut prover = prover.start_notarize();
 
   // TODO: unwrap for now as we need to bring in `tlsn_formats`
   // Commit to the transcript with the default committer, which will commit using BLAKE3.
