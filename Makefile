@@ -2,6 +2,7 @@ wasm:
 	@# TODO use `-- --crate-type=cdylib --crate-type=rlib` in wasm-pack command below
 	@# once https://github.com/rustwasm/wasm-pack/pull/1329 has been merged.
 	@# Docs: https://doc.rust-lang.org/reference/linkage.html
+	@# Ref: https://github.com/rustwasm/wasm-pack/blob/62ab39cf82ec4d358c1f08f348cd0dc44768f412/src/manifest/mod.rs#L512
 	@# For now, manually add [lib] section to Cargo.toml for WASM compilation.
 	cargo install wasm-pack
 	cp Cargo.toml Cargo.toml.backup
