@@ -12,9 +12,6 @@ rustflags=[
   "target-feature=+atomics,+bulk-memory,+mutable-globals",
 ]
 
-[unstable]
-build-std=["panic_abort", "std"]
-
 [alias]
 # cargo aliases to check and build the wasm client separately
 wasm-check="check --target wasm32-unknown-unknown -p wasm-client"

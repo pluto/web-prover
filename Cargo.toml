@@ -11,6 +11,7 @@ tracing=["dep:tracing", "dep:tracing-subscriber"]
 # There are dependencies that should be here like `ws_stream_wasm` and `tokio-tungstenite` but I'm afraid it may be difficult to have them be conditional 
 websocket=[]
 
+# default = ["websocket", "tracing"]
 default = ["websocket", "tracing"]
 
 # Crate type is really only needed for wasm, but I don't know how to specify it only for wasm.
