@@ -3,7 +3,7 @@ import init, {
   initThreadPool,
   prover,
   verify
-} from "../pkg/index.js";
+} from "../pkg/web_prover.js";
 
 const numConcurrency = navigator.hardwareConcurrency;
 

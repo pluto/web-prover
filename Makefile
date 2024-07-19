@@ -15,6 +15,12 @@ wasm:
 ios:
 	# TODO
 
+wasm-demo/node_modules:
+	cd wasm-demo && npm install
+
+wasm-demo: wasm-demo/node_modules
+	cd wasm-demo && npm run start
+
 libs:
 	# TODO ios target
 	-mkdir build
@@ -36,4 +42,4 @@ xcframework:
 		-headers ./build/tlsnotary.h \
 		-output build/tlsnotary.xcframework
 
-.PHONY: wasm ios libs xcframework cbindgen
+.PHONY: wasm wasm-demo ios libs xcframework cbindgen

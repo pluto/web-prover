@@ -11,8 +11,7 @@ tracing=["dep:tracing", "dep:tracing-subscriber"]
 # There are dependencies that should be here like `ws_stream_wasm` and `tokio-tungstenite` but I'm afraid it may be difficult to have them be conditional 
 websocket=[]
 
-# default = ["websocket", "tracing"]
-# default = ["websocket", "tracing"]
+default = ["websocket", "tracing"]
 
 # [[bin]]
 # name="mock_client"

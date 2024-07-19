@@ -48,7 +48,6 @@ dump
 *.swo
 
 /target
-/wasm-client
-node_modules/
 
 Cargo.toml.backup
+/pkg
