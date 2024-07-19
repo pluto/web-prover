@@ -12,7 +12,7 @@ tracing=["dep:tracing", "dep:tracing-subscriber"]
 websocket=[]
 
 # default = ["websocket", "tracing"]
-default = ["websocket", "tracing"]
+# default = ["websocket", "tracing"]
 
 # Crate type is really only needed for wasm, but I don't know how to specify it only for wasm.
 [lib]
