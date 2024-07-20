@@ -260,14 +260,14 @@ async fn prover_inner(config: Config) -> Result<TlsProof, ClientErrors> {
   // Spawn the HTTP task to be run concurrently
   #[cfg(not(target_arch = "wasm32"))]
   let _mpc_tls_connection_task = spawn(mpc_tls_connection);
-  #[cfg(target_arch = "wasm32")]
-  let (connection_sender, connection_receiver) = oneshot::channel();
-  let connection_fut = mpc_tls_connection.without_shutdown();
-  let handled_connection_fut = async {
-    let result = connection_fut.await;
-    let _ = connection_sender.send(result);
-  };
-  spawn_local(handled_connection_fut);
+
+  // let (connection_sender, connection_receiver) = oneshot::channel();
+  // let connection_fut = mpc_tls_connection.without_shutdown();
+  // let handled_connection_fut = async {
+  //   let result = connection_fut.await;
+  //   let _ = connection_sender.send(result);
+  // };
+  // spawn_local(handled_connection_fut);
   //---------------------------------------------------------------------------------------------------------------------------------------//
 
   //---------------------------------------------------------------------------------------------------------------------------------------//
@@ -338,9 +338,9 @@ async fn prover_inner(config: Config) -> Result<TlsProof, ClientErrors> {
   #[cfg(feature = "tracing")]
   debug!("Sent request");
   //---------------------------------------------------------------------------------------------------------------------------------------//
-  use futures::AsyncWriteExt;
-  let mut client_socket = connection_receiver.await.unwrap().unwrap().io.into_inner();
-  client_socket.close().await.unwrap();
+  // use futures::AsyncWriteExt;
+  // let mut client_socket = connection_receiver.await.unwrap().unwrap().io.into_inner();
+  // client_socket.close().await.unwrap();
 
   //---------------------------------------------------------------------------------------------------------------------------------------//
   // Complete the prover and notarization

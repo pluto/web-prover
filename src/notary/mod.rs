@@ -37,59 +37,59 @@ pub async fn request_notarization(
   //---------------------------------------------------------------------------------------------------------------------------------------//
   // Configure TLS Notary session and get session id
   //---------------------------------------------------------------------------------------------------------------------------------------//
-
+  todo!("todo");
   // TODO the following applies to WASM only, make it work with non wasm as well
 
-  #[cfg(feature = "tracing")]
-  let _span = tracing::span!(tracing::Level::TRACE, "configure_tls_notary_session").entered();
-  let mut opts = web_sys::RequestInit::new();
-  opts.method("POST");
-  opts.mode(web_sys::RequestMode::Cors);
+  // #[cfg(feature = "tracing")]
+  // let _span = tracing::span!(tracing::Level::TRACE, "configure_tls_notary_session").entered();
+  // let mut opts = web_sys::RequestInit::new();
+  // opts.method("POST");
+  // opts.mode(web_sys::RequestMode::Cors);
 
-  let headers = web_sys::Headers::new().unwrap(); // TODO fix unwrap
-  headers.append("Host", notary_host).unwrap(); // TODO fix unwrap
-  headers.append("Content-Type", "application/json").unwrap(); // TODO fix unwrap
-  opts.headers(&headers);
+  // let headers = web_sys::Headers::new().unwrap(); // TODO fix unwrap
+  // headers.append("Host", notary_host).unwrap(); // TODO fix unwrap
+  // headers.append("Content-Type", "application/json").unwrap(); // TODO fix unwrap
+  // opts.headers(&headers);
 
-  let notarization_session_request = NotarizationSessionRequest {
-    client_type:   config_notarization_session_request.client_type,
-    max_sent_data: config_notarization_session_request.max_sent_data,
-    max_recv_data: config_notarization_session_request.max_recv_data,
-  };
+  // let notarization_session_request = NotarizationSessionRequest {
+  //   client_type:   config_notarization_session_request.client_type,
+  //   max_sent_data: config_notarization_session_request.max_sent_data,
+  //   max_recv_data: config_notarization_session_request.max_recv_data,
+  // };
 
-  let payload = serde_json::to_string(&notarization_session_request).unwrap(); // TODO fix unwrap
-  opts.body(Some(&wasm_bindgen::JsValue::from_str(&payload)));
+  // let payload = serde_json::to_string(&notarization_session_request).unwrap(); // TODO fix unwrap
+  // opts.body(Some(&wasm_bindgen::JsValue::from_str(&payload)));
 
-  let url = format!("https://{}:{}/session", notary_host, notary_port);
+  // let url = format!("https://{}:{}/session", notary_host, notary_port);
 
-  let raw_notarization_session_response =
-    wasm_utils::fetch_as_json_string(&url, &opts).await.unwrap(); // TODO fix unwrap
-  let notarization_response =
-    serde_json::from_str::<NotarizationSessionResponse>(&raw_notarization_session_response)
-      .unwrap(); // TODO fix unwrap
-  #[cfg(feature = "tracing")]
-  info!("Session configured, session_id: {}", notarization_response.session_id);
-  #[cfg(feature = "tracing")]
-  drop(_span);
+  // let raw_notarization_session_response =
+  //   wasm_utils::fetch_as_json_string(&url, &opts).await.unwrap(); // TODO fix unwrap
+  // let notarization_response =
+  //   serde_json::from_str::<NotarizationSessionResponse>(&raw_notarization_session_response)
+  //     .unwrap(); // TODO fix unwrap
+  // #[cfg(feature = "tracing")]
+  // info!("Session configured, session_id: {}", notarization_response.session_id);
+  // #[cfg(feature = "tracing")]
+  // drop(_span);
 
-  // TODO: Be careful to put this in with the right target arch
-  #[cfg(feature = "tracing")]
-  debug!("TLS socket created with TCP connection");
-  let (_, notary_tls_socket) = WsMeta::connect(
-    format!(
-      "wss://{}:{}/notarize?sessionId={}",
-      notary_host, notary_port, notarization_response.session_id
-    ),
-    None,
-  )
-  .await?;
-  //---------------------------------------------------------------------------------------------------------------------------------------//
+  // // TODO: Be careful to put this in with the right target arch
+  // #[cfg(feature = "tracing")]
+  // debug!("TLS socket created with TCP connection");
+  // let (_, notary_tls_socket) = WsMeta::connect(
+  //   format!(
+  //     "wss://{}:{}/notarize?sessionId={}",
+  //     notary_host, notary_port, notarization_response.session_id
+  //   ),
+  //   None,
+  // )
+  // .await?;
+  // //---------------------------------------------------------------------------------------------------------------------------------------//
 
-  // Claim back the TLS socket after HTTP exchange is done
+  // // Claim back the TLS socket after HTTP exchange is done
+  // // #[cfg(not(target_arch = "wasm32"))]
+  // // let Parts { io: notary_tls_socket, .. } = connection_task.await??;
   // #[cfg(not(target_arch = "wasm32"))]
-  // let Parts { io: notary_tls_socket, .. } = connection_task.await??;
-  #[cfg(not(target_arch = "wasm32"))]
-  return Ok((notary_tls_socket.into_inner(), notarization_response.session_id.to_string()));
-  #[cfg(target_arch = "wasm32")]
-  return Ok((notary_tls_socket, notarization_response.session_id.to_string()));
+  // return Ok((notary_tls_socket.into_inner(), notarization_response.session_id.to_string()));
+  // #[cfg(target_arch = "wasm32")]
+  // return Ok((notary_tls_socket, notarization_response.session_id.to_string()));
 }
