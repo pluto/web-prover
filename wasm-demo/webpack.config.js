@@ -39,9 +39,9 @@ module.exports = {
     server: {
       type: "https",
       options: {
-        key: fs.readFileSync("../src/fixture/mock_server/server-key.pem"),
-        cert: fs.readFileSync("../src/fixture/mock_server/server-cert.pem"),
-        ca: fs.readFileSync("../src/fixture/mock_server/ca-cert.pem"),
+        key: fs.readFileSync("../tests/fixture/certs/server-key.pem"),
+        cert: fs.readFileSync("../test/fixture/certs/server-cert.pem"),
+        ca: fs.readFileSync("../tests/fixture/certs/ca-cert.pem"),
       },
     },
   },

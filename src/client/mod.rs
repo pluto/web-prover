@@ -34,7 +34,7 @@ use super::*;
 
 #[cfg(test)] mod tests;
 
-const NOTARY_CA_CERT: &[u8] = include_bytes!("../fixture/mock_server/ca-cert.cer");
+const NOTARY_CA_CERT: &[u8] = include_bytes!("../../tests/fixture/certs/ca-cert.cer"); // TODO make build config
 
 #[derive(Serialize, Clone)]
 #[cfg(all(not(target_arch = "wasm32"), target_os = "ios"))]

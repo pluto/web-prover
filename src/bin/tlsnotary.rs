@@ -15,12 +15,12 @@ async fn main() {
     notarization:  NotarizationProperties { max_transcript_size: 20480 },
     tls:           TLSProperties {
       enabled:              true,
-      private_key_pem_path: "./tests/fixture/mock_server/server-key.pem".into(), // TODO CLI or ENV
-      certificate_pem_path: "./tests/fixture/mock_server/server-cert.pem".into(), // TODO CLI or ENV
+      private_key_pem_path: "./tests/fixture/certs/server-key.pem".into(), // TODO CLI or ENV
+      certificate_pem_path: "./tests/fixture/certs/server-cert.pem".into(), // TODO CLI or ENV
     },
     notary_key:    NotarySigningKeyProperties {
-      private_key_pem_path: "./tests/fixture/notary/notary.key".into(),
-      public_key_pem_path:  "./tests/fixture/notary/notary.pub".into(),
+      private_key_pem_path: "./tests/fixture/certs/notary.key".into(), // TODO CLI or ENV
+      public_key_pem_path:  "./tests/fixture/certs/notary.pub".into(), // TODO CLI or ENV
     },
     logging:       LoggingProperties { level: "DEBUG".into(), filter: None },
     authorization: AuthorizationProperties {
