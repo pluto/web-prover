@@ -1,6 +1,5 @@
 pub mod client;
 pub mod errors;
-pub mod notary;
 // pub mod routes;
 pub use errors::ClientErrors;
 
