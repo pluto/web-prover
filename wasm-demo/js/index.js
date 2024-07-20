@@ -1,6 +1,6 @@
 import init, {
-  setup_tracing_web,
-  initThreadPool,
+  setup_tracing,
+  // initThreadPool,
   prover,
   verify
 } from "../pkg/web_prover.js";
@@ -8,8 +8,8 @@ import init, {
 const numConcurrency = navigator.hardwareConcurrency;
 
 await init();
-setup_tracing_web("debug,tlsn_extension_rs=debug");
-await initThreadPool(numConcurrency);
+setup_tracing("debug,tlsn_extension_rs=debug");
+// await initThreadPool(numConcurrency);
 
 const proof = await prover(
   {

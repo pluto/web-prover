@@ -6,40 +6,10 @@ use std::{
 
 use js_sys::JSON;
 use pin_project_lite::pin_project;
-use tracing_subscriber::{
-  fmt::{format::Pretty, time::UtcTime},
-  prelude::*,
-  EnvFilter,
-};
-use tracing_web::{performance_layer, MakeWebConsoleWriter};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
-pub use wasm_bindgen_rayon::init_thread_pool;
 use web_sys::{Request, RequestInit, Response};
 
-#[cfg(feature = "tracing")] use super::*;
-
-extern crate console_error_panic_hook;
-
-#[wasm_bindgen]
-pub fn setup_tracing_web(logging_filter: &str) {
-  let fmt_layer = tracing_subscriber::fmt::layer()
-        .with_ansi(false) // Only partially supported across browsers
-        .with_timer(UtcTime::rfc_3339()) // std::time is not available in browsers
-        // .with_thread_ids(true)
-        // .with_thread_names(true)
-        .with_writer(MakeWebConsoleWriter::new()); // write events to the console
-  let perf_layer = performance_layer().with_details_from_fields(Pretty::default());
-
-  let filter_layer = EnvFilter::builder().parse(logging_filter).unwrap_or_default();
-
-  tracing_subscriber::registry().with(filter_layer).with(fmt_layer).with(perf_layer).init(); // Install these as subscribers to tracing events
-
-  #[cfg(feature = "tracing")]
-  debug!("🪵 Logging set up 🪵")
-}
-
-#[cfg(target_arch = "wasm32")]
 pub async fn fetch_as_json_string(url: &str, opts: &RequestInit) -> Result<String, JsValue> {
   let request = Request::new_with_str_and_init(url, opts)?;
   let window = web_sys::window().expect("Window object");

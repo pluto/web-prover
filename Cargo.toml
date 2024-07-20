@@ -5,13 +5,12 @@ edition="2021"
 build  ="build.rs"
 
 [features]
-tracing=["dep:tracing", "dep:tracing-subscriber"]
 # Should be able to set this up for both wasm and not wasm with the right deps
 # May need to default the websocket or something to make this work nicely? Can always turn off defaults for conditional comp
 # There are dependencies that should be here like `ws_stream_wasm` and `tokio-tungstenite` but I'm afraid it may be difficult to have them be conditional 
 websocket=[]
 
-# default = ["websocket", "tracing"]
+default=["websocket"]
 
 # [[bin]]
 # name="mock_client"
@@ -39,38 +38,39 @@ codegen-units=1
 panic        ="unwind" # abort helps decrease file size, but makes the mobile app crash on panic
 
 [dependencies]
+cfg-if="0.1"
+
 serde     ={ version="1.0.147", features=["derive"] }
 serde_json="1.0"
 
 # # Web
 # url           ="2.5.0"
-url = { version = "2.0", features = ["serde"] }
+url={ version="2.0", features=["serde"] }
 # http-body-util="0.1"
 # rustls        ={ version="0.23.10", default-features = false}
 # rustls-pemfile={ version="2.1.2" }
 # # Logging and errors
-tracing           ={ version="0.1", optional=true }
-tracing-subscriber={ version="0.3", optional=true }
+tracing           ={ version="0.1" }
+tracing-subscriber={ version="0.3" }
 thiserror         ="1.0.61"
 # # Async
-futures     ="0.3"
-futures-util="0.3.28"
+futures="0.3"
+# futures-util="0.3.28"
 # # Other
 base64="0.22.0"
 
 # anyhow="1.0.86"
 
-hyper         ={ version="1.1", features=["client", "http1", "full"] } # TODO remove full?
-hyper-util={ version="0.1", features=["full"] }
+# hyper         ={ version="1.1", features=["client", "http1", "full"] } # TODO remove full?
+# hyper-util={ version="0.1", features=["full"] }
 http-body-util="0.1"
 
 # # rustls        ={ version="0.23.10" }
 # # rustls-pemfile={ version="2.0.0" }
 
-tokio-util  ="0.7"
+# tokio-util  ="0.7"
 # tokio-rustls={ version="0.26.0" }
-tokio       ={ version="1", features=["rt", "rt-multi-thread", "macros", "net", "io-std", "fs"] }
-
+# tokio       ={ version="1", features=["rt", "rt-multi-thread", "macros", "net", "io-std", "fs"] }
 
 # form_urlencoded  ="1.2.1"
 # tokio-tungstenite="0.23.0"
@@ -81,13 +81,13 @@ tokio       ={ version="1", features=["rt", "rt-multi-thread", "macros", "net", 
 # tlsn-tls-client-async={ git="https://github.com/tlsnotary/tlsn.git" }
 
 # webpki-roots="0.26.1"
-pki-types   ={ package="rustls-pki-types", version="1.7" }
+# pki-types   ={ package="rustls-pki-types", version="1.7" }
 
 # clap={ version="4.5.8", features=["derive"] }
 
-tlsn-prover={ git="https://github.com/pluto/tlsn.git" }
-tlsn-core  ={ git="https://github.com/pluto/tlsn.git" }
-tls-client={ git="https://github.com/pluto/tlsn.git", package="tlsn-tls-client" }
+# tlsn-prover={ git="https://github.com/pluto/tlsn.git" }
+# tlsn-core  ={ git="https://github.com/pluto/tlsn.git" }
+# tls-client={ git="https://github.com/pluto/tlsn.git", package="tlsn-tls-client" }
 
 ####################################################################################################
 # Target-specific configuration
@@ -96,20 +96,19 @@ tls-client={ git="https://github.com/pluto/tlsn.git", package="tlsn-tls-client" 
 # #- Non-wasm target configuration ------------------------------------------------------------------#
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 
-
 notary-server={ git="https://github.com/pluto/tlsn.git " }
 eyre         ="0.6.8"
 structopt    ="0.3.26"
 
 # # Web
-hyper-util={ version="0.1", features=["full"] }
 # # Async
 tokio-util={ version="0.7", features=[
   "compat",
 ] } # compat is used to work with AsyncRead and AsyncWrite from other crates
 tokio-rustls={ version="0.26.0" }
 tokio={ version="1", features=["rt", "rt-multi-thread", "macros", "net", "io-std", "fs"] }
-hyper         ={ version="1.1", features=["client", "http1"] }
+hyper={ version="1.1", features=["client", "http1"] }
+hyper-util={ version="0.1", features=["http1"] }
 # # TLSN
 # # tlsn-prover={ git="https://github.com/tlsnotary/tlsn.git" }
 # tlsn-core  ={ git="https://github.com/tlsnotary/tlsn.git" }
@@ -120,6 +119,8 @@ hyper         ={ version="1.1", features=["client", "http1"] }
 tls-client={ git="https://github.com/pluto/tlsn.git", package="tlsn-tls-client" }
 # Web
 # hyper-util={ version="0.1", features=["http1"] }
+hyper={ version="1.1", features=["client", "http1"] }
+hyper-util={ version="0.1", features=["http1"] }
 ## Use the patched ws_stream_wasm to fix the issue https://github.com/najamelan/ws_stream_wasm/issues/12#issuecomment-1711902958
 ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wasm", rev="2ed12aad9f0236e5321f577672f309920b2aef51" }
 # Serde
@@ -176,7 +177,7 @@ wasm-bindgen-rayon  ="1.0"
 tracing-subscriber  ={ version="0.3", features=["time", "env-filter"] }
 tracing-web         ="0.1.2"
 
-gloo-utils = { version = "0.1", features = ["serde"] }
+gloo-utils={ version="0.1", features=["serde"] }
 
 # TLSN
 tlsn-prover={ git="https://github.com/pluto/tlsn.git" }

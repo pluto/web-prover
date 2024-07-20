@@ -2,8 +2,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ClientErrors {
-  // #[error(transparent)]
-  // RustTlsError(#[from] rustls::Error),
+  #[cfg(not(target_arch = "wasm32"))]
+  #[error(transparent)]
+  RustTlsError(#[from] rustls::Error),
 
   #[error(transparent)]
   IoError(#[from] std::io::Error),

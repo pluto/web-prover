@@ -9,7 +9,7 @@ wasm:
 	echo '\n\n[lib]\ncrate-type = ["cdylib", "rlib"]' >> Cargo.toml
 	~/.cargo/bin/wasm-pack build --release --target web ./ -- \
 	  -Z build-std=panic_abort,std \
-	  --features=websocket,tracing
+	  --features=websocket
 	mv Cargo.toml.backup Cargo.toml
 
 ios:

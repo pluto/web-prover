@@ -1,8 +1,13 @@
-use notary_server::{
-  init_tracing, run_server, AuthorizationProperties, LoggingProperties, NotarizationProperties,
-  NotaryServerProperties, NotarySigningKeyProperties, ServerProperties, TLSProperties,
-};
+cfg_if::cfg_if! {
+  if #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))] {
+    use notary_server::{
+      init_tracing, run_server, AuthorizationProperties, LoggingProperties, NotarizationProperties,
+      NotaryServerProperties, NotarySigningKeyProperties, ServerProperties, TLSProperties,
+    }
+  }
+}
 
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 #[tokio::main]
 async fn main() {
   let config = NotaryServerProperties {
@@ -35,3 +40,7 @@ async fn main() {
   // Run the server
   run_server(&config).await.unwrap();
 }
+
+// TODO we need at least a main() to make cargo check happy
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
+fn main() {}

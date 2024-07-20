@@ -9,4 +9,4 @@ rustflags=[
 ]
 
 [alias]
-check-wasm="check --target wasm32-unknown-unknown -Z build-std=panic_abort,std --features=websocket,tracing"
+check-wasm="check --target wasm32-unknown-unknown -Z build-std=panic_abort,std --features=websocket"
