@@ -1,23 +1,37 @@
-use eyre::{eyre, Result};
 use notary_server::{
-  init_tracing, parse_config_file, run_server, CliFields, NotaryServerError, NotaryServerProperties,
+  init_tracing, run_server, AuthorizationProperties, LoggingProperties, NotarizationProperties,
+  NotaryServerProperties, NotarySigningKeyProperties, ServerProperties, TLSProperties,
 };
-use structopt::StructOpt;
-#[cfg(feature = "tracing")] use tracing::debug;
 
 #[tokio::main]
-async fn main() -> Result<(), NotaryServerError> {
-  // Load command line arguments which contains the config file location
-  let cli_fields: CliFields = CliFields::from_args();
-  let config: NotaryServerProperties = parse_config_file(&cli_fields.config_file)?;
+async fn main() {
+  let config = NotaryServerProperties {
+    server:        ServerProperties {
+      name:      "notary-server".into(),
+      host:      "0.0.0.0".into(), // TODO CLI or ENV
+      port:      7074,             // TODO CLI or ENV
+      html_info: "".into(),
+    },
+    notarization:  NotarizationProperties { max_transcript_size: 20480 },
+    tls:           TLSProperties {
+      enabled:              true,
+      private_key_pem_path: "./tests/fixture/mock_server/server-key.pem".into(), // TODO CLI or ENV
+      certificate_pem_path: "./tests/fixture/mock_server/server-cert.pem".into(), // TODO CLI or ENV
+    },
+    notary_key:    NotarySigningKeyProperties {
+      private_key_pem_path: "./tests/fixture/notary/notary.key".into(),
+      public_key_pem_path:  "./tests/fixture/notary/notary.pub".into(),
+    },
+    logging:       LoggingProperties { level: "DEBUG".into(), filter: None },
+    authorization: AuthorizationProperties {
+      enabled:            false,
+      whitelist_csv_path: "".into(),
+    },
+  };
 
   // Set up tracing for logging
-  init_tracing(&config).map_err(|err| eyre!("Failed to set up tracing: {err}"))?;
-  #[cfg(feature = "tracing")]
-  debug!(?config, "Server config loaded");
+  init_tracing(&config).unwrap();
 
   // Run the server
-  run_server(&config).await?;
-
-  Ok(())
+  run_server(&config).await.unwrap();
 }
