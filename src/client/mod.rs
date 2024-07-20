@@ -10,7 +10,6 @@ use base64::prelude::*;
 use gloo_utils::format::JsValueSerdeExt;
 use http_body_util::Full;
 use hyper::{body::Bytes, Request};
-use notary;
 use tlsn_core::{commitment::CommitmentKind, proof::TlsProof};
 use tlsn_prover::tls::{Prover, ProverConfig};
 #[cfg(feature = "tracing")] use tracing::error;
