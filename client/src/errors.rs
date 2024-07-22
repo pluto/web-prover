@@ -2,19 +2,19 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ClientErrors {
-  #[cfg(not(target_arch = "wasm32"))]
-  #[error(transparent)]
-  RustTlsError(#[from] rustls::Error),
+  // #[cfg(not(target_arch = "wasm32"))]
+  // #[error(transparent)]
+  // RustTlsError(#[from] rustls::Error),
 
   #[error(transparent)]
   IoError(#[from] std::io::Error),
 
-  #[error(transparent)]
-  SerdeJsonError(#[from] serde_json::Error),
+  // #[error(transparent)]
+  // SerdeJsonError(#[from] serde_json::Error),
 
-  #[cfg(all(target_arch = "wasm32", feature = "websocket"))]
-  #[error(transparent)]
-  WebSocketError(#[from] ws_stream_wasm::WsErr),
+  // #[cfg(all(target_arch = "wasm32", feature = "websocket"))]
+  // #[error(transparent)]
+  // WebSocketError(#[from] ws_stream_wasm::WsErr),
 
   #[error(transparent)]
   HyperError(#[from] hyper::Error),
@@ -22,9 +22,9 @@ pub enum ClientErrors {
   #[error(transparent)]
   HttpError(#[from] hyper::http::Error),
 
-  #[cfg(not(target_arch = "wasm32"))]
-  #[error(transparent)]
-  JoinError(#[from] tokio::task::JoinError),
+  // #[cfg(not(target_arch = "wasm32"))]
+  // #[error(transparent)]
+  // JoinError(#[from] tokio::task::JoinError),
 
   #[error(transparent)]
   Utf8Error(#[from] std::str::Utf8Error),

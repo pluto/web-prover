@@ -9,6 +9,8 @@ use wasm_bindgen::prelude::*;
 use tracing::{debug, info};
 use std::panic;
 
+use client::{Config, prover_inner};
+
 #[wasm_bindgen]
 pub async fn prover(config: JsValue) -> Result<String, JsValue> {
   panic::set_hook(Box::new(console_error_panic_hook::hook));

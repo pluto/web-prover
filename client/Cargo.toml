@@ -6,3 +6,13 @@ edition = "2021"
 build = "../build.rs"
 
 [dependencies]
+serde               ={ version="1.0.147", features=["derive"] }
+tlsn-core  ={ git="https://github.com/tlsnotary/tlsn.git" }
+tlsn-prover={ git="https://github.com/pluto/tlsn.git" }
+thiserror = "1.0.63"
+hyper = "1.4.1"
+base64="0.22.0"
+url = "2.5.2"
+
+[features]
+websocket = []
