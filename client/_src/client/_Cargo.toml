@@ -1,0 +1,137 @@
+[package]
+name   ="prover"
+version="0.1.0"
+edition="2021"
+build  ="build.rs"
+
+[features]
+tracing=["dep:tracing", "dep:tracing-subscriber"]
+# Should be able to set this up for both wasm and not wasm with the right deps
+# May need to default the websocket or something to make this work nicely? Can always turn off defaults for conditional comp
+# There are dependencies that should be here like `ws_stream_wasm` and `tokio-tungstenite` but I'm afraid it may be difficult to have them be conditional 
+websocket=[]
+
+# Crate type is really only needed for wasm, but I don't know how to specify it only for wasm.
+[lib]
+crate-type=["cdylib", "rlib"]
+
+# Shared build profile for all targets
+# This release profile attempts to create the smallest possible binary size
+[profile.release]
+strip        =true
+opt-level    ="z"
+lto          =true
+codegen-units=1
+panic        ="unwind" # abort helps decrease file size, but makes the mobile app crash on panic
+
+# Shared dependencies for all targets
+[dependencies]
+# Serde
+serde     ={ version="1.0", features=["derive"] }
+serde_json="1.0"
+# Web
+url           ="2.5"
+hyper         ={ version="1.3", features=["client", "http1"] }
+http-body-util="0.1"
+rustls        ={ version="0.23.10" }
+rustls-pemfile={ version="2.1.2" }                             # WAS PREVIOUSLY JUST IN THE NON WASM
+# Logging and errors
+tracing           ={ version="0.1", optional=true }
+tracing-subscriber={ version="0.3", optional=true }
+thiserror         ="1.0.61"
+# Async
+futures     ="0.3"
+futures-util="0.3.28"
+# Other
+base64="0.22.0"
+
+####################################################################################################
+# Target-specific configuration
+####################################################################################################
+
+#- Non-wasm target configuration ------------------------------------------------------------------#
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# Web
+hyper-util={ version="0.1", features=["full"] }
+# Async
+tokio-util={ version="0.7", features=[
+    "compat",
+] } # compat is used to work with AsyncRead and AsyncWrite from other crates
+tokio-rustls={ version="0.26.0" }
+tokio={ version="1", features=["rt", "rt-multi-thread", "macros", "net", "io-std", "fs"] }
+# TLSN
+tlsn-prover={ git="https://github.com/pluto/tlsn.git" }
+tlsn-core  ={ git="https://github.com/pluto/tlsn.git" }
+
+#- Wasm target configuration ----------------------------------------------------------------------#
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# TLSN
+tls-client={ git="https://github.com/pluto/tlsn.git", package="tlsn-tls-client" }
+# Web
+hyper-util={ version="0.1", features=["http1"] }
+## Use the patched ws_stream_wasm to fix the issue https://github.com/najamelan/ws_stream_wasm/issues/12#issuecomment-1711902958
+ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wasm", rev="2ed12aad9f0236e5321f577672f309920b2aef51" }
+# Serde
+serde-wasm-bindgen="0.6.5"
+
+# Other
+ring          ={ version="0.17", features=["wasm32_unknown_unknown_js"] }
+chrono        ="0.4"
+elliptic-curve={ version="0.13.5", features=["pkcs8"] }
+getrandom     ={ version="0.2", features=["js"] }
+js-sys        ="0.3.64"
+p256          ={ version="0.13", features=["pem", "ecdsa"] }
+rayon         ="1.5"
+# time crate: https://crates.io/crates/time
+# NOTE: It is required, otherwise "time not implemented on this platform" error happens right after "!@# 2".
+# Probably due to tokio's time feature is used in tlsn-prover?
+time={ version="0.3.34", features=["wasm-bindgen"] }
+# Used to calculate elapsed time.
+web-time="1.0"
+
+web-sys={ version="0.3.4", features=[
+    "BinaryType",
+    "Blob",
+    "ErrorEvent",
+    "FileReader",
+    "MessageEvent",
+    "ProgressEvent",
+    "WebSocket",
+    "console",
+    'Document',
+    'HtmlElement',
+    'HtmlInputElement',
+    'Window',
+    'Worker',
+    'Headers',
+    'Request',
+    'RequestInit',
+    'RequestMode',
+    'Response',
+] }
+
+# The `console_error_panic_hook` crate provides better debugging of panics by
+# logging them with `console.error`. This is great for development, but requires
+# all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
+# code size when deploying.
+console_error_panic_hook={ version="0.1.7" }
+
+webpki-roots        ="0.26.1"
+pki-types           ={ package="rustls-pki-types", version="1.7" }
+pin-project-lite    ="0.2.4"
+wasm-bindgen        ="0.2.87"
+wasm-bindgen-futures="0.4.37"
+wasm-bindgen-rayon  ="1.0"
+tracing-subscriber  ={ version="0.3", features=["time", "env-filter"] }
+tracing-web         ="0.1.2"
+
+# TLSN
+tlsn-prover={ git="https://github.com/pluto/tlsn.git" }
+tlsn-core  ={ git="https://github.com/pluto/tlsn.git" }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test="0.3.42"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt=false
+#---------------------------------------------------------------------------------------------#
