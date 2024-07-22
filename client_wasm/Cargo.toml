@@ -8,7 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 
 [dependencies]
-client = { path = "../client"}
+client = { path = "../client", features = ["websocket"]}
 tls-client={ git="https://github.com/tlsnotary/tlsn.git", package="tlsn-tls-client" }
 # Web
 # hyper-util={ version="0.1", features=["http1"] }
