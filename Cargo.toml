@@ -1,5 +1,5 @@
 [workspace]
-members =[ "ios","wasm"]
+members =[ "client", "client_ios", "client_wasm"]
 resolver="2"
 
 # TODO: merge tlsnotary and origo into one `notary` bin
@@ -15,3 +15,7 @@ path="bin/mock_server.rs"
 [[bin]]
 name="mock_server"
 path="bin/mock_server.rs"
+
+# Can use something like this for e2e testing of the workspace
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+# [[test]]
