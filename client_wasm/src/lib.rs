@@ -1,4 +1,8 @@
+use std::panic;
+
+use client::{prover_inner, Config};
 use gloo_utils::format::JsValueSerdeExt;
+use tracing::{debug, info};
 use tracing_subscriber::{
   fmt::{format::Pretty, time::UtcTime},
   prelude::*,
@@ -6,11 +10,6 @@ use tracing_subscriber::{
 };
 use tracing_web::{performance_layer, MakeWebConsoleWriter};
 use wasm_bindgen::prelude::*;
-use tracing::{debug, info};
-use std::panic;
-
-use client::{Config, prover_inner};
-
 pub use wasm_bindgen_rayon::init_thread_pool;
 
 #[wasm_bindgen]

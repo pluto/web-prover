@@ -20,17 +20,27 @@ path="bin/origo.rs"
 name="mock_server"
 path="bin/mock_server.rs"
 
+[[bin]]
+name="proxy"
+path="bin/proxy.rs"
+
 # Can use something like this for e2e testing of the workspace
 # https://doc.rust-lang.org/cargo/reference/manifest.html
 # [[test]]
 
 [dependencies]
-notary-server ={ git="https://github.com/tlsnotary/tlsn.git " }
-tokio         ={ version="1" }
-hyper         ={ version="1.1", features=["client", "http1"] }
-hyper-util    ={ version="0.1" }
-http-body-util="0.1"
-pki-types     ={ package="rustls-pki-types", version="1.7" }
-rustls        ={ version="0.23.10" }
-rustls-pemfile={ version="2.0.0" }
-tokio-rustls  ={ version="0.26.0" }
+# Dependancies for the binaries
+notary-server    ={ git="https://github.com/tlsnotary/tlsn.git " }
+tokio            ={ version="1.39.0", features=["full"] }
+hyper            ={ version="1.4.1", features=["full"] }
+hyper-util       ={ version="0.1.6" }
+http-body-util   ="0.1"
+pki-types        ={ package="rustls-pki-types", version="1.7" }
+rustls           ={ version="0.23.11" }
+rustls-pemfile   ={ version="2.0.0" }
+tokio-rustls     ={ version="0.26.0" }
+url              ={ version="2.0", features=["serde"] }
+hex              ="0.4"
+futures-util     ="0.3"
+form_urlencoded  ="1.2.1"
+tokio-tungstenite="0.23.0"

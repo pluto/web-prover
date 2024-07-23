@@ -16,7 +16,7 @@ env:
 jobs:
   clippy:
     name: clippy
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -28,14 +28,9 @@ jobs:
           profile: minimal
           components: clippy
           override: true
-
-      - name: install target
-        run: rustup target add aarch64-apple-darwin
-      - name: Install rust-src component
-        run: rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
       
       - name: cargo clippy
-        run: cargo clippy --all
+        run: cargo clippy
 
   fmt:
     name: fmt project
@@ -50,3 +45,4 @@ jobs:
       - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
       - run: rustup component add rustfmt
       - run: cargo fmt --all -- --check
+    

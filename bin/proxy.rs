@@ -1,25 +1,33 @@
-//! This is a proxy notarization server
+use std::{collections::HashMap, convert::Infallible, fs, io, sync::Arc};
 
-use std::{convert::Infallible, sync::Arc};
-
-use http_body_util::combinators::BoxBody;
+use http_body_util::{combinators::BoxBody, BodyExt, Empty, Full};
 use hyper::{
   body::{Bytes, Incoming},
+  header::{
+    HeaderValue, CONNECTION, SEC_WEBSOCKET_ACCEPT, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION,
+    UPGRADE,
+  },
   server::conn::http1,
   service::service_fn,
-  Method, Request, Response,
+  upgrade::Upgraded,
+  Method, Request, Response, StatusCode,
 };
 use hyper_util::rt::TokioIo;
+use pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::ServerConfig;
-use tokio::net::TcpListener;
+use tokio::net::{tcp, TcpListener};
 use tokio_rustls::TlsAcceptor;
-use web_prover::{load_certs, load_private_key, routes};
+use tokio_tungstenite::{
+  tungstenite::{handshake::derive_accept_key, protocol::Role},
+  WebSocketStream,
+};
 
 #[tokio::main]
 async fn main() {
-  let addr = "127.0.0.1:8070"; // TODO make env var?
-  let certs = load_certs("fixture/notary/server-cert.pem").unwrap();
-  let key = load_private_key("fixture/notary/server-key.pem").unwrap();
+  let addr = "0.0.0.0:8050"; // TODO make env var?
+
+  let certs = load_certs("./fixture/certs/server-cert.pem").unwrap();
+  let key = load_private_key("./fixture/certs/server-key.pem").unwrap();
 
   let listener = TcpListener::bind(addr).await.unwrap();
 
@@ -59,36 +67,35 @@ async fn handle_request(
 ) -> Result<Response<BoxBody<Bytes, Infallible>>, hyper::Error> {
   match (req.method(), req.uri().path()) {
     // GET /health
-    (&Method::OPTIONS, "/health") => routes::cors_preflight(req).await,
-    (&Method::GET, "/health") => routes::health(req).await,
+    (&Method::OPTIONS, "/health") => cors_preflight(req).await,
+    (&Method::GET, "/health") => health(req).await,
 
     // GET /v1 websocket handler
-    (&Method::OPTIONS, "/v1") => routes::cors_preflight(req).await,
-    (&Method::GET, "/v1") => routes::v1_websocket(req).await,
+    (&Method::OPTIONS, "/v1") => cors_preflight(req).await,
+    (&Method::GET, "/v1") => v1_websocket(req).await,
 
     // Not found
-    _ => routes::not_found(req).await,
+    _ => not_found(req).await,
   }
 }
 
-use std::{collections::HashMap, convert::Infallible};
+fn load_certs(filename: &str) -> io::Result<Vec<CertificateDer<'static>>> {
+  let certfile =
+    fs::File::open(filename).map_err(|e| error(format!("failed to open {}: {}", filename, e)))?;
+  let mut reader = io::BufReader::new(certfile);
+  rustls_pemfile::certs(&mut reader).collect()
+}
 
-use http_body_util::{combinators::BoxBody, BodyExt, Empty, Full};
-use hyper::{
-  body::{Bytes, Incoming},
-  header::{
-    HeaderValue, CONNECTION, SEC_WEBSOCKET_ACCEPT, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION,
-    UPGRADE,
-  },
-  upgrade::Upgraded,
-  Request, Response, StatusCode,
-};
-use hyper_util::rt::TokioIo;
-use tokio_tungstenite::{
-  tungstenite::{handshake::derive_accept_key, protocol::Role},
-  WebSocketStream,
-};
+fn load_private_key(filename: &str) -> io::Result<PrivateKeyDer<'static>> {
+  let keyfile =
+    fs::File::open(filename).map_err(|e| error(format!("failed to open {}: {}", filename, e)))?;
+  let mut reader = io::BufReader::new(keyfile);
+  rustls_pemfile::private_key(&mut reader).map(|key| key.unwrap())
+}
 
+fn error(err: String) -> io::Error { io::Error::new(io::ErrorKind::Other, err) }
+
+// TODO: find a better home for below logic.
 pub async fn cors_preflight(
   _req: Request<Incoming>,
 ) -> Result<Response<BoxBody<Bytes, Infallible>>, hyper::Error> {
@@ -214,8 +221,6 @@ async fn v1_websocket_handler(
   target_port: u16,
   in_socket: WebSocketStream<TokioIo<Upgraded>>,
 ) {
-  // let mut stream = ws_stream_tungstenite::WsStream::new(ws_stream);
-
   use std::net::SocketAddr;
 
   use futures_util::{SinkExt, StreamExt};
@@ -227,43 +232,79 @@ async fn v1_websocket_handler(
 
   let target_host = if target_host == "localhost" { "127.0.0.1" } else { &target_host };
 
+  // TODO feature flag to allow localhost/ 127.0.0.1
+  //      otherwise resolve domain and make sure no private IP addresses can be accessed
+  //      similar to https://github.com/pluto/tlsn-websocket-proxy/blob/61e490f7b4fd9f6e750f0c6a83f88eb44766784f/main.go#L36-L46
+
   let target_url = format!("{}:{}", target_host, target_port);
-  println!("target: {}", target_url);
+  println!("Connecting to target: {}", target_url);
   let target_addr: SocketAddr = target_url.parse().expect("Invalid address");
+
   let mut tcp_stream =
     TcpStream::connect(target_addr).await.expect("Failed to connect to TCP server");
-
-  let mut tcp_buf = [0; 4096];
-
+  let (mut tcp_read, mut tcp_write) = tcp_stream.split();
   let (mut ws_sink, mut ws_stream) = in_socket.split();
-  loop {
-    tokio::select! {
-        Some(ws_msg) = ws_stream.next() => {
-            let ws_msg = ws_msg.expect("failed to read ws");
 
-            // TODO: dedup me
-            if let Message::Binary(data) = ws_msg {
-                println!("forward binary message: {:?}", data);
-                tcp_stream.write_all(&data).await.expect("failed to write target server");
-                let n = tcp_stream.read(&mut tcp_buf).await.expect("failed to read target server");
-                println!("received response from server: bytes={:?}, message={:?}", n, tcp_buf[..n].to_vec());
-                ws_sink.send(Message::Binary(tcp_buf[..n].to_vec())).await.expect("failed to forward to socket");
-            } else if let Message::Text(data) = ws_msg {
-                println!("forward text message: {:?}", data);
-                tcp_stream.write_all(data.as_bytes()).await.expect("failed to write to server");
-                let n = tcp_stream.read(&mut tcp_buf).await.expect("failed to read target server");
-                let msg = String::from_utf8(tcp_buf[..n].to_vec()).expect("failed to parse str");
-                ws_sink.send(Message::Text(msg)).await.expect("failed to forward to socket");
-            } else if let Message::Close(_) = ws_msg {
-                ws_sink.close().await.expect("failed to close socket");
-                tcp_stream.shutdown().await.expect("failed to close tcp_stream");
-            } else {
-                println!("receiving data of unhandled format: {:?}", ws_msg);
-            }
+  let ws_to_tcp = async {
+    while let Some(msg) = ws_stream.next().await {
+      // TODO refactor below
+      match msg {
+        // Ok(Message::Text(text)) => {
+        //   // Decode base64 encoded text
+        //   //   let decoded = base64::decode(&text).expect("Failed to decode base64");
+        //   //   tcp_stream.write_all(&decoded).await.expect("Failed to write to TCP stream");
+        //   todo!("text message");
+        // },
+        Ok(Message::Binary(bin)) => {
+          tcp_write.write_all(&bin).await.expect("Failed to write to TCP stream");
         },
-        else => break,
+        Ok(Message::Ping(_)) => {
+          todo!("respond with pong?");
+        },
+        Ok(Message::Pong(_)) => {
+          todo!("do we need to implement this?");
+        },
+        Ok(Message::Text(_)) => {
+          panic!("we don't need this");
+        },
+        Ok(Message::Close(_)) => {
+          break;
+        },
+        Ok(_) => (),
+        Err(e) => {
+          eprintln!("WebSocket error: {}", e);
+          break;
+        },
+      }
     }
-  }
+  };
+
+  // TODO fix unwraps and expect's below
+
+  let tcp_to_ws = async {
+    let mut tcp_buf = [0; 4096];
+    loop {
+      let n = tcp_read.read(&mut tcp_buf).await.expect("Failed to read from TCP stream");
+
+      // TODO n == 0 works but is not correct
+      // If n is 0, then it can indicate one of two scenarios:
+      // This reader has reached its "end of file" and will likely no longer be able to produce
+      // bytes. Note that this does not mean that the reader will always no longer be able to
+      // produce bytes. The buffer specified was 0 bytes in length.
+      //
+      // tcp_buf holds encrypted data, we can't introspect a HTTP request to check for ending
+      // newlines for example.
+
+      if n == 0 {
+        ws_sink.close().await.unwrap(); // TODO fix unwrap
+        break;
+      }
+      let data = &tcp_buf[..n];
+      ws_sink.send(Message::Binary(data.to_vec())).await.expect("Failed to send WebSocket message");
+    }
+  };
+
+  tokio::join!(ws_to_tcp, tcp_to_ws);
 }
 
 fn full<T: Into<Bytes>>(chunk: T) -> BoxBody<Bytes, Infallible> { Full::new(chunk.into()).boxed() }

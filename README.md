@@ -9,7 +9,7 @@ TODO: Explain project layout
 make wasm
 make ios # TODO
 cargo run --release --bin tlsnotary
-cargo run --release --bin origo # TODO
+cargo run --release --bin origo
 cargo run --release --bin mock_server
 ```
 
@@ -18,7 +18,7 @@ cargo run --release --bin mock_server
 ```
 cargo run --release --bin tlsnotary
 cargo run --release --bin mock_server
-cargo run --release --bin websocket_proxy # TODO port 8050
+cargo run --release --bin proxy
 make wasm
 make wasm-demo
 open https://localhost:8090

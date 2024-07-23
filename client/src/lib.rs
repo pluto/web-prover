@@ -1,7 +1,6 @@
 mod errors;
 mod tlsnotary;
-#[cfg(target_arch = "wasm32")]
-mod wasm_utils;
+#[cfg(target_arch = "wasm32")] mod wasm_utils;
 
 use std::collections::HashMap;
 
@@ -14,8 +13,10 @@ use tlsn_prover::tls::{Prover, ProverConfig};
 use tracing::{debug, info, trace};
 use url::Url;
 #[cfg(target_arch = "wasm32")]
-use { wasm_bindgen_futures::spawn_local,
-ws_stream_wasm::WsMeta, wasm_utils::WasmAsyncIo, futures::channel::oneshot};
+use {
+  futures::channel::oneshot, wasm_bindgen_futures::spawn_local, wasm_utils::WasmAsyncIo,
+  ws_stream_wasm::WsMeta,
+};
 
 const NOTARY_CA_CERT: &[u8] = include_bytes!("../../fixture/certs/ca-cert.cer"); // TODO make build config
 
@@ -148,7 +149,7 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   // };
   #[cfg(all(feature = "websocket", target_arch = "wasm32"))]
   let ws_query = url::form_urlencoded::Serializer::new(String::new())
-    .extend_pairs([("target", format!("{}:{}", target_host, target_port))])
+    .extend_pairs([("target_host", target_host), ("target_port", &target_port.to_string())])
     .finish();
   #[cfg(all(feature = "websocket", target_arch = "wasm32"))]
   let (mpc_tls_connection, prover_fut) = {
