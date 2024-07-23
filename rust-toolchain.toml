@@ -3,8 +3,7 @@
 
 [toolchain]
 # what toolchain to use. 
-channel   ="nightly"
-components=["rustfmt", "clippy", "check"]
+channel="nightly"
 
 # option to specify a date to pin to a particular release 
 # date = "2024-03-19"
