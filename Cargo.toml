@@ -33,6 +33,3 @@ tokio        ={ version="1" }
 [profile.release]
 lto      =true # Enable Link Time Optimization
 opt-level="z"  # Optimize for size
-
-[package.metadata.wasm-pack.profile.release]
-wasm-opt=true
