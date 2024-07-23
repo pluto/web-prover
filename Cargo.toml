@@ -1,5 +1,5 @@
 [workspace]
-members =["client", "client_ios", "client_wasm"]
+members =["client", "client_ios", "client_wasm", "notary"]
 resolver="2"
 
 [package]

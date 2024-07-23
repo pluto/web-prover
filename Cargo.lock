@@ -2683,6 +2683,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "notary"
+version = "0.1.0"
+
+[[package]]
 name = "notary-server"
 version = "0.1.0-alpha.6"
 source = "git+https://github.com/tlsnotary/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
