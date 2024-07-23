@@ -48,5 +48,3 @@ dump
 *.swo
 
 /target
-
-Cargo.toml.backup
