@@ -50,7 +50,7 @@ async fn main() {
 
   let certs = load_certs("./fixture/certs/server-cert.pem").unwrap(); // TODO make CLI or ENV var
   let key = load_private_key("./fixture/certs/server-key.pem").unwrap(); // TODO make CLI or ENV var
-  let addr = "127.0.0.1:8070"; // TODO make env var?
+  let addr = "127.0.0.1:7074"; // TODO make env var?
 
   let listener = TcpListener::bind(addr).await.unwrap();
   info!("Listening on https://{}", addr);
