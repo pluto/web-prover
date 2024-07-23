@@ -4,3 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+rustls           ={ version="0.23.11" }
+axum = "0.7.5"
+tokio = "1.39.1"
+tracing = "0.1.40"
+hyper-util = "0.1.6"
+hyper = "1.4.1"
+futures-util = "0.3.30"
+tokio-rustls = "0.26.0"
+tower-http = "0.5.2"
+tower-service = "0.3.2"
+rustls-pemfile = "2.1.2"
