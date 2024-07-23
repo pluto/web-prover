@@ -3,8 +3,8 @@ members =["client", "client_ios", "client_wasm"]
 resolver="2"
 
 [package]
-name="webprover"
-edition = "2021"
+name   ="webprover"
+edition="2021"
 
 # TODO: merge tlsnotary and origo into one `notary` bin
 # TODO: put rust websocket proxy code into tlsnotary and origo
@@ -25,5 +25,12 @@ path="bin/mock_server.rs"
 # [[test]]
 
 [dependencies]
-notary-server={ git="https://github.com/tlsnotary/tlsn.git " }
-tokio        ={ version="1" }
+notary-server ={ git="https://github.com/tlsnotary/tlsn.git " }
+tokio         ={ version="1" }
+hyper         ={ version="1.1", features=["client", "http1"] }
+hyper-util    ={ version="0.1" }
+http-body-util="0.1"
+pki-types     ={ package="rustls-pki-types", version="1.7" }
+rustls        ={ version="0.23.10" }
+rustls-pemfile={ version="2.0.0" }
+tokio-rustls  ={ version="0.26.0" }
