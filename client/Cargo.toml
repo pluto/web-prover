@@ -34,6 +34,9 @@ futures-util="0.3.28"
 # Other
 base64="0.22.0"
 
+## TESTING THIS OUT
+reqwest={ version="0.12.5", features=["json"] }
+
 ####################################################################################################
 # Target-specific configuration
 ####################################################################################################
@@ -49,8 +52,9 @@ tokio-util={ version="0.7", features=[
 tokio-rustls={ version="0.26.0" }
 tokio={ version="1", features=["rt", "rt-multi-thread", "macros", "net", "io-std", "fs"] }
 # TLSN
-tlsn-prover={ git="https://github.com/tlsnotary/tlsn.git" }
-tlsn-core  ={ git="https://github.com/tlsnotary/tlsn.git" }
+tlsn-prover      ={ git="https://github.com/tlsnotary/tlsn.git" }
+tlsn-core        ={ git="https://github.com/tlsnotary/tlsn.git" }
+tokio-tungstenite="0.23.1"
 
 #- Wasm target configuration ----------------------------------------------------------------------#
 [target.'cfg(target_arch = "wasm32")'.dependencies]

@@ -16,8 +16,12 @@ use url::Url;
 use {futures::channel::oneshot, wasm_bindgen_futures::spawn_local, ws_stream_wasm::WsMeta};
 #[cfg(not(target_arch = "wasm32"))]
 use {
-  tokio::net::TcpStream, tokio_util::compat::FuturesAsyncReadCompatExt,
+  futures_util::StreamExt,
+  tokio::io::{AsyncReadExt, AsyncWriteExt},
+  tokio::net::TcpStream,
+  tokio_util::compat::FuturesAsyncReadCompatExt,
   tokio_util::compat::TokioAsyncReadCompatExt,
+  tokio_util::compat::TokioAsyncWriteCompatExt,
 };
 
 const NOTARY_CA_CERT: &[u8] = include_bytes!("../../fixture/certs/ca-cert.cer"); // TODO make build config
@@ -122,9 +126,9 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   let prover_config = prover_config.build()?;
 
-  // Create a new prover and with MPC backend.
+  // Create a new prover and with MPC backend. use tokio::io::{AsyncReadExt, AsyncWriteExt};
   #[cfg(not(target_arch = "wasm32"))]
-  let prover = Prover::new(prover_config).setup(notary_tls_socket.compat()).await?;
+  let prover = Prover::new(prover_config).setup(notary_tls_socket).await?;
   #[cfg(target_arch = "wasm32")]
   let prover = Prover::new(prover_config).setup(notary_tls_socket.into_io()).await?;
 
