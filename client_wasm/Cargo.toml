@@ -77,5 +77,3 @@ tracing             ="0.1"
 # TLSN
 tlsn-prover={ git="https://github.com/tlsnotary/tlsn.git" }
 tlsn-core  ={ git="https://github.com/tlsnotary/tlsn.git" }
-
-parking_lot = { version = "0.12", features = ["nightly"] }
