@@ -149,7 +149,7 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   // };
   #[cfg(all(feature = "websocket", target_arch = "wasm32"))]
   let ws_query = url::form_urlencoded::Serializer::new(String::new())
-    .extend_pairs([("target", format!("{}:{}", target_host, target_port))])
+    .extend_pairs([("target_host", target_host), ("target_port", &target_port.to_string())])
     .finish();
   #[cfg(all(feature = "websocket", target_arch = "wasm32"))]
   let (mpc_tls_connection, prover_fut) = {

@@ -20,6 +20,10 @@ path="bin/origo.rs"
 name="mock_server"
 path="bin/mock_server.rs"
 
+[[bin]]
+name="proxy"
+path="bin/proxy.rs"
+
 # Can use something like this for e2e testing of the workspace
 # https://doc.rust-lang.org/cargo/reference/manifest.html
 # [[test]]
