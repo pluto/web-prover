@@ -15,7 +15,11 @@
 //
 // GET /v1/tlsnotary/proxy (mostly this: https://github.com/pluto/web-prover/blob/30ba86a2d5887c2f7c4e2d7bb50b378998ccd297/bin/proxy.rs#L219)
 
-use std::{fs, io, sync::Arc};
+use std::{
+  collections::HashMap,
+  fs, io,
+  sync::{Arc, Mutex},
+};
 
 use axum::{
   extract::Request,
@@ -37,6 +41,8 @@ use tokio_rustls::TlsAcceptor;
 use tower_service::Service;
 use tracing::{debug, error, info};
 
+mod tlsn;
+
 #[tokio::main]
 async fn main() {
   let subscriber = tracing_subscriber::FmtSubscriber::new();
@@ -49,15 +55,18 @@ async fn main() {
   let listener = TcpListener::bind(addr).await.unwrap();
   info!("Listening on https://{}", addr);
 
+  let notary_globals = tlsn::NotaryGlobals::new();
+
   let mut server_config =
     ServerConfig::builder().with_no_client_auth().with_single_cert(certs, key).unwrap();
   server_config.alpn_protocols = vec![b"http/1.1".to_vec()];
   let tls_acceptor = TlsAcceptor::from(Arc::new(server_config));
-
   let protocol = Arc::new(http1::Builder::new());
 
-  let router =
-    Router::new().route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }));
+  let router = Router::new()
+    // .route_layer(from_extractor_with_state::<tlsn::NotaryGlobals>(notary_globals.clone()))
+    .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
+    .route("/v1/tlsnotary/session", post(tlsn::initialize).with_state(notary_globals));
 
   loop {
     let (tcp_stream, _) = listener.accept().await.unwrap();

@@ -2687,17 +2687,21 @@ name = "notary"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "axum-macros",
  "futures-util",
  "hyper",
  "hyper-util",
  "rustls 0.23.11",
  "rustls-pemfile 2.1.2",
+ "serde",
+ "serde_json",
  "tokio",
  "tokio-rustls 0.26.0",
  "tower-http",
  "tower-service",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]

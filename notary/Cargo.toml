@@ -6,6 +6,7 @@ edition="2021"
 [dependencies]
 rustls            ={ version="0.23.11" }
 axum              ="0.7.5"                                                     # features = ["ws"]
+axum-macros       ="0.4.1"
 tokio             ={ version="1.39.1", features=["full"] }
 tracing           ="0.1.40"
 tracing-subscriber="0.3.18"
@@ -16,3 +17,6 @@ tokio-rustls      ="0.26.0"
 tower-http        ="0.5.2"
 tower-service     ="0.3.2"
 rustls-pemfile    ="2.1.2"
+uuid              ="1.10.0"
+serde             ="1.0"
+serde_json        ="1.0"
