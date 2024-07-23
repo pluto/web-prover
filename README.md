@@ -9,7 +9,7 @@ TODO: Explain project layout
 make wasm
 make ios # TODO
 cargo run --release --bin tlsnotary
-cargo run --release --bin origo # TODO
+cargo run --release --bin origo
 cargo run --release --bin mock_server
 ```
 
