@@ -247,8 +247,7 @@ async fn v1_websocket_handler(
 
   let ws_to_tcp = async {
     while let Some(msg) = ws_stream.next().await {
-
-        // TODO refactor below
+      // TODO refactor below
       match msg {
         // Ok(Message::Text(text)) => {
         //   // Decode base64 encoded text
@@ -293,8 +292,8 @@ async fn v1_websocket_handler(
       // bytes. Note that this does not mean that the reader will always no longer be able to
       // produce bytes. The buffer specified was 0 bytes in length.
       //
-      // tcp_buf holds encrypted data, we can't introspect a HTTP request to check for ending newlines for example.
-
+      // tcp_buf holds encrypted data, we can't introspect a HTTP request to check for ending
+      // newlines for example.
 
       if n == 0 {
         ws_sink.close().await.unwrap(); // TODO fix unwrap
