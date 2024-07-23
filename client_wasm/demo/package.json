@@ -1,18 +1,15 @@
 {
 	"author": "",
-	"name": "tlsn-wasm",
+	"name": "wasm-demo",
 	"version": "1.0.0",
 	"scripts": {
-	  "build": "rimraf dist pkg && webpack",
-	  "start": "rimraf dist && webpack-dev-server --port 8090",
-	  "test": "cargo test && wasm-pack test --headless"
+	  "start": "webpack-dev-server --port 8090"
 	},
 	"devDependencies": {
 	  "@wasm-tool/wasm-pack-plugin": "^1.7.0",
 	  "copy-webpack-plugin": "^5.0.3",
 	  "webpack": "^5.92.0",
 	  "webpack-cli": "^5.1.4",
-	  "webpack-dev-server": "^5.0.4",
-	  "rimraf": "^5.0.0"
+	  "webpack-dev-server": "^5.0.4"
 	}
   }

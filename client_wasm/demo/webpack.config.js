@@ -48,6 +48,7 @@ module.exports = {
   plugins: [
     new CopyPlugin([path.resolve(__dirname, "static")]),
 
+    // We are not using Webpack to build the WASM module.
     // new WasmPackPlugin({
     //   crateDirectory: __dirname,
     //   extraArgs: "--target web"

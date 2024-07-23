@@ -27,9 +27,3 @@ path="bin/mock_server.rs"
 [dependencies]
 notary-server={ git="https://github.com/tlsnotary/tlsn.git " }
 tokio        ={ version="1" }
-
-
-# TODO: will be ignored if put in client_wasm/Cargo.toml
-[profile.release]
-lto      =true # Enable Link Time Optimization
-opt-level="z"  # Optimize for size
