@@ -1,44 +1,45 @@
 # Web Prover
-This repository is used to do end-to-end testing on the TLSN protocol.
-There are two end to end flows we test here. 
-- a rust binary that represents the mobile SDK target
-- a web assembly client (`wasm-client`) 
 
-## Client Abstraction
+TODO: Web Prover high level explainer  
+TODO: Explain project layout  
 
-The client is designed to be egnostic both over build targets, the underlying networking protocol, and the underlying notarization scheme. 
+## Usage
 
-## End to End testing for Mobile Target
-
-1) Start the notary. From the root directory run:
-```sh
-cargo run -p webprover --bin tlsn --release
 ```
-2) Run the mock target.
-```sh
-cargo run -p webprover --bin mock_target
-```
-3) Run the mock client
-```sh
-cargo run -p webprover --bin mock_client
+make wasm
+make ios # TODO
+cargo run --release --bin tlsnotary
+cargo run --release --bin origo
+cargo run --release --bin mock_server
 ```
 
+## WASM Demo
 
-<!-- You can test the binary mobile target with a simple TUI.
 ```
-cargo run -p tester
+make wasm
+make wasm-demo
+open https://localhost:8090
 ```
-This will test and end to end web proof against a mock go server with the with the default `health` endpoint on the go server which just returns a status OK.
-To run with other endpoints you can pass the `--endpoint` flag followed by the endpoint parameters for example: `cargo run -p notary-tester -- --endpoint bin/10KB`.  -->
 
-## End to End testing WASM target
-TODO
+## Feature flags
 
-Run wasm with 
-```sh
-wasm-pack build --target web wasm-proxy-client     
-``` 
+TODO: target_arch explainer (for wasm)  
+TODO: target_os explainer (for ios)  
+TODO: explain all feature flags  
 
+
+## Development
+
+### Configuring rust-analyzer for wasm32
+
+The [client](./client/) crate utilizes `#[cfg(target_arch = "wasm32")]` flags. To ensure that rust-analyzer highlights active code paths that depend on these feature flags, you can configure it in Visual Studio Code. Here’s how:
+
+```
+# .vscode/settings.json
+{
+  "rust-analyzer.cargo.target": "wasm32-unknown-unknown"
+}
+```
 
 ## Known Reproducible Failures
 
