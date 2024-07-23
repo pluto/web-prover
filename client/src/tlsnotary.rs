@@ -3,13 +3,7 @@ use tracing::{debug, info};
 #[cfg(target_arch = "wasm32")]
 use {super::wasm_utils, ws_stream_wasm::WsMeta};
 #[cfg(not(target_arch = "wasm32"))]
-use {
-  hyper::client::conn::http1::Parts,
-  std::sync::Arc,
-  tokio::net::TcpStream,
-  tokio::spawn,
-  tokio_rustls::{client::TlsStream, TlsConnector},
-};
+use {tokio::net::TcpStream, tokio_rustls::client::TlsStream};
 
 use super::*;
 
@@ -40,6 +34,7 @@ type NetworkStream = ws_stream_wasm::WsStream;
 #[cfg(not(target_arch = "wasm32"))]
 type NetworkStream = TlsStream<TcpStream>;
 
+#[cfg(target_arch = "wasm32")]
 pub async fn request_notarization(
   notary_host: &str,
   notary_port: u16,
@@ -91,8 +86,13 @@ pub async fn request_notarization(
   // Claim back the TLS socket after HTTP exchange is done
   // #[cfg(not(target_arch = "wasm32"))]
   // let Parts { io: notary_tls_socket, .. } = connection_task.await??;
-  #[cfg(not(target_arch = "wasm32"))]
-  return Ok((notary_tls_socket.into_inner(), notarization_response.session_id.to_string()));
-  #[cfg(target_arch = "wasm32")]
   return Ok((notary_tls_socket, notarization_response.session_id.to_string()));
+}
+
+pub async fn request_notarization(
+  notary_host: &str,
+  notary_port: u16,
+  config_notarization_session_request: &NotarizationSessionRequest,
+) -> Result<(NetworkStream, String), errors::ClientErrors> {
+  todo!();
 }
