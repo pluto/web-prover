@@ -1,15 +1,15 @@
 import init, {
   setup_tracing,
-  // initThreadPool,
+  initThreadPool,
   prover,
   verify
-} from "../pkg/web_prover.js";
+} from "../pkg/client_wasm.js";
 
 const numConcurrency = navigator.hardwareConcurrency;
 
 await init();
 setup_tracing("debug,tlsn_extension_rs=debug");
-// await initThreadPool(numConcurrency);
+await initThreadPool(numConcurrency);
 
 const proof = await prover(
   {

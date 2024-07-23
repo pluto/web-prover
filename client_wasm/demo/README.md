@@ -1,2 +1,2 @@
-# wasm-demo
+# WASM Demo 
 

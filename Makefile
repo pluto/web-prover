@@ -20,9 +20,9 @@ ios:
 		-output build/tlsnotary.xcframework
 
 wasm-demo/node_modules:
-	cd wasm-demo && npm install
+	cd client_wasm/demo && npm install
 
 wasm-demo: wasm-demo/node_modules
-	cd wasm-demo && npm run start
+	cd client_wasm/demo && npm run start
 
 .PHONY: wasm wasm-demo ios
