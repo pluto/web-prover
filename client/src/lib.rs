@@ -1,7 +1,6 @@
 mod errors;
 mod tlsnotary;
-#[cfg(target_arch = "wasm32")]
-mod wasm_utils;
+#[cfg(target_arch = "wasm32")] mod wasm_utils;
 
 use std::collections::HashMap;
 
@@ -14,8 +13,10 @@ use tlsn_prover::tls::{Prover, ProverConfig};
 use tracing::{debug, info, trace};
 use url::Url;
 #[cfg(target_arch = "wasm32")]
-use { wasm_bindgen_futures::spawn_local,
-ws_stream_wasm::WsMeta, wasm_utils::WasmAsyncIo, futures::channel::oneshot};
+use {
+  futures::channel::oneshot, wasm_bindgen_futures::spawn_local, wasm_utils::WasmAsyncIo,
+  ws_stream_wasm::WsMeta,
+};
 
 const NOTARY_CA_CERT: &[u8] = include_bytes!("../../fixture/certs/ca-cert.cer"); // TODO make build config
 

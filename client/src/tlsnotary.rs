@@ -1,22 +1,11 @@
-use serde::{Deserialize, Serialize};
-use tracing::{debug, info, trace};
-
-#[cfg(not(target_arch = "wasm32"))]
-use {
-  tokio::net::TcpStream,
-  tokio_rustls::client::TlsStream,
-};
-
-use super::*;
-
 use std::io::{BufReader, Cursor};
+
 use http_body_util::{BodyExt, Either, Empty, Full};
 use hyper::{body::Bytes, Request, StatusCode};
+use serde::{Deserialize, Serialize};
+use tracing::{debug, info, trace};
 #[cfg(target_arch = "wasm32")]
-use {
-  wasm_bindgen_futures::spawn_local, ws_stream_wasm::WsMeta, super::wasm_utils
-};
-
+use {super::wasm_utils, wasm_bindgen_futures::spawn_local, ws_stream_wasm::WsMeta};
 #[cfg(not(target_arch = "wasm32"))]
 use {
   hyper::client::conn::http1::Parts,
@@ -25,6 +14,10 @@ use {
   tokio::spawn,
   tokio_rustls::{client::TlsStream, TlsConnector},
 };
+#[cfg(not(target_arch = "wasm32"))]
+use {tokio::net::TcpStream, tokio_rustls::client::TlsStream};
+
+use super::*;
 
 // TODO can we import and use struct from https://sourcegraph.com/github.com/tlsnotary/tlsn/-/blob/notary/server/src/domain/notary.rs ?
 /// Request object of the /session API
@@ -60,8 +53,6 @@ pub async fn request_notarization(
   notary_port: u16,
   config_notarization_session_request: &NotarizationSessionRequest,
 ) -> Result<(NetworkStream, String), errors::ClientErrors> {
-
-
   let _span = tracing::span!(tracing::Level::TRACE, "configure_tls_notary_session").entered();
   let mut opts = web_sys::RequestInit::new();
   opts.method("POST");
@@ -103,7 +94,8 @@ pub async fn request_notarization(
     ),
     None,
   )
-  .await.unwrap();
+  .await
+  .unwrap();
 
   // TODO
   // Claim back the TLS socket after HTTP exchange is done
