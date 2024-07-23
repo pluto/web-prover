@@ -15,13 +15,12 @@
 //
 // GET /v1/tlsnotary/proxy (mostly this: https://github.com/pluto/web-prover/blob/30ba86a2d5887c2f7c4e2d7bb50b378998ccd297/bin/proxy.rs#L219)
 
-use std::{net::{IpAddr, SocketAddr, TcpListener}, pin::Pin, sync::Arc};
-
-use axum::Router;
-use rustls::{Certificate, PrivateKey, ServerConfig};
-use tokio::{fs::File, net::TcpListener};
-use tokio_rustls::TlsAcceptor;
-use axum::http::StatusCode;
+use std::{
+  fs, io,
+  net::{IpAddr, SocketAddr},
+  pin::Pin,
+  sync::Arc,
+};
 
 use axum::{
   extract::Request,
@@ -31,37 +30,34 @@ use axum::{
   routing::{get, post},
   Json, Router,
 };
-
 use futures_util::future::poll_fn;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
-use tokio::{fs::File, net::TcpListener};
+use rustls::{
+  pki_types::{CertificateDer, PrivateKeyDer},
+  ServerConfig,
+};
+use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
-use tower_http::cors::CorsLayer;
+// use tower_http::cors::CorsLayer;
 use tower_service::Service;
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
-fn main() {
-  let (tls_private_key, tls_certificates) =
-    load_tls_key_and_cert("./fixture/certs/server-key.pem", "./fixture/certs/server-cert.pem").unwrap();
+#[tokio::main]
+async fn main() {
+  let certs = load_certs("./fixture/certs/server-cert.pem").unwrap();
+  let key = load_private_key("./fixture/certs/server-key.pem").unwrap();
 
-  let mut server_config = ServerConfig::builder()
-    .with_safe_defaults()
-    .with_no_client_auth()
-    .with_single_cert(tls_certificates, tls_private_key)
-    .unwrap();
-    // .map_err(|err| eyre!("Failed to instantiate notary server tls config: {err}"))?;
+  let mut server_config =
+    ServerConfig::builder().with_no_client_auth().with_single_cert(certs, key).unwrap();
 
   // Set the http protocols we support
   server_config.alpn_protocols = vec![b"http/1.1".to_vec()];
   let tls_config = Arc::new(server_config);
   let tls_acceptor = TlsAcceptor::from(tls_config);
 
-  let notary_address = SocketAddr::new(
-    IpAddr::V4("0.0.0.0".parse().unwrap()),
-    7074,
-  );
-  let mut listener = TcpListener::bind(notary_address).unwrap();
+  let notary_address = SocketAddr::new(IpAddr::V4("0.0.0.0".parse().unwrap()), 7074);
+  let mut listener = TcpListener::bind(notary_address).await.unwrap();
 
   info!("Listening for TCP traffic at {}", notary_address);
 
@@ -113,21 +109,18 @@ fn main() {
   }
 }
 
-async fn load_tls_key_and_cert(
-  private_key_pem_path: &str,
-  certificate_pem_path: &str,
-) -> Result<(PrivateKey, Vec<Certificate>)> {
-  debug!("Loading notary server's tls private key and certificate");
-
-  let mut private_key_file_reader = read_pem_file(private_key_pem_path).await?;
-  let mut private_keys = rustls_pemfile::pkcs8_private_keys(&mut private_key_file_reader)?;
-  ensure!(private_keys.len() == 1, "More than 1 key found in the tls private key pem file");
-  let private_key = PrivateKey(private_keys.remove(0));
-
-  let mut certificate_file_reader = read_pem_file(certificate_pem_path).await?;
-  let certificates =
-    rustls_pemfile::certs(&mut certificate_file_reader)?.into_iter().map(Certificate).collect();
-
-  debug!("Successfully loaded notary server's tls private key and certificate!");
-  Ok((private_key, certificates))
+fn load_certs(filename: &str) -> io::Result<Vec<CertificateDer<'static>>> {
+  let certfile =
+    fs::File::open(filename).map_err(|e| error(format!("failed to open {}: {}", filename, e)))?;
+  let mut reader = io::BufReader::new(certfile);
+  rustls_pemfile::certs(&mut reader).collect()
 }
+
+fn load_private_key(filename: &str) -> io::Result<PrivateKeyDer<'static>> {
+  let keyfile =
+    fs::File::open(filename).map_err(|e| error(format!("failed to open {}: {}", filename, e)))?;
+  let mut reader = io::BufReader::new(keyfile);
+  rustls_pemfile::private_key(&mut reader).map(|key| key.unwrap())
+}
+
+fn error(err: String) -> io::Error { io::Error::new(io::ErrorKind::Other, err) }
