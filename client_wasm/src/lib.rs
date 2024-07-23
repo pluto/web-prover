@@ -11,6 +11,8 @@ use std::panic;
 
 use client::{Config, prover_inner};
 
+pub use wasm_bindgen_rayon::init_thread_pool;
+
 #[wasm_bindgen]
 pub async fn prover(config: JsValue) -> Result<String, JsValue> {
   panic::set_hook(Box::new(console_error_panic_hook::hook));

@@ -39,15 +39,16 @@ module.exports = {
     server: {
       type: "https",
       options: {
-        key: fs.readFileSync("../tests/fixture/certs/server-key.pem"),
-        cert: fs.readFileSync("../tests/fixture/certs/server-cert.pem"),
-        ca: fs.readFileSync("../tests/fixture/certs/ca-cert.pem"),
+        key: fs.readFileSync("../../fixture/certs/server-key.pem"),
+        cert: fs.readFileSync("../../fixture/certs/server-cert.pem"),
+        ca: fs.readFileSync("../../fixture/certs/ca-cert.pem"),
       },
     },
   },
   plugins: [
     new CopyPlugin([path.resolve(__dirname, "static")]),
 
+    // We are not using Webpack to build the WASM module.
     // new WasmPackPlugin({
     //   crateDirectory: __dirname,
     //   extraArgs: "--target web"
