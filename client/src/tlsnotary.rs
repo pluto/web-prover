@@ -1,13 +1,14 @@
+use async_tungstenite::{stream::Stream, tungstenite::stream::MaybeTlsStream};
 use http_body_util::BodyExt;
 use hyper::header::HeaderValue;
 use hyper_util::rt::TokioIo;
 use serde::{Deserialize, Serialize};
-use tokio_tungstenite::MaybeTlsStream;
+#[cfg(not(target_arch = "wasm32"))]
+use tokio_rustls::client::TlsStream;
+use tokio_rustls::TlsConnector;
 use tracing::{debug, info};
 #[cfg(target_arch = "wasm32")]
 use {super::wasm_utils, ws_stream_wasm::WsMeta};
-#[cfg(not(target_arch = "wasm32"))]
-use {tokio::net::TcpStream, tokio_rustls::client::TlsStream};
 
 use super::*;
 
@@ -36,7 +37,7 @@ struct NotarizationSessionResponse {
 type NetworkStream = ws_stream_wasm::WsStream;
 
 #[cfg(all(feature = "websocket", not(target_arch = "wasm32")))]
-type NetworkStream = tokio_tungstenite::WebSocketStream<MaybeTlsStream<TcpStream>>;
+type NetworkStream = ws_stream_tungstenite::WsStream;
 
 #[cfg(not(feature = "websocket"))]
 type NetworkStream = TlsStream<TcpStream>;
@@ -126,8 +127,11 @@ pub async fn request_notarization(
     "wss://{}:{}/notarize?sessionId={}",
     notary_host, notary_port, notarization_response.session_id
   );
+  // use async_tungstenite::async_std::connect_async_with_tls_connector;
+  // -- connect_async_with_tls_connector
+  use ws_stream_tungstenite::WsStream;
+  let (notary_tls_socket, _) = async_tungstenite::async_std::connect_async(wss_url).await.unwrap();
+  let ws_connection = WsStream::new(notary_tls_socket);
 
-  let (notary_tls_socket, _) = tokio_tungstenite::connect_async(wss_url).await.unwrap();
-
-  Ok((notary_tls_socket, notarization_response.session_id.to_string()))
+  Ok((ws_connection, notarization_response.session_id.to_string()))
 }

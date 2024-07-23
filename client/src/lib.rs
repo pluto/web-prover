@@ -5,6 +5,7 @@ mod tlsnotary;
 use std::collections::HashMap;
 
 use base64::prelude::*;
+use futures_util::SinkExt;
 use http_body_util::Full;
 use hyper::{body::Bytes, Request};
 use serde::{Deserialize, Serialize};
@@ -128,7 +129,7 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   // Create a new prover and with MPC backend. use tokio::io::{AsyncReadExt, AsyncWriteExt};
   #[cfg(not(target_arch = "wasm32"))]
-  let prover = Prover::new(prover_config).setup(notary_tls_socket).await?;
+  let prover = Prover::new(prover_config).setup(notary_tls_socket.compat()).await?;
   #[cfg(target_arch = "wasm32")]
   let prover = Prover::new(prover_config).setup(notary_tls_socket.into_io()).await?;
 

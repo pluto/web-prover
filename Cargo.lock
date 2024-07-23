@@ -386,6 +386,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b75356056920673b02621b35afd0f7dda9306d03c79a30f5c56c44cf256e3de"
 
 [[package]]
+name = "async-tls"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2ae3c9eba89d472a0e4fe1dea433df78fbbe63d2b764addaf2ba3a6bde89a5e"
+dependencies = [
+ "futures-core",
+ "futures-io",
+ "rustls 0.21.12",
+ "rustls-pemfile 1.0.4",
+ "webpki-roots 0.22.6",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -415,6 +428,8 @@ version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2cca750b12e02c389c1694d35c16539f88b8bbaa5945934fdc1b41a776688589"
 dependencies = [
+ "async-std",
+ "async-tls",
  "futures-io",
  "futures-util",
  "log",
@@ -840,6 +855,7 @@ dependencies = [
 name = "client"
 version = "0.1.0"
 dependencies = [
+ "async-tungstenite 0.25.1",
  "base64 0.22.1",
  "cfg-if",
  "chrono",
@@ -868,7 +884,6 @@ dependencies = [
  "tlsn-tls-client",
  "tokio",
  "tokio-rustls 0.26.0",
- "tokio-tungstenite 0.23.1",
  "tokio-util",
  "tracing",
  "tracing-subscriber",
@@ -880,7 +895,8 @@ dependencies = [
  "wasm-bindgen-test",
  "web-sys",
  "web-time 1.1.0",
- "webpki-roots",
+ "webpki-roots 0.26.3",
+ "ws_stream_tungstenite",
  "ws_stream_wasm",
 ]
 
@@ -920,7 +936,7 @@ dependencies = [
  "wasm-bindgen-rayon",
  "web-sys",
  "web-time 1.1.0",
- "webpki-roots",
+ "webpki-roots 0.26.3",
  "ws_stream_wasm",
 ]
 
@@ -4122,7 +4138,7 @@ dependencies = [
  "tlsn-tls-core",
  "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=45370cc)",
  "web-time 0.2.4",
- "webpki-roots",
+ "webpki-roots 0.26.3",
 ]
 
 [[package]]
@@ -4218,7 +4234,7 @@ dependencies = [
  "tracing",
  "uid-mux",
  "web-time 0.2.4",
- "webpki-roots",
+ "webpki-roots 0.26.3",
 ]
 
 [[package]]
@@ -5074,6 +5090,15 @@ checksum = "ed63aea5ce73d0ff405984102c42de94fc55a6b75765d621c65262469b3c9b53"
 dependencies = [
  "ring",
  "untrusted",
+]
+
+[[package]]
+name = "webpki-roots"
+version = "0.22.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6c71e40d7d2c34a5106301fb632274ca37242cd0c9d3e64dbece371a40a2d87"
+dependencies = [
+ "webpki",
 ]
 
 [[package]]
