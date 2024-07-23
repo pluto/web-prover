@@ -2,7 +2,7 @@ wasm:
 	@# TODO: -C lto fails with `lto can only be run for executables, cdylibs and static library outputs`
 	cargo install wasm-pack
 	cd client_wasm && \
-	  RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C opt-level=z" \
+	  PATH="/opt/homebrew/opt/llvm/bin:$$PATH" RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C opt-level=z" \
 	  ~/.cargo/bin/wasm-pack build --release --target web ./ -- \
 	    -Z build-std=panic_abort,std
 

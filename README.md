@@ -46,4 +46,4 @@ The [client](./client/) crate utilizes `#[cfg(target_arch = "wasm32")]` flags. T
 
 ## Known Reproducible Failures
 
-- `error: failed to run custom build command for ring v0.17.8`. If you run into this error you machine is not using the right llvm path and you should prefix this command with `PATH="/opt/homebrew/opt/llvm/bin:$PATH"`. If this still doesn't work install with `brew install llvm`
+- `error: failed to run custom build command for ring v0.17.8`. If you run into this error you machine is not using the right llvm path.
