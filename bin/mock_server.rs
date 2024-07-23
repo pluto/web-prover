@@ -13,10 +13,10 @@ use tokio_rustls::TlsAcceptor;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-  let addr = "127.0.0.1:8080";
+  let addr = "0.0.0.0:8085";
 
-  let certs = load_certs("fixture/mock_server/server-cert.pem")?;
-  let key = load_private_key("fixture/mock_server/server-key.pem")?;
+  let certs = load_certs("./fixture/certs/server-cert.pem")?;
+  let key = load_private_key("./fixture/certs/server-key.pem")?;
 
   let listener = TcpListener::bind(addr).await?;
 

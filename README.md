@@ -10,14 +10,14 @@ make wasm
 make ios # TODO
 cargo run --release --bin tlsnotary
 cargo run --release --bin origo # TODO
-cargo run --release --bin mock_server # TODO
+cargo run --release --bin mock_server
 ```
 
 ## WASM Demo
 
 ```
 cargo run --release --bin tlsnotary
-cargo run --release --bin mock_server # TODO port 8085
+cargo run --release --bin mock_server
 cargo run --release --bin websocket_proxy # TODO port 8050
 make wasm
 make wasm-demo
