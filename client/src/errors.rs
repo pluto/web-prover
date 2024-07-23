@@ -1,4 +1,6 @@
 use thiserror::Error;
+#[cfg(not(target_arch = "wasm32"))]
+use tokio_rustls::rustls;
 
 #[derive(Debug, Error)]
 pub enum ClientErrors {
@@ -15,6 +17,10 @@ pub enum ClientErrors {
   #[cfg(all(target_arch = "wasm32", feature = "websocket"))]
   #[error(transparent)]
   WebSocketError(#[from] ws_stream_wasm::WsErr),
+
+  #[cfg(target_arch = "wasm32")]
+  #[error("{0}")]
+  JsValueAsError(String),
 
   #[error(transparent)]
   HyperError(#[from] hyper::Error),
@@ -52,4 +58,10 @@ pub enum ClientErrors {
 
   #[error(transparent)]
   SubstringsProofBuilderError(#[from] tlsn_core::proof::SubstringsProofBuilderError),
+}
+
+impl From<wasm_bindgen::JsValue> for ClientErrors {
+  fn from(val: wasm_bindgen::JsValue) -> ClientErrors {
+    ClientErrors::JsValueAsError(serde_wasm_bindgen::from_value::<String>(val).unwrap())
+  }
 }

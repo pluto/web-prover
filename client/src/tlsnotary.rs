@@ -1,11 +1,7 @@
-use std::io::{BufReader, Cursor};
-
-use http_body_util::{BodyExt, Either, Empty, Full};
-use hyper::{body::Bytes, Request, StatusCode};
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, trace};
+use tracing::{debug, info};
 #[cfg(target_arch = "wasm32")]
-use {super::wasm_utils, wasm_bindgen_futures::spawn_local, ws_stream_wasm::WsMeta};
+use {super::wasm_utils, ws_stream_wasm::WsMeta};
 #[cfg(not(target_arch = "wasm32"))]
 use {
   hyper::client::conn::http1::Parts,
@@ -14,8 +10,6 @@ use {
   tokio::spawn,
   tokio_rustls::{client::TlsStream, TlsConnector},
 };
-#[cfg(not(target_arch = "wasm32"))]
-use {tokio::net::TcpStream, tokio_rustls::client::TlsStream};
 
 use super::*;
 
@@ -46,8 +40,6 @@ type NetworkStream = ws_stream_wasm::WsStream;
 #[cfg(not(target_arch = "wasm32"))]
 type NetworkStream = TlsStream<TcpStream>;
 
-// TODO will have to adapt request_notarization for other target as well
-#[cfg(target_arch = "wasm32")]
 pub async fn request_notarization(
   notary_host: &str,
   notary_port: u16,
@@ -58,9 +50,9 @@ pub async fn request_notarization(
   opts.method("POST");
   opts.mode(web_sys::RequestMode::Cors);
 
-  let headers = web_sys::Headers::new().unwrap(); // TODO fix unwrap
-  headers.append("Host", notary_host).unwrap(); // TODO fix unwrap
-  headers.append("Content-Type", "application/json").unwrap(); // TODO fix unwrap
+  let headers = web_sys::Headers::new()?;
+  headers.append("Host", notary_host)?;
+  headers.append("Content-Type", "application/json")?;
   opts.headers(&headers);
 
   let notarization_session_request = NotarizationSessionRequestAPI {
@@ -69,16 +61,14 @@ pub async fn request_notarization(
     max_recv_data: config_notarization_session_request.max_recv_data,
   };
 
-  let payload = serde_json::to_string(&notarization_session_request).unwrap(); // TODO fix unwrap
+  let payload = serde_json::to_string(&notarization_session_request)?;
   opts.body(Some(&wasm_bindgen::JsValue::from_str(&payload)));
 
   let url = format!("https://{}:{}/session", notary_host, notary_port);
 
-  let raw_notarization_session_response =
-    wasm_utils::fetch_as_json_string(&url, &opts).await.unwrap(); // TODO fix unwrap
+  let raw_notarization_session_response = wasm_utils::fetch_as_json_string(&url, &opts).await?;
   let notarization_response =
-    serde_json::from_str::<NotarizationSessionResponse>(&raw_notarization_session_response)
-      .unwrap(); // TODO fix unwrap
+    serde_json::from_str::<NotarizationSessionResponse>(&raw_notarization_session_response)?;
 
   info!("Session configured, session_id: {}", notarization_response.session_id);
 

@@ -5,7 +5,7 @@ mod tlsnotary;
 use std::collections::HashMap;
 
 use base64::prelude::*;
-use http_body_util::{BodyExt, Full};
+use http_body_util::Full;
 use hyper::{body::Bytes, Request};
 use serde::{Deserialize, Serialize};
 use tlsn_core::{commitment::CommitmentKind, proof::TlsProof};
@@ -13,9 +13,11 @@ use tlsn_prover::tls::{Prover, ProverConfig};
 use tracing::{debug, info, trace};
 use url::Url;
 #[cfg(target_arch = "wasm32")]
+use {futures::channel::oneshot, wasm_bindgen_futures::spawn_local, ws_stream_wasm::WsMeta};
+#[cfg(not(target_arch = "wasm32"))]
 use {
-  futures::channel::oneshot, wasm_bindgen_futures::spawn_local, wasm_utils::WasmAsyncIo,
-  ws_stream_wasm::WsMeta,
+  tokio::net::TcpStream, tokio_util::compat::FuturesAsyncReadCompatExt,
+  tokio_util::compat::TokioAsyncReadCompatExt,
 };
 
 const NOTARY_CA_CERT: &[u8] = include_bytes!("../../fixture/certs/ca-cert.cer"); // TODO make build config
@@ -118,7 +120,7 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
     prover_config.max_recv_data(max_recv_data);
   }
 
-  let prover_config = prover_config.build().unwrap();
+  let prover_config = prover_config.build()?;
 
   // Create a new prover and with MPC backend.
   #[cfg(not(target_arch = "wasm32"))]
@@ -142,11 +144,11 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   // tcpstream. ALSO, this does noit actually provide a websocket feature for non-wasm.
   //
   // Bind the Prover to server connection
-  // #[cfg(any(not(feature = "websocket"), not(target_arch = "wasm32")))]
-  // let (mpc_tls_connection, prover_fut) = {
-  //   let client_target_socket = TcpStream::connect((target_host, target_port)).await?;
-  //   prover.connect(client_target_socket.compat()).await?
-  // };
+  #[cfg(any(not(feature = "websocket"), not(target_arch = "wasm32")))]
+  let (mpc_tls_connection, prover_fut) = {
+    let client_target_socket = TcpStream::connect((target_host, target_port)).await?;
+    prover.connect(client_target_socket.compat()).await?
+  };
   #[cfg(all(feature = "websocket", target_arch = "wasm32"))]
   let ws_query = url::form_urlencoded::Serializer::new(String::new())
     .extend_pairs([("target_host", target_host), ("target_port", &target_port.to_string())])
@@ -162,7 +164,7 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   // mpc_tls_connection is mpc_tls_connection (in working code)
 
   #[cfg(any(not(feature = "websocket"), not(target_arch = "wasm32")))]
-  let mpc_tls_connection = WasmAsyncIo::new(mpc_tls_connection.compat());
+  let mpc_tls_connection = hyper_util::rt::TokioIo::new(mpc_tls_connection.compat());
   #[cfg(all(feature = "websocket", target_arch = "wasm32"))]
   let mpc_tls_connection = wasm_utils::WasmAsyncIo::new(mpc_tls_connection);
 
@@ -171,7 +173,7 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   // Spawn the Prover to be run concurrently
   #[cfg(not(target_arch = "wasm32"))]
-  let prover_task = spawn(prover_fut);
+  let prover_task = tokio::spawn(prover_fut);
 
   #[cfg(target_arch = "wasm32")]
   let prover_task = {
@@ -190,15 +192,19 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   // Spawn the HTTP task to be run concurrently
   #[cfg(not(target_arch = "wasm32"))]
-  let _mpc_tls_connection_task = spawn(mpc_tls_connection);
+  let _mpc_tls_connection_task = tokio::spawn(mpc_tls_connection);
 
-  let (connection_sender, connection_receiver) = oneshot::channel();
-  let connection_fut = mpc_tls_connection.without_shutdown();
-  let handled_connection_fut = async {
-    let result = connection_fut.await;
-    let _ = connection_sender.send(result);
+  #[cfg(target_arch = "wasm32")]
+  let connection_receiver = {
+    let (connection_sender, connection_receiver) = oneshot::channel();
+    let connection_fut = mpc_tls_connection.without_shutdown();
+    let handled_connection_fut = async {
+      let result = connection_fut.await;
+      let _ = connection_sender.send(result);
+    };
+    spawn_local(handled_connection_fut);
+    connection_receiver
   };
-  spawn_local(handled_connection_fut);
   //---------------------------------------------------------------------------------------------------------------------------------------//
 
   //---------------------------------------------------------------------------------------------------------------------------------------//
@@ -268,14 +274,17 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   debug!("Sent request");
   //---------------------------------------------------------------------------------------------------------------------------------------//
-  use futures::AsyncWriteExt;
-  let mut client_socket = connection_receiver.await.unwrap().unwrap().io.into_inner();
-  client_socket.close().await.unwrap();
+  #[cfg(target_arch = "wasm32")]
+  {
+    use futures::AsyncWriteExt;
+    let mut client_socket = connection_receiver.await.unwrap()?.io.into_inner(); // TODO fix unwrap
+    client_socket.close().await?;
+  }
 
   //---------------------------------------------------------------------------------------------------------------------------------------//
   // Complete the prover and notarization
   //---------------------------------------------------------------------------------------------------------------------------------------//
-  let prover = prover_task.await.unwrap().unwrap(); // TODO fix unwrap
+  let prover = prover_task.await.unwrap()?; // TODO fix unwrap
 
   // Upgrade the prover to an HTTP prover, and start notarization.
   let mut prover = prover.to_http()?.start_notarize();
