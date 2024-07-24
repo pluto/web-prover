@@ -7,8 +7,6 @@ use serde::{Deserialize, Serialize};
 use tokio_rustls::client::TlsStream;
 use tokio_rustls::TlsConnector;
 use tracing::{debug, info};
-#[cfg(target_arch = "wasm32")]
-use {super::wasm_utils, ws_stream_wasm::WsMeta};
 
 use super::*;
 
@@ -33,21 +31,12 @@ struct NotarizationSessionResponse {
   pub session_id: String,
 }
 
-#[cfg(all(feature = "websocket", target_arch = "wasm32"))]
-type NetworkStream = ws_stream_wasm::WsStream;
-
-#[cfg(all(feature = "websocket", not(target_arch = "wasm32")))]
-type NetworkStream = ws_stream_tungstenite::WsStream;
-
-#[cfg(not(feature = "websocket"))]
-type NetworkStream = TlsStream<TcpStream>;
-
 #[cfg(target_arch = "wasm32")]
 pub async fn request_notarization(
   notary_host: &str,
   notary_port: u16,
   config_notarization_session_request: &NotarizationSessionRequest,
-) -> Result<(NetworkStream, String), errors::ClientErrors> {
+) -> Result<String, errors::ClientErrors> {
   let _span = tracing::span!(tracing::Level::TRACE, "configure_tls_notary_session").entered();
   let mut opts = web_sys::RequestInit::new();
   opts.method("POST");
@@ -79,29 +68,18 @@ pub async fn request_notarization(
 
   // TODO: Be careful to put this in with the right target arch
 
-  debug!("TLS socket created with TCP connection");
-  let (_, notary_tls_socket) = WsMeta::connect(
-    format!(
-      "wss://{}:{}/notarize?sessionId={}",
-      notary_host, notary_port, notarization_response.session_id
-    ),
-    None,
-  )
-  .await
-  .unwrap();
-
   // TODO
   // Claim back the TLS socket after HTTP exchange is done
   // #[cfg(not(target_arch = "wasm32"))]
   // let Parts { io: notary_tls_socket, .. } = connection_task.await??;
-  Ok((notary_tls_socket, notarization_response.session_id.to_string()))
+  Ok(notarization_response.session_id.to_string())
 }
 
 pub async fn request_notarization(
   notary_host: &str,
   notary_port: u16,
   config_notarization_session_request: &NotarizationSessionRequest,
-) -> Result<(NetworkStream, String), errors::ClientErrors> {
+) -> Result<String, errors::ClientErrors> {
   let _span = tracing::span!(tracing::Level::TRACE, "configure_tls_notary_session").entered();
 
   let notarization_response: NotarizationSessionResponse = reqwest::Client::new()
@@ -123,15 +101,6 @@ pub async fn request_notarization(
   // Websocket feature flag: Websocket
   // Non websocket feature flag: TCP connection
   // -> NetworkStream
-  let wss_url = format!(
-    "wss://{}:{}/notarize?sessionId={}",
-    notary_host, notary_port, notarization_response.session_id
-  );
-  // use async_tungstenite::async_std::connect_async_with_tls_connector;
-  // -- connect_async_with_tls_connector
-  use ws_stream_tungstenite::WsStream;
-  let (notary_tls_socket, _) = async_tungstenite::async_std::connect_async(wss_url).await.unwrap();
-  let ws_connection = WsStream::new(notary_tls_socket);
 
-  Ok((ws_connection, notarization_response.session_id.to_string()))
+  Ok(notarization_response.session_id.to_string())
 }

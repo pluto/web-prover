@@ -55,7 +55,7 @@ tokio={ version="1", features=["rt", "rt-multi-thread", "macros", "net", "io-std
 tlsn-prover          ={ git="https://github.com/tlsnotary/tlsn.git" }
 tlsn-core            ={ git="https://github.com/tlsnotary/tlsn.git" }
 async-tungstenite    ={ version="0.25.1", features=["async-std-runtime", "async-tls"] }
-ws_stream_tungstenite="0.13.0"
+ws_stream_tungstenite={ version="0.13.0", features=["tokio_io"]}
 
 #- Wasm target configuration ----------------------------------------------------------------------#
 [target.'cfg(target_arch = "wasm32")'.dependencies]

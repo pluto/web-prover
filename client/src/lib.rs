@@ -93,12 +93,31 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   //---------------------------------------------------------------------------------------------------------------------------------------//
 
   let _span = tracing::span!(tracing::Level::TRACE, "connect_to_notary").entered();
-  let (notary_tls_socket, session_id) = tlsnotary::request_notarization(
+
+  let session_id = tlsnotary::request_notarization(
     &config.notary_host,
     config.notary_port,
     &config.notarization_session_request,
   )
   .await?;
+
+  let wss_url = format!(
+    "wss://{}:{}/notarize?sessionId={}",
+    config.notary_host, config.notary_port, session_id
+  );
+
+  debug!("TLS socket created with TCP connection");
+
+  // Mode 1)
+  #[cfg(target_arch = "wasm32")]
+  use {super::wasm_utils, ws_stream_wasm::WsMeta};
+  #[cfg(target_arch = "wasm32")]
+  let (_, notary_tls_socket) = WsMeta::connect(wss_url, None).await.unwrap();
+
+  // Mode 2)
+  use ws_stream_tungstenite::WsStream;
+  let (notary_tls_socket, _) = async_tungstenite::async_std::connect_async(wss_url).await.unwrap();
+  let ws_connection = WsStream::new(notary_tls_socket);
 
   info!("connected to notary with session id: {session_id:?}");
 
@@ -129,7 +148,8 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   // Create a new prover and with MPC backend. use tokio::io::{AsyncReadExt, AsyncWriteExt};
   #[cfg(not(target_arch = "wasm32"))]
-  let prover = Prover::new(prover_config).setup(notary_tls_socket.compat()).await?;
+  let prover =
+    Prover::new(prover_config).setup(TokioAsyncReadCompatExt::compat(ws_connection)).await?;
   #[cfg(target_arch = "wasm32")]
   let prover = Prover::new(prover_config).setup(notary_tls_socket.into_io()).await?;
 
