@@ -3,28 +3,30 @@ use std::{
   sync::{Arc, Mutex},
 };
 
+use async_trait::async_trait;
 use axum::{
   extract::{rejection::JsonRejection, FromRequestParts, Query, State},
   http::{header, request::Parts, StatusCode},
   response::{IntoResponse, Json, Response},
 };
 use axum_macros::debug_handler;
+use eyre::eyre;
 use notary_server::NotaryServerError;
+use p256::{
+  ecdsa::{Signature, SigningKey},
+  pkcs8::DecodePrivateKey,
+};
 use serde::{Deserialize, Serialize};
+use tlsn_verifier::tls::{Verifier, VerifierConfig};
 use tokio::io::{AsyncRead, AsyncWrite};
+use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{debug, error, info, trace};
 use uuid::Uuid;
-use p256::ecdsa::{Signature, SigningKey};
-use tlsn_verifier::tls::{Verifier, VerifierConfig};
-use async_trait::async_trait;
-use eyre::eyre;
-use tokio_util::compat::TokioAsyncReadCompatExt;
 use ws_stream_tungstenite::WsStream;
-
-use crate::tcp::TcpUpgrade;
 
 use crate::{
   axum_websocket::{header_eq, WebSocketUpgrade},
+  tcp::TcpUpgrade,
 };
 
 #[derive(Clone, Debug)]
@@ -102,8 +104,6 @@ pub enum ProtocolUpgrade {
   Ws(WebSocketUpgrade),
 }
 
-
-
 #[async_trait]
 impl<S> FromRequestParts<S> for ProtocolUpgrade
 where S: Send + Sync
@@ -164,10 +164,10 @@ pub async fn notarize(protocol_upgrade: ProtocolUpgrade) -> impl IntoResponse {
   // TODO Should we just hardcode one UUID4 and pass in the same for all calls?
   let session_id = Uuid::new_v4().to_string();
 
-  let notary_signing_key = load_notary_signing_key("./fixture/certs/notary.key").unwrap(); // TODO don't do this for every request, pass in as axum state?
+  let notary_signing_key = load_notary_signing_key("./fixture/certs/notary.key"); // TODO don't do this for every request, pass in as axum state?
 
-  let max_sent_data = 10000; // matches client_wasm/demo/js/index.js proof config
-  let max_recv_data = 10000; // matches client_wasm/demo/js/index.js proof config
+  let max_sent_data = Some(10000); // matches client_wasm/demo/js/index.js proof config
+  let max_recv_data = Some(10000); // matches client_wasm/demo/js/index.js proof config
 
   match protocol_upgrade {
     ProtocolUpgrade::Ws(ws) => ws.on_upgrade(move |socket| {
@@ -200,10 +200,8 @@ pub async fn notarize(protocol_upgrade: ProtocolUpgrade) -> impl IntoResponse {
 
 // TODO move this to a better location
 /// Load notary signing key from static file
-fn load_notary_signing_key(private_key_pem_path: &str) -> Result<SigningKey, ()> {
-  let notary_signing_key = SigningKey::read_pkcs8_pem_file(private_key_pem_path)
-    .map_err(|err| eyre!("Failed to load notary signing key for notarization: {err}"))?;
-  Ok(notary_signing_key)
+fn load_notary_signing_key(private_key_pem_path: &str) -> SigningKey {
+  SigningKey::read_pkcs8_pem_file(private_key_pem_path).unwrap()
 }
 
 // Handler to initialize and configure notarization for both TCP and WebSocket clients
