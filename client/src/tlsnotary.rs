@@ -56,14 +56,6 @@ pub async fn request_notarization(
 
   info!("Session configured, session_id: {}", notarization_response.session_id);
 
-  drop(_span);
-
-  // TODO: Be careful to put this in with the right target arch
-
-  // TODO
-  // Claim back the TLS socket after HTTP exchange is done
-  // #[cfg(not(target_arch = "wasm32"))]
-  // let Parts { io: notary_tls_socket, .. } = connection_task.await??;
   Ok(notarization_response.session_id.to_string())
 }
 
@@ -88,12 +80,6 @@ pub async fn request_notarization(
     .json()
     .await
     .unwrap();
-
-  drop(_span);
-
-  // Websocket feature flag: Websocket
-  // Non websocket feature flag: TCP connection
-  // -> NetworkStream
 
   Ok(notarization_response.session_id.to_string())
 }

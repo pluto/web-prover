@@ -96,6 +96,11 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   )
   .await?;
 
+  // TODO: (OLD COMMENT?)
+  // Claim back the TLS socket after HTTP exchange is done
+  // #[cfg(not(target_arch = "wasm32"))]
+  // let Parts { io: notary_tls_socket, .. } = connection_task.await??;
+
   let wss_url = format!(
     "wss://{}:{}/notarize?sessionId={}",
     config.notary_host, config.notary_port, session_id
