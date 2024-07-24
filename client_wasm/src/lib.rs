@@ -2,7 +2,7 @@ use std::panic;
 
 use client::{prover_inner, Config};
 use gloo_utils::format::JsValueSerdeExt;
-use tracing::{debug, info};
+use tracing::debug;
 use tracing_subscriber::{
   fmt::{format::Pretty, time::UtcTime},
   prelude::*,
