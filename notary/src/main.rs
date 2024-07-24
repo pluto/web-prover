@@ -44,7 +44,6 @@ use tracing::{debug, error, info};
 mod axum_websocket;
 mod tcp;
 mod tlsn;
-mod websockets;
 
 #[tokio::main]
 async fn main() {
@@ -65,53 +64,21 @@ async fn main() {
   let protocol = Arc::new(http1::Builder::new());
 
   let router = Router::new()
-    // .route_layer(from_extractor_with_state::<tlsn::NotaryGlobals>(notary_globals.clone()))
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
     .route("/v1/tlsnotary", get(tlsn::notarize))
     .layer(CorsLayer::permissive());
   // .route("/v1/tlsnotary/proxy", post(todo!("websocket proxy")))
   // .route("/v1/origo", post(todo!("call into origo")));
 
-  // .route("/v1/tlsnotary/session", post(tlsn::initialize).with_state(notary_globals));
-
   use futures_util::future::poll_fn;
 
   loop {
-    // let tcp_stream = match poll_fn(|cx| std::pin::Pin::new(&mut listener).poll_accept(cx)).await
-    // {   Ok((stream, _)) => stream,
-    //   Err(_) => {
-    //     error!("error!");
-    //     continue;
-    //   },
-    // };
-
     let (tcp_stream, _) = listener.accept().await.unwrap();
     let tls_acceptor = tls_acceptor.clone();
     let tower_service = router.clone();
     let protocol = protocol.clone();
 
     tokio::spawn(async move {
-      // match tls_acceptor.accept(tcp_stream).await {
-      //   Ok(stream) => {
-      //     info!("Accepted prover's TLS-secured TCP connection");
-      //     // Reference: https://github.com/tokio-rs/axum/blob/5201798d4e4d4759c208ef83e30ce85820c07baa/examples/low-level-rustls/src/main.rs#L67-L80
-      //     let io = TokioIo::new(stream);
-      //     let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
-      //       info!("tower_service.call");
-      //       tower_service.clone().call(request)
-      //     });
-      //     // Serve different requests using the same hyper protocol and axum router
-      //     protocol
-      //                       .serve_connection(io, hyper_service)
-      //                       // use with_upgrades to upgrade connection to websocket for websocket
-      // clients                       // and to extract tcp connection for tcp clients
-      //                       .with_upgrades()
-      //                       .await.unwrap();
-      //   },
-      //   Err(err) => {
-      //     error!("{}", err.to_string());
-      //   },
-      // }
       match tls_acceptor.accept(tcp_stream).await {
         Ok(tls_stream) => {
           let io = TokioIo::new(tls_stream);

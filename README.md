@@ -8,16 +8,14 @@ TODO: Explain project layout
 ```
 make wasm
 make ios # TODO
-cargo run --release -p notary # TODO when done will replace tlsnotary and origo
-cargo run --release --bin tlsnotary
-cargo run --release --bin origo
+cargo run --release -p notary
 cargo run --release --bin mock_server
 ```
 
 ## WASM Demo
 
 ```
-cargo run --release --bin tlsnotary
+cargo run --release -p notary
 cargo run --release --bin mock_server
 cargo run --release --bin proxy
 make wasm
