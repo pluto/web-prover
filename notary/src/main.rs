@@ -67,9 +67,9 @@ async fn main() {
   let router = Router::new()
     // .route_layer(from_extractor_with_state::<tlsn::NotaryGlobals>(notary_globals.clone()))
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
-    .route("/v1/tlsnotary", post(tlsn::notarize))
-    .route("/v1/tlsnotary/proxy", post(todo!("websocket proxy")))
-    .route("/v1/origo", post(todo!("call into origo")));
+    .route("/v1/tlsnotary", post(tlsn::notarize));
+    // .route("/v1/tlsnotary/proxy", post(todo!("websocket proxy")))
+    // .route("/v1/origo", post(todo!("call into origo")));
 
     // .route("/v1/tlsnotary/session", post(tlsn::initialize).with_state(notary_globals));
 

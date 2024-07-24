@@ -11,6 +11,8 @@ use axum::{
 };
 use axum_macros::debug_handler;
 use eyre::eyre;
+use hyper::upgrade::{OnUpgrade, Upgraded};
+use hyper_util::rt::TokioIo;
 use notary_server::NotaryServerError;
 use p256::{
   ecdsa::{Signature, SigningKey},
@@ -25,7 +27,7 @@ use uuid::Uuid;
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
-  axum_websocket::{header_eq, WebSocketUpgrade},
+  axum_websocket::{header_eq, WebSocket, WebSocketUpgrade},
   tcp::TcpUpgrade,
 };
 
@@ -159,42 +161,62 @@ pub async fn notary_service<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   Ok(())
 }
 
-pub async fn notarize(protocol_upgrade: ProtocolUpgrade) -> impl IntoResponse {
+// TODO Response or impl IntoResponse?
+pub async fn notarize(protocol_upgrade: ProtocolUpgrade) -> Response {
   // We manually just create a UUID4 for the remaining calls here
   // TODO Should we just hardcode one UUID4 and pass in the same for all calls?
   let session_id = Uuid::new_v4().to_string();
-
-  let notary_signing_key = load_notary_signing_key("./fixture/certs/notary.key"); // TODO don't do this for every request, pass in as axum state?
 
   let max_sent_data = Some(10000); // matches client_wasm/demo/js/index.js proof config
   let max_recv_data = Some(10000); // matches client_wasm/demo/js/index.js proof config
 
   match protocol_upgrade {
     ProtocolUpgrade::Ws(ws) => ws.on_upgrade(move |socket| {
-      let stream = WsStream::new(socket.into_inner());
-      notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data);
-      //   .await
-      // {
-      //   Ok(_) => {
-      //     info!(?session_id, "Successful notarization using websocket!");
-      //   },
-      //   Err(err) => {
-      //     error!(?session_id, "Failed notarization using websocket: {err}");
-      //   },
-      // }
+      let notary_signing_key = load_notary_signing_key("./fixture/certs/notary.key"); // TODO don't do this for every request, pass in as axum state?
+      websocket_notarize(socket, notary_signing_key, session_id, max_sent_data, max_recv_data)
     }),
     ProtocolUpgrade::Tcp(tcp) => tcp.on_upgrade(move |stream| {
-      notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data);
-      //   .await
-      // {
-      //   Ok(_) => {
-      //     info!(?session_id, "Successful notarization using tcp!");
-      //   },
-      //   Err(err) => {
-      //     error!(?session_id, "Failed notarization using tcp: {err}");
-      //   },
-      // }
+      let notary_signing_key = load_notary_signing_key("./fixture/certs/notary.key"); // TODO don't do this for every request, pass in as axum state?
+      tcp_notarize(stream, notary_signing_key, session_id, max_sent_data, max_recv_data)
     }),
+  }
+}
+
+pub async fn websocket_notarize(
+  socket: WebSocket,
+  notary_signing_key: SigningKey,
+  session_id: String,
+  max_sent_data: Option<usize>,
+  max_recv_data: Option<usize>,
+) {
+  let stream = WsStream::new(socket.into_inner());
+  match notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data).await
+  {
+    Ok(_) => {
+      info!(?session_id, "Successful notarization using websocket!");
+    },
+    Err(err) => {
+      error!(?session_id, "Failed notarization using websocket: {err}");
+    },
+  }
+}
+
+pub async fn tcp_notarize(
+  stream: TokioIo<Upgraded>,
+  notary_signing_key: SigningKey,
+  session_id: String,
+  max_sent_data: Option<usize>,
+  max_recv_data: Option<usize>,
+) {
+  debug!(?session_id, "Upgraded to tcp connection");
+  match notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data).await
+  {
+    Ok(_) => {
+      info!(?session_id, "Successful notarization using tcp!");
+    },
+    Err(err) => {
+      error!(?session_id, "Failed notarization using tcp: {err}");
+    },
   }
 }
 
