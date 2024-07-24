@@ -5,7 +5,6 @@ mod tlsnotary;
 use std::collections::HashMap;
 
 use base64::prelude::*;
-use futures_util::SinkExt;
 use http_body_util::Full;
 use hyper::{body::Bytes, Request};
 use serde::{Deserialize, Serialize};
@@ -17,12 +16,8 @@ use url::Url;
 use {futures::channel::oneshot, wasm_bindgen_futures::spawn_local, ws_stream_wasm::WsMeta};
 #[cfg(not(target_arch = "wasm32"))]
 use {
-  futures_util::StreamExt,
-  tokio::io::{AsyncReadExt, AsyncWriteExt},
-  tokio::net::TcpStream,
-  tokio_util::compat::FuturesAsyncReadCompatExt,
+  tokio::net::TcpStream, tokio_util::compat::FuturesAsyncReadCompatExt,
   tokio_util::compat::TokioAsyncReadCompatExt,
-  tokio_util::compat::TokioAsyncWriteCompatExt,
 };
 
 const NOTARY_CA_CERT: &[u8] = include_bytes!("../../fixture/certs/ca-cert.cer"); // TODO make build config
@@ -108,16 +103,16 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   debug!("TLS socket created with TCP connection");
 
-  // Mode 1)
-  #[cfg(target_arch = "wasm32")]
-  use {super::wasm_utils, ws_stream_wasm::WsMeta};
   #[cfg(target_arch = "wasm32")]
   let (_, notary_tls_socket) = WsMeta::connect(wss_url, None).await.unwrap();
 
-  // Mode 2)
-  use ws_stream_tungstenite::WsStream;
-  let (notary_tls_socket, _) = async_tungstenite::async_std::connect_async(wss_url).await.unwrap();
-  let ws_connection = WsStream::new(notary_tls_socket);
+  #[cfg(not(target_arch = "wasm32"))]
+  let ws_connection = {
+    use ws_stream_tungstenite::WsStream;
+    let (notary_tls_socket, _) =
+      async_tungstenite::async_std::connect_async(wss_url).await.unwrap();
+    WsStream::new(notary_tls_socket)
+  };
 
   info!("connected to notary with session id: {session_id:?}");
 

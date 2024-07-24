@@ -1,12 +1,4 @@
-use async_tungstenite::{stream::Stream, tungstenite::stream::MaybeTlsStream};
-use http_body_util::BodyExt;
-use hyper::header::HeaderValue;
-use hyper_util::rt::TokioIo;
 use serde::{Deserialize, Serialize};
-#[cfg(not(target_arch = "wasm32"))]
-use tokio_rustls::client::TlsStream;
-use tokio_rustls::TlsConnector;
-use tracing::{debug, info};
 
 use super::*;
 
@@ -75,6 +67,7 @@ pub async fn request_notarization(
   Ok(notarization_response.session_id.to_string())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn request_notarization(
   notary_host: &str,
   notary_port: u16,
