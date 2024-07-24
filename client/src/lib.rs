@@ -89,12 +89,13 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   let _span = tracing::span!(tracing::Level::TRACE, "connect_to_notary").entered();
 
-  let session_id = tlsnotary::request_notarization(
-    &config.notary_host,
-    config.notary_port,
-    &config.notarization_session_request,
-  )
-  .await?;
+  // let session_id = tlsnotary::request_notarization(
+  //   &config.notary_host,
+  //   config.notary_port,
+  //   &config.notarization_session_request,
+  // )
+  // .await?;
+let session_id = "c655ee6e-fad7-44c3-8884-5330287982a8"; // TODO hardcoded UUID4. notary does not need it anymore.
 
   // TODO: (OLD COMMENT?)
   // Claim back the TLS socket after HTTP exchange is done
@@ -102,8 +103,8 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   // let Parts { io: notary_tls_socket, .. } = connection_task.await??;
 
   let wss_url = format!(
-    "wss://{}:{}/notarize?sessionId={}",
-    config.notary_host, config.notary_port, session_id
+    "wss://{}:{}/v1/tlsnotary",
+    config.notary_host, config.notary_port
   );
 
   debug!("TLS socket created with TCP connection");

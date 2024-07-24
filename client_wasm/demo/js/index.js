@@ -14,7 +14,7 @@ await initThreadPool(numConcurrency);
 const proof = await prover(
   {
     notary_host: "localhost",
-    notary_port: 7074,
+    notary_port: 7075,
     target_method: "GET",
     target_url: "https://localhost:8085/health",
     target_headers: {},

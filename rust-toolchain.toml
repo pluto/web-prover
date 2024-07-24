@@ -24,5 +24,6 @@ profile="default"
 # targets=["wasm32-unknown-unknown", "aarch64-apple-ios"]
 # targets=["wasm32-unknown-unknown"]
 
+# TODO does opt-level=z apply to all crates? did this come from WASM?
 [profile.release]
 opt-level="z"

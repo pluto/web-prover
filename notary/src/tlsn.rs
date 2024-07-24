@@ -167,8 +167,8 @@ pub async fn notarize(protocol_upgrade: ProtocolUpgrade) -> Response {
   // TODO Should we just hardcode one UUID4 and pass in the same for all calls?
   let session_id = Uuid::new_v4().to_string();
 
-  let max_sent_data = Some(10000); // matches client_wasm/demo/js/index.js proof config
-  let max_recv_data = Some(10000); // matches client_wasm/demo/js/index.js proof config
+  let max_sent_data = Some(10000); // TODO matches client_wasm/demo/js/index.js proof config
+  let max_recv_data = Some(10000); // TODO matches client_wasm/demo/js/index.js proof config
 
   match protocol_upgrade {
     ProtocolUpgrade::Ws(ws) => ws.on_upgrade(move |socket| {
