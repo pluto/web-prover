@@ -1,4 +1,4 @@
-mod errors;
+pub mod errors;
 mod tlsnotary;
 #[cfg(target_arch = "wasm32")] mod wasm_utils;
 
@@ -8,7 +8,8 @@ use base64::prelude::*;
 use http_body_util::Full;
 use hyper::{body::Bytes, Request};
 use serde::{Deserialize, Serialize};
-use tlsn_core::{commitment::CommitmentKind, proof::TlsProof};
+use tlsn_core::commitment::CommitmentKind;
+pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::{Prover, ProverConfig};
 use tracing::{debug, info, trace};
 use url::Url;
