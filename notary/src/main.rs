@@ -53,7 +53,7 @@ async fn main() {
 
   let certs = load_certs("./fixture/certs/server-cert.pem").unwrap(); // TODO make CLI or ENV var
   let key = load_private_key("./fixture/certs/server-key.pem").unwrap(); // TODO make CLI or ENV var
-  let addr = "0.0.0.0:7075"; // TODO make env var?
+  let addr = "0.0.0.0:7443"; // TODO make env var?
 
   let mut listener = TcpListener::bind(addr).await.unwrap();
   info!("Listening on https://{}", addr);
@@ -77,54 +77,54 @@ async fn main() {
   use futures_util::future::poll_fn;
 
   loop {
-    let tcp_stream = match poll_fn(|cx| std::pin::Pin::new(&mut listener).poll_accept(cx)).await {
-      Ok((stream, _)) => stream,
-      Err(_) => {
-        error!("error!");
-        continue;
-      },
-    };
+    // let tcp_stream = match poll_fn(|cx| std::pin::Pin::new(&mut listener).poll_accept(cx)).await
+    // {   Ok((stream, _)) => stream,
+    //   Err(_) => {
+    //     error!("error!");
+    //     continue;
+    //   },
+    // };
 
-    // let (tcp_stream, _) = listener.accept().await.unwrap();
+    let (tcp_stream, _) = listener.accept().await.unwrap();
     let tls_acceptor = tls_acceptor.clone();
     let tower_service = router.clone();
     let protocol = protocol.clone();
 
     tokio::spawn(async move {
-      match tls_acceptor.accept(tcp_stream).await {
-        Ok(stream) => {
-          info!("Accepted prover's TLS-secured TCP connection");
-          // Reference: https://github.com/tokio-rs/axum/blob/5201798d4e4d4759c208ef83e30ce85820c07baa/examples/low-level-rustls/src/main.rs#L67-L80
-          let io = TokioIo::new(stream);
-          let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
-            info!("tower_service.call");
-            tower_service.clone().call(request)
-          });
-          // Serve different requests using the same hyper protocol and axum router
-          protocol
-                            .serve_connection(io, hyper_service)
-                            // use with_upgrades to upgrade connection to websocket for websocket clients
-                            // and to extract tcp connection for tcp clients
-                            .with_upgrades()
-                            .await.unwrap();
-        },
-        Err(err) => {
-          error!("{}", err.to_string());
-        },
-      }
       // match tls_acceptor.accept(tcp_stream).await {
-      //   Ok(tls_stream) => {
-      //     let io = TokioIo::new(tls_stream);
+      //   Ok(stream) => {
+      //     info!("Accepted prover's TLS-secured TCP connection");
+      //     // Reference: https://github.com/tokio-rs/axum/blob/5201798d4e4d4759c208ef83e30ce85820c07baa/examples/low-level-rustls/src/main.rs#L67-L80
+      //     let io = TokioIo::new(stream);
       //     let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
+      //       info!("tower_service.call");
       //       tower_service.clone().call(request)
       //     });
-      //     // TODO should we check returned Result here?
-      //     let _ = protocol.serve_connection(io, hyper_service).with_upgrades().await;
+      //     // Serve different requests using the same hyper protocol and axum router
+      //     protocol
+      //                       .serve_connection(io, hyper_service)
+      //                       // use with_upgrades to upgrade connection to websocket for websocket
+      // clients                       // and to extract tcp connection for tcp clients
+      //                       .with_upgrades()
+      //                       .await.unwrap();
       //   },
       //   Err(err) => {
-      //     error!("{err:#}"); // TODO format this better
+      //     error!("{}", err.to_string());
       //   },
       // }
+      match tls_acceptor.accept(tcp_stream).await {
+        Ok(tls_stream) => {
+          let io = TokioIo::new(tls_stream);
+          let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
+            tower_service.clone().call(request)
+          });
+          // TODO should we check returned Result here?
+          let _ = protocol.serve_connection(io, hyper_service).with_upgrades().await;
+        },
+        Err(err) => {
+          error!("{err:#}"); // TODO format this better
+        },
+      }
     });
   }
 }
