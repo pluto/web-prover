@@ -42,6 +42,9 @@ use tower_service::Service;
 use tracing::{debug, error, info};
 
 mod tlsn;
+mod tcp;
+mod websockets;
+mod axum_websocket;
 
 #[tokio::main]
 async fn main() {
@@ -55,8 +58,6 @@ async fn main() {
   let listener = TcpListener::bind(addr).await.unwrap();
   info!("Listening on https://{}", addr);
 
-  let notary_globals = tlsn::NotaryGlobals::new();
-
   let mut server_config =
     ServerConfig::builder().with_no_client_auth().with_single_cert(certs, key).unwrap();
   server_config.alpn_protocols = vec![b"http/1.1".to_vec()];
@@ -66,7 +67,11 @@ async fn main() {
   let router = Router::new()
     // .route_layer(from_extractor_with_state::<tlsn::NotaryGlobals>(notary_globals.clone()))
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
-    .route("/v1/tlsnotary/session", post(tlsn::initialize).with_state(notary_globals));
+    .route("/v1/tlsnotary", post(tlsn::notarize))
+    .route("/v1/tlsnotary/proxy", post(todo!("websocket proxy")))
+    .route("/v1/origo", post(todo!("call into origo")));
+
+    // .route("/v1/tlsnotary/session", post(tlsn::initialize).with_state(notary_globals));
 
   loop {
     let (tcp_stream, _) = listener.accept().await.unwrap();

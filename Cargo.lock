@@ -2686,22 +2686,35 @@ dependencies = [
 name = "notary"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "async-tungstenite 0.25.1",
  "axum",
+ "axum-core",
  "axum-macros",
+ "base64 0.21.7",
+ "eyre",
+ "futures",
  "futures-util",
+ "http 1.1.0",
  "hyper",
  "hyper-util",
+ "notary-server",
+ "p256",
  "rustls 0.23.11",
  "rustls-pemfile 2.1.2",
  "serde",
  "serde_json",
+ "sha1",
+ "tlsn-verifier",
  "tokio",
  "tokio-rustls 0.26.0",
+ "tokio-util",
  "tower-http",
  "tower-service",
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "ws_stream_tungstenite",
 ]
 
 [[package]]

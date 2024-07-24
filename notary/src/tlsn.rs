@@ -9,9 +9,23 @@ use axum::{
   response::{IntoResponse, Json, Response},
 };
 use axum_macros::debug_handler;
+use notary_server::NotaryServerError;
 use serde::{Deserialize, Serialize};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tracing::{debug, error, info, trace};
 use uuid::Uuid;
+use p256::ecdsa::{Signature, SigningKey};
+use tlsn_verifier::tls::{Verifier, VerifierConfig};
+use async_trait::async_trait;
+use eyre::eyre;
+use tokio_util::compat::TokioAsyncReadCompatExt;
+use ws_stream_tungstenite::WsStream;
+
+use crate::tcp::TcpUpgrade;
+
+use crate::{
+  axum_websocket::{header_eq, WebSocketUpgrade},
+};
 
 #[derive(Clone, Debug)]
 pub struct SessionData {
@@ -81,54 +95,165 @@ pub enum ClientType {
   Websocket,
 }
 
-/// Handler to initialize and configure notarization for both TCP and WebSocket clients
-#[debug_handler(state = NotaryGlobals)]
-pub async fn initialize(
-  State(notary_globals): State<NotaryGlobals>,
-  payload: Result<Json<NotarizationSessionRequest>, JsonRejection>,
-) -> impl IntoResponse {
-  info!(?payload, "Received request for initializing a notarization session");
-
-  // Parse the body payload
-  let payload = match payload {
-    Ok(payload) => payload,
-    Err(err) => {
-      error!("Malformed payload submitted for initializing notarization: {err}");
-	  panic!("todo");
-    //   return NotaryServerError::BadProverRequest(err.to_string()).into_response(); // TODO
-    },
-  };
-
-  // TODO
-  // Ensure that the max_transcript_size submitted is not larger than the global max limit
-  // configured in notary server
-  //   if payload.max_sent_data.is_some() || payload.max_recv_data.is_some() {
-  //     let requested_transcript_size =
-  //       payload.max_sent_data.unwrap_or_default() + payload.max_recv_data.unwrap_or_default();
-  //     if requested_transcript_size > notary_globals.notarization_config.max_transcript_size {
-  //       error!(
-  //         "Max transcript size requested {:?} exceeds the maximum threshold {:?}",
-  //         requested_transcript_size, notary_globals.notarization_config.max_transcript_size
-  //       );
-  //       return NotaryServerError::BadProverRequest(
-  //         "Max transcript size requested exceeds the maximum threshold".to_string(),
-  //       )
-  //       .into_response();
-  //     }
-  //   }
-
-  let prover_session_id = Uuid::new_v4().to_string();
-
-  // Store the configuration data in a temporary store
-  notary_globals.store.lock().unwrap().insert(prover_session_id.clone(), SessionData {
-    max_sent_data: payload.max_sent_data,
-    max_recv_data: payload.max_recv_data,
-    // created_at:    Utc::now(),
-  });
-
-  trace!("Latest store state: {:?}", notary_globals.store);
-
-  // Return the session id in the response to the client
-  (StatusCode::OK, Json(NotarizationSessionResponse { session_id: prover_session_id }))
-    .into_response()
+/// A wrapper enum to facilitate extracting TCP connection for either WebSocket or TCP clients,
+/// so that we can use a single endpoint and handler for notarization for both types of clients
+pub enum ProtocolUpgrade {
+  Tcp(TcpUpgrade),
+  Ws(WebSocketUpgrade),
 }
+
+
+
+#[async_trait]
+impl<S> FromRequestParts<S> for ProtocolUpgrade
+where S: Send + Sync
+{
+  type Rejection = NotaryServerError;
+
+  async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+    // Extract tcp connection for websocket client
+    if header_eq(&parts.headers, header::UPGRADE, "websocket") {
+      let extractor = WebSocketUpgrade::from_request_parts(parts, state)
+        .await
+        .map_err(|err| NotaryServerError::BadProverRequest(err.to_string()))?;
+      return Ok(Self::Ws(extractor));
+    // Extract tcp connection for tcp client
+    } else if header_eq(&parts.headers, header::UPGRADE, "tcp") {
+      let extractor = TcpUpgrade::from_request_parts(parts, state)
+        .await
+        .map_err(|err| NotaryServerError::BadProverRequest(err.to_string()))?;
+      return Ok(Self::Tcp(extractor));
+    } else {
+      return Err(NotaryServerError::BadProverRequest(
+        "Upgrade header is not set for client".to_string(),
+      ));
+    }
+  }
+}
+
+pub async fn notary_service<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
+  socket: T,
+  signing_key: &SigningKey,
+  session_id: &str,
+  max_sent_data: Option<usize>,
+  max_recv_data: Option<usize>,
+) -> Result<(), NotaryServerError> {
+  debug!(?session_id, "Starting notarization...");
+
+  let mut config_builder = VerifierConfig::builder();
+
+  config_builder = config_builder.id(session_id);
+
+  if let Some(max_sent_data) = max_sent_data {
+    config_builder = config_builder.max_sent_data(max_sent_data);
+  }
+
+  if let Some(max_recv_data) = max_recv_data {
+    config_builder = config_builder.max_recv_data(max_recv_data);
+  }
+
+  let config = config_builder.build()?;
+
+  Verifier::new(config).notarize::<_, Signature>(socket.compat(), signing_key).await?;
+
+  Ok(())
+}
+
+pub async fn notarize(protocol_upgrade: ProtocolUpgrade) -> impl IntoResponse {
+  // We manually just create a UUID4 for the remaining calls here
+  // TODO Should we just hardcode one UUID4 and pass in the same for all calls?
+  let session_id = Uuid::new_v4().to_string();
+
+  let notary_signing_key = load_notary_signing_key("./fixture/certs/notary.key").unwrap(); // TODO don't do this for every request, pass in as axum state?
+
+  let max_sent_data = 10000; // matches client_wasm/demo/js/index.js proof config
+  let max_recv_data = 10000; // matches client_wasm/demo/js/index.js proof config
+
+  match protocol_upgrade {
+    ProtocolUpgrade::Ws(ws) => ws.on_upgrade(move |socket| {
+      let stream = WsStream::new(socket.into_inner());
+      notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data);
+      //   .await
+      // {
+      //   Ok(_) => {
+      //     info!(?session_id, "Successful notarization using websocket!");
+      //   },
+      //   Err(err) => {
+      //     error!(?session_id, "Failed notarization using websocket: {err}");
+      //   },
+      // }
+    }),
+    ProtocolUpgrade::Tcp(tcp) => tcp.on_upgrade(move |stream| {
+      notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data);
+      //   .await
+      // {
+      //   Ok(_) => {
+      //     info!(?session_id, "Successful notarization using tcp!");
+      //   },
+      //   Err(err) => {
+      //     error!(?session_id, "Failed notarization using tcp: {err}");
+      //   },
+      // }
+    }),
+  }
+}
+
+// TODO move this to a better location
+/// Load notary signing key from static file
+fn load_notary_signing_key(private_key_pem_path: &str) -> Result<SigningKey, ()> {
+  let notary_signing_key = SigningKey::read_pkcs8_pem_file(private_key_pem_path)
+    .map_err(|err| eyre!("Failed to load notary signing key for notarization: {err}"))?;
+  Ok(notary_signing_key)
+}
+
+// Handler to initialize and configure notarization for both TCP and WebSocket clients
+// #[debug_handler(state = NotaryGlobals)]
+// pub async fn initialize(
+//   State(notary_globals): State<NotaryGlobals>,
+//   payload: Result<Json<NotarizationSessionRequest>, JsonRejection>,
+// ) -> impl IntoResponse {
+//   info!(?payload, "Received request for initializing a notarization session");
+
+//   // Parse the body payload
+//   let payload = match payload {
+//     Ok(payload) => payload,
+//     Err(err) => {
+//       error!("Malformed payload submitted for initializing notarization: {err}");
+// 	  panic!("todo");
+//     //   return NotaryServerError::BadProverRequest(err.to_string()).into_response(); // TODO
+//     },
+//   };
+
+//   // TODO
+//   // Ensure that the max_transcript_size submitted is not larger than the global max limit
+//   // configured in notary server
+//   //   if payload.max_sent_data.is_some() || payload.max_recv_data.is_some() {
+//   //     let requested_transcript_size =
+//   //       payload.max_sent_data.unwrap_or_default() + payload.max_recv_data.unwrap_or_default();
+//   //     if requested_transcript_size > notary_globals.notarization_config.max_transcript_size {
+//   //       error!(
+//   //         "Max transcript size requested {:?} exceeds the maximum threshold {:?}",
+//   //         requested_transcript_size, notary_globals.notarization_config.max_transcript_size
+//   //       );
+//   //       return NotaryServerError::BadProverRequest(
+//   //         "Max transcript size requested exceeds the maximum threshold".to_string(),
+//   //       )
+//   //       .into_response();
+//   //     }
+//   //   }
+
+//   let prover_session_id = Uuid::new_v4().to_string();
+
+//   // Store the configuration data in a temporary store
+//   notary_globals.store.lock().unwrap().insert(prover_session_id.clone(), SessionData {
+//     max_sent_data: payload.max_sent_data,
+//     max_recv_data: payload.max_recv_data,
+//     // created_at:    Utc::now(),
+//   });
+
+//   trace!("Latest store state: {:?}", notary_globals.store);
+
+//   // Return the session id in the response to the client
+//   (StatusCode::OK, Json(NotarizationSessionResponse { session_id: prover_session_id }))
+//     .into_response()
+// }
