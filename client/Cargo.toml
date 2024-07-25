@@ -43,7 +43,7 @@ base64="0.22.0"
 hyper-util={ version="0.1", features=["full"] }
 # Async
 tokio-util={ version="0.7", features=[
-    "compat",
+  "compat",
 ] } # compat is used to work with AsyncRead and AsyncWrite from other crates
 tokio-rustls={ version="0.26.0" }
 tokio={ version="1", features=["rt", "rt-multi-thread", "macros", "net", "io-std", "fs"] }
@@ -78,24 +78,24 @@ time={ version="0.3.34", features=["wasm-bindgen"] }
 web-time="1.0"
 
 web-sys={ version="0.3.4", features=[
-    "BinaryType",
-    "Blob",
-    "ErrorEvent",
-    "FileReader",
-    "MessageEvent",
-    "ProgressEvent",
-    "WebSocket",
-    "console",
-    'Document',
-    'HtmlElement',
-    'HtmlInputElement',
-    'Window',
-    'Worker',
-    'Headers',
-    'Request',
-    'RequestInit',
-    'RequestMode',
-    'Response',
+  "BinaryType",
+  "Blob",
+  "ErrorEvent",
+  "FileReader",
+  "MessageEvent",
+  "ProgressEvent",
+  "WebSocket",
+  "console",
+  'Document',
+  'HtmlElement',
+  'HtmlInputElement',
+  'Window',
+  'Worker',
+  'Headers',
+  'Request',
+  'RequestInit',
+  'RequestMode',
+  'Response',
 ] }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by

@@ -15,7 +15,7 @@ use hyper::{
 use hyper_util::rt::TokioIo;
 use pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::ServerConfig;
-use tokio::net::{tcp, TcpListener};
+use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 use tokio_tungstenite::{
   tungstenite::{handshake::derive_accept_key, protocol::Role},

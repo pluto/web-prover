@@ -1,5 +1,5 @@
 pub mod errors;
-mod tlsnotary;
+
 #[cfg(target_arch = "wasm32")] mod wasm_utils;
 
 use std::collections::HashMap;
@@ -90,24 +90,14 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   let _span = tracing::span!(tracing::Level::TRACE, "connect_to_notary").entered();
 
-  let session_id = tlsnotary::request_notarization(
-    &config.notary_host,
-    config.notary_port,
-    &config.notarization_session_request,
-  )
-  .await?;
-
   // TODO: (OLD COMMENT?)
   // Claim back the TLS socket after HTTP exchange is done
   // #[cfg(not(target_arch = "wasm32"))]
   // let Parts { io: notary_tls_socket, .. } = connection_task.await??;
 
-  let wss_url = format!(
-    "wss://{}:{}/notarize?sessionId={}",
-    config.notary_host, config.notary_port, session_id
-  );
-
   debug!("TLS socket created with TCP connection");
+
+  let wss_url = format!("wss://{}:{}/v1/tlsnotary", config.notary_host, config.notary_port);
 
   #[cfg(target_arch = "wasm32")]
   let (_, notary_tls_socket) = WsMeta::connect(wss_url, None).await.unwrap();
@@ -119,8 +109,6 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
       async_tungstenite::async_std::connect_async(wss_url).await.unwrap();
     WsStream::new(notary_tls_socket)
   };
-
-  info!("connected to notary with session id: {session_id:?}");
 
   drop(_span);
   //---------------------------------------------------------------------------------------------------------------------------------------//
@@ -136,6 +124,7 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   let _span = tracing::span!(tracing::Level::TRACE, "create_prover").entered();
   let mut prover_config = ProverConfig::builder();
+  let session_id = "c655ee6e-fad7-44c3-8884-5330287982a8"; // TODO random hardcoded UUID4. notary does not need it anymore.
   prover_config.id(session_id).server_dns(target_host).root_cert_store(root_store);
 
   if let Some(max_sent_data) = config.notarization_session_request.max_sent_data {

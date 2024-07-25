@@ -2687,6 +2687,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "notary"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "async-tungstenite 0.25.1",
+ "axum",
+ "axum-core",
+ "axum-macros",
+ "base64 0.21.7",
+ "eyre",
+ "futures",
+ "futures-util",
+ "http 1.1.0",
+ "hyper",
+ "hyper-util",
+ "notary-server",
+ "p256",
+ "rustls 0.23.12",
+ "rustls-pemfile 2.1.2",
+ "serde",
+ "serde_json",
+ "sha1",
+ "tlsn-verifier",
+ "tokio",
+ "tokio-rustls 0.26.0",
+ "tokio-util",
+ "tower-http",
+ "tower-service",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "ws_stream_tungstenite",
+]
+
+[[package]]
 name = "notary-server"
 version = "0.1.0-alpha.6"
 source = "git+https://github.com/tlsnotary/tlsn.git#3554db83e17b2e5fc98293b397a2907b7f023496"
@@ -4865,7 +4900,6 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
- "serde",
 ]
 
 [[package]]
@@ -5127,14 +5161,12 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
- "notary-server",
  "rustls 0.23.12",
  "rustls-pemfile 2.1.2",
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.26.0",
  "tokio-tungstenite 0.23.1",
- "url",
 ]
 
 [[package]]

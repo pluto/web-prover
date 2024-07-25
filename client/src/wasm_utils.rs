@@ -10,17 +10,6 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{Request, RequestInit, Response};
 
-pub async fn fetch_as_json_string(url: &str, opts: &RequestInit) -> Result<String, JsValue> {
-  let request = Request::new_with_str_and_init(url, opts)?;
-  let window = web_sys::window().expect("Window object");
-  let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
-  assert!(resp_value.is_instance_of::<Response>());
-  let resp: Response = resp_value.dyn_into()?;
-  let json = JsFuture::from(resp.json()?).await?;
-  let stringified = JSON::stringify(&json)?;
-  stringified.as_string().ok_or_else(|| JsValue::from_str("Could not stringify JSON"))
-}
-
 pin_project! {
     #[derive(Debug)]
     pub(crate) struct WasmAsyncIo<T> {
