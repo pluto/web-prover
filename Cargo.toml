@@ -6,12 +6,6 @@ resolver="2"
 name   ="webprover"
 edition="2021"
 
-# TODO: merge tlsnotary and origo into one `notary` bin
-# TODO: put rust websocket proxy code into tlsnotary and origo
-[[bin]]
-name="tlsnotary"
-path="bin/tlsnotary.rs"
-
 [[bin]]
 name="origo"
 path="bin/origo.rs"
