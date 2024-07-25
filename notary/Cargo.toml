@@ -23,8 +23,9 @@ uuid                 ={ version="1.10", features=["v4", "fast-rng"] }
 serde_json           ="1.0"
 notary-server        ={ git="https://github.com/tlsnotary/tlsn.git " }
 tlsn-verifier        ={ git="https://github.com/tlsnotary/tlsn.git " }
-async-tungstenite    ={ version="0.25", features=["tokio-native-tls"] }
-ws_stream_tungstenite={ version="0.13.0", features=["tokio_io"] }
+# async-tungstenite    ={ version="0.25", features=["tokio-native-tls"] }
+tokio-tungstenite = { version = "0.23.1", features = ["stream"]}
+ws_stream_tungstenite={ git="https://github.com/pluto/ws_stream_tungstenite.git", branch="latest", features=["tokio"] }
 async-trait          ="0.1.67"
 axum                 ={ version="0.7", features=["ws"] }
 axum-core            ="0.4"

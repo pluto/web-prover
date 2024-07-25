@@ -15,20 +15,9 @@
 //
 // GET /v1/tlsnotary/proxy (mostly this: https://github.com/pluto/web-prover/blob/30ba86a2d5887c2f7c4e2d7bb50b378998ccd297/bin/proxy.rs#L219)
 
-use std::{
-  collections::HashMap,
-  fs, io,
-  sync::{Arc, Mutex},
-};
+use std::{fs, io, sync::Arc};
 
-use axum::{
-  extract::Request,
-  http::StatusCode,
-  middleware::from_extractor_with_state,
-  response::{Html, IntoResponse},
-  routing::{get, post},
-  Json, Router,
-};
+use axum::{extract::Request, http::StatusCode, response::IntoResponse, routing::get, Router};
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use rustls::{
@@ -39,7 +28,7 @@ use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 use tower_http::cors::CorsLayer;
 use tower_service::Service;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 mod axum_websocket;
 mod tcp;
@@ -54,7 +43,7 @@ async fn main() {
   let key = load_private_key("./fixture/certs/server-key.pem").unwrap(); // TODO make CLI or ENV var
   let addr = "0.0.0.0:7443"; // TODO make env var?
 
-  let mut listener = TcpListener::bind(addr).await.unwrap();
+  let listener = TcpListener::bind(addr).await.unwrap();
   info!("Listening on https://{}", addr);
 
   let mut server_config =
@@ -69,8 +58,6 @@ async fn main() {
     .layer(CorsLayer::permissive());
   // .route("/v1/tlsnotary/proxy", post(todo!("websocket proxy")))
   // .route("/v1/origo", post(todo!("call into origo")));
-
-  use futures_util::future::poll_fn;
 
   loop {
     let (tcp_stream, _) = listener.accept().await.unwrap();

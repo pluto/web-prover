@@ -7,12 +7,12 @@ use axum::{
   response::Response,
 };
 use axum_core::body::Body;
+use http::header::{HeaderMap, HeaderName};
 use hyper::upgrade::{OnUpgrade, Upgraded};
 use hyper_util::rt::TokioIo;
 use notary_server::NotaryServerError;
-use tracing::{debug, error, info};
-
-// use crate::{domain::notary::NotaryGlobals, service::notary_service, NotaryServerError};
+use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
+use tracing::error;
 
 /// Custom extractor used to extract underlying TCP connection for TCP client — using the same
 /// upgrade primitives used by the WebSocket implementation where the underlying TCP connection
@@ -71,5 +71,17 @@ impl TcpUpgrade {
       .header(header::UPGRADE, TCP);
 
     builder.body(Body::empty()).unwrap()
+  }
+}
+
+pub fn load_notary_signing_key(private_key_pem_path: &str) -> SigningKey {
+  SigningKey::read_pkcs8_pem_file(private_key_pem_path).unwrap()
+}
+
+pub fn header_eq(headers: &HeaderMap, key: HeaderName, value: &'static str) -> bool {
+  if let Some(header) = headers.get(&key) {
+    header.as_bytes().eq_ignore_ascii_case(value.as_bytes())
+  } else {
+    false
   }
 }
