@@ -3,6 +3,9 @@ name   ="client_ios"
 version="0.1.0"
 edition="2021"
 
+[lib]
+crate-type = ["staticlib"]
+
 [dependencies]
 # Local
 client.workspace=true
@@ -14,3 +17,12 @@ tracing.workspace           =true
 tracing-subscriber.workspace=true
 # Async
 tokio="1.39.1"
+
+# TODO warning: profiles for the non root package will be ignored, specify profiles at the workspace root
+# try to get the final file size to be as small as possible
+# [profile.release]
+# strip = true
+# opt-level = "z"
+# lto = true
+# codegen-units = 1
+# panic = "unwind" # abort helps decrease file size, but makes the mobile app crash on panic
