@@ -10,7 +10,7 @@ use axum_core::body::Body;
 use hyper::upgrade::{OnUpgrade, Upgraded};
 use hyper_util::rt::TokioIo;
 use notary_server::NotaryServerError;
-use tracing::{debug, error, info};
+use tracing::error;
 
 // use crate::{domain::notary::NotaryGlobals, service::notary_service, NotaryServerError};
 

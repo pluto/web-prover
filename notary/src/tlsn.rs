@@ -1,28 +1,21 @@
-use std::{
-  collections::HashMap,
-  sync::{Arc, Mutex},
-};
-
 use async_trait::async_trait;
 use axum::{
-  extract::{rejection::JsonRejection, FromRequestParts, Query, State},
-  http::{header, request::Parts, StatusCode},
-  response::{IntoResponse, Json, Response},
+  extract::FromRequestParts,
+  http::{header, request::Parts},
+  response::Response,
 };
-use axum_macros::debug_handler;
-use eyre::eyre;
-use hyper::upgrade::{OnUpgrade, Upgraded};
+
+use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use notary_server::NotaryServerError;
 use p256::{
   ecdsa::{Signature, SigningKey},
   pkcs8::DecodePrivateKey,
 };
-use serde::{Deserialize, Serialize};
 use tlsn_verifier::tls::{Verifier, VerifierConfig};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 use ws_stream_tungstenite::WsStream;
 
