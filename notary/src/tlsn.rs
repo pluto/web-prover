@@ -21,7 +21,7 @@ use p256::{
 use serde::{Deserialize, Serialize};
 use tlsn_verifier::tls::{Verifier, VerifierConfig};
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio_util::compat::TokioAsyncReadCompatExt;
+use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::{debug, error, info, trace};
 use uuid::Uuid;
 use ws_stream_tungstenite::WsStream;
@@ -30,6 +30,8 @@ use crate::{
   axum_websocket::{header_eq, WebSocket, WebSocketUpgrade},
   tcp::TcpUpgrade,
 };
+
+// use axum::extract::ws::{header_eq, WebSocket, WebSocketUpgrade};
 
 /// A wrapper enum to facilitate extracting TCP connection for either WebSocket or TCP clients,
 /// so that we can use a single endpoint and handler for notarization for both types of clients
@@ -65,8 +67,8 @@ where S: Send + Sync
   }
 }
 
-pub async fn notary_service<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
-  socket: T,
+pub async fn notary_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
+  socket: S,
   signing_key: &SigningKey,
   session_id: &str,
   max_sent_data: Option<usize>,
@@ -113,7 +115,6 @@ pub async fn notarize(protocol_upgrade: ProtocolUpgrade) -> Response {
     }),
   }
 }
-
 pub async fn websocket_notarize(
   socket: WebSocket,
   notary_signing_key: SigningKey,
@@ -121,7 +122,7 @@ pub async fn websocket_notarize(
   max_sent_data: Option<usize>,
   max_recv_data: Option<usize>,
 ) {
-  let stream = WsStream::new(socket.into_inner());
+  let stream = WsStream::new(socket.into_inner()).compat();
   match notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data).await
   {
     Ok(_) => {
