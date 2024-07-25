@@ -45,7 +45,7 @@ hyper-util={ version="0.1", features=["full"] }
 tokio-util={ version="0.7", features=[
   "compat",
 ] } # compat is used to work with AsyncRead and AsyncWrite from other crates
-tokio-rustls={ version="0.26.0", default-features = false, features = ["logging", "tls12"] }
+tokio-rustls={ version="0.26.0", default-features=false, features=["logging", "tls12"] }
 tokio={ version="1", features=["rt", "rt-multi-thread", "macros", "net", "io-std", "fs"] }
 # TLSN
 tlsn-prover          ={ git="https://github.com/tlsnotary/tlsn.git" }
