@@ -2704,7 +2704,7 @@ dependencies = [
  "hyper-util",
  "notary-server",
  "p256",
- "rustls 0.23.11",
+ "rustls 0.23.12",
  "rustls-pemfile 2.1.2",
  "serde",
  "serde_json",
@@ -4900,7 +4900,6 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
- "serde",
 ]
 
 [[package]]
@@ -5162,14 +5161,12 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
- "notary-server",
  "rustls 0.23.12",
  "rustls-pemfile 2.1.2",
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.26.0",
  "tokio-tungstenite 0.23.1",
- "url",
 ]
 
 [[package]]

@@ -1,6 +1,4 @@
-mod errors;
 pub mod errors;
-mod tlsnotary;
 
 #[cfg(target_arch = "wasm32")] mod wasm_utils;
 
