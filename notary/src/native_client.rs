@@ -3,9 +3,9 @@
 
 use anyhow::Result;
 use clap::Parser;
+use client::{prover_inner, ClientType, Config, NotarizationSessionRequest};
 use tracing::{info, Level};
 use tracing_subscriber::EnvFilter;
-use client::{Config, ClientType, NotarizationSessionRequest, prover_inner};
 
 #[derive(Parser)]
 #[clap(name = "TLSN Client")]
@@ -36,19 +36,19 @@ async fn main() -> Result<()> {
   tracing_subscriber::fmt().with_env_filter(env_filter).init();
 
   let config = Config {
-    notary_host:         "localhost".into(), // prod: tlsnotary.pluto.xyz
-    notary_port:         7047,               // prod: 443
-    target_method:       "GET".into(),
-    target_url:          format!("https://localhost:8080/{}", args.endpoint),
-    target_headers:      Default::default(),
-    target_body:         "".to_string(),
-    websocket_proxy_url: "https://0.0.0.0:8050".into(), /* prod: ./tlsnotary.pluto.xyz-rootca.crt */
+    notary_host:                  "localhost".into(), // prod: tlsnotary.pluto.xyz
+    notary_port:                  7047,               // prod: 443
+    target_method:                "GET".into(),
+    target_url:                   format!("https://localhost:8080/{}", args.endpoint),
+    target_headers:               Default::default(),
+    target_body:                  "".to_string(),
+    websocket_proxy_url:          "https://0.0.0.0:8050".into(), /* prod: ./tlsnotary.pluto.
+                                                                  * xyz-rootca.crt */
     notarization_session_request: NotarizationSessionRequest {
       client_type:   ClientType::Tcp,
       max_sent_data: Some(4096),
       max_recv_data: Some(16384),
     },
-
   };
   info!("Client config: {:?}", config);
 
