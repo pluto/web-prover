@@ -37,13 +37,11 @@ async fn main() -> Result<()> {
 
   let config = Config {
     notary_host:                  "localhost".into(), // prod: tlsnotary.pluto.xyz
-    notary_port:                  7047,               // prod: 443
+    notary_port:                  7443,               // prod: 443
     target_method:                "GET".into(),
-    target_url:                   format!("https://localhost:8080/{}", args.endpoint),
+    target_url:                   format!("https://localhost:8080/health"),
     target_headers:               Default::default(),
     target_body:                  "".to_string(),
-    websocket_proxy_url:          "https://0.0.0.0:8050".into(), /* prod: ./tlsnotary.pluto.
-                                                                  * xyz-rootca.crt */
     notarization_session_request: NotarizationSessionRequest {
       client_type:   ClientType::Tcp,
       max_sent_data: Some(4096),
