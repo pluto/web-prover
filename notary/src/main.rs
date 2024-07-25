@@ -15,18 +15,9 @@
 //
 // GET /v1/tlsnotary/proxy (mostly this: https://github.com/pluto/web-prover/blob/30ba86a2d5887c2f7c4e2d7bb50b378998ccd297/bin/proxy.rs#L219)
 
-use std::{
-  fs, io,
-  sync::Arc,
-};
+use std::{fs, io, sync::Arc};
 
-use axum::{
-  extract::Request,
-  http::StatusCode,
-  response::IntoResponse,
-  routing::get,
-  Router,
-};
+use axum::{extract::Request, http::StatusCode, response::IntoResponse, routing::get, Router};
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use rustls::{
@@ -67,7 +58,6 @@ async fn main() {
     .layer(CorsLayer::permissive());
   // .route("/v1/tlsnotary/proxy", post(todo!("websocket proxy")))
   // .route("/v1/origo", post(todo!("call into origo")));
-
 
   loop {
     let (tcp_stream, _) = listener.accept().await.unwrap();

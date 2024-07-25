@@ -140,13 +140,6 @@ use std::{
 };
 
 use async_trait::async_trait;
-use tokio_tungstenite::{
-  tungstenite::{
-      self as ts,
-      protocol::{self, WebSocketConfig},
-  },
-  WebSocketStream,
-};
 use axum::{body::Bytes, extract::FromRequestParts, response::Response, Error};
 use axum_core::body::Body;
 use futures_util::{
@@ -160,9 +153,17 @@ use http::{
 };
 use hyper_util::rt::TokioIo;
 use sha1::{Digest, Sha1};
+use tokio_tungstenite::{
+  tungstenite::{
+    self as ts,
+    protocol::{self, WebSocketConfig},
+  },
+  WebSocketStream,
+};
 use tracing::error;
 
 use self::rejection::*;
+use crate::tcp::header_eq;
 
 /// Extractor for establishing WebSocket connections.
 ///
@@ -355,8 +356,7 @@ impl<F> WebSocketUpgrade<F> {
       let upgraded = TokioIo::new(upgraded);
 
       let socket =
-      WebSocketStream::from_raw_socket(upgraded, protocol::Role::Server, Some(config))
-          .await;
+        WebSocketStream::from_raw_socket(upgraded, protocol::Role::Server, Some(config)).await;
       // let socket = WebSocketStream::from_raw_socket(
       //   // NOTARY_MODIFICATION: Need to use TokioAdapter to wrap Upgraded which doesn't implement
       //   // futures crate's AsyncRead and AsyncWrite
@@ -456,15 +456,6 @@ where S: Send + Sync
   }
 }
 
-/// NOTARY_MODIFICATION: Made this function public to be used in service.rs
-pub fn header_eq(headers: &HeaderMap, key: HeaderName, value: &'static str) -> bool {
-  if let Some(header) = headers.get(&key) {
-    header.as_bytes().eq_ignore_ascii_case(value.as_bytes())
-  } else {
-    false
-  }
-}
-
 fn header_contains(headers: &HeaderMap, key: HeaderName, value: &'static str) -> bool {
   let header = if let Some(header) = headers.get(&key) {
     header
@@ -490,9 +481,7 @@ pub struct WebSocket {
 
 impl WebSocket {
   /// NOTARY_MODIFICATION: Consume `self` and get the inner [`async_tungstenite::WebSocketStream`].
-  pub fn into_inner(self) -> WebSocketStream<TokioIo<hyper::upgrade::Upgraded>> {
-    self.inner
-  }
+  pub fn into_inner(self) -> WebSocketStream<TokioIo<hyper::upgrade::Upgraded>> { self.inner }
 
   /// Receive another message.
   ///
