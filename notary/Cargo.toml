@@ -7,31 +7,36 @@ edition="2021"
 hyper      ={ version="1.1", features=["client", "http1", "server"] }
 hyper-util ={ version="0.1", features=["full"] }
 serde      ={ version="1.0", features=["derive"] }
-rustls     ={ version="0.23.11" }
+rustls     ={ version="0.23.11", default-features=false, features=["logging", "tls12", "std"] }
 axum-macros="0.4.1"
 
-tokio                ={ version="1.39.1", features=["full"] }
-tokio-util           ={ version="0.7", features=["compat"] }
-tracing              ="0.1.40"
-tracing-subscriber   ="0.3.18"
-futures-util         ="0.3.30"
-tokio-rustls         ="0.26.0"
-tower-http           ="0.5.2"
-tower-service        ="0.3.2"
-rustls-pemfile       ="2.1.2"
-uuid                 ={ version="1.10", features=["v4", "fast-rng"] }
-serde_json           ="1.0"
-notary-server        ={ git="https://github.com/tlsnotary/tlsn.git " }
-tlsn-verifier        ={ git="https://github.com/tlsnotary/tlsn.git " }
+tokio             ={ version="1.39.1", features=["full"] }
+tokio-util        ={ version="0.7", features=["compat"] }
+tracing           ="0.1.40"
+tracing-subscriber="0.3.18"
+futures-util      ="0.3.30"
+tokio-rustls      ={ version="0.26.0", default-features=false, features=["logging", "tls12"] }
+tower-http        ="0.5.2"
+tower-service     ="0.3.2"
+rustls-pemfile    ="2.1.2"
+uuid              ={ version="1.10", features=["v4", "fast-rng"] }
+serde_json        ="1.0"
+notary-server     ={ git="https://github.com/tlsnotary/tlsn.git " }
+tlsn-verifier     ={ git="https://github.com/tlsnotary/tlsn.git " }
 # async-tungstenite    ={ version="0.25", features=["tokio-native-tls"] }
-tokio-tungstenite = { version = "0.23.1", features = ["stream"]}
-ws_stream_tungstenite={ git="https://github.com/pluto/ws_stream_tungstenite.git", branch="latest", features=["tokio"] }
-async-trait          ="0.1.67"
-axum                 ={ version="0.7", features=["ws"] }
-axum-core            ="0.4"
-futures              ="0.3"
-eyre                 ="0.6.8"
-p256                 ="0.13"
-base64               ="0.21.0"
-http                 ="1.1"
-sha1                 ="0.10"
+tokio-tungstenite={ version="0.23.1", features=["stream"] }
+ws_stream_tungstenite={ git="https://github.com/pluto/ws_stream_tungstenite.git", branch="latest", features=[
+	"tokio",
+] }
+async-trait="0.1.67"
+axum={ version="0.7", features=["ws"] }
+axum-core="0.4"
+futures="0.3"
+eyre="0.6.8"
+p256="0.13"
+base64="0.21.0"
+http="1.1"
+sha1="0.10"
+
+[dev-dependencies]
+tower="0.4.13"
