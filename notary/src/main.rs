@@ -33,6 +33,7 @@ use tracing::{error, info};
 mod axum_websocket;
 mod tcp;
 mod tlsn;
+mod websocket_proxy;
 
 #[tokio::main]
 async fn main() {
@@ -55,6 +56,7 @@ async fn main() {
   let router = Router::new()
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
     .route("/v1/tlsnotary", get(tlsn::notarize))
+    .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
     .layer(CorsLayer::permissive());
   // .route("/v1/tlsnotary/proxy", post(todo!("websocket proxy")))
   // .route("/v1/origo", post(todo!("call into origo")));
