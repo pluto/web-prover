@@ -1,17 +1,17 @@
 use std::net::SocketAddr;
 
-use async_trait::async_trait;
-use axum::{extract::Query, response::Response, routing::get, Router};
+// use async_trait::async_trait;
+use axum::{extract::Query, response::Response};
 use futures_util::{SinkExt, StreamExt};
-use hyper::upgrade::Upgraded;
+// use hyper::upgrade::Upgraded;
 use serde::Deserialize;
 use tokio::{
-  io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+  io::{AsyncReadExt, AsyncWriteExt},
   net::TcpStream,
 };
 use tokio_tungstenite::tungstenite::protocol::Message;
-use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
-use ws_stream_tungstenite::WsStream;
+// use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
+// use hyper_util::rt::TokioIo;
 
 use crate::axum_websocket::{WebSocket, WebSocketUpgrade};
 
@@ -27,7 +27,7 @@ pub async fn proxy(ws: WebSocketUpgrade, query: Query<Target>) -> Response {
   })
 }
 
-pub async fn handle_connection(socket: WebSocket, target_host: &str, target_port: u16) {
+async fn handle_connection(socket: WebSocket, target_host: &str, target_port: u16) {
   let target_url = format!("{}:{}", target_host, target_port);
   println!("Connecting to target: {}", target_url);
   let target_addr: SocketAddr = target_url.parse().expect("Invalid address");
