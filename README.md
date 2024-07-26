@@ -34,15 +34,48 @@ TODO: explain all feature flags
 
 ### Configuring rust-analyzer for wasm32
 
-The [client](./client/) crate utilizes `#[cfg(target_arch = "wasm32")]` flags. To ensure that rust-analyzer highlights active code paths that depend on these feature flags, you can configure it in Visual Studio Code. Here’s how:
+```
+# .vscode/settings.json
+{
+  "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
+  "rust-analyzer.cargo.features": ["websocket"]
+}
+
+# Cargo.toml
+# set members to:
+members =["client", "client_wasm"]
+```
+
+### Configuring rust-analyzer for ios
+
+Note that this only works on Mac. The iOS target cannot be built on Linux.
 
 ```
 # .vscode/settings.json
 {
-  "rust-analyzer.cargo.target": "wasm32-unknown-unknown"
+  "rust-analyzer.cargo.target": "aarch64-apple-ios",
+  "rust-analyzer.cargo.features": []
 }
+
+# Cargo.toml
+# set members to:
+members =["client", "client_ios"]
 ```
 
-## Known Reproducible Failures
+## Known Issues
 
-- `error: failed to run custom build command for ring v0.17.8`. If you run into this error you machine is not using the right llvm path.
+### `error: failed to run custom build command for ring v0.17.8`
+
+You'll have to install LLVM, ie. `brew install llvm`, and then update your
+`export PATH="$(brew --prefix)/opt/llvm/bin:$PATH".
+
+rust-analyzer might not pick up on the llvm path, you can manually let it know via:
+
+```
+# .vscode/settings.json
+{
+  "rust-analyzer.cargo.extraEnv": {
+    "PATH": "<paste your $PATH here>" // note, $PATH env substitutions don't work
+  }
+}
+```
