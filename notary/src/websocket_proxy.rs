@@ -34,9 +34,7 @@ pub async fn handle_connection(socket: WebSocket, target_host: &str, target_port
   let mut tcp_stream =
     TcpStream::connect(target_addr).await.expect("Failed to connect to TCP server");
   let (mut tcp_read, mut tcp_write) = tcp_stream.split();
-
-  let stream = WsStream::new(socket.into_inner()).compat();
-  let (mut ws_sink, mut ws_stream) = stream.split();
+  let (mut ws_sink, mut ws_stream) = socket.into_inner().split();
 
   let ws_to_tcp = async {
     while let Some(msg) = ws_stream.next().await {
