@@ -64,10 +64,10 @@ members =["client", "client_ios"]
 
 ## Known Issues
 
-### `error: failed to run custom build command for ring v0.17.8`
+#### `error: failed to run custom build command for ring v0.17.8`
 
 You'll have to install LLVM, ie. `brew install llvm`, and then update your
-`export PATH="$(brew --prefix)/opt/llvm/bin:$PATH".
+`export PATH="$(brew --prefix)/opt/llvm/bin:$PATH"`.
 
 rust-analyzer might not pick up on the llvm path, you can manually let it know via:
 
