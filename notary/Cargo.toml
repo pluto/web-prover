@@ -7,7 +7,7 @@ edition="2021"
 hyper      ={ version="1.1", features=["client", "http1", "server"] }
 hyper-util ={ version="0.1", features=["full"] }
 serde      ={ version="1.0", features=["derive"] }
-rustls     ={ version="0.23.11", default-features=false, features=["logging", "tls12", "std"] }
+rustls     ={ version="0.23.11", default-features=false, features=["logging", "tls12", "std", "ring"] }
 axum-macros="0.4.1"
 
 tokio             ={ version="1.39.1", features=["full"] }

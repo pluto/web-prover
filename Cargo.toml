@@ -26,10 +26,6 @@ path="bin/origo.rs"
 name="mock_server"
 path="bin/mock_server.rs"
 
-[[bin]]
-name="proxy"
-path="bin/proxy.rs"
-
 # Can use something like this for e2e testing of the workspace
 # https://doc.rust-lang.org/cargo/reference/manifest.html
 # [[test]]
@@ -41,7 +37,7 @@ hyper            ={ version="1.4.1", features=["full"] }
 hyper-util       ={ version="0.1.6", features=["full"] }
 http-body-util   ="0.1"
 pki-types        ={ package="rustls-pki-types", version="1.7" }
-rustls           ={ version="0.23.11", default-features=false, features=["logging", "tls12", "std"] }
+rustls           ={ version="0.23.11", default-features=false, features=["logging", "tls12", "std", "ring"] }
 rustls-pemfile   ={ version="2.0.0" }
 tokio-rustls     ={ version="0.26.0", default-features=false, features=["logging", "tls12"] }
 hex              ="0.4"

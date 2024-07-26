@@ -1,20 +1,3 @@
-// TODO combined binary which offers the following endpoints:
-//
-// GET /health
-//
-// GET /v1/origo/proxy (supports TCP or websocket connection) - focus on this one later, requires
-// Thor's work.
-//
-// POST /v1/tlsnotary/session -> https://github.com/tlsnotary/tlsn/blob/3554db83e17b2e5fc98293b397a2907b7f023496/notary/server/src/service.rs#L114 (pub async fn initialize)
-// GET /v1/tlsnotary/notarize (supports TCP or websocket connection)
-//    a few possible entrypoints:
-//       - https://github.com/tlsnotary/tlsn/blob/3554db83e17b2e5fc98293b397a2907b7f023496/notary/server/src/service.rs#L71
-//         (pub async fn upgrade_protocol)
-//       - https://github.com/tlsnotary/tlsn/blob/3554db83e17b2e5fc98293b397a2907b7f023496/notary/server/src/service.rs#L173
-//         (pub async fn notary_service)
-//
-// GET /v1/tlsnotary/proxy (mostly this: https://github.com/pluto/web-prover/blob/30ba86a2d5887c2f7c4e2d7bb50b378998ccd297/bin/proxy.rs#L219)
-
 use std::{fs, io, sync::Arc};
 
 use axum::{extract::Request, http::StatusCode, response::IntoResponse, routing::get, Router};
@@ -33,6 +16,7 @@ use tracing::{error, info};
 mod axum_websocket;
 mod tcp;
 mod tlsn;
+mod websocket_proxy;
 
 #[tokio::main]
 async fn main() {
@@ -55,6 +39,7 @@ async fn main() {
   let router = Router::new()
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
     .route("/v1/tlsnotary", get(tlsn::notarize))
+    .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
     .layer(CorsLayer::permissive());
   // .route("/v1/tlsnotary/proxy", post(todo!("websocket proxy")))
   // .route("/v1/origo", post(todo!("call into origo")));

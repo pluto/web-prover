@@ -17,7 +17,6 @@ cargo run --release --bin mock_server
 ```
 cargo run --release -p notary
 cargo run --release --bin mock_server
-cargo run --release --bin proxy
 make wasm
 make wasm-demo
 open https://localhost:8090
