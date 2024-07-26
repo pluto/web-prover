@@ -1,38 +1,33 @@
-use std::net::SocketAddr;
-
-// use async_trait::async_trait;
 use axum::{extract::Query, response::Response};
 use futures_util::{SinkExt, StreamExt};
-// use hyper::upgrade::Upgraded;
 use serde::Deserialize;
 use tokio::{
   io::{AsyncReadExt, AsyncWriteExt},
   net::TcpStream,
 };
 use tokio_tungstenite::tungstenite::protocol::Message;
+use tracing::info;
 
-// use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
-// use hyper_util::rt::TokioIo;
 use crate::axum_websocket::{WebSocket, WebSocketUpgrade};
 
 #[derive(Deserialize)]
-struct Target {
+pub struct Target {
   target_host: String,
   target_port: u16,
 }
 
 pub async fn proxy(ws: WebSocketUpgrade, query: Query<Target>) -> Response {
-  ws.on_upgrade(move |socket| {
-    handle_connection(socket, &query.target_host, query.target_port);
+  ws.on_upgrade(move |socket| async move {
+    // TODO is await here correct?
+    handle_connection(socket, &query.target_host, query.target_port).await;
   })
 }
 
-async fn handle_connection(socket: WebSocket, target_host: &str, target_port: u16) {
-  let target_url = format!("{}:{}", target_host, target_port);
-  println!("Connecting to target: {}", target_url);
-  let target_addr: SocketAddr = target_url.parse().expect("Invalid address");
-  let mut tcp_stream =
-    TcpStream::connect(target_addr).await.expect("Failed to connect to TCP server");
+pub async fn handle_connection(socket: WebSocket, target_host: &str, target_port: u16) {
+  info!("Connecting to target {}:{}", target_host, target_port);
+  let mut tcp_stream = TcpStream::connect(format!("{}:{}", target_host, target_port))
+    .await
+    .expect("Failed to connect to TCP server");
   let (mut tcp_read, mut tcp_write) = tcp_stream.split();
   let (mut ws_sink, mut ws_stream) = socket.into_inner().split();
 
@@ -66,7 +61,7 @@ async fn handle_connection(socket: WebSocket, target_host: &str, target_port: u1
           eprintln!("WebSocket error: {}", e);
           break;
         },
-      }
+      };
     }
   };
 
