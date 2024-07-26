@@ -63,7 +63,7 @@ ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wa
 serde-wasm-bindgen="0.6.5"
 
 # Other
-ring          ={ version="0.17", features=["wasm32_unknown_unknown_js"] }
+ring          ={ version="0.17", default-features = false, features=["wasm32_unknown_unknown_js"] }
 chrono        ="0.4"
 elliptic-curve={ version="0.13.5", features=["pkcs8"] }
 getrandom     ={ version="0.2", features=["js"] }
