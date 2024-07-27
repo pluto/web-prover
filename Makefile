@@ -7,11 +7,12 @@ wasm:
 	    -Z build-std=panic_abort,std
 
 ios:
+	-cargo install cbindgen
 	rustup target add aarch64-apple-ios
 	rustup target add aarch64-apple-ios-sim
 	cargo build -p client_ios --release --target aarch64-apple-ios # builds target/aarch64-apple-ios/release/libclient_ios.a
 	cargo build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
-	cbindgen --lang c --crate client_ios --output target/aarch64-apple-ios/release/libclient_ios.h # brew install cbindgen
+	~/.cargo/bin/cbindgen --lang c --crate client_ios --output target/aarch64-apple-ios/release/libclient_ios.h
 	xcodebuild -create-xcframework \
 		-library target/aarch64-apple-ios/release/libclient_ios.a \
 		-headers target/aarch64-apple-ios/release/libclient_ios.h \

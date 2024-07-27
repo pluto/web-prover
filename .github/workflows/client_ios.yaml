@@ -1,0 +1,36 @@
+name: client_ios
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: client_ios
+    runs-on: macos-latest
+
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: rustup toolchain install nightly --profile minimal --no-self-update
+
+      - run: rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
+
+      # TODO: do we need llvm for this?
+      - name: Install LLVM and Clang to support 'ring' crate
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "10.0"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: make ios
+
+      # TODO: store ios lib as github artifact
