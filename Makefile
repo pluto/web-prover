@@ -13,12 +13,16 @@ ios:
 	cargo build -p client_ios --release --target aarch64-apple-ios # builds target/aarch64-apple-ios/release/libclient_ios.a
 	cargo build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
 	~/.cargo/bin/cbindgen --lang c --crate client_ios --output target/aarch64-apple-ios/release/libclient_ios.h
+	-rm -r target/aarch64-apple-ios/release/libclient_ios.xcframework
+	-rm -r target/aarch64-apple-ios-sim/release/libclient_ios.xcframework
 	xcodebuild -create-xcframework \
 		-library target/aarch64-apple-ios/release/libclient_ios.a \
 		-headers target/aarch64-apple-ios/release/libclient_ios.h \
+		-output target/aarch64-apple-ios/release/libclient_ios.xcframework
+	xcodebuild -create-xcframework \
 		-library target/aarch64-apple-ios-sim/release/libclient_ios.a \
 		-headers target/aarch64-apple-ios/release/libclient_ios.h \
-		-output target/aarch64-apple-ios/release/libclient_ios.xcframework
+		-output target/aarch64-apple-ios-sim/release/libclient_ios.xcframework
 
 wasm-demo/node_modules:
 	cd client_wasm/demo && npm install
