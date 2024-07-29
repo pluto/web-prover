@@ -50,9 +50,11 @@ jobs:
       - run: make wasm
 
       - run: "tar czf pkg.tar.gz ./pkg/*"
+        if: matrix.os == 'ubuntu-latest'
         working-directory: "client_wasm"
 
       - uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-latest'
         with:
           name: "wasm.tar.gz"
           path: "client_wasm/pkg.tar.gz"
