@@ -3,6 +3,7 @@ use std::{fs, io, sync::Arc};
 use axum::{extract::Request, http::StatusCode, response::IntoResponse, routing::get, Router};
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
+use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
 use rustls::{
   pki_types::{CertificateDer, PrivateKeyDer},
   ServerConfig,
@@ -14,21 +15,30 @@ use tower_service::Service;
 use tracing::{error, info};
 
 mod axum_websocket;
+mod config;
 mod tcp;
 mod tlsn;
 mod websocket_proxy;
 
+#[derive(Debug, Clone)]
+struct SharedState {
+  notary_signing_key: SigningKey,
+  tlsn_max_sent_data: usize,
+  tlsn_max_recv_data: usize,
+}
+
 #[tokio::main]
 async fn main() {
+  let c = config::read_config();
+
   let subscriber = tracing_subscriber::FmtSubscriber::new();
   tracing::subscriber::set_global_default(subscriber).unwrap();
 
-  let certs = load_certs("./fixture/certs/server-cert.pem").unwrap(); // TODO make CLI or ENV var
-  let key = load_private_key("./fixture/certs/server-key.pem").unwrap(); // TODO make CLI or ENV var
-  let addr = "0.0.0.0:7443"; // TODO make env var?
+  let certs = load_certs(&c.server_cert).unwrap();
+  let key = load_private_key(&c.server_key).unwrap();
 
-  let listener = TcpListener::bind(addr).await.unwrap();
-  info!("Listening on https://{}", addr);
+  let listener = TcpListener::bind(&c.listen).await.unwrap();
+  info!("Listening on https://{}", &c.listen);
 
   let mut server_config =
     ServerConfig::builder().with_no_client_auth().with_single_cert(certs, key).unwrap();
@@ -36,12 +46,18 @@ async fn main() {
   let tls_acceptor = TlsAcceptor::from(Arc::new(server_config));
   let protocol = Arc::new(http1::Builder::new());
 
+  let shared_state = Arc::new(SharedState {
+    notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
+    tlsn_max_sent_data: c.tlsn_max_sent_data,
+    tlsn_max_recv_data: c.tlsn_max_recv_data,
+  });
+
   let router = Router::new()
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
     .route("/v1/tlsnotary", get(tlsn::notarize))
     .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
-    .layer(CorsLayer::permissive());
-  // .route("/v1/tlsnotary/proxy", post(todo!("websocket proxy")))
+    .layer(CorsLayer::permissive())
+    .with_state(shared_state);
   // .route("/v1/origo", post(todo!("call into origo")));
 
   loop {
@@ -83,3 +99,7 @@ fn load_private_key(filename: &str) -> io::Result<PrivateKeyDer<'static>> {
 }
 
 fn error(err: String) -> io::Error { io::Error::new(io::ErrorKind::Other, err) }
+
+pub fn load_notary_signing_key(private_key_pem_path: &str) -> SigningKey {
+  SigningKey::read_pkcs8_pem_file(private_key_pem_path).unwrap()
+}

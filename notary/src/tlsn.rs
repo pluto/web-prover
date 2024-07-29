@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use axum::{
-  extract::FromRequestParts,
+  extract::{FromRequestParts, State},
   http::{header, request::Parts},
   response::Response,
 };
@@ -17,7 +19,8 @@ use ws_stream_tungstenite::WsStream;
 
 use crate::{
   axum_websocket::{WebSocket, WebSocketUpgrade},
-  tcp::{header_eq, load_notary_signing_key, TcpUpgrade},
+  tcp::{header_eq, TcpUpgrade},
+  SharedState,
 };
 // TODO: use this place of our local file once this gets merged: https://github.com/tokio-rs/axum/issues/2848
 // use axum::extract::ws::{WebSocket, WebSocketUpgrade};
@@ -85,21 +88,23 @@ pub async fn notary_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 }
 
 // TODO Response or impl IntoResponse?
-pub async fn notarize(protocol_upgrade: ProtocolUpgrade) -> Response {
+pub async fn notarize(
+  protocol_upgrade: ProtocolUpgrade,
+  State(state): State<Arc<SharedState>>,
+) -> Response {
   // We manually just create a UUID4 for the remaining calls here
   // TODO Should we just hardcode one UUID4 and pass in the same for all calls?
   let session_id = Uuid::new_v4().to_string();
 
-  let max_sent_data = Some(10000); // TODO matches client_wasm/demo/js/index.js proof config
-  let max_recv_data = Some(10000); // TODO matches client_wasm/demo/js/index.js proof config
+  let max_sent_data = Some(state.tlsn_max_sent_data);
+  let max_recv_data = Some(state.tlsn_max_recv_data);
+  let notary_signing_key = state.notary_signing_key.clone();
 
   match protocol_upgrade {
     ProtocolUpgrade::Ws(ws) => ws.on_upgrade(move |socket| {
-      let notary_signing_key = load_notary_signing_key("./fixture/certs/notary.key"); // TODO don't do this for every request, pass in as axum state?
       websocket_notarize(socket, notary_signing_key, session_id, max_sent_data, max_recv_data)
     }),
     ProtocolUpgrade::Tcp(tcp) => tcp.on_upgrade(move |stream| {
-      let notary_signing_key = load_notary_signing_key("./fixture/certs/notary.key"); // TODO don't do this for every request, pass in as axum state?
       tcp_notarize(stream, notary_signing_key, session_id, max_sent_data, max_recv_data)
     }),
   }

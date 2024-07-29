@@ -11,7 +11,6 @@ use http::header::{HeaderMap, HeaderName};
 use hyper::upgrade::{OnUpgrade, Upgraded};
 use hyper_util::rt::TokioIo;
 use notary_server::NotaryServerError;
-use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
 use tracing::error;
 
 /// Custom extractor used to extract underlying TCP connection for TCP client — using the same
@@ -72,10 +71,6 @@ impl TcpUpgrade {
 
     builder.body(Body::empty()).unwrap()
   }
-}
-
-pub fn load_notary_signing_key(private_key_pem_path: &str) -> SigningKey {
-  SigningKey::read_pkcs8_pem_file(private_key_pem_path).unwrap()
 }
 
 pub fn header_eq(headers: &HeaderMap, key: HeaderName, value: &'static str) -> bool {
