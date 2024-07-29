@@ -7,15 +7,15 @@ TODO: Explain project layout
 
 ```
 make wasm
-make ios # TODO
-cargo run --release -p notary
+make ios
+cargo run --release -p notary -- --config ./fixture/notary-config.toml
 cargo run --release --bin mock_server
 ```
 
 ## WASM Demo
 
 ```
-cargo run --release -p notary
+cargo run --release -p notary -- --config ./fixture/notary-config.toml
 cargo run --release --bin mock_server
 make wasm
 make wasm-demo
