@@ -33,4 +33,22 @@ jobs:
 
       - run: make ios
 
-      # TODO: store ios lib as github artifact
+      - uses: actions/upload-artifact@v4
+        with:
+          name: "libclient_ios.a"
+          path: "target/aarch64-apple-ios/release/libclient_ios.a"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: "libclient_ios_sim.a"
+          path: "target/aarch64-apple-ios-sim/release/libclient_ios.a"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: "libclient_ios.h"
+          path: "target/aarch64-apple-ios/release/libclient_ios.h"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: "libclient_ios.xcframework"
+          path: "target/aarch64-apple-ios/release/libclient_ios.xcframework"
