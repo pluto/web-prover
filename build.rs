@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::{env, process::Command};
 
 fn main() {
   let output =
@@ -7,4 +7,16 @@ fn main() {
   println!("cargo:rustc-env=GIT_HASH={}", git_hash);
   println!("cargo:rerun-if-changed=.git/HEAD");
   println!("cargo:rerun-if-changed=.git/refs/heads/main");
+
+  
+  // useful for local debugging
+  // TODO rerun does not trigger if env variable changes
+  // https://github.com/rust-lang/cargo/issues/10358
+  // work-around? run `cargo clean`
+  println!("cargo:rerun-if-env-changed=NOTARY_CA_CERT_PATH");
+  if let Ok(notary_ca_cert_path) = env::var("NOTARY_CA_CERT_PATH") {
+    println!("Using NOTARY_CA_CERT_PATH={}", notary_ca_cert_path);
+    println!("cargo:rustc-cfg=feature=\"notary_ca_cert\"");
+    println!("cargo:rustc-env=NOTARY_CA_CERT_PATH={}", notary_ca_cert_path);
+  }
 }

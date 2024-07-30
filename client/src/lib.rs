@@ -21,8 +21,6 @@ use {
   tokio_util::compat::TokioAsyncReadCompatExt,
 };
 
-const NOTARY_CA_CERT: &[u8] = include_bytes!("../../fixture/certs/ca-cert.cer"); // TODO make build config
-
 #[derive(Deserialize, Clone, Debug)]
 pub struct Config {
   pub notary_host:                  String,
@@ -116,11 +114,7 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   //---------------------------------------------------------------------------------------------------------------------------------------//
   // Set up the prover which lies on the client and can access the notary for MPC
   //---------------------------------------------------------------------------------------------------------------------------------------//
-
-  let certificate = pki_types::CertificateDer::from(NOTARY_CA_CERT.to_vec());
-  let mut root_store = tls_client::RootCertStore::empty();
-  let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
-  assert_eq!(added, 1); // TODO there is probably a better way
+  let root_store = default_root_store(); // TODO lot of memory allocation happening here. maybe add this to shared state?
 
   let _span = tracing::span!(tracing::Level::TRACE, "create_prover").entered();
   let mut prover_config = ProverConfig::builder();
@@ -349,4 +343,29 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   Ok(TlsProof { session: session_proof, substrings: substrings_proof })
   //---------------------------------------------------------------------------------------------------------------------------------------//
+}
+
+#[cfg(feature = "notary_ca_cert")]
+const NOTARY_CA_CERT: &[u8] = include_bytes!(env!("NOTARY_CA_CERT_PATH"));
+
+/// Default root store using mozilla certs.
+fn default_root_store() -> tls_client::RootCertStore {
+  let mut root_store = tls_client::RootCertStore::empty();
+  root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
+    tls_client::OwnedTrustAnchor::from_subject_spki_name_constraints(
+      ta.subject.as_ref(),
+      ta.subject_public_key_info.as_ref(),
+      ta.name_constraints.as_ref().map(|nc| nc.as_ref()),
+    )
+  }));
+
+  #[cfg(feature = "notary_ca_cert")]
+  {
+    debug!("notary_ca_cert feature enabled");
+    let certificate = pki_types::CertificateDer::from(NOTARY_CA_CERT.to_vec());
+    let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
+    assert_eq!(added, 1); // TODO there is probably a better way
+  }
+
+  root_store
 }

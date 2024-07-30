@@ -967,6 +967,7 @@ dependencies = [
  "hyper-util",
  "js-sys",
  "p256",
+ "parking_lot",
  "pin-project-lite",
  "rayon",
  "reqwest",

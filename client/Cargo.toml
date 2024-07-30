@@ -8,6 +8,10 @@ build="../build.rs"
 [features]
 websocket=[]
 
+# used in build.rs, activate by setting NOTARY_CA_CERT_PATH as env variable
+# used for local development
+notary_ca_cert=[]
+
 # Shared dependencies for all targets
 [dependencies]
 # TLSN
@@ -109,6 +113,8 @@ wasm-bindgen-futures    ="0.4.37"
 wasm-bindgen-rayon      ="1.0"
 tracing-subscriber      ={ version="0.3", features=["time", "env-filter"] }
 tracing-web             ="0.1.2"
+
+parking_lot = { version = "0.12", features = ["nightly"] }
 
 # TLSN
 tlsn-prover    ={ git="https://github.com/tlsnotary/tlsn.git" }
