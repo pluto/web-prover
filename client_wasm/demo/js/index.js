@@ -47,6 +47,5 @@ const proof = await prover({
 
 console.log(proof);
 
-  // websocket_proxy_url: "wss://ws.tlsnotary.pluto.xyz",
 // TODO verify
 // JSON.parse(await verify(JSON.stringify(proof), pubkey));
