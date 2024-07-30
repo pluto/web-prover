@@ -8,8 +8,10 @@ use rustls::{
   pki_types::{CertificateDer, PrivateKeyDer},
   ServerConfig,
 };
+use rustls_acme::{caches::DirCache, AcmeConfig};
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
+use tokio_stream::{wrappers::TcpListenerStream, StreamExt};
 use tower_http::cors::CorsLayer;
 use tower_service::Service;
 use tracing::{error, info};
@@ -38,12 +40,13 @@ async fn main() {
   let key = load_private_key(&c.server_key).unwrap();
 
   let listener = TcpListener::bind(&c.listen).await.unwrap();
+  let tcp_incoming = TcpListenerStream::new(listener);
   info!("Listening on https://{}", &c.listen);
 
   let mut server_config =
     ServerConfig::builder().with_no_client_auth().with_single_cert(certs, key).unwrap();
   server_config.alpn_protocols = vec![b"http/1.1".to_vec()];
-  let tls_acceptor = TlsAcceptor::from(Arc::new(server_config));
+  // let tls_acceptor = TlsAcceptor::from(Arc::new(server_config));
   let protocol = Arc::new(http1::Builder::new());
 
   let shared_state = Arc::new(SharedState {
@@ -60,28 +63,63 @@ async fn main() {
     .with_state(shared_state);
   // .route("/v1/origo", post(todo!("call into origo")));
 
-  loop {
-    let (tcp_stream, _) = listener.accept().await.unwrap();
-    let tls_acceptor = tls_acceptor.clone();
+  let mut tls_incoming = AcmeConfig::new(["example.com"])
+    .contact_push("mailto:admin@example.com")
+    .cache(DirCache::new("./rustls_acme_cache"))
+    .tokio_incoming(tcp_incoming, vec![b"http/1.1".to_vec()]);
+
+  while let Some(tls) = tls_incoming.next().await {
+    let tls = tls.unwrap(); // TODO
+
     let tower_service = router.clone();
     let protocol = protocol.clone();
 
     tokio::spawn(async move {
-      match tls_acceptor.accept(tcp_stream).await {
-        Ok(tls_stream) => {
-          let io = TokioIo::new(tls_stream);
-          let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
-            tower_service.clone().call(request)
-          });
-          // TODO should we check returned Result here?
-          let _ = protocol.serve_connection(io, hyper_service).with_upgrades().await;
-        },
-        Err(err) => {
-          error!("{err:#}"); // TODO format this better
-        },
-      }
+      let io = TokioIo::new(tls);
+      let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
+        tower_service.clone().call(request)
+      });
+      // TODO should we check returned Result here?
+      let _ = protocol.serve_connection(io, hyper_service).with_upgrades().await;
     });
   }
+
+  // loop {
+  //   let (tcp_stream, _) = listener.accept().await.unwrap();
+  //   let tls_acceptor = tls_acceptor.clone();
+  //   let tower_service = router.clone();
+  //   let protocol = protocol.clone();
+
+  //   tokio::spawn(async move {
+  //     match tls_incoming.next().await {
+  //       Ok(tls_stream) => {
+  //         let io = TokioIo::new(tls_stream);
+  //         let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
+  //           tower_service.clone().call(request)
+  //         });
+  //         // TODO should we check returned Result here?
+  //         let _ = protocol.serve_connection(io, hyper_service).with_upgrades().await;
+  //       },
+  //       Err(err) => {
+  //         error!("{err:#}"); // TODO format this better
+  //       },
+  //     }
+
+  //     // match tls_acceptor.accept(tcp_stream).await {
+  //     //   Ok(tls_stream) => {
+  //     //     let io = TokioIo::new(tls_stream);
+  //     //     let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
+  //     //       tower_service.clone().call(request)
+  //     //     });
+  //     //     // TODO should we check returned Result here?
+  //     //     let _ = protocol.serve_connection(io, hyper_service).with_upgrades().await;
+  //     //   },
+  //     //   Err(err) => {
+  //     //     error!("{err:#}"); // TODO format this better
+  //     //   },
+  //     // }
+  //   });
+  // }
 }
 
 fn load_certs(filename: &str) -> io::Result<Vec<CertificateDer<'static>>> {

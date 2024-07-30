@@ -14,7 +14,7 @@ tokio-util={ version="0.7", features=["compat"] }
 tracing="0.1.40"
 tracing-subscriber="0.3.18"
 futures-util="0.3.30"
-tokio-rustls={ version="0.26.0", default-features=false, features=["logging", "tls12"] }
+tokio-rustls={ version="0.26.0", default-features=false, features=["logging", "tls12", "ring"] }
 tower-http="0.5.2"
 tower-service="0.3.2"
 rustls-pemfile="2.1.2"
@@ -38,6 +38,8 @@ sha1="0.10"
 config="0.14.0"
 clap={ version="4.5", features=["derive"] }
 clap_derive="4.5"
+rustls-acme={ version="0.10", features=["ring", "axum"] }
+tokio-stream={ version="0.1", features=["net"] }
 
 [dev-dependencies]
 tower="0.4.13"
