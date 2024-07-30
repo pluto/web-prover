@@ -3,7 +3,7 @@ wasm:
 	-cargo install wasm-pack
 	cd client_wasm && \
 	  PATH="/opt/homebrew/opt/llvm/bin:$$PATH" RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C opt-level=z" \
-	  rustup run nightly ~/.cargo/bin/wasm-pack build --release --target web ./ -- \
+	  rustup run nightly ~/.cargo/bin/wasm-pack build --debug --target web ./ -- \
 	    -Z build-std=panic_abort,std
 
 ios:
