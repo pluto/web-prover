@@ -40,7 +40,6 @@ clap={ version="4.5", features=["derive"] }
 clap_derive="4.5"
 rustls-acme={ version="0.10", default-features=false, features=["ring", "tokio"] }
 tokio-stream={ version="0.1", features=["net"] }
-# ring="0.17.8"
 
 [dev-dependencies]
 tower="0.4.13"
