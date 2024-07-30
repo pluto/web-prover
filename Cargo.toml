@@ -45,5 +45,6 @@ futures-util     ="0.3"
 form_urlencoded  ="1.2.1"
 tokio-tungstenite="0.23.0"
 
+# TODO how to get symbols for debugging (stack trace) into wasm module in --release mode?
 # [profile.release]
 # debug = true
