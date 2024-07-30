@@ -66,6 +66,7 @@ async fn acme_listen(listener: TcpListener, router: Router, domain: &str, email:
   let mut state = AcmeConfig::new([domain])
     .contact_push(format!("mailto:{}", email))
     .cache(DirCache::new("./rustls_acme_cache")) // TODO make this a config
+    .directory_lets_encrypt(true)
     .state();
   let challenge_rustls_config = state.challenge_rustls_config();
 

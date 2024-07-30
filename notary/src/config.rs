@@ -31,6 +31,10 @@ pub fn read_config() -> Config {
   let builder = config::Config::builder()
     .set_default("listen", "0.0.0.0:443")
     .unwrap()
+    .set_default("server_cert", "") // TODO is this the right way to make server_cert optional?
+    .unwrap()
+    .set_default("server_key", "") // TODO is this the right way to make server_key optional?
+    .unwrap()
     .set_default("acme_email", "") // TODO is this the right way to make acme_email optional?
     .unwrap()
     .set_default("acme_domain", "") // TODO is this the right way to make acme_domain optional?
