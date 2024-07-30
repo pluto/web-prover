@@ -16,15 +16,25 @@ pub struct Config {
   pub server_key:         String,
   pub listen:             String,
   pub notary_signing_key: String,
+
   pub tlsn_max_sent_data: usize,
   pub tlsn_max_recv_data: usize,
+
+  pub acme_email:  String,
+  pub acme_domain: String,
 }
 
 // TODO read_config should not use unwrap
 pub fn read_config() -> Config {
   let args = Args::parse();
 
-  let builder = config::Config::builder().set_default("listen", "0.0.0.0:443").unwrap();
+  let builder = config::Config::builder()
+    .set_default("listen", "0.0.0.0:443")
+    .unwrap()
+    .set_default("acme_email", "") // TODO is this the right way to make acme_email optional?
+    .unwrap()
+    .set_default("acme_domain", "") // TODO is this the right way to make acme_domain optional?
+    .unwrap();
 
   // does config file exist?
   let config_file = args.config;

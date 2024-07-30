@@ -9,9 +9,9 @@ use rustls::{
   ServerConfig,
 };
 use rustls_acme::{caches::DirCache, AcmeConfig};
-use tokio::net::TcpListener;
-use tokio_rustls::TlsAcceptor;
-use tokio_stream::{wrappers::TcpListenerStream, StreamExt};
+use tokio::{io::AsyncWriteExt, net::TcpListener};
+use tokio_rustls::{LazyConfigAcceptor, TlsAcceptor};
+use tokio_stream::StreamExt;
 use tower_http::cors::CorsLayer;
 use tower_service::Service;
 use tracing::{error, info};
@@ -36,18 +36,8 @@ async fn main() {
   let subscriber = tracing_subscriber::FmtSubscriber::new();
   tracing::subscriber::set_global_default(subscriber).unwrap();
 
-  let certs = load_certs(&c.server_cert).unwrap();
-  let key = load_private_key(&c.server_key).unwrap();
-
   let listener = TcpListener::bind(&c.listen).await.unwrap();
-  let tcp_incoming = TcpListenerStream::new(listener);
   info!("Listening on https://{}", &c.listen);
-
-  let mut server_config =
-    ServerConfig::builder().with_no_client_auth().with_single_cert(certs, key).unwrap();
-  server_config.alpn_protocols = vec![b"http/1.1".to_vec()];
-  // let tls_acceptor = TlsAcceptor::from(Arc::new(server_config));
-  let protocol = Arc::new(http1::Builder::new());
 
   let shared_state = Arc::new(SharedState {
     notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
@@ -63,63 +53,100 @@ async fn main() {
     .with_state(shared_state);
   // .route("/v1/origo", post(todo!("call into origo")));
 
-  let mut tls_incoming = AcmeConfig::new(["example.com"])
-    .contact_push("mailto:admin@example.com")
-    .cache(DirCache::new("./rustls_acme_cache"))
-    .tokio_incoming(tcp_incoming, vec![b"http/1.1".to_vec()]);
+  if &c.server_cert != "" || &c.server_key != "" {
+    listen(listener, router, &c.server_cert, &c.server_key).await;
+  } else {
+    acme_listen(listener, router, &c.acme_domain, &c.acme_email).await;
+  }
+}
 
-  while let Some(tls) = tls_incoming.next().await {
-    let tls = tls.unwrap(); // TODO
+async fn acme_listen(listener: TcpListener, router: Router, domain: &str, email: &str) {
+  let protocol = Arc::new(http1::Builder::new());
 
+  let mut state = AcmeConfig::new([domain])
+    .contact_push(format!("mailto:{}", email))
+    .cache(DirCache::new("./rustls_acme_cache")) // TODO make this a config
+    .state();
+  let challenge_rustls_config = state.challenge_rustls_config();
+
+  let mut rustls_config =
+    ServerConfig::builder().with_no_client_auth().with_cert_resolver(state.resolver());
+  rustls_config.alpn_protocols = vec![b"http/1.1".to_vec()];
+
+  tokio::spawn(async move {
+    loop {
+      match state.next().await.unwrap() {
+        Ok(ok) => info!("event: {:?}", ok),
+        Err(err) => error!("error: {:?}", err),
+      }
+    }
+  });
+
+  loop {
+    let (tcp, _) = listener.accept().await.unwrap();
+    let challenge_rustls_config = challenge_rustls_config.clone();
+    let rustls_config = rustls_config.clone();
     let tower_service = router.clone();
     let protocol = protocol.clone();
 
     tokio::spawn(async move {
-      let io = TokioIo::new(tls);
-      let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
-        tower_service.clone().call(request)
-      });
-      // TODO should we check returned Result here?
-      let _ = protocol.serve_connection(io, hyper_service).with_upgrades().await;
+      let start_handshake = LazyConfigAcceptor::new(Default::default(), tcp).await.unwrap();
+
+      if rustls_acme::is_tls_alpn_challenge(&start_handshake.client_hello()) {
+        info!("received TLS-ALPN-01 validation request");
+        let mut tls = start_handshake.into_stream(challenge_rustls_config).await.unwrap();
+        tls.shutdown().await.unwrap();
+      } else {
+        let tls = start_handshake.into_stream(Arc::new(rustls_config)).await.unwrap();
+        let io = TokioIo::new(tls);
+        let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
+          tower_service.clone().call(request)
+        });
+        let _ = protocol.serve_connection(io, hyper_service).with_upgrades().await;
+      }
     });
   }
+}
 
-  // loop {
-  //   let (tcp_stream, _) = listener.accept().await.unwrap();
-  //   let tls_acceptor = tls_acceptor.clone();
-  //   let tower_service = router.clone();
-  //   let protocol = protocol.clone();
+async fn listen(
+  listener: TcpListener,
+  router: Router,
+  server_cert_path: &str,
+  server_key_path: &str,
+) {
+  let protocol = Arc::new(http1::Builder::new());
 
-  //   tokio::spawn(async move {
-  //     match tls_incoming.next().await {
-  //       Ok(tls_stream) => {
-  //         let io = TokioIo::new(tls_stream);
-  //         let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
-  //           tower_service.clone().call(request)
-  //         });
-  //         // TODO should we check returned Result here?
-  //         let _ = protocol.serve_connection(io, hyper_service).with_upgrades().await;
-  //       },
-  //       Err(err) => {
-  //         error!("{err:#}"); // TODO format this better
-  //       },
-  //     }
+  info!("Using {} and {}", server_cert_path, server_key_path);
+  let certs = load_certs(server_cert_path).unwrap();
+  let key = load_private_key(server_key_path).unwrap();
 
-  //     // match tls_acceptor.accept(tcp_stream).await {
-  //     //   Ok(tls_stream) => {
-  //     //     let io = TokioIo::new(tls_stream);
-  //     //     let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
-  //     //       tower_service.clone().call(request)
-  //     //     });
-  //     //     // TODO should we check returned Result here?
-  //     //     let _ = protocol.serve_connection(io, hyper_service).with_upgrades().await;
-  //     //   },
-  //     //   Err(err) => {
-  //     //     error!("{err:#}"); // TODO format this better
-  //     //   },
-  //     // }
-  //   });
-  // }
+  let mut server_config =
+    ServerConfig::builder().with_no_client_auth().with_single_cert(certs, key).unwrap();
+  server_config.alpn_protocols = vec![b"http/1.1".to_vec()];
+  let tls_acceptor = TlsAcceptor::from(Arc::new(server_config));
+
+  loop {
+    let (tcp_stream, _) = listener.accept().await.unwrap();
+    let tls_acceptor = tls_acceptor.clone();
+    let tower_service = router.clone();
+    let protocol = protocol.clone();
+
+    tokio::spawn(async move {
+      match tls_acceptor.accept(tcp_stream).await {
+        Ok(tls_stream) => {
+          let io = TokioIo::new(tls_stream);
+          let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
+            tower_service.clone().call(request)
+          });
+          // TODO should we check returned Result here?
+          let _ = protocol.serve_connection(io, hyper_service).with_upgrades().await;
+        },
+        Err(err) => {
+          error!("{err:#}"); // TODO format this better
+        },
+      }
+    });
+  }
 }
 
 fn load_certs(filename: &str) -> io::Result<Vec<CertificateDer<'static>>> {
