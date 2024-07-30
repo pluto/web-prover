@@ -37,8 +37,7 @@ const proof = await prover({
   target_url: "https://example.com",
   target_headers: {},
   target_body: "",
-  // websocket_proxy_url: "wss://ws.tlsnotary.pluto.xyz",
-  websocket_proxy_url: "wss://notary.pluto.dev:443/v1/tlsnotary/websocket_proxy",
+  websocket_proxy_url: "wss://notary.pluto.dev/v1/tlsnotary/websocket_proxy",
   notarization_session_request: {
     client_type: "Websocket",
     max_sent_data: 10000,
@@ -48,5 +47,6 @@ const proof = await prover({
 
 console.log(proof);
 
+  // websocket_proxy_url: "wss://ws.tlsnotary.pluto.xyz",
 // TODO verify
 // JSON.parse(await verify(JSON.stringify(proof), pubkey));

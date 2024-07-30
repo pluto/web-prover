@@ -15,6 +15,7 @@ use tokio_stream::StreamExt;
 use tower_http::cors::CorsLayer;
 use tower_service::Service;
 use tracing::{error, info};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod axum_websocket;
 mod config;
@@ -33,8 +34,10 @@ struct SharedState {
 async fn main() {
   let c = config::read_config();
 
-  let subscriber = tracing_subscriber::FmtSubscriber::new();
-  tracing::subscriber::set_global_default(subscriber).unwrap();
+  tracing_subscriber::registry()
+    .with(tracing_subscriber::fmt::layer())
+    .with(tracing_subscriber::EnvFilter::from_default_env()) // set via RUST_LOG=INFO etc
+    .init();
 
   let listener = TcpListener::bind(&c.listen).await.unwrap();
   info!("Listening on https://{}", &c.listen);

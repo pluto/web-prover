@@ -116,6 +116,7 @@ pub async fn websocket_notarize(
   max_sent_data: Option<usize>,
   max_recv_data: Option<usize>,
 ) {
+  debug!("Upgraded to websocket connection");
   let stream = WsStream::new(socket.into_inner()).compat();
   match notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data).await
   {
@@ -135,7 +136,7 @@ pub async fn tcp_notarize(
   max_sent_data: Option<usize>,
   max_recv_data: Option<usize>,
 ) {
-  debug!(?session_id, "Upgraded to tcp connection");
+  debug!("Upgraded to tcp connection");
   match notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data).await
   {
     Ok(_) => {
