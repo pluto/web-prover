@@ -15,7 +15,7 @@ notary_ca_cert=[]
 # Shared dependencies for all targets
 [dependencies]
 # TLSN
-tls-client  ={ git="https://github.com/tlsnotary/tlsn.git", package="tlsn-tls-client", tag = "v0.1.0-alpha.6" }
+tls-client  ={ workspace=true }
 webpki-roots="0.26.1"
 pki-types   ={ package="rustls-pki-types", version="1.7" }
 cfg-if      ="1.0.0"
@@ -52,8 +52,8 @@ tokio-util={ version="0.7", features=[
 tokio-rustls={ version="0.26.0", default-features=false, features=["logging", "tls12"] }
 tokio={ version="1", features=["rt", "rt-multi-thread", "macros", "net", "io-std", "fs"] }
 # TLSN
-tlsn-prover          ={ git="https://github.com/tlsnotary/tlsn.git", tag = "v0.1.0-alpha.6" }
-tlsn-core            ={ git="https://github.com/tlsnotary/tlsn.git", tag = "v0.1.0-alpha.6" }
+tlsn-prover          ={ workspace=true }
+tlsn-core            ={ workspace=true }
 async-tungstenite    ={ version="0.25.1", features=["async-std-runtime", "async-tls"] }
 ws_stream_tungstenite={ version="0.13.0", features=["tokio_io"] }
 
@@ -114,12 +114,12 @@ wasm-bindgen-rayon      ="1.0"
 tracing-subscriber      ={ version="0.3", features=["time", "env-filter"] }
 tracing-web             ="0.1.2"
 
-parking_lot = { version = "0.12", features = ["nightly"] }
+parking_lot={ version="0.12", features=["nightly"] }
 
 # TLSN
-tlsn-prover    ={ git="https://github.com/tlsnotary/tlsn.git", tag = "v0.1.0-alpha.6" }
-tlsn-core      ={ git="https://github.com/tlsnotary/tlsn.git", tag = "v0.1.0-alpha.6" }
-tlsn-tls-client={ git="https://github.com/tlsnotary/tlsn.git", tag = "v0.1.0-alpha.6" }
+tlsn-prover={ workspace=true }
+tlsn-core  ={ workspace=true }
+tls-client ={ workspace=true }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test="0.3.42"

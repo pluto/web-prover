@@ -14,6 +14,12 @@ serde_json="1.0.120"
 tracing           ="0.1.40"
 tracing-subscriber="0.3.18"
 
+notary-server={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
+tlsn-verifier={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
+tlsn-prover  ={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
+tlsn-core    ={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
+tls-client   ={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4", package="tlsn-tls-client" }
+
 [package]
 name   ="webprover"
 edition="2021"
