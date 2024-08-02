@@ -1092,35 +1092,39 @@ dependencies = [
 name = "client_wasm"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "client",
  "console_error_panic_hook",
  "elliptic-curve",
+ "futures",
+ "futures-util",
  "getrandom",
- "gloo-utils",
- "hyper 1.4.1",
- "hyper-util",
+ "http-body-util",
+ "hyper 0.14.30",
  "js-sys",
  "p256",
- "pin-project-lite",
  "rayon",
  "ring",
- "rustls-pki-types",
+ "serde",
  "serde-wasm-bindgen",
  "serde_json",
+ "strum",
+ "strum_macros",
  "time",
  "tlsn-core",
  "tlsn-prover",
- "tlsn-tls-client",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
  "tracing-web",
+ "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-rayon",
+ "wasm-bindgen-test",
  "web-sys",
  "web-time 1.1.0",
- "webpki-roots 0.26.3",
  "ws_stream_wasm",
 ]
 
@@ -2004,19 +2008,6 @@ dependencies = [
  "futures-core",
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "gloo-utils"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "037fcb07216cb3a30f7292bd0176b050b7b9a052ba830ef7d5d65f6dc64ba58e"
-dependencies = [
- "js-sys",
- "serde",
- "serde_json",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
@@ -4197,6 +4188,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "strum"
+version = "0.26.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8fec0f0aef304996cf250b31b5a10dee7980c85da9d759361292b8bca5a18f06"
+
+[[package]]
+name = "strum_macros"
+version = "0.26.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c6bee85a5a24955dc440386795aa378cd9cf82acd5f764469152d2270e581be"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "rustversion",
+ "syn 2.0.72",
+]
+
+[[package]]
 name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4541,6 +4551,7 @@ dependencies = [
  "tlsn-tls-mpc",
  "tlsn-utils",
  "tlsn-utils-aio",
+ "tracing",
  "web-time 0.2.4",
  "webpki-roots 0.26.3",
 ]
@@ -5250,6 +5261,7 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]

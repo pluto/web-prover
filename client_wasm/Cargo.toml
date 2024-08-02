@@ -8,29 +8,40 @@ crate-type=["cdylib", "rlib"]
 
 [dependencies]
 client={ path="../client", features=["websocket"] }
-# Web
-# hyper-util={ version="0.1", features=["http1"] }
-hyper     ={ version="1.1", features=["client", "http1"] }
-hyper-util={ version="0.1", features=["http1"] }
-## Use the patched ws_stream_wasm to fix the issue https://github.com/najamelan/ws_stream_wasm/issues/12#issuecomment-1711902958
-ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wasm", rev="2ed12aad9f0236e5321f577672f309920b2aef51" }
-# Serde
-serde-wasm-bindgen="0.6.5"
 
-# Other
-ring          ={ version="0.17", features=["wasm32_unknown_unknown_js"] }
-chrono        ="0.4"
-elliptic-curve={ version="0.13.5", features=["pkcs8"] }
-getrandom     ={ version="0.2", features=["js"] }
-js-sys        ="0.3.64"
-p256          ={ version="0.13", features=["pem", "ecdsa"] }
-rayon         ="1.5"
+chrono              ="0.4"
+elliptic-curve      ={ version="0.13.5", features=["pkcs8"] }
+futures             ="0.3"
+futures-util        ="0.3.28"
+getrandom           ={ version="0.2", features=["js"] }
+js-sys              ="0.3.64"
+p256                ={ version="0.13", features=["pem", "ecdsa"] }
+rayon               ="1.5"
+serde               ={ version="1.0.147", features=["derive"] }
+serde-wasm-bindgen  ="0.6.1"
+serde_json          ="1.0"
+tokio-util          ="0.7"
+tracing             ="0.1"
+url                 ={ version="2.0", features=["serde"] }
+wasm-bindgen        ="0.2.87"
+wasm-bindgen-futures="0.4.37"
+wasm-bindgen-rayon  ="1.0"
+
+hyper             ={ version="0.14", features=["client", "http1"] }
+tracing-subscriber={ version="0.3", features=["time"] }
+tracing-web       ="0.1.2"
+
+ring={ version="0.17", features=["wasm32_unknown_unknown_js"] }
+
 # time crate: https://crates.io/crates/time
 # NOTE: It is required, otherwise "time not implemented on this platform" error happens right after "!@# 2".
 # Probably due to tokio's time feature is used in tlsn-prover?
 time={ version="0.3.34", features=["wasm-bindgen"] }
 # Used to calculate elapsed time.
 web-time="1.0"
+
+tlsn-prover={ workspace=true }
+tlsn-core  ={ workspace=true }
 
 web-sys={ version="0.3.4", features=[
   "BinaryType",
@@ -53,26 +64,20 @@ web-sys={ version="0.3.4", features=[
   'Response',
 ] }
 
+# Use the patched ws_stream_wasm to fix the issue https://github.com/najamelan/ws_stream_wasm/issues/12#issuecomment-1711902958
+ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wasm", rev="2ed12aad9f0236e5321f577672f309920b2aef51" }
+
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
 # all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
 # code size when deploying.
 console_error_panic_hook={ version="0.1.7" }
 
-webpki-roots        ="0.26.1"
-pki-types           ={ package="rustls-pki-types", version="1.7" }
-pin-project-lite    ="0.2.4"
-wasm-bindgen        ="0.2.87"
-wasm-bindgen-futures="0.4.37"
-wasm-bindgen-rayon  ="1.0"
-tracing-subscriber  ={ version="0.3", features=["time", "env-filter"] }
-tracing-web         ="0.1.2"
+strum       ={ version="0.26.1" }
+strum_macros="0.26.1"
 
-gloo-utils={ version="0.1", features=["serde"] }
-serde_json="1.0"
-tracing   ="0.1"
+base64="0.22.0"
+http-body-util="0.1"
 
-# TLSN
-tlsn-prover={ workspace=true }
-tlsn-core  ={ workspace=true }
-tls-client={ workspace=true }
+[dev-dependencies]
+wasm-bindgen-test="0.3.34"

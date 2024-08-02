@@ -16,9 +16,11 @@ tracing-subscriber="0.3.18"
 
 notary-server={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
 tlsn-verifier={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
-tlsn-prover  ={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
-tlsn-core    ={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
-tls-client   ={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4", package="tlsn-tls-client" }
+tlsn-prover={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4", features=[
+	"tracing",
+] }
+tlsn-core={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
+tls-client={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4", package="tlsn-tls-client" }
 
 [package]
 name   ="webprover"
