@@ -64,7 +64,7 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   let target_url = Url::parse(&config.target_url)?;
 
   trace!("parsed `target_url`: {target_url:?}");
-  // TODO: These three lines with target_url should probably throw a well-defined error instead of 
+  // TODO: These three lines with target_url should probably throw a well-defined error instead of
   // causing panic.
   let target_host = target_url.host_str().expect("Invalid `target_url` host!");
   assert!(target_url.scheme() == "https");
@@ -81,7 +81,7 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   //---------------------------------------------------------------------------------------------------------------------------------------//
   // TODO: The following should be made modular in that we don't want to enforce we are going to
   // notary approach
-  //---------------------------------------------------------------------------------------------------------------------------------------// 
+  //---------------------------------------------------------------------------------------------------------------------------------------//
   // Create a notary session and get back a `NetworkStream` and the session ID
   //---------------------------------------------------------------------------------------------------------------------------------------//
 
@@ -110,18 +110,17 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   drop(_span);
   //---------------------------------------------------------------------------------------------------------------------------------------//
 
-  //---------------------------------------------------------------------------------------------------------------------------------------// 
+  //---------------------------------------------------------------------------------------------------------------------------------------//
   // Set up the prover which lies on the client and can access the notary for MPC
-  //---------------------------------------------------------------------------------------------------------------------------------------// 
-  
+  //---------------------------------------------------------------------------------------------------------------------------------------//
+
   let root_store = default_root_store(); // TODO lot of memory allocation happening here.
-  // maybe add this to shared state?
+                                         // maybe add this to shared state?
 
   let _span = tracing::span!(tracing::Level::TRACE, "create_prover").entered();
   let mut prover_config = ProverConfig::builder();
-  let session_id = "c655ee6e-fad7-44c3-8884-5330287982a8"; // TODO random hardcoded UUID4. notary does not need it anymore. 
-  prover_config.id(session_id).server_dns(target_host).
-  root_cert_store(root_store); 
+  let session_id = "c655ee6e-fad7-44c3-8884-5330287982a8"; // TODO random hardcoded UUID4. notary does not need it anymore.
+  prover_config.id(session_id).server_dns(target_host).root_cert_store(root_store);
   prover_config.max_transcript_size(
     config.notarization_session_request.max_sent_data.unwrap()
       + config.notarization_session_request.max_recv_data.unwrap(),
@@ -146,7 +145,7 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   //---------------------------------------------------------------------------------------------------------------------------------------//
   // Connect the client to the target via TLS and maintain it concurrently
   //---------------------------------------------------------------------------------------------------------------------------------------//
-  // TODO: This will likely not compile without websocket feature  on wasm since this is a tokio 
+  // TODO: This will likely not compile without websocket feature  on wasm since this is a tokio
   // tcpstream. ALSO, this does noit actually provide a websocket feature for non-wasm.
   //
   // Bind the Prover to server connection
@@ -215,12 +214,11 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   //---------------------------------------------------------------------------------------------------------------------------------------//
   // Build the HTTP request asking the target for some data
   //---------------------------------------------------------------------------------------------------------------------------------------//
-  let mut request =
-  Request::builder().method(config.target_method.as_str()).uri(config.target_url);
+  let mut request = Request::builder().method(config.target_method.as_str()).uri(config.target_url);
 
   // The following `unwrap()` should be safe since we just created the `Request` above
   let headers = request.headers_mut().unwrap();
-  // TODO: This could be a source of error as the mapping now just holds a single string, so I will 
+  // TODO: This could be a source of error as the mapping now just holds a single string, so I will
   // leave commented out code here.
   for (key, value) in config.target_headers {
     //   for (key, values) in config.target_headers {
@@ -251,7 +249,6 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   let request = request.body(body)?;
   //---------------------------------------------------------------------------------------------------------------------------------------//
-  //---------------------------------------------------------------------------------------------------------------------------------------//
   // Send the HTTP request from the client to the target
   //---------------------------------------------------------------------------------------------------------------------------------------//
 
@@ -269,12 +266,12 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
       debug!("Response:\n{:?}", _payload);
       debug!("Response Status:\n{:?}", status);
-      
+
       assert!(status.is_success()); // status is 200-299
 
       debug!("Request OK");
     },
-    Err(e) if e.is_incomplete_message() => println!("Response: IncompleteMessage (ignored)"), /*TODO */
+    Err(e) if e.is_incomplete_message() => println!("Response: IncompleteMessage (ignored)"), /* TODO */
     Err(e) => panic!("{:?}", e),
   };
 
@@ -309,7 +306,7 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   //---------------------------------------------------------------------------------------------------------------------------------------//
   // Restructure the proof and return it
   //---------------------------------------------------------------------------------------------------------------------------------------//
-   let session_proof = notarized_session.session_proof();
+  let session_proof = notarized_session.session_proof();
 
   let mut proof_builder = notarized_session.session().data().build_substrings_proof();
 

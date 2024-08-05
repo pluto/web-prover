@@ -90,7 +90,7 @@ pub async fn notarize(
   // TODO Should we just hardcode one UUID4 and pass in the same for all calls?
   // let session_id = Uuid::new_v4().to_string();
 
-  // NOTE: This causes the setup to hang if it doesn't match. 
+  // NOTE: This causes the setup to hang if it doesn't match.
   let session_id = "c655ee6e-fad7-44c3-8884-5330287982a8".to_string();
 
   debug!("Starting notarize with ID: {}", session_id);

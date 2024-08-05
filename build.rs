@@ -8,7 +8,6 @@ fn main() {
   println!("cargo:rerun-if-changed=.git/HEAD");
   println!("cargo:rerun-if-changed=.git/refs/heads/main");
 
-  
   // useful for local debugging
   // TODO rerun does not trigger if env variable changes
   // https://github.com/rust-lang/cargo/issues/10358
