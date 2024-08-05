@@ -17,7 +17,7 @@ const proof = await prover(
     notary_host: "localhost",
     notary_port: 7443,
     target_method: "GET",
-    target_url: "https://localhost:8085/health",
+    target_url: "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json", // "https://localhost:8085/health",
     target_headers: {},
     target_body: "",
     // websocket_proxy_url: "wss://ws.alpha4.tlsnotary.pluto.dev",

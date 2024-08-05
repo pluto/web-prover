@@ -378,7 +378,7 @@ pub async fn tlsnotary_notarize(
   Ok(TlsProof { session: session_proof, substrings: substrings_proof })
 }
 
-// #[cfg(feature = "notary_ca_cert")]
+#[cfg(feature = "notary_ca_cert")]
 const NOTARY_CA_CERT: &[u8] = include_bytes!(env!("NOTARY_CA_CERT_PATH"));
 
 /// Default root store using mozilla certs.
@@ -392,7 +392,7 @@ pub fn default_root_store() -> tls_client::RootCertStore {
     )
   }));
 
-  // #[cfg(feature = "notary_ca_cert")]
+  #[cfg(feature = "notary_ca_cert")]
   {
     debug!("notary_ca_cert feature enabled");
     let certificate = pki_types::CertificateDer::from(NOTARY_CA_CERT.to_vec());
