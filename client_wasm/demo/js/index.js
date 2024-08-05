@@ -20,8 +20,8 @@ const proof = await prover(
     target_url: "https://localhost:8085/health",
     target_headers: {},
     target_body: "",
-    websocket_proxy_url: "wss://ws.alpha4.tlsnotary.pluto.dev",
-    // websocket_proxy_url: "wss://localhost:7443/v1/tlsnotary/websocket_proxy",
+    // websocket_proxy_url: "wss://ws.alpha4.tlsnotary.pluto.dev",
+    websocket_proxy_url: "wss://localhost:7443/v1/tlsnotary/websocket_proxy",
     notarization_session_request: {
       client_type: "Websocket",
       max_sent_data: 10000,

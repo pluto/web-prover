@@ -17,8 +17,7 @@ cargo run --release --bin mock_server
 ```
 cargo run --release -p notary -- --config ./fixture/notary-config.toml
 cargo run --release --bin mock_server
-make wasm
-make wasm-demo
+NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" make wasm && make wasm-demo
 open https://localhost:8090
 ```
 

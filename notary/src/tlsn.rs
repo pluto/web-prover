@@ -88,7 +88,12 @@ pub async fn notarize(
 ) -> Response {
   // We manually just create a UUID4 for the remaining calls here
   // TODO Should we just hardcode one UUID4 and pass in the same for all calls?
-  let session_id = Uuid::new_v4().to_string();
+  // let session_id = Uuid::new_v4().to_string();
+
+  // NOTE: This causes the setup to hang if it doesn't match. 
+  let session_id = "c655ee6e-fad7-44c3-8884-5330287982a8".to_string();
+
+  debug!("Starting notarize with ID: {}", session_id);
 
   let max_sent_data = Some(state.tlsn_max_sent_data);
   let max_recv_data = Some(state.tlsn_max_recv_data);
