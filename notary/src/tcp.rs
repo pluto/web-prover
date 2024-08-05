@@ -11,6 +11,7 @@ use http::header::{HeaderMap, HeaderName};
 use hyper::upgrade::{OnUpgrade, Upgraded};
 use hyper_util::rt::TokioIo;
 use tracing::error;
+
 use crate::tlsn::NotaryServerError;
 
 /// Custom extractor used to extract underlying TCP connection for TCP client — using the same
