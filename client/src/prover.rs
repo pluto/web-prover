@@ -21,9 +21,10 @@ use tlsn_prover::tls::{
 use tokio::{net::TcpStream, runtime};
 use tokio_rustls::TlsConnector;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
+use tracing::debug;
 use url::Url;
 
-use crate::{default_root_store, send_request, Config};
+use crate::{send_request, Config};
 
 // uses websocket to connect to notary
 // TODO decide if that means it's using the websocket proxy as well?
@@ -68,16 +69,15 @@ pub async fn setup_connection(config: &mut Config) -> Prover<Closed> {
 				.await
 				.unwrap();
 
+  // TODO remove this - it's not used?
   // Attach the hyper HTTP client to the notary TLS connection to send request to the /session
   // endpoint to configure notarization and obtain session id
-  let (mut request_sender, connection) =
-    hyper::client::conn::handshake(notary_tls_socket).await.unwrap();
-
+  //   let (mut request_sender, connection) =
+  // hyper::client::conn::handshake(notary_tls_socket).await.unwrap();
   // Spawn the HTTP task to be run concurrently
-  let connection_task = tokio::spawn(connection.without_shutdown());
-
+  //   let connection_task = tokio::spawn(connection.without_shutdown());
   // Claim back the TLS socket after HTTP exchange is done
-  let Parts { io: notary_tls_socket, .. } = connection_task.await.unwrap().unwrap();
+  //   let Parts { io: notary_tls_socket, .. } = connection_task.await.unwrap().unwrap();
 
   let prover = Prover::new(prover_config).setup(notary_tls_socket.compat()).await.unwrap();
 
@@ -88,17 +88,17 @@ pub async fn setup_connection(config: &mut Config) -> Prover<Closed> {
 
   let prover_task = tokio::spawn(prover_fut);
 
-  let (mut request_sender, connection) =
+  let (request_sender, connection) =
     hyper::client::conn::handshake(mpc_tls_connection.compat()).await.unwrap();
 
   let connection_task = tokio::spawn(connection.without_shutdown());
 
   send_request(
     request_sender,
-    config.target_method,
-    config.target_url,
-    config.target_headers,
-    config.target_body,
+    config.target_method.clone(),
+    config.target_url.clone(),
+    config.target_headers.clone(),
+    config.target_body.clone(),
   )
   .await;
 
@@ -106,4 +106,29 @@ pub async fn setup_connection(config: &mut Config) -> Prover<Closed> {
   client_socket.close().await.unwrap();
 
   prover_task.await.unwrap().unwrap()
+}
+
+#[cfg(feature = "notary_ca_cert")]
+const NOTARY_CA_CERT: &[u8] = include_bytes!(env!("NOTARY_CA_CERT_PATH"));
+
+/// Default root store using mozilla certs.
+fn default_root_store() -> rustls::RootCertStore {
+  let mut root_store = rustls::RootCertStore::empty();
+  root_store.add_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
+    rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
+      ta.subject.as_ref(),
+      ta.subject_public_key_info.as_ref(),
+      ta.name_constraints.as_ref().map(|nc| nc.as_ref()),
+    )
+  }));
+
+  #[cfg(feature = "notary_ca_cert")]
+  {
+    debug!("notary_ca_cert feature enabled");
+    let certificate = pki_types::CertificateDer::from(NOTARY_CA_CERT.to_vec());
+    let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
+    assert_eq!(added, 1); // TODO there is probably a better way
+  }
+
+  root_store
 }

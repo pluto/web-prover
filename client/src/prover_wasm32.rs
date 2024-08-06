@@ -25,15 +25,18 @@ use web_sys::{Headers, Request as WebsysRequest, RequestInit, RequestMode, Respo
 use web_time::Instant;
 use ws_stream_wasm::*;
 
-use crate::{default_root_store, send_request, Config};
+use crate::{send_request, Config};
 
 // uses websockets to connect to notary and websocket proxy
 pub async fn setup_connection(config: &mut Config) -> Prover<Closed> {
   let session_id = config.session_id();
 
+  let root_store = default_root_store();
+
   let prover_config = ProverConfig::builder()
-    .id(session_id)
+    .id(session_id.clone())
     .server_dns(config.target_host())
+    .root_cert_store(root_store)
     .max_transcript_size(
       config.notarization_session_request.max_sent_data.unwrap()
         + config.notarization_session_request.max_recv_data.unwrap(),
@@ -43,7 +46,7 @@ pub async fn setup_connection(config: &mut Config) -> Prover<Closed> {
 
   let wss_url = format!(
     "wss://{}:{}/v1/tlsnotary?session_id={}",
-    config.notary_host, config.notary_port, session_id,
+    config.notary_host, config.notary_port, session_id.clone(),
   );
 
   let (_, notary_ws_stream) = WsMeta::connect(wss_url, None).await.unwrap();
@@ -95,4 +98,29 @@ pub async fn setup_connection(config: &mut Config) -> Prover<Closed> {
   client_socket.close().await.unwrap();
 
   prover_receiver.await.unwrap().unwrap()
+}
+
+#[cfg(feature = "notary_ca_cert")]
+const NOTARY_CA_CERT: &[u8] = include_bytes!(env!("NOTARY_CA_CERT_PATH"));
+
+/// Default root store using mozilla certs.
+fn default_root_store() -> tls_client::RootCertStore {
+  let mut root_store = tls_client::RootCertStore::empty();
+  root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
+    tls_client::OwnedTrustAnchor::from_subject_spki_name_constraints(
+      ta.subject.as_ref(),
+      ta.subject_public_key_info.as_ref(),
+      ta.name_constraints.as_ref().map(|nc| nc.as_ref()),
+    )
+  }));
+
+  #[cfg(feature = "notary_ca_cert")]
+  {
+    debug!("notary_ca_cert feature enabled");
+    let certificate = pki_types::CertificateDer::from(NOTARY_CA_CERT.to_vec());
+    let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
+    assert_eq!(added, 1); // TODO there is probably a better way
+  }
+
+  root_store
 }

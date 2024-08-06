@@ -36,6 +36,7 @@ futures-util="0.3.28"
 # Other
 base64="0.22.0"
 
+
 tokio-util={ version="0.7", features=[
   "compat",
 ] } # compat is used to work with AsyncRead and AsyncWrite from other crates
