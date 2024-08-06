@@ -2,7 +2,7 @@ use std::{error::Error, sync::Arc};
 
 use async_trait::async_trait;
 use axum::{
-  extract::{FromRequestParts, State},
+  extract::{FromRequestParts, Query, State},
   http::{header, request::Parts, StatusCode},
   response::{IntoResponse, Response},
 };
@@ -10,11 +10,11 @@ use eyre::Report;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use p256::ecdsa::{Signature, SigningKey};
+use serde::Deserialize;
 use tlsn_verifier::tls::{Verifier, VerifierConfig, VerifierConfigBuilderError, VerifierError};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::{debug, error, info};
-use uuid::Uuid;
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
@@ -81,17 +81,18 @@ pub async fn notary_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   Ok(())
 }
 
+#[derive(Deserialize)]
+pub struct NotarizeQuery {
+  session_id: String,
+}
+
 // TODO Response or impl IntoResponse?
 pub async fn notarize(
   protocol_upgrade: ProtocolUpgrade,
+  query: Query<NotarizeQuery>,
   State(state): State<Arc<SharedState>>,
 ) -> Response {
-  // We manually just create a UUID4 for the remaining calls here
-  // TODO Should we just hardcode one UUID4 and pass in the same for all calls?
-  // let session_id = Uuid::new_v4().to_string();
-
-  // NOTE: This causes the setup to hang if it doesn't match.
-  let session_id = "c655ee6e-fad7-44c3-8884-5330287982a8".to_string();
+  let session_id = query.session_id.clone();
 
   debug!("Starting notarize with ID: {}", session_id);
 

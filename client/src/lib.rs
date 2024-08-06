@@ -92,9 +92,14 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   // #[cfg(not(target_arch = "wasm32"))]
   // let Parts { io: notary_tls_socket, .. } = connection_task.await??;
 
-  debug!("TLS socket created with TCP connection ZZZZ TRACY");
+  debug!("TLS socket created with TCP connection");
 
-  let wss_url = format!("wss://{}:{}/v1/tlsnotary", config.notary_host, config.notary_port);
+  let session_id = uuid::Uuid::new_v4().to_string();
+
+  let wss_url = format!(
+    "wss://{}:{}/v1/tlsnotary?session_id={}",
+    config.notary_host, config.notary_port, session_id
+  );
 
   #[cfg(target_arch = "wasm32")]
   let (_, notary_tls_socket) = WsMeta::connect(wss_url, None).await.unwrap();
@@ -119,7 +124,6 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   let _span = tracing::span!(tracing::Level::TRACE, "create_prover").entered();
   let mut prover_config = ProverConfig::builder();
-  let session_id = "c655ee6e-fad7-44c3-8884-5330287982a8"; // TODO random hardcoded UUID4. notary does not need it anymore.
   prover_config.id(session_id).server_dns(target_host).root_cert_store(root_store);
   prover_config.max_transcript_size(
     config.notarization_session_request.max_sent_data.unwrap()

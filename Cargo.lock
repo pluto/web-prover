@@ -1065,6 +1065,7 @@ dependencies = [
  "tracing-subscriber",
  "tracing-web",
  "url",
+ "uuid",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-rayon",
