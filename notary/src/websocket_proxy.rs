@@ -70,7 +70,6 @@ pub async fn handle_connection(socket: WebSocket, target_host: &str, target_port
   let tcp_to_ws = async {
     let mut tcp_buf = [0; 4096];
     loop {
-      debug!("ws: read");
       let n = tcp_read.read(&mut tcp_buf).await.expect("Failed to read from TCP stream");
 
       // TODO n == 0 works but is not correct
@@ -83,7 +82,6 @@ pub async fn handle_connection(socket: WebSocket, target_host: &str, target_port
       // newlines for example.
 
       if n == 0 {
-        debug!("tcp_to_ws: n == 0");
         ws_sink.close().await.unwrap(); // TODO fix unwrap
         break;
       }
@@ -93,5 +91,4 @@ pub async fn handle_connection(socket: WebSocket, target_host: &str, target_port
   };
 
   tokio::join!(ws_to_tcp, tcp_to_ws);
-  debug!("ws proxy ended");
 }

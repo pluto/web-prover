@@ -342,46 +342,6 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   //---------------------------------------------------------------------------------------------------------------------------------------//
 }
 
-pub async fn tlsnotary_notarize(
-  prover: Prover<tlsn_prover::tls::state::Closed>,
-) -> Result<TlsProof, errors::ClientErrors> {
-  let mut prover = prover.to_http()?.start_notarize();
-
-  prover.commit().unwrap();
-
-  let notarized_session = prover.finalize().await?;
-
-  let session_proof = notarized_session.session_proof();
-
-  let mut proof_builder = notarized_session.session().data().build_substrings_proof();
-
-  // Prove the request, while redacting the secrets from it.
-  let request = &notarized_session.transcript().requests[0];
-
-  proof_builder.reveal_sent(&request.without_data(), CommitmentKind::Blake3)?;
-
-  proof_builder.reveal_sent(&request.request.target, CommitmentKind::Blake3)?;
-
-  for header in &request.headers {
-    // Only reveal the host header
-    if header.name.as_str().eq_ignore_ascii_case("Host") {
-      proof_builder.reveal_sent(header, CommitmentKind::Blake3)?;
-    } else {
-      proof_builder.reveal_sent(&header.without_value(), CommitmentKind::Blake3)?;
-    }
-  }
-
-  // Prove the entire response, as we don't need to redact anything
-  let response = &notarized_session.transcript().responses[0];
-
-  proof_builder.reveal_recv(response, CommitmentKind::Blake3)?;
-
-  // Build the proof
-  let substrings_proof = proof_builder.build()?;
-
-  Ok(TlsProof { session: session_proof, substrings: substrings_proof })
-}
-
 #[cfg(feature = "notary_ca_cert")]
 const NOTARY_CA_CERT: &[u8] = include_bytes!(env!("NOTARY_CA_CERT_PATH"));
 
