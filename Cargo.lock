@@ -913,7 +913,7 @@ dependencies = [
  "futures-util",
  "getrandom",
  "http-body-util",
- "hyper 1.4.1",
+ "hyper 0.14.30",
  "hyper-util",
  "js-sys",
  "p256",
@@ -921,17 +921,20 @@ dependencies = [
  "pin-project-lite",
  "rayon",
  "ring",
+ "rustls 0.21.12",
  "rustls-pki-types",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
+ "strum",
+ "strum_macros",
  "thiserror",
  "time",
  "tlsn-core",
  "tlsn-prover",
  "tlsn-tls-client",
  "tokio",
- "tokio-rustls",
+ "tokio-rustls 0.24.1",
  "tokio-util",
  "tracing",
  "tracing-subscriber",
@@ -2545,7 +2548,7 @@ dependencies = [
  "thiserror",
  "tlsn-verifier",
  "tokio",
- "tokio-rustls",
+ "tokio-rustls 0.26.0",
  "tokio-stream",
  "tokio-tungstenite 0.23.1",
  "tokio-util",
@@ -4129,6 +4132,16 @@ dependencies = [
 
 [[package]]
 name = "tokio-rustls"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c28327cf380ac148141087fbfb9de9d7bd4e84ab5d2c28fbc911d753de8a7081"
+dependencies = [
+ "rustls 0.21.12",
+ "tokio",
+]
+
+[[package]]
+name = "tokio-rustls"
 version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c7bc40d0e5a97695bb96e27995cd3a08538541b0a846f65bba7a359f36700d4"
@@ -4743,7 +4756,7 @@ dependencies = [
  "rustls-pemfile 2.1.2",
  "rustls-pki-types",
  "tokio",
- "tokio-rustls",
+ "tokio-rustls 0.26.0",
  "tokio-tungstenite 0.23.1",
 ]
 

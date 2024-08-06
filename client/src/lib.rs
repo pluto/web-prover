@@ -1,25 +1,25 @@
-pub mod errors;
+#[cfg(not(target_arch = "wasm32"))] mod prover;
+#[cfg(not(target_arch = "wasm32"))]
+use prover::setup_connection;
 
-#[cfg(target_arch = "wasm32")] mod wasm_utils;
+#[cfg(target_arch = "wasm32")] mod prover_wasm32;
+#[cfg(target_arch = "wasm32")]
+use prover_wasm32::setup_connection;
+
+pub mod errors;
 
 use std::collections::HashMap;
 
 use base64::prelude::*;
 use http_body_util::Full;
-use hyper::{body::Bytes, client::conn::http1::SendRequest, Request};
+// use hyper::{body::Bytes, client::conn::http1::SendRequest, Request};
+use hyper::{body::Bytes, Request};
 use serde::{Deserialize, Serialize};
 use tlsn_core::commitment::CommitmentKind;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
 use tracing::{debug, info, trace};
 use url::Url;
-#[cfg(target_arch = "wasm32")]
-use {futures::channel::oneshot, wasm_bindgen_futures::spawn_local, ws_stream_wasm::WsMeta};
-#[cfg(not(target_arch = "wasm32"))]
-use {
-  tokio::net::TcpStream, tokio_util::compat::FuturesAsyncReadCompatExt,
-  tokio_util::compat::TokioAsyncReadCompatExt,
-};
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct Config {
@@ -31,7 +31,35 @@ pub struct Config {
   pub target_body:                  String,
   #[cfg(feature = "websocket")]
   pub websocket_proxy_url:          String,
-  pub notarization_session_request: NotarizationSessionRequest, // TODO rename to something better
+  pub notarization_session_request: NotarizationSessionRequest, /* TODO rename to something
+                                                                 * better */
+
+  #[serde(skip)]
+  session_id: String,
+}
+
+impl Config {
+  fn session_id(&mut self) -> String {
+    if self.session_id.is_empty() {
+      self.session_id = uuid::Uuid::new_v4().to_string();
+    }
+    self.session_id.clone()
+  }
+
+  fn target_host(&self) -> String {
+    let target_url = Url::parse(&self.target_url).unwrap();
+    target_url.host_str().unwrap().to_string()
+  }
+
+  fn target_port(&self) -> u16 {
+    let target_url = Url::parse(&self.target_url).unwrap();
+    target_url.port_or_known_default().unwrap()
+  }
+
+  fn target_is_https(&self) -> bool {
+    let target_url = Url::parse(&self.target_url).unwrap();
+    target_url.scheme() == "https"
+  }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,134 +80,37 @@ pub enum ClientType {
   Websocket,
 }
 
-pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErrors> {
-  let target_url = Url::parse(&config.target_url)?;
-  info!("target: {}", target_url);
-  let target_host = target_url.host_str().expect("Invalid `target_url` host!");
-  assert!(target_url.scheme() == "https");
-  let target_port = target_url.port_or_known_default().expect("Target has an unknown port!");
+pub async fn prover_inner(mut config: Config) -> Result<TlsProof, errors::ClientErrors> {
+  //   let target_url = Url::parse(&config.target_url)?;
+  //   info!("target: {}", target_url);
+  //   let target_host = target_url.host_str().expect("Invalid `target_url` host!");
+  //   assert!(target_url.scheme() == "https");
+  //   let target_port = target_url.port_or_known_default().expect("Target has an unknown port!");
 
-  let session_id = uuid::Uuid::new_v4().to_string();
-  info!("session_id: {}", session_id);
+  //   let session_id = uuid::Uuid::new_v4().to_string();
+  //   info!("session_id: {}", session_id);
 
   // TODO lot of memory allocation happening here.
   // maybe add this to shared state?
-  let root_store = default_root_store();
+  //   let root_store = default_root_store();
 
-  debug!("Creating prover config");
-  let mut prover_config = ProverConfig::builder();
-  prover_config.id(session_id.clone()).server_dns(target_host).root_cert_store(root_store);
-  prover_config.max_transcript_size(
-    config.notarization_session_request.max_sent_data.unwrap()
-      + config.notarization_session_request.max_recv_data.unwrap(),
-  ); // TODO unwrap
-  let prover_config = prover_config.build()?;
+  //   let mut prover_config = ProverConfig::builder();
+  //   prover_config.id(session_id.clone()).server_dns(target_host).root_cert_store(root_store);
+  //   prover_config.max_transcript_size(
+  //     config.notarization_session_request.max_sent_data.unwrap()
+  //       + config.notarization_session_request.max_recv_data.unwrap(),
+  //   ); // TODO unwrap
+  //   let prover_config = prover_config.build()?;
 
-  let wss_url = format!(
-    "wss://{}:{}/v1/tlsnotary?session_id={}",
-    config.notary_host,
-    config.notary_port,
-    session_id.clone()
-  );
+  //   let request = build_request(
+  //     config.target_method,
+  //     config.target_url,
+  //     config.target_headers,
+  //     config.target_body,
+  //   );
 
-  #[cfg(target_arch = "wasm32")]
-  let (_, notary_tls_socket) = WsMeta::connect(wss_url, None).await.unwrap();
-
-  #[cfg(not(target_arch = "wasm32"))]
-  let ws_connection = {
-    use ws_stream_tungstenite::WsStream;
-    let (notary_tls_socket, _) =
-      async_tungstenite::async_std::connect_async(wss_url).await.unwrap();
-    WsStream::new(notary_tls_socket)
-  };
-
-  // Create a new prover and with MPC backend. use tokio::io::{AsyncReadExt, AsyncWriteExt};
-  #[cfg(not(target_arch = "wasm32"))]
-  let prover =
-    Prover::new(prover_config).setup(TokioAsyncReadCompatExt::compat(ws_connection)).await?;
-  #[cfg(target_arch = "wasm32")]
-  let prover = Prover::new(prover_config).setup(notary_tls_socket.into_io()).await?;
-
-  // Bind the Prover to server connection
-  #[cfg(any(not(feature = "websocket"), not(target_arch = "wasm32")))]
-  let (mpc_tls_connection, prover_fut) = {
-    let client_target_socket = TcpStream::connect((target_host, target_port)).await?;
-    prover.connect(client_target_socket.compat()).await?
-  };
-  #[cfg(all(feature = "websocket", target_arch = "wasm32"))]
-  let ws_query = url::form_urlencoded::Serializer::new(String::new())
-    .extend_pairs([("target_host", target_host), ("target_port", &target_port.to_string())])
-    .finish();
-  #[cfg(all(feature = "websocket", target_arch = "wasm32"))]
-  let (mpc_tls_connection, prover_fut) = {
-    let (_, ws_stream) =
-      WsMeta::connect(format!("{}?{}", config.websocket_proxy_url, ws_query), None).await?;
-    let client_target_socket = ws_stream.into_io();
-    prover.connect(client_target_socket).await?
-  };
-
-  #[cfg(any(not(feature = "websocket"), not(target_arch = "wasm32")))]
-  let mpc_tls_connection = hyper_util::rt::TokioIo::new(mpc_tls_connection.compat());
-  #[cfg(all(feature = "websocket", target_arch = "wasm32"))]
-  let mpc_tls_connection = wasm_utils::WasmAsyncIo::new(mpc_tls_connection);
-
-  // Grab a control handle to the Prover
-  let prover_ctrl = prover_fut.control();
-
-  // Spawn the Prover to be run concurrently
-  #[cfg(not(target_arch = "wasm32"))]
-  let prover_task = tokio::spawn(prover_fut);
-
-  #[cfg(target_arch = "wasm32")]
-  let prover_task = {
-    let (tx, rx) = oneshot::channel();
-    let prover_fut = async {
-      let result = prover_fut.await;
-      tx.send(result).expect("Failed to send result out of prover task channel!");
-    };
-    spawn_local(prover_fut);
-    rx
-  };
-
-  // Attach the hyper HTTP client to the TLS connection
-  let (request_sender, mpc_tls_connection) =
-    hyper::client::conn::http1::handshake(mpc_tls_connection).await?;
-
-  // Spawn the HTTP task to be run concurrently
-  #[cfg(not(target_arch = "wasm32"))]
-  let _mpc_tls_connection_task = tokio::spawn(mpc_tls_connection);
-
-  #[cfg(target_arch = "wasm32")]
-  let connection_receiver = {
-    let (connection_sender, connection_receiver) = oneshot::channel();
-    let connection_fut = mpc_tls_connection.without_shutdown();
-    let handled_connection_fut = async {
-      let result = connection_fut.await;
-      let _ = connection_sender.send(result);
-    };
-    spawn_local(handled_connection_fut);
-    connection_receiver
-  };
-
-  prover_ctrl.defer_decryption().await?;
-
-  send_request(
-    request_sender,
-    config.target_method,
-    config.target_url,
-    config.target_headers,
-    config.target_body,
-  )
-  .await;
-
-  #[cfg(target_arch = "wasm32")]
-  {
-    use futures::AsyncWriteExt;
-    let mut client_socket = connection_receiver.await.unwrap()?.io.into_inner(); // TODO fix unwrap
-    client_socket.close().await?;
-  }
-
-  let prover = prover_task.await.unwrap()?; // TODO fix unwrap
+  // setup_connection is based on arch (wasm32 vs non-wasm)
+  let prover = setup_connection(&mut config).await;
   notarize(prover).await
 }
 
@@ -223,11 +154,10 @@ async fn notarize(prover: Prover<Closed>) -> Result<TlsProof, errors::ClientErro
   let substrings_proof = proof_builder.build()?;
 
   Ok(TlsProof { session: session_proof, substrings: substrings_proof })
-  //---------------------------------------------------------------------------------------------------------------------------------------//
 }
 
 async fn send_request(
-  mut request_sender: SendRequest<Full<Bytes>>,
+  mut request_sender: hyper::client::conn::SendRequest<hyper::Body>,
   method: String,
   url: String,
   headers: HashMap<String, String>,
@@ -240,13 +170,9 @@ async fn send_request(
     Ok(response) => {
       let status = response.status();
       let _payload = response.into_body();
-
       debug!("Response:\n{:?}", _payload);
       debug!("Response Status:\n{:?}", status);
-
       assert!(status.is_success()); // status is 200-299
-
-      debug!("Request OK");
     },
     Err(e) if e.is_incomplete_message() => println!("Response: IncompleteMessage (ignored)"), /* TODO */
     Err(e) => panic!("{:?}", e),
@@ -258,7 +184,7 @@ fn build_request(
   url: String,
   headers: HashMap<String, String>,
   body: String,
-) -> Request<Full<Bytes>> {
+) -> Request<hyper::Body> {
   let u = Url::parse(&url).unwrap();
   let target_host = u.host_str().expect("Invalid `target_url` host!");
   assert!(u.scheme() == "https");
@@ -294,9 +220,11 @@ fn build_request(
   }
 
   let body = if body.is_empty() {
-    Full::new(Bytes::from(vec![])) // TODO Empty::<Bytes>::new()
+    hyper::Body::empty()
+    // Full::new(Bytes::from(vec![])) // TODO Empty::<Bytes>::new()
   } else {
-    Full::new(Bytes::from(BASE64_STANDARD.decode(body).unwrap()))
+    hyper::Body::from(BASE64_STANDARD.decode(body).unwrap())
+    // Full::new(Bytes::from(BASE64_STANDARD.decode(body).unwrap()))
   };
 
   request.body(body).unwrap()
