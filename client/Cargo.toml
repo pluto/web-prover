@@ -36,7 +36,6 @@ futures-util="0.3.28"
 # Other
 base64="0.22.0"
 
-
 tokio-util={ version="0.7", features=[
   "compat",
 ] } # compat is used to work with AsyncRead and AsyncWrite from other crates
@@ -63,6 +62,8 @@ tlsn-prover          ={ workspace=true }
 tlsn-core            ={ workspace=true }
 async-tungstenite    ={ version="0.25.1", features=["async-std-runtime", "async-tls"] }
 ws_stream_tungstenite={ version="0.13.0", features=["tokio_io"] }
+clap                 ={ version="4.5.13", features=["derive"] }
+anyhow               ="1.0.86"
 
 #- Wasm target configuration ----------------------------------------------------------------------#
 [target.'cfg(target_arch = "wasm32")'.dependencies]

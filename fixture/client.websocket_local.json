@@ -1,0 +1,14 @@
+{
+	"notary_host": "localhost",
+	"notary_port": 7443,
+	"target_method": "GET",
+	"target_url": "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json",
+	"target_headers": {},
+	"target_body": "",
+	"websocket_proxy_url": "wss://localhost:7443/v1/tlsnotary/websocket_proxy",
+	"notarization_session_request": {
+		"client_type": "Websocket",
+		"max_sent_data": 10000,
+		"max_recv_data": 10000
+	}
+}

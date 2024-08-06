@@ -1,7 +1,7 @@
 # Web Prover
 
 TODO: Web Prover high level explainer  
-TODO: Explain project layout  
+TODO: Explain project layout
 
 ## Usage
 
@@ -10,6 +10,7 @@ make wasm
 make ios
 cargo run --release -p notary -- --config ./fixture/notary-config.toml
 cargo run --release --bin mock_server
+NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" cargo run -p client -- --config ./fixture/client.tcp_local.json
 ```
 
 ## WASM Demo
@@ -17,7 +18,8 @@ cargo run --release --bin mock_server
 ```
 cargo run --release -p notary -- --config ./fixture/notary-config.toml
 cargo run --release --bin mock_server
-NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" make wasm && make wasm-demo
+NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" make wasm
+make wasm-demo
 open https://localhost:8090
 ```
 
@@ -25,8 +27,7 @@ open https://localhost:8090
 
 TODO: target_arch explainer (for wasm)  
 TODO: target_os explainer (for ios)  
-TODO: explain all feature flags  
-
+TODO: explain all feature flags
 
 ## Development
 

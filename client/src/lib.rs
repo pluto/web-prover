@@ -1,21 +1,17 @@
 #[cfg(not(target_arch = "wasm32"))] mod prover;
-#[cfg(not(target_arch = "wasm32"))]
-use prover::setup_connection;
-
 #[cfg(target_arch = "wasm32")] mod prover_wasm32;
-#[cfg(target_arch = "wasm32")]
-use prover_wasm32::setup_connection;
 
-mod config;
+pub mod config;
 pub mod errors;
-pub use config::Config;
+
+use config::ClientType;
 use hyper::Request;
 use tlsn_core::commitment::CommitmentKind;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
 use tracing::debug;
 
-pub async fn prover_inner(mut config: Config) -> Result<TlsProof, errors::ClientErrors> {
+pub async fn prover_inner(mut config: config::Config) -> Result<TlsProof, errors::ClientErrors> {
   let root_store = default_root_store();
 
   let prover_config = ProverConfig::builder()
@@ -29,8 +25,15 @@ pub async fn prover_inner(mut config: Config) -> Result<TlsProof, errors::Client
     .build()
     .unwrap();
 
-  // setup_connection is based on arch (wasm32 vs non-wasm)
-  let prover = setup_connection(&mut config, prover_config).await;
+  #[cfg(target_arch = "wasm32")]
+  let prover = prover_wasm32::setup_connection(&mut config, prover_config).await;
+
+  #[cfg(not(target_arch = "wasm32"))]
+  let prover = match config.notarization_session_request.client_type {
+    ClientType::Tcp => prover::setup_tcp_connection(&mut config, prover_config).await,
+    ClientType::Websocket => prover::setup_websocket_connection(&mut config, prover_config).await,
+  };
+
   notarize(prover).await
 }
 
