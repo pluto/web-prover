@@ -7,7 +7,7 @@ use prover::setup_connection;
 use prover_wasm32::setup_connection;
 
 mod config;
-mod errors;
+pub mod errors;
 pub use config::Config;
 use hyper::Request;
 use tlsn_core::commitment::CommitmentKind;
