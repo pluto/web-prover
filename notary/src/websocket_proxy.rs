@@ -6,7 +6,7 @@ use tokio::{
   net::TcpStream,
 };
 use tokio_tungstenite::tungstenite::protocol::Message;
-use tracing::{debug, info};
+use tracing::info;
 
 use crate::axum_websocket::{WebSocket, WebSocketUpgrade};
 

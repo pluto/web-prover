@@ -8,19 +8,16 @@ hyper={ version="1.1", features=["client", "http1", "server"] }
 hyper-util={ version="0.1", features=["full"] }
 serde={ version="1.0", features=["derive"] }
 rustls={ version="0.23.11", default-features=false, features=["logging", "tls12", "std", "ring"] }
-axum-macros="0.4.1"
 tokio={ version="1.39.1", features=["full"] }
 tokio-util={ version="0.7", features=["compat"] }
 tracing="0.1.40"
-tracing-subscriber="0.3.18"
+tracing-subscriber={ version="0.3.18", features=["env-filter"] }
 futures-util="0.3.30"
 tokio-rustls={ version="0.26.0", default-features=false, features=["logging", "tls12", "ring"] }
 tower-http={ version="0.5.2", features=["cors"] }
 tower-service="0.3.2"
 rustls-pemfile="2.1.2"
-uuid={ version="1.10", features=["v4", "fast-rng"] }
 serde_json="1.0"
-notary-server={ workspace=true }
 tlsn-verifier={ workspace=true }
 tokio-tungstenite={ version="0.23.1", features=["stream"] }
 ws_stream_tungstenite={ git="https://github.com/pluto/ws_stream_tungstenite.git", branch="latest", features=[
@@ -40,7 +37,7 @@ clap={ version="4.5", features=["derive"] }
 clap_derive="4.5"
 rustls-acme={ version="0.10", default-features=false, features=["ring", "tokio"] }
 tokio-stream={ version="0.1", features=["net"] }
-thiserror = "1"
+thiserror="1"
 
 [dev-dependencies]
 tower="0.4.13"
