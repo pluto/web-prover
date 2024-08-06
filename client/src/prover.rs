@@ -12,7 +12,10 @@ use crate::{send_request, Config};
 // uses websocket to connect to notary
 // TODO decide if that means it's using the websocket proxy as well?
 #[cfg(feature = "websocket")]
-pub async fn setup_connection(_config: &mut Config, _prover_config: ProverConfig) -> Prover<Closed> {
+pub async fn setup_connection(
+  _config: &mut Config,
+  _prover_config: ProverConfig,
+) -> Prover<Closed> {
   todo!("feature websocket enabled but not implemented for non-wasm target");
 }
 
