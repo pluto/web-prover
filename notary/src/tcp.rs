@@ -10,8 +10,9 @@ use axum_core::body::Body;
 use http::header::{HeaderMap, HeaderName};
 use hyper::upgrade::{OnUpgrade, Upgraded};
 use hyper_util::rt::TokioIo;
-use notary_server::NotaryServerError;
 use tracing::error;
+
+use crate::tlsn::NotaryServerError;
 
 /// Custom extractor used to extract underlying TCP connection for TCP client — using the same
 /// upgrade primitives used by the WebSocket implementation where the underlying TCP connection

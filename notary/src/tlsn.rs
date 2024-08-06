@@ -1,20 +1,20 @@
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 use async_trait::async_trait;
 use axum::{
-  extract::{FromRequestParts, State},
-  http::{header, request::Parts},
-  response::Response,
+  extract::{FromRequestParts, Query, State},
+  http::{header, request::Parts, StatusCode},
+  response::{IntoResponse, Response},
 };
+use eyre::Report;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
-use notary_server::NotaryServerError;
 use p256::ecdsa::{Signature, SigningKey};
-use tlsn_verifier::tls::{Verifier, VerifierConfig};
+use serde::Deserialize;
+use tlsn_verifier::tls::{Verifier, VerifierConfig, VerifierConfigBuilderError, VerifierError};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::{debug, error, info};
-use uuid::Uuid;
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
@@ -70,15 +70,9 @@ pub async fn notary_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 
   let mut config_builder = VerifierConfig::builder();
 
-  config_builder = config_builder.id(session_id);
-
-  if let Some(max_sent_data) = max_sent_data {
-    config_builder = config_builder.max_sent_data(max_sent_data);
-  }
-
-  if let Some(max_recv_data) = max_recv_data {
-    config_builder = config_builder.max_recv_data(max_recv_data);
-  }
+  config_builder = config_builder
+    .id(session_id)
+    .max_transcript_size(max_sent_data.unwrap() + max_recv_data.unwrap()); // TODO unwrap, probably shouldn't be Option in the first place
 
   let config = config_builder.build()?;
 
@@ -87,14 +81,20 @@ pub async fn notary_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   Ok(())
 }
 
+#[derive(Deserialize)]
+pub struct NotarizeQuery {
+  session_id: String,
+}
+
 // TODO Response or impl IntoResponse?
 pub async fn notarize(
   protocol_upgrade: ProtocolUpgrade,
+  query: Query<NotarizeQuery>,
   State(state): State<Arc<SharedState>>,
 ) -> Response {
-  // We manually just create a UUID4 for the remaining calls here
-  // TODO Should we just hardcode one UUID4 and pass in the same for all calls?
-  let session_id = Uuid::new_v4().to_string();
+  let session_id = query.session_id.clone();
+
+  debug!("Starting notarize with ID: {}", session_id);
 
   let max_sent_data = Some(state.tlsn_max_sent_data);
   let max_recv_data = Some(state.tlsn_max_recv_data);
@@ -116,6 +116,7 @@ pub async fn websocket_notarize(
   max_sent_data: Option<usize>,
   max_recv_data: Option<usize>,
 ) {
+  debug!("Upgraded to websocket connection");
   let stream = WsStream::new(socket.into_inner()).compat();
   match notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data).await
   {
@@ -135,7 +136,7 @@ pub async fn tcp_notarize(
   max_sent_data: Option<usize>,
   max_recv_data: Option<usize>,
 ) {
-  debug!(?session_id, "Upgraded to tcp connection");
+  debug!("Upgraded to tcp connection");
   match notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data).await
   {
     Ok(_) => {
@@ -144,5 +145,40 @@ pub async fn tcp_notarize(
     Err(err) => {
       error!(?session_id, "Failed notarization using tcp: {err}");
     },
+  }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum NotaryServerError {
+  #[error(transparent)]
+  Unexpected(#[from] Report),
+  #[error("Failed to connect to prover: {0}")]
+  Connection(String),
+  #[error("Error occurred during notarization: {0}")]
+  Notarization(Box<dyn Error + Send + 'static>),
+  #[error("Invalid request from prover: {0}")]
+  BadProverRequest(String),
+  #[error("Unauthorized request from prover: {0}")]
+  UnauthorizedProverRequest(String),
+}
+
+impl From<VerifierError> for NotaryServerError {
+  fn from(error: VerifierError) -> Self { Self::Notarization(Box::new(error)) }
+}
+
+impl From<VerifierConfigBuilderError> for NotaryServerError {
+  fn from(error: VerifierConfigBuilderError) -> Self { Self::Notarization(Box::new(error)) }
+}
+
+/// Trait implementation to convert this error into an axum http response
+impl IntoResponse for NotaryServerError {
+  fn into_response(self) -> Response {
+    match self {
+      bad_request_error @ NotaryServerError::BadProverRequest(_) =>
+        (StatusCode::BAD_REQUEST, bad_request_error.to_string()).into_response(),
+      unauthorized_request_error @ NotaryServerError::UnauthorizedProverRequest(_) =>
+        (StatusCode::UNAUTHORIZED, unauthorized_request_error.to_string()).into_response(),
+      _ => (StatusCode::INTERNAL_SERVER_ERROR, "Something wrong happened.").into_response(),
+    }
   }
 }

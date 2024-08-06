@@ -8,10 +8,14 @@ build="../build.rs"
 [features]
 websocket=[]
 
+# used in build.rs, activate by setting NOTARY_CA_CERT_PATH as env variable
+# used for local development
+notary_ca_cert=[]
+
 # Shared dependencies for all targets
 [dependencies]
 # TLSN
-tls-client  ={ git="https://github.com/tlsnotary/tlsn.git", package="tlsn-tls-client" }
+tls-client  ={ workspace=true }
 webpki-roots="0.26.1"
 pki-types   ={ package="rustls-pki-types", version="1.7" }
 cfg-if      ="1.0.0"
@@ -33,6 +37,11 @@ futures-util="0.3.28"
 # Other
 base64="0.22.0"
 
+[dependencies.uuid]
+version         ="1.10.0"
+default-features=false
+features        =["v4"]
+
 ####################################################################################################
 # Target-specific configuration
 ####################################################################################################
@@ -48,8 +57,8 @@ tokio-util={ version="0.7", features=[
 tokio-rustls={ version="0.26.0", default-features=false, features=["logging", "tls12"] }
 tokio={ version="1", features=["rt", "rt-multi-thread", "macros", "net", "io-std", "fs"] }
 # TLSN
-tlsn-prover          ={ git="https://github.com/tlsnotary/tlsn.git" }
-tlsn-core            ={ git="https://github.com/tlsnotary/tlsn.git" }
+tlsn-prover          ={ workspace=true }
+tlsn-core            ={ workspace=true }
 async-tungstenite    ={ version="0.25.1", features=["async-std-runtime", "async-tls"] }
 ws_stream_tungstenite={ version="0.13.0", features=["tokio_io"] }
 
@@ -110,14 +119,16 @@ wasm-bindgen-rayon      ="1.0"
 tracing-subscriber      ={ version="0.3", features=["time", "env-filter"] }
 tracing-web             ="0.1.2"
 
+parking_lot={ version="0.12", features=["nightly"] }
+
 # TLSN
-tlsn-prover    ={ git="https://github.com/tlsnotary/tlsn.git" }
-tlsn-core      ={ git="https://github.com/tlsnotary/tlsn.git" }
-tlsn-tls-client={ git="https://github.com/tlsnotary/tlsn.git" }
+tlsn-prover={ workspace=true }
+tlsn-core  ={ workspace=true }
+tls-client ={ workspace=true }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test="0.3.42"
 
-[package.metadata.wasm-pack.profile.release]
-wasm-opt=false
+# [package.metadata.wasm-pack.profile.release]
+# wasm-opt=false
 #---------------------------------------------------------------------------------------------#

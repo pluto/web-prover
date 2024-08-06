@@ -14,6 +14,14 @@ serde_json="1.0.120"
 tracing           ="0.1.40"
 tracing-subscriber="0.3.18"
 
+notary-server={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
+tlsn-verifier={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
+tlsn-prover={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4", features=[
+	"tracing",
+] }
+tlsn-core={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
+tls-client={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4", package="tlsn-tls-client" }
+
 [package]
 name   ="webprover"
 edition="2021"
@@ -44,3 +52,7 @@ hex              ="0.4"
 futures-util     ="0.3"
 form_urlencoded  ="1.2.1"
 tokio-tungstenite="0.23.0"
+
+# TODO how to get symbols for debugging (stack trace) into wasm module in --release mode?
+# [profile.release]
+# debug = true

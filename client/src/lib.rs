@@ -10,7 +10,7 @@ use hyper::{body::Bytes, Request};
 use serde::{Deserialize, Serialize};
 use tlsn_core::commitment::CommitmentKind;
 pub use tlsn_core::proof::TlsProof;
-use tlsn_prover::tls::{Prover, ProverConfig};
+use tlsn_prover::tls::{state::ProverState, Prover, ProverConfig};
 use tracing::{debug, info, trace};
 use url::Url;
 #[cfg(target_arch = "wasm32")]
@@ -20,8 +20,6 @@ use {
   tokio::net::TcpStream, tokio_util::compat::FuturesAsyncReadCompatExt,
   tokio_util::compat::TokioAsyncReadCompatExt,
 };
-
-const NOTARY_CA_CERT: &[u8] = include_bytes!("../../fixture/certs/ca-cert.cer"); // TODO make build config
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct Config {
@@ -81,7 +79,6 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   drop(_span);
   //---------------------------------------------------------------------------------------------------------------------------------------//
-
   // TODO: The following should be made modular in that we don't want to enforce we are going to
   // notary approach
   //---------------------------------------------------------------------------------------------------------------------------------------//
@@ -97,7 +94,12 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   debug!("TLS socket created with TCP connection");
 
-  let wss_url = format!("wss://{}:{}/v1/tlsnotary", config.notary_host, config.notary_port);
+  let session_id = uuid::Uuid::new_v4().to_string();
+
+  let wss_url = format!(
+    "wss://{}:{}/v1/tlsnotary?session_id={}",
+    config.notary_host, config.notary_port, session_id
+  );
 
   #[cfg(target_arch = "wasm32")]
   let (_, notary_tls_socket) = WsMeta::connect(wss_url, None).await.unwrap();
@@ -117,23 +119,16 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   // Set up the prover which lies on the client and can access the notary for MPC
   //---------------------------------------------------------------------------------------------------------------------------------------//
 
-  let certificate = pki_types::CertificateDer::from(NOTARY_CA_CERT.to_vec());
-  let mut root_store = tls_client::RootCertStore::empty();
-  let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
-  assert_eq!(added, 1); // TODO there is probably a better way
+  let root_store = default_root_store(); // TODO lot of memory allocation happening here.
+                                         // maybe add this to shared state?
 
   let _span = tracing::span!(tracing::Level::TRACE, "create_prover").entered();
   let mut prover_config = ProverConfig::builder();
-  let session_id = "c655ee6e-fad7-44c3-8884-5330287982a8"; // TODO random hardcoded UUID4. notary does not need it anymore.
   prover_config.id(session_id).server_dns(target_host).root_cert_store(root_store);
-
-  if let Some(max_sent_data) = config.notarization_session_request.max_sent_data {
-    prover_config.max_sent_data(max_sent_data);
-  }
-  if let Some(max_recv_data) = config.notarization_session_request.max_recv_data {
-    prover_config.max_recv_data(max_recv_data);
-  }
-
+  prover_config.max_transcript_size(
+    config.notarization_session_request.max_sent_data.unwrap()
+      + config.notarization_session_request.max_recv_data.unwrap(),
+  ); // TODO unwrap
   let prover_config = prover_config.build()?;
 
   // Create a new prover and with MPC backend. use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -143,13 +138,12 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   #[cfg(target_arch = "wasm32")]
   let prover = Prover::new(prover_config).setup(notary_tls_socket.into_io()).await?;
 
-  trace!("{prover:?}");
+  debug!("{prover:?}");
 
-  info!("prover created");
+  debug!("prover created");
 
   drop(_span);
   //---------------------------------------------------------------------------------------------------------------------------------------//
-
   // TODO: This is where we have to consider using another mode of connection like ws
   // connect to target
   //---------------------------------------------------------------------------------------------------------------------------------------//
@@ -176,8 +170,6 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
     prover.connect(client_target_socket).await?
   };
 
-  // mpc_tls_connection is mpc_tls_connection (in working code)
-
   #[cfg(any(not(feature = "websocket"), not(target_arch = "wasm32")))]
   let mpc_tls_connection = hyper_util::rt::TokioIo::new(mpc_tls_connection.compat());
   #[cfg(all(feature = "websocket", target_arch = "wasm32"))]
@@ -186,6 +178,7 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   // Grab a control handle to the Prover
   let prover_ctrl = prover_fut.control();
 
+  debug!("prover created");
   // Spawn the Prover to be run concurrently
   #[cfg(not(target_arch = "wasm32"))]
   let prover_task = tokio::spawn(prover_fut);
@@ -260,8 +253,6 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   let request = request.body(body)?;
   //---------------------------------------------------------------------------------------------------------------------------------------//
-
-  //---------------------------------------------------------------------------------------------------------------------------------------//
   // Send the HTTP request from the client to the target
   //---------------------------------------------------------------------------------------------------------------------------------------//
 
@@ -274,12 +265,13 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
   // TODO: Clean up this logging and error handling
   match request_sender.send_request(request).await {
     Ok(response) => {
-      let is_success = response.status().is_success();
+      let status = response.status();
       let _payload = response.into_body();
 
       debug!("Response:\n{:?}", _payload);
+      debug!("Response Status:\n{:?}", status);
 
-      assert!(is_success); // status is 200-299
+      assert!(status.is_success()); // status is 200-299
 
       debug!("Request OK");
     },
@@ -313,7 +305,6 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   debug!("Notarization complete!");
   //---------------------------------------------------------------------------------------------------------------------------------------//
-
   // TODO: This is where selective disclosure happens, we should modularize this and verify its
   // correctness
   //---------------------------------------------------------------------------------------------------------------------------------------//
@@ -349,4 +340,29 @@ pub async fn prover_inner(config: Config) -> Result<TlsProof, errors::ClientErro
 
   Ok(TlsProof { session: session_proof, substrings: substrings_proof })
   //---------------------------------------------------------------------------------------------------------------------------------------//
+}
+
+#[cfg(feature = "notary_ca_cert")]
+const NOTARY_CA_CERT: &[u8] = include_bytes!(env!("NOTARY_CA_CERT_PATH"));
+
+/// Default root store using mozilla certs.
+pub fn default_root_store() -> tls_client::RootCertStore {
+  let mut root_store = tls_client::RootCertStore::empty();
+  root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
+    tls_client::OwnedTrustAnchor::from_subject_spki_name_constraints(
+      ta.subject.as_ref(),
+      ta.subject_public_key_info.as_ref(),
+      ta.name_constraints.as_ref().map(|nc| nc.as_ref()),
+    )
+  }));
+
+  #[cfg(feature = "notary_ca_cert")]
+  {
+    debug!("notary_ca_cert feature enabled");
+    let certificate = pki_types::CertificateDer::from(NOTARY_CA_CERT.to_vec());
+    let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
+    assert_eq!(added, 1); // TODO there is probably a better way
+  }
+
+  root_store
 }
