@@ -30,10 +30,7 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
   let proof = result
     .map_err(|e| {
       let backtrace = std::backtrace::Backtrace::capture();
-      panic!(
-        "Error:{e:?}/n
-  Stack:{backtrace:?}"
-      )
+      panic!("Error:{e:?}\nStack:{backtrace:?}")
     })
     .unwrap();
   CString::new(
