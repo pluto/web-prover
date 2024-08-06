@@ -1,28 +1,11 @@
-use std::{
-  backtrace::Backtrace,
-  collections::HashMap,
-  ffi::{CStr, CString},
-  io::{BufReader, Cursor},
-  os::raw::c_char,
-  panic::{self, AssertUnwindSafe},
-  sync::Arc,
-};
+use std::sync::Arc;
 
-use base64::prelude::*;
 use futures::AsyncWriteExt;
-use hyper::client::conn::Parts;
 use rustls::ClientConfig;
-use serde::{Deserialize, Serialize};
-use tlsn_core::proof::TlsProof;
-use tlsn_prover::tls::{
-  state::{Closed, Notarize},
-  Prover, ProverConfig,
-};
-use tokio::{net::TcpStream, runtime};
+use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
 use tokio_rustls::TlsConnector;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
-use url::Url;
 
 use crate::{send_request, Config};
 
@@ -35,23 +18,13 @@ use crate::{send_request, Config};
 
 // uses raw TCP socket to connect to notary
 // #[cfg(not(feature = "websocket"))]
-pub async fn setup_connection(config: &mut Config) -> Prover<Closed> {
+pub async fn setup_connection(config: &mut Config, prover_config: ProverConfig) -> Prover<Closed> {
   let root_store = default_root_store();
 
   let client_notary_config = ClientConfig::builder()
     .with_safe_defaults()
     .with_root_certificates(root_store)
     .with_no_client_auth();
-
-  let prover_config = ProverConfig::builder()
-    .id(config.session_id())
-    .server_dns(config.target_host())
-    .max_transcript_size(
-      config.notarization_session_request.max_sent_data.unwrap()
-        + config.notarization_session_request.max_recv_data.unwrap(),
-    )
-    .build()
-    .unwrap();
 
   let notary_connector = TlsConnector::from(Arc::new(client_notary_config));
 
@@ -93,14 +66,7 @@ pub async fn setup_connection(config: &mut Config) -> Prover<Closed> {
 
   let connection_task = tokio::spawn(connection.without_shutdown());
 
-  send_request(
-    request_sender,
-    config.target_method.clone(),
-    config.target_url.clone(),
-    config.target_headers.clone(),
-    config.target_body.clone(),
-  )
-  .await;
+  send_request(request_sender, config.to_request()).await;
 
   let mut client_socket = connection_task.await.unwrap().unwrap().io.into_inner(); // TODO: stalls here if Connection: close is removed
   client_socket.close().await.unwrap();
@@ -110,6 +76,11 @@ pub async fn setup_connection(config: &mut Config) -> Prover<Closed> {
 
 #[cfg(feature = "notary_ca_cert")]
 const NOTARY_CA_CERT: &[u8] = include_bytes!(env!("NOTARY_CA_CERT_PATH"));
+
+// TODO default_root_store() duplicates lib.rs::default_root_store() but returns
+// rustls::RootCertStore instead of tls_client::RootCertStore. Can we make the ClientConfig
+// above accept the tls_client version or can we somehow convert types? The underlying
+// implementation is the same.
 
 /// Default root store using mozilla certs.
 fn default_root_store() -> rustls::RootCertStore {
