@@ -5,8 +5,7 @@ pub mod config;
 pub mod errors;
 
 use config::ClientType;
-use hyper::{body::HttpBody, Request};
-use tlsn_core::commitment::CommitmentKind;
+use hyper::Request;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
 use tracing::{debug, info};
@@ -40,45 +39,26 @@ pub async fn prover_inner(mut config: config::Config) -> Result<TlsProof, errors
 }
 
 async fn notarize(prover: Prover<Closed>) -> Result<TlsProof, errors::ClientErrors> {
-  let mut prover = prover.to_http()?.start_notarize();
+  // copied from https://github.com/tlsnotary/tlsn/blob/3554db83e17b2e5fc98293b397a2907b7f023496/tlsn/examples/simple/simple_prover.rs#L145C1-L169C2
+  let mut prover = prover.start_notarize();
 
-  // TODO: unwrap for now as we need to bring in `tlsn_formats`
-  // Commit to the transcript with the default committer, which will commit using BLAKE3.
-  prover.commit().unwrap();
+  let sent_len = prover.sent_transcript().data().len();
+  let recv_len = prover.recv_transcript().data().len();
 
-  let notarized_session = prover.finalize().await?;
+  let builder = prover.commitment_builder();
+  let sent_commitment = builder.commit_sent(&(0..sent_len)).unwrap();
+  let recv_commitment = builder.commit_recv(&(0..recv_len)).unwrap();
 
-  debug!("Notarization complete");
+  let notarized_session = prover.finalize().await.unwrap();
 
-  let session_proof = notarized_session.session_proof();
+  let mut proof_builder = notarized_session.data().build_substrings_proof();
 
-  let mut proof_builder = notarized_session.session().data().build_substrings_proof();
+  proof_builder.reveal_by_id(sent_commitment).unwrap();
+  proof_builder.reveal_by_id(recv_commitment).unwrap();
 
-  // Prove the request, while redacting the secrets from it.
-  let request = &notarized_session.transcript().requests[0];
+  let substrings_proof = proof_builder.build().unwrap();
 
-  proof_builder.reveal_sent(&request.without_data(), CommitmentKind::Blake3)?;
-
-  proof_builder.reveal_sent(&request.request.target, CommitmentKind::Blake3)?;
-
-  for header in &request.headers {
-    // Only reveal the host header
-    if header.name.as_str().eq_ignore_ascii_case("Host") {
-      proof_builder.reveal_sent(header, CommitmentKind::Blake3)?;
-    } else {
-      proof_builder.reveal_sent(&header.without_value(), CommitmentKind::Blake3)?;
-    }
-  }
-
-  // Prove the entire response, as we don't need to redact anything
-  let response = &notarized_session.transcript().responses[0];
-
-  proof_builder.reveal_recv(response, CommitmentKind::Blake3)?;
-
-  // Build the proof
-  let substrings_proof = proof_builder.build()?;
-
-  Ok(TlsProof { session: session_proof, substrings: substrings_proof })
+  Ok(TlsProof { session: notarized_session.session_proof(), substrings: substrings_proof })
 }
 
 async fn send_request(
@@ -89,7 +69,13 @@ async fn send_request(
   match request_sender.send_request(request).await {
     Ok(response) => {
       let status = response.status();
-      debug!("Response with status code {:?}:\n{}", status, body_to_string(response).await);
+      let headers = response.headers().clone();
+      debug!(
+        "Response with status code {:?}:\nHeaders: {:?}\n\nBody:\n{}",
+        status,
+        headers,
+        body_to_string(response).await
+      );
       assert!(status.is_success()); // status is 200-299
     },
     Err(e) if e.is_incomplete_message() => println!("Response: IncompleteMessage (ignored)"), /* TODO is this safe to ignore */
