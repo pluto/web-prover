@@ -32,12 +32,14 @@ struct SharedState {
 
 #[tokio::main]
 async fn main() {
-  let c = config::read_config();
-
   tracing_subscriber::registry()
     .with(tracing_subscriber::fmt::layer())
     .with(tracing_subscriber::EnvFilter::from_default_env()) // set via RUST_LOG=INFO etc
     .init();
+
+  info!("GIT_HASH: {}", env!("GIT_HASH"));
+
+  let c = config::read_config();
 
   let listener = TcpListener::bind(&c.listen).await.unwrap();
   info!("Listening on https://{}", &c.listen);
