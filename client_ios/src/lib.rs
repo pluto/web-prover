@@ -1,6 +1,6 @@
 use std::ffi::{c_char, CStr, CString};
 
-use client::{errors::ClientErrors, config::Config};
+use client::{config::Config, errors::ClientErrors};
 
 #[derive(serde::Serialize)]
 struct Output {
