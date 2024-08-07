@@ -92,7 +92,7 @@ async fn send_request(
       debug!("Response with status code {:?}:\n{}", status, body_to_string(response).await);
       assert!(status.is_success()); // status is 200-299
     },
-    Err(e) if e.is_incomplete_message() => println!("Response: IncompleteMessage (ignored)"),  // TODO is this safe to ignore
+    Err(e) if e.is_incomplete_message() => println!("Response: IncompleteMessage (ignored)"), /* TODO is this safe to ignore */
     Err(e) => panic!("{:?}", e),
   };
 }
