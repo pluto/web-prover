@@ -15,6 +15,8 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
   let collector = tracing_subscriber::fmt().with_max_level(tracing::Level::TRACE).finish();
   tracing::subscriber::set_global_default(collector).map_err(|e| panic!("{e:?}")).unwrap();
 
+  println!("GIT_HASH: {:?}", env!("GIT_HASH"));
+
   let result: Result<client::TlsProof, ClientErrors> =
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
       let config_str = unsafe {
@@ -27,12 +29,14 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
     }))
     .map_err(|e| panic!("{e:?}"))
     .unwrap();
+
   let proof = result
     .map_err(|e| {
       let backtrace = std::backtrace::Backtrace::capture();
       panic!("Error:{e:?}\nStack:{backtrace:?}")
     })
     .unwrap();
+
   CString::new(
     serde_json::to_string_pretty(&Output {
       proof: Some(serde_json::to_string_pretty(&proof).unwrap()),
