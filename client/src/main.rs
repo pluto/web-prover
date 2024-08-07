@@ -1,14 +1,14 @@
 use anyhow::Result;
 use clap::Parser;
 use client::config::Config;
-use tracing::{info, Level};
+use tracing::Level;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
-#[clap(name = "TLSN Client")]
-#[clap(about = "A dummy client for Pluto TLSN WebProofs.", long_about = None)]
+#[clap(name = "Web Proof Client")]
+#[clap(about = "A client to generate Web Proofs.", long_about = None)]
 struct Args {
-  #[clap(short, long, required = false, default_value = "TRACE")]
+  #[clap(short, long, required = false, default_value = "DEBUG")]
   log_level: String,
 
   #[clap(short, long, required = true, default_value = "config.json")]

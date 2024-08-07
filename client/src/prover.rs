@@ -19,7 +19,10 @@ pub async fn setup_websocket_connection(
 }
 
 // uses raw TCP socket to connect to notary
-pub async fn setup_tcp_connection(config: &mut Config, prover_config: ProverConfig) -> Prover<Closed> {
+pub async fn setup_tcp_connection(
+  config: &mut Config,
+  prover_config: ProverConfig,
+) -> Prover<Closed> {
   let root_store = default_root_store();
 
   let client_notary_config = ClientConfig::builder()
