@@ -9,9 +9,11 @@ use hyper::Request;
 use tlsn_core::commitment::CommitmentKind;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
-use tracing::debug;
+use tracing::{debug, info};
 
 pub async fn prover_inner(mut config: config::Config) -> Result<TlsProof, errors::ClientErrors> {
+  info!("GIT_HASH: {}", env!("GIT_HASH"));
+
   let root_store = default_root_store();
 
   let prover_config = ProverConfig::builder()

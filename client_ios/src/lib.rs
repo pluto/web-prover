@@ -15,8 +15,6 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
   let collector = tracing_subscriber::fmt().with_max_level(tracing::Level::TRACE).finish();
   tracing::subscriber::set_global_default(collector).map_err(|e| panic!("{e:?}")).unwrap();
 
-  println!("GIT_HASH: {:?}", env!("GIT_HASH"));
-
   let result: Result<client::TlsProof, ClientErrors> =
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
       let config_str = unsafe {

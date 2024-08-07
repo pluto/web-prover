@@ -2,7 +2,6 @@
 name   ="client"
 version="0.1.0"
 edition="2021"
-# i think we need this
 build="../build.rs"
 
 [features]
