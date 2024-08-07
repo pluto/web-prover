@@ -5,6 +5,7 @@ use rustls::ClientConfig;
 use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
 use tokio_rustls::TlsConnector;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
+use tracing::debug; // needed for notary_ca_cert feature below
 
 use crate::{config::Config, send_request};
 
