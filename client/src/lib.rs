@@ -5,7 +5,7 @@ pub mod config;
 pub mod errors;
 
 use config::ClientType;
-use hyper::Request;
+use hyper::{body::HttpBody, Request};
 use tlsn_core::commitment::CommitmentKind;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
@@ -89,12 +89,10 @@ async fn send_request(
   match request_sender.send_request(request).await {
     Ok(response) => {
       let status = response.status();
-      let _payload = response.into_body();
-      debug!("Response:\n{:?}", _payload);
-      debug!("Response Status:\n{:?}", status);
+      debug!("Response with status code {:?}:\n{}", status, body_to_string(response).await);
       assert!(status.is_success()); // status is 200-299
     },
-    Err(e) if e.is_incomplete_message() => println!("Response: IncompleteMessage (ignored)"), /* TODO */
+    Err(e) if e.is_incomplete_message() => println!("Response: IncompleteMessage (ignored)"), /* TODO is this safe to ignore */
     Err(e) => panic!("{:?}", e),
   };
 }
@@ -125,4 +123,9 @@ fn default_root_store() -> tls_client::RootCertStore {
   }
 
   root_store
+}
+
+async fn body_to_string(res: hyper::Response<hyper::Body>) -> String {
+  let body_bytes = hyper::body::to_bytes(res.into_body()).await.unwrap(); // TODO fix unwrap
+  String::from_utf8(body_bytes.to_vec()).unwrap()
 }
