@@ -10,14 +10,28 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    name: client_wasm on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - run: rustup toolchain install nightly --profile minimal --no-self-update
-
       - run: rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+        if: matrix.os == 'ubuntu-latest'
+
+      - run: rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
+        if: matrix.os == 'macos-latest'
+
+      - name: Install LLVM and Clang to support 'ring' crate
+        if: matrix.os == 'macos-latest'
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "10.0"
 
       - run: RUST_LOG=DEBUG cargo run --release -p notary -- --config ./fixture/notary-config.toml &
 
