@@ -1,7 +1,7 @@
 use std::panic;
 
 use base64::prelude::*;
-use client::Config;
+use client::config::Config;
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::Full;
 use hyper::{body::Bytes, Body, Request};
