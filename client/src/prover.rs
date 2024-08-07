@@ -5,7 +5,6 @@ use rustls::ClientConfig;
 use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
 use tokio_rustls::TlsConnector;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
-use tracing::debug;
 
 use crate::{config::Config, send_request};
 
@@ -23,6 +22,7 @@ pub async fn setup_tcp_connection(
   config: &mut Config,
   prover_config: ProverConfig,
 ) -> Prover<Closed> {
+  let session_id = config.session_id();
   let root_store = default_root_store();
 
   let client_notary_config = ClientConfig::builder()
@@ -38,23 +38,34 @@ pub async fn setup_tcp_connection(
       .unwrap();
 
   let notary_tls_socket = notary_connector
-				// Require the domain name of notary server to be the same as that in the server cert
-				.connect(
-					rustls::ServerName::try_from(config.notary_host.as_str()).unwrap(),
-					notary_socket,
-				) // TODO make this a config
-				.await
-				.unwrap();
+    .connect(rustls::ServerName::try_from(config.notary_host.as_str()).unwrap(), notary_socket)
+    .await
+    .unwrap();
 
-  // TODO remove this - it's not used?
-  // Attach the hyper HTTP client to the notary TLS connection to send request to the /session
-  // endpoint to configure notarization and obtain session id
-  //   let (mut request_sender, connection) =
-  // hyper::client::conn::handshake(notary_tls_socket).await.unwrap();
-  // Spawn the HTTP task to be run concurrently
-  //   let connection_task = tokio::spawn(connection.without_shutdown());
-  // Claim back the TLS socket after HTTP exchange is done
-  //   let Parts { io: notary_tls_socket, .. } = connection_task.await.unwrap().unwrap();
+  let (mut request_sender, connection) =
+    hyper::client::conn::handshake(notary_tls_socket).await.unwrap();
+  let connection_task = tokio::spawn(connection.without_shutdown());
+
+  let request = hyper::Request::builder()
+    .uri(format!(
+      "https://{}:{}/v1/tlsnotary?session_id={}",
+      config.notary_host.clone(),
+      config.notary_port.clone(),
+      session_id.clone(),
+    ))
+    .method("GET")
+    .header("Host", config.notary_host.clone())
+    .header("Connection", "Upgrade")
+    .header("Upgrade", "TCP")
+    .body(hyper::Body::empty())
+    .unwrap();
+
+  let response = request_sender.send_request(request).await.unwrap();
+  assert!(response.status() == hyper::StatusCode::SWITCHING_PROTOCOLS);
+
+  // Claim back the TLS socket after the HTTP to TCP upgrade is done
+  let hyper::client::conn::Parts { io: notary_tls_socket, .. } =
+    connection_task.await.unwrap().unwrap();
 
   let prover = Prover::new(prover_config).setup(notary_tls_socket.compat()).await.unwrap();
 
@@ -72,7 +83,7 @@ pub async fn setup_tcp_connection(
 
   send_request(request_sender, config.to_request()).await;
 
-  let mut client_socket = connection_task.await.unwrap().unwrap().io.into_inner(); // TODO: stalls here if Connection: close is removed
+  let mut client_socket = connection_task.await.unwrap().unwrap().io.into_inner();
   client_socket.close().await.unwrap();
 
   prover_task.await.unwrap().unwrap()
