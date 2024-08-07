@@ -33,7 +33,7 @@ pub async fn prover_inner(mut config: config::Config) -> Result<TlsProof, errors
     ClientType::Tcp => prover::setup_tcp_connection(&mut config, prover_config).await,
     ClientType::Websocket => prover::setup_websocket_connection(&mut config, prover_config).await,
   };
-
+  
   notarize(prover).await
 }
 
