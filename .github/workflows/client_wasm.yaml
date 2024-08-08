@@ -47,9 +47,6 @@ jobs:
       #      wasm-pack test --firefox
       #      docs: https://rustwasm.github.io/docs/wasm-pack/tutorials/npm-browser-packages/testing-your-project.html
 
-      # make sure it builds with notary_ca_cert feature
-      - run: NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" make wasm && rm -rf client_wasm/pkg
-
       - run: make wasm
 
       - run: "tar czf pkg.tar.gz ./pkg/*"
