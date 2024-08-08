@@ -31,7 +31,7 @@ TODO: explain all feature flags
 
 ## Development
 
-### Configuring rust-analyzer for wasm32
+### Configure rust-analyzer for wasm32
 
 ```
 # .vscode/settings.json
@@ -45,7 +45,7 @@ TODO: explain all feature flags
 members =["client", "client_wasm"]
 ```
 
-### Configuring rust-analyzer for ios
+### Configure rust-analyzer for ios
 
 Note that this only works on Mac. The iOS target cannot be built on Linux.
 
