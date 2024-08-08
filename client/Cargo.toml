@@ -37,7 +37,8 @@ base64="0.22.0"
 tokio-util={ version="0.7", features=[
   "compat",
 ] } # compat is used to work with AsyncRead and AsyncWrite from other crates
-
+chrono="0.4"
+p256={ version="0.13", features=["pem", "ecdsa"] }
 [dependencies.uuid]
 version         ="1.10.0"
 default-features=false
@@ -74,7 +75,6 @@ serde-wasm-bindgen="0.6.5"
 
 # Other
 ring          ={ version="0.17", default-features=false, features=["wasm32_unknown_unknown_js"] }
-chrono        ="0.4"
 elliptic-curve={ version="0.13.5", features=["pkcs8"] }
 getrandom     ={ version="0.2", features=["js"] }
 js-sys        ="0.3.64"
