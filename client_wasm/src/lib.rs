@@ -25,12 +25,30 @@ use ws_stream_wasm::WsMeta;
 #[wasm_bindgen]
 pub async fn prover(config: JsValue) -> Result<String, JsValue> {
   panic::set_hook(Box::new(console_error_panic_hook::hook));
+
   let config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
+
   let proof = client::prover_inner(config)
     .await
     .map_err(|e| JsValue::from_str(&format!("Could not produce proof: {:?}", e)))?;
+
   serde_json::to_string_pretty(&proof)
     .map_err(|e| JsValue::from_str(&format!("Could not serialize proof: {:?}", e)))
+}
+
+#[wasm_bindgen]
+pub async fn verify(proof: &str, notary_pubkey_str: &str) -> Result<String, JsValue> {
+  panic::set_hook(Box::new(console_error_panic_hook::hook));
+
+  let proof: TlsProof = serde_json::from_str(proof)
+    .map_err(|e| JsValue::from_str(&format!("Could not deserialize proof: {:?}", e)))?;
+
+  let result = client::verify(proof, notary_pubkey_str)
+    .await;
+    // .map_err(|e| JsValue::from_str(&format!("Could not verify proof: {:?}", e)))?;
+
+  serde_json::to_string_pretty(&result)
+    .map_err(|e| JsValue::from_str(&format!("Could not serialize result: {:?}", e)))
 }
 
 #[wasm_bindgen]

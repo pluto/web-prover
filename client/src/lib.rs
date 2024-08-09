@@ -4,8 +4,13 @@
 pub mod config;
 pub mod errors;
 
+use std::time::Duration;
+
 use config::ClientType;
 use hyper::Request;
+use p256::pkcs8::DecodePublicKey;
+use serde::{Deserialize, Serialize};
+use tlsn_core::proof::SessionProof;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
 use tracing::{debug, info};
@@ -61,6 +66,53 @@ async fn notarize(prover: Prover<Closed>) -> Result<TlsProof, errors::ClientErro
   Ok(TlsProof { session: notarized_session.session_proof(), substrings: substrings_proof })
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct VerifyResult {
+  pub server_name: String,
+  pub time:        u64,
+  pub sent:        String,
+  pub recv:        String,
+}
+
+pub async fn verify(proof: TlsProof, notary_pubkey_str: &str) -> VerifyResult {
+  let TlsProof {
+    // The session proof establishes the identity of the server and the commitments
+    // to the TLS transcript.
+    session,
+    // The substrings proof proves select portions of the transcript, while redacting
+    // anything the Prover chose not to disclose.
+    substrings,
+  } = proof;
+
+  session.verify_with_default_cert_verifier(get_notary_pubkey(notary_pubkey_str)).unwrap();
+
+  let SessionProof { header, session_info, .. } = session;
+
+  let time = chrono::DateTime::UNIX_EPOCH + Duration::from_secs(header.time());
+
+  let (mut sent, mut recv) = substrings.verify(&header).unwrap();
+
+  sent.set_redacted(b'X');
+  recv.set_redacted(b'X');
+
+  debug!(
+    "Successfully verified that the bytes below came from a session with {:?} at {}.",
+    session_info.server_name, time
+  );
+  debug!("Note that the bytes which the Prover chose not to disclose are shown as X.");
+  debug!("Bytes sent:");
+  debug!("{}", String::from_utf8(sent.data().to_vec()).unwrap());
+  debug!("Bytes received:");
+  debug!("{}", String::from_utf8(recv.data().to_vec()).unwrap());
+
+  VerifyResult {
+    server_name: String::from(session_info.server_name.as_str()),
+    time:        header.time(),
+    sent:        String::from_utf8(sent.data().to_vec()).unwrap(),
+    recv:        String::from_utf8(recv.data().to_vec()).unwrap(),
+  }
+}
+
 async fn send_request(
   mut request_sender: hyper::client::conn::SendRequest<hyper::Body>,
   request: Request<hyper::Body>,
@@ -114,4 +166,8 @@ fn default_root_store() -> tls_client::RootCertStore {
 async fn body_to_string(res: hyper::Response<hyper::Body>) -> String {
   let body_bytes = hyper::body::to_bytes(res.into_body()).await.unwrap(); // TODO fix unwrap
   String::from_utf8(body_bytes.to_vec()).unwrap()
+}
+
+fn get_notary_pubkey(pubkey: &str) -> p256::PublicKey {
+  p256::PublicKey::from_public_key_pem(pubkey).unwrap()
 }
