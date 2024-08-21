@@ -37,4 +37,5 @@ jobs:
 
       - run: |
           RUST_LOG=DEBUG cargo run --release -p notary -- --config ./fixture/notary-config.toml &
+          sleep 10
           NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer cargo run --release -p client -- --config ./fixture/client.tcp_local.json
