@@ -36,7 +36,7 @@ jobs:
         if: matrix.os == 'macos-latest'
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "17" # https://formulae.brew.sh/formula/llvm#default
+          version: "18" # https://formulae.brew.sh/formula/llvm#default
 
       - uses: Swatinem/rust-cache@v2
         with:

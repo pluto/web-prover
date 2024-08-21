@@ -27,7 +27,7 @@ jobs:
       - name: Install LLVM and Clang to support 'ring' crate
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "17" # https://formulae.brew.sh/formula/llvm#default
+          version: "18" # https://formulae.brew.sh/formula/llvm#default
 
       - uses: Swatinem/rust-cache@v2
 
