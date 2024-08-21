@@ -36,7 +36,7 @@ jobs:
         if: matrix.os == 'macos-latest'
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "10.0"
+          version: "10"
 
       - uses: Swatinem/rust-cache@v2
         with:

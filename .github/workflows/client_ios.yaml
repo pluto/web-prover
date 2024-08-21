@@ -27,7 +27,7 @@ jobs:
       - name: Install LLVM and Clang to support 'ring' crate
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "10.0"
+          version: "10"
 
       - uses: Swatinem/rust-cache@v2
 
