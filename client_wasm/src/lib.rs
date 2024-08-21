@@ -43,9 +43,8 @@ pub async fn verify(proof: &str, notary_pubkey_str: &str) -> Result<String, JsVa
   let proof: TlsProof = serde_json::from_str(proof)
     .map_err(|e| JsValue::from_str(&format!("Could not deserialize proof: {:?}", e)))?;
 
-  let result = client::verify(proof, notary_pubkey_str)
-    .await;
-    // .map_err(|e| JsValue::from_str(&format!("Could not verify proof: {:?}", e)))?;
+  let result = client::verify(proof, notary_pubkey_str).await;
+  // .map_err(|e| JsValue::from_str(&format!("Could not verify proof: {:?}", e)))?;
 
   serde_json::to_string_pretty(&result)
     .map_err(|e| JsValue::from_str(&format!("Could not serialize result: {:?}", e)))

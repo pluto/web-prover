@@ -25,9 +25,9 @@ jobs:
 
       # TODO: do we need llvm for this?
       - name: Install LLVM and Clang to support 'ring' crate
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "10.0"
+        run: |
+          brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
+          echo /usr/local/opt/llvm@18/bin >> $GITHUB_PATH
 
       - uses: Swatinem/rust-cache@v2
 
