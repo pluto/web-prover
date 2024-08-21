@@ -34,9 +34,9 @@ jobs:
 
       - name: Install LLVM and Clang to support 'ring' crate
         if: matrix.os == 'macos-latest'
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "18" # https://formulae.brew.sh/formula/llvm#default
+        run: |
+          brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
+          echo /usr/local/opt/llvm@18/bin >> $GITHUB_PATH
 
       - uses: Swatinem/rust-cache@v2
         with:
