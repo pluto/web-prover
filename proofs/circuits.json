@@ -1,0 +1,39 @@
+{
+  "multiplier_3": {
+    "file": "multiplier",
+    "template": "Multiplier",
+    "params": [3]
+  },
+  "sha256_32": {
+    "file": "sha256",
+    "template": "Sha256Bytes",
+    "params": [32]
+  },
+  "sudoku_9x9": {
+    "file": "sudoku",
+    "template": "Sudoku",
+    "pubs": ["puzzle"],
+    "params": [3]
+  },
+  "sudoku_4x4": {
+    "file": "sudoku",
+    "template": "Sudoku",
+    "pubs": ["puzzle"],
+    "params": [2]
+  },
+  "fp64": {
+    "file": "float_add",
+    "template": "FloatAdd",
+    "params": [11, 52]
+  },
+  "fp32": {
+    "file": "float_add",
+    "template": "FloatAdd",
+    "params": [8, 23]
+  },
+  "fibonacci_11": {
+    "file": "fibonacci",
+    "template": "Fibonacci",
+    "params": [11]
+  }
+}

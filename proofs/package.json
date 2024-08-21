@@ -1,0 +1,18 @@
+{
+  "description": "Circomkit examples",
+  "scripts": {
+    "start": "npx ts-node ./src/index.ts",
+    "test": "npx mocha"
+  },
+  "dependencies": {
+    "circomkit": "0.2.1",
+    "circomlib": "^2.0.5"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.1",
+    "@types/node": "^20.3.0",
+    "mocha": "^10.2.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.1.3"
+  }
+}
