@@ -1,0 +1,7 @@
+[package]
+name = "tls-proxy"
+edition = "2021"
+version = "1.0.1"
+
+[lib]
+name = "tls_proxy"
