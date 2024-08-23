@@ -15,15 +15,27 @@ logging = ["tracing"]
 prf = ["dep:hmac", "dep:sha2"]
 
 [dependencies]
-rand.workspace = true
-sct.workspace = true
-webpki = { workspace = true, features = ["alloc", "std"] }
-tracing = { workspace = true, optional = true }
-ring.workspace = true
-futures.workspace = true
-serde = { workspace = true, optional = true, features = ["derive"] }
-rustls-pemfile.workspace = true
-thiserror.workspace = true
-web-time.workspace = true
-hmac = { workspace = true, optional = true }
-sha2 = { workspace = true, optional = true }
+# rand.workspace = true
+rand = "0.8"
+# sct.workspace = true
+sct = "0.7"
+# webpki = { workspace = true, features = ["alloc", "std"] }
+webpki = {version = "0.22", features = ["alloc", "std"]}
+# tracing = { workspace = true, optional = true }
+tracing = {version = "0.1", optional = true }
+# ring.workspace = true
+ring = { version = "0.17", features = ["wasm32_unknown_unknown_js"] }
+# futures.workspace = true
+futures = "0.3"
+# serde = { workspace = true, optional = true, features = ["derive"] }
+serde = {version = "1", optional = true, features = ["derive"]}
+# rustls-pemfile.workspace = true
+rustls-pemfile = "1"
+# thiserror.workspace = true
+thiserror = "1"
+# web-time.workspace = true
+web-time = "0.2"
+# hmac = { workspace = true, optional = true }
+hmac = {version = "0.12", optional = true}
+# sha2 = { workspace = true, optional = true }
+sha2 = {version = "0.10", optional = true}

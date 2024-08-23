@@ -13,19 +13,19 @@ pub async fn prover_inner_origo(
   let session_id = config.session_id();
   let root_store = crate::default_root_store();
 
-  let config = tls_client::ClientConfig::builder()
+  let config = tls_client2::ClientConfig::builder()
     .with_safe_defaults()
     .with_root_certificates(root_store)
     .with_no_client_auth();
 
   //   let origo_conn = OrigoConnection::new();
-  let client = tls_client::ClientConnection::new(
+  let client = tls_client2::ClientConnection::new(
     Arc::new(config),
-    Box::new(tls_client::RustCryptoBackend13::new(origo_conn)),
+    Box::new(tls_client2::RustCryptoBackend13::new(origo_conn)),
     tls_client::ServerName::try_from(target_host).unwrap(),
   )
   .unwrap();
-  let (mut client_tls_conn, tls_fut) = tls_client_async::bind_client(ws_stream.into_io(), client);
+  let (mut client_tls_conn, tls_fut) = tls_client_async2::bind_client(ws_stream.into_io(), client);
 
   //   let client_notary_config = rustls::ClientConfig::builder()
   //     .with_safe_defaults()

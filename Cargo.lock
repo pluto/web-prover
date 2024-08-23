@@ -932,6 +932,8 @@ dependencies = [
  "strum_macros",
  "thiserror",
  "time",
+ "tls-client",
+ "tls-client-async",
  "tlsn-core",
  "tlsn-prover",
  "tlsn-tls-client",

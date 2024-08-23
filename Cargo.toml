@@ -1,12 +1,8 @@
 [workspace]
-members=["client", "client_ios", "client_wasm", "notary", "tls/tls-client", "tls/tls-client-async"]
+members=["client", "client_ios", "client_wasm", "notary"]
 # members =["client", "client_wasm"] # config for wasm32 rust analyzer
 # members =["client", "client_ios"] # config for ios rust analyzer
 resolver="2"
-
-[patch.'https://github.com/tlsnotary/tlsn.git']
-tls-client      ={ path="tls/tls-client" }
-tls-client-async={ path="tls/tls-client-async" }
 
 [workspace.dependencies]
 # Local re-exporting
@@ -25,55 +21,6 @@ tlsn-prover={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4",
 ] }
 tlsn-core={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
 tls-client={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4", package="tlsn-tls-client" }
-
-# All of the following dependencies are tls-client deps:
-
-# rand
-rand       ="0.8"
-rand_chacha="0.3"
-
-# crypto
-aes         ="0.8"
-aes-gcm     ="0.9"
-sha2        ="0.10"
-hmac        ="0.12"
-sct         ="0.7"
-digest      ="0.10"
-webpki      ="0.22"
-webpki-roots="0.26"
-
-ring={ version="0.17", features=["wasm32_unknown_unknown_js"] }
-
-p256          ="0.13"
-rustls-pemfile="1"
-rustls        ="0.20"
-async-rustls  ="0.4"
-
-# async
-async-trait="0.1"
-futures    ="0.3"
-tokio      ="1"
-tokio-util ="0.7"
-hyper      ="0.14"
-
-# serialization
-bytes="1"
-# serde="1"
-
-# error/log
-# tracing           ="0.1"
-# tracing-subscriber="0.3"
-thiserror ="1"
-log       ="0.4"
-env_logger="0.10"
-
-# testing
-rstest="0.12"
-
-# misc
-derive_builder   ="0.12"
-enum-try-as-inner="0.1"
-web-time         ="0.2"
 
 [package]
 name   ="webprover"
