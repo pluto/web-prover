@@ -1,6 +1,8 @@
 #[cfg(not(target_arch = "wasm32"))] mod prover;
 #[cfg(target_arch = "wasm32")] mod prover_wasm32;
 
+#[cfg(not(target_arch = "wasm32"))] mod origo;
+
 pub mod config;
 pub mod errors;
 
@@ -14,9 +16,26 @@ pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
 use tracing::{debug, info};
 
-pub async fn prover_inner(mut config: config::Config) -> Result<TlsProof, errors::ClientErrors> {
+pub async fn prover_inner(config: config::Config) -> Result<TlsProof, errors::ClientErrors> {
   info!("GIT_HASH: {}", env!("GIT_HASH"));
+  match config.mode {
+    config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
+    config::NotaryMode::Origo => prover_inner_origo(config).await,
+  }
+}
 
+pub async fn prover_inner_origo(config: config::Config) -> Result<TlsProof, errors::ClientErrors> {
+  // TODO
+  #[cfg(not(target_arch = "wasm32"))]
+  return origo::prover_inner_origo(config).await;
+
+  #[cfg(target_arch = "wasm32")]
+  todo!("todo")
+}
+
+pub async fn prover_inner_tlsn(
+  mut config: config::Config,
+) -> Result<TlsProof, errors::ClientErrors> {
   let root_store = default_root_store();
 
   let prover_config = ProverConfig::builder()

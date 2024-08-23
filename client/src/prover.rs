@@ -99,7 +99,7 @@ const NOTARY_CA_CERT: &[u8] = include_bytes!(env!("NOTARY_CA_CERT_PATH"));
 // implementation is the same.
 
 /// Default root store using mozilla certs.
-fn default_root_store() -> rustls::RootCertStore {
+pub fn default_root_store() -> rustls::RootCertStore {
   let mut root_store = rustls::RootCertStore::empty();
   root_store.add_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
     rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(

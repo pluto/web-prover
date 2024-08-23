@@ -14,7 +14,7 @@ notary_ca_cert=[]
 # Shared dependencies for all targets
 [dependencies]
 # TLSN
-tls-client  ={ workspace=true }
+tls-client={ workspace=true }
 webpki-roots="0.26.1"
 pki-types   ={ package="rustls-pki-types", version="1.7" }
 cfg-if      ="1.0.0"
