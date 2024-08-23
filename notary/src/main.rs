@@ -19,6 +19,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod axum_websocket;
 mod config;
+mod origo;
 mod tcp;
 mod tlsn;
 mod websocket_proxy;
@@ -54,9 +55,9 @@ async fn main() {
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
     .route("/v1/tlsnotary", get(tlsn::notarize))
     .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
+    .route("/v1/origo", get(origo::proxy))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
-  // .route("/v1/origo", post(todo!("call into origo")));
 
   if &c.server_cert != "" || &c.server_key != "" {
     listen(listener, router, &c.server_cert, &c.server_key).await;

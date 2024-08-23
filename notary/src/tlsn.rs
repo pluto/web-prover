@@ -109,6 +109,7 @@ pub async fn notarize(
     }),
   }
 }
+
 pub async fn websocket_notarize(
   socket: WebSocket,
   notary_signing_key: SigningKey,
