@@ -934,6 +934,7 @@ dependencies = [
  "time",
  "tls-client",
  "tls-client-async",
+ "tls-proxy",
  "tlsn-core",
  "tlsn-prover",
  "tlsn-tls-client",
