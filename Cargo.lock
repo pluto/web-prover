@@ -5087,3 +5087,11 @@ dependencies = [
  "quote",
  "syn 2.0.72",
 ]
+
+[[patch.unused]]
+name = "tls-client"
+version = "0.1.0-alpha.5"
+
+[[patch.unused]]
+name = "tls-client-async"
+version = "0.1.0-alpha.5"

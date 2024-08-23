@@ -1,5 +1,5 @@
 {
-	"mode": "Origo",
+	"mode": "TLSN",
 	"notary_host": "localhost",
 	"notary_port": 7443,
 	"target_method": "GET",
