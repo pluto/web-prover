@@ -1,16 +1,13 @@
 use tlsn_core::proof::TlsProof;
 
-use crate::config;
-use crate::errors;
+use crate::{config, errors};
 
 // use tls_client::{ClientConnection, RustCryptoBackend, RustCryptoBackend13, ServerName};
 // use tls_client_async::bind_client;
 
-
 pub async fn prover_inner_origo(
   mut config: config::Config,
 ) -> Result<TlsProof, errors::ClientErrors> {
-
   let session_id = config.session_id();
   let root_store = crate::prover::default_root_store();
 
