@@ -1,5 +1,5 @@
 [workspace]
-members=["client", "client_ios", "client_wasm", "notary"]
+members=["client", "client_ios", "client_wasm", "notary", "tls/tls-client", "tls/tls-client-async"]
 # members =["client", "client_wasm"] # config for wasm32 rust analyzer
 # members =["client", "client_ios"] # config for ios rust analyzer
 resolver="2"
@@ -25,6 +25,8 @@ tlsn-prover={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4",
 ] }
 tlsn-core={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
 tls-client={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4", package="tlsn-tls-client" }
+
+# All of the following dependencies are tls-client deps:
 
 # rand
 rand       ="0.8"
