@@ -31,6 +31,8 @@ use crate::{config::Config, send_request};
 pub async fn setup_connection(config: &mut Config, prover_config: ProverConfig) -> Prover<Closed> {
   let session_id = config.session_id();
 
+  let websocket_proxy_url = config.websocket_proxy_url.clone().unwrap();
+
   let wss_url = format!(
     "wss://{}:{}/v1/tlsnotary?session_id={}",
     config.notary_host,
@@ -51,7 +53,7 @@ pub async fn setup_connection(config: &mut Config, prover_config: ProverConfig) 
     .finish();
 
   let (_, client_ws_stream) =
-    WsMeta::connect(format!("{}?{}", config.websocket_proxy_url, ws_query), None).await.unwrap();
+    WsMeta::connect(format!("{}?{}", websocket_proxy_url, ws_query), None).await.unwrap();
   let client_ws_stream_into = client_ws_stream.into_io();
 
   let (mpc_tls_connection, prover_fut) = prover.connect(client_ws_stream_into).await.unwrap();

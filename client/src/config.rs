@@ -5,18 +5,27 @@ use hyper::Request;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum NotaryMode {
+  Origo,
+  TLSN,
+}
+
 #[derive(Deserialize, Clone, Debug)]
 pub struct Config {
-  pub notary_host:                  String,
-  pub notary_port:                  u16,
-  pub target_method:                String,
-  pub target_url:                   String,
-  pub target_headers:               HashMap<String, String>,
-  pub target_body:                  String,
-  #[cfg(feature = "websocket")]
-  pub websocket_proxy_url:          String,
-  pub notarization_session_request: NotarizationSessionRequest, /* TODO rename to something
-                                                                 * better */
+  pub mode:                NotaryMode,
+  pub notary_host:         String,
+  pub notary_port:         u16,
+  pub target_method:       String,
+  pub target_url:          String,
+  pub target_headers:      HashMap<String, String>,
+  pub target_body:         String,
+  pub websocket_proxy_url: Option<String>, // if set, use websocket proxy
+
+  /// Maximum data that can be sent by the prover
+  pub max_sent_data: Option<usize>,
+  /// Maximum data that can be received by the prover
+  pub max_recv_data: Option<usize>,
 
   #[serde(skip)]
   session_id: String,
@@ -76,22 +85,4 @@ impl Config {
 
     request.body(body).unwrap()
   }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NotarizationSessionRequest {
-  pub client_type:   ClientType, // TODO depends on feature = websocket
-  /// Maximum data that can be sent by the prover
-  pub max_sent_data: Option<usize>,
-  /// Maximum data that can be received by the prover
-  pub max_recv_data: Option<usize>,
-}
-
-/// Types of client that the prover is using
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ClientType {
-  /// Client that has access to the transport layer
-  Tcp,
-  /// Client that cannot directly access transport layer, e.g. browser extension
-  Websocket,
 }

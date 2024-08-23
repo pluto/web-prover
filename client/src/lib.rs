@@ -6,7 +6,6 @@ pub mod errors;
 
 use std::time::Duration;
 
-use config::ClientType;
 use hyper::Request;
 use p256::pkcs8::DecodePublicKey;
 use serde::{Deserialize, Serialize};
@@ -24,10 +23,7 @@ pub async fn prover_inner(mut config: config::Config) -> Result<TlsProof, errors
     .id(config.session_id())
     .root_cert_store(root_store)
     .server_dns(config.target_host())
-    .max_transcript_size(
-      config.notarization_session_request.max_sent_data.unwrap()
-        + config.notarization_session_request.max_recv_data.unwrap(),
-    )
+    .max_transcript_size(config.max_sent_data.unwrap() + config.max_recv_data.unwrap())
     .build()
     .unwrap();
 
@@ -35,9 +31,10 @@ pub async fn prover_inner(mut config: config::Config) -> Result<TlsProof, errors
   let prover = prover_wasm32::setup_connection(&mut config, prover_config).await;
 
   #[cfg(not(target_arch = "wasm32"))]
-  let prover = match config.notarization_session_request.client_type {
-    ClientType::Tcp => prover::setup_tcp_connection(&mut config, prover_config).await,
-    ClientType::Websocket => prover::setup_websocket_connection(&mut config, prover_config).await,
+  let prover = if config.websocket_proxy_url.is_some() {
+    prover::setup_websocket_connection(&mut config, prover_config).await
+  } else {
+    prover::setup_tcp_connection(&mut config, prover_config).await
   };
 
   notarize(prover).await
