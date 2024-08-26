@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::{body::HttpBody, StatusCode};
-use hyper_util::rt::TokioIo;
 use tlsn_core::proof::TlsProof;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::debug;
@@ -71,13 +70,8 @@ pub async fn prover_inner_origo(
   let hyper::client::conn::Parts { io: notary_tls_socket, .. } =
     connection_task.await.unwrap().unwrap();
 
-  let (mut client_tls_conn, tls_fut) =
+  let (client_tls_conn, tls_fut) =
     tls_client_async2::bind_client(notary_tls_socket.compat(), client);
-
-  //   let client_tls_conn = hyper_util::rt::TokioIo::new(client_tls_conn);
-
-  //   let client_tls_conn = TokioIo::new(client_tls_conn);
-  //   let client_tls_conn = unsafe { FuturesIo::new(client_tls_conn) }; // TODO is this needed?
 
   // TODO: What do with tls_fut? what do with tls_receiver?
   let (tls_sender, tls_receiver) = oneshot::channel();
@@ -89,15 +83,10 @@ pub async fn prover_inner_origo(
   };
   tokio::spawn(handled_tls_fut);
 
-  //   let client_tls_conn = hyper_util::rt::TokioIo::new(client_tls_conn);
-
-  // use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
   use tokio_util::compat::FuturesAsyncReadCompatExt;
 
   let (mut request_sender, connection) =
     hyper::client::conn::handshake(client_tls_conn.compat()).await.unwrap();
-  // hyper1::client::conn::http1::handshake(client_tls_conn).await.unwrap();
 
   let (connection_sender, connection_receiver) = oneshot::channel();
   let connection_fut = connection.without_shutdown();
@@ -149,90 +138,3 @@ fn default_root_store() -> tls_client2::RootCertStore {
 
   root_store
 }
-
-// use core::slice;
-// use std::{
-//   pin::Pin,
-//   task::{Context, Poll},
-// };
-
-// use pin_project_lite::pin_project;
-
-// pin_project! {
-//     #[derive(Debug)]
-//     pub(crate) struct FuturesIo<T> {
-//         #[pin]
-//         inner: T,
-//     }
-// }
-
-// impl<T> FuturesIo<T> {
-//   /// Create a new `FuturesIo` wrapping the given I/O object.
-//   ///
-//   /// # Safety
-//   ///
-//   /// This wrapper is only safe to use if the inner I/O object does not under
-//   /// any circumstance read from the buffer passed to `poll_read` in the
-//   /// `futures::AsyncRead` implementation.
-//   pub(crate) unsafe fn new(inner: T) -> Self { Self { inner } }
-
-//   pub(crate) fn into_inner(self) -> T { self.inner }
-// }
-
-// // hyper::rt::io::Read
-// impl<T> tokio::io::AsyncWrite for FuturesIo<T>
-// // impl<T> hyper::rt::io::Write for FuturesIo<T>
-// where T: futures::AsyncWrite + Unpin
-// {
-//   fn poll_write(
-//     self: Pin<&mut Self>,
-//     cx: &mut Context<'_>,
-//     buf: &[u8],
-//   ) -> Poll<Result<usize, std::io::Error>> {
-//     self.project().inner.poll_write(cx, buf)
-//   }
-
-//   fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
-//     self.project().inner.poll_flush(cx)
-//   }
-
-//   fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
-//     self.project().inner.poll_close(cx)
-//   }
-
-//   fn poll_write_vectored(
-//     self: Pin<&mut Self>,
-//     cx: &mut Context<'_>,
-//     bufs: &[std::io::IoSlice<'_>],
-//   ) -> Poll<Result<usize, std::io::Error>> {
-//     self.project().inner.poll_write_vectored(cx, bufs)
-//   }
-// }
-
-// // Adapted from https://github.com/hyperium/hyper-util/blob/99b77a5a6f75f24bc0bcb4ca74b5f26a07b19c80/src/rt/tokio.rs
-// impl<T> tokio::io::AsyncRead for FuturesIo<T>
-// // impl<T> hyper::rt::Read for FuturesIo<T>
-// where T: futures::AsyncRead + Unpin
-// {
-//   fn poll_read(
-//     self: Pin<&mut Self>,
-//     cx: &mut Context<'_>,
-//     mut buf: hyper::rt::ReadBufCursor<'_>,
-//   ) -> Poll<Result<(), std::io::Error>> {
-//     // Safety: buf_slice should only be written to, so it's safe to convert `&mut
-//     // [MaybeUninit<u8>]` to `&mut [u8]`.
-//     let buf_slice = unsafe {
-//       slice::from_raw_parts_mut(buf.as_mut().as_mut_ptr() as *mut u8, buf.as_mut().len())
-//     };
-
-//     let n = match futures::AsyncRead::poll_read(self.project().inner, cx, buf_slice) {
-//       Poll::Ready(Ok(n)) => n,
-//       other => return other.map_ok(|_| ()),
-//     };
-
-//     unsafe {
-//       buf.advance(n);
-//     }
-//     Poll::Ready(Ok(()))
-//   }
-// }
