@@ -2,7 +2,6 @@ use anyhow::Result;
 use clap::Parser;
 use client::config::Config;
 use tracing::Level;
-use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
 #[clap(name = "Web Proof Client")]
@@ -24,11 +23,10 @@ async fn main() -> Result<()> {
     "warn" => Level::WARN,
     "info" => Level::INFO,
     "debug" => Level::DEBUG,
+    "trace" => Level::TRACE,
     _ => Level::TRACE,
   };
-  let _crate_name = env!("CARGO_PKG_NAME");
-  let env_filter = EnvFilter::builder().parse_lossy(format!("{}={},info", _crate_name, log_level));
-  tracing_subscriber::fmt().with_env_filter(env_filter).init();
+  tracing_subscriber::fmt().with_max_level(log_level).init();
 
   let config_json = std::fs::read_to_string(args.config)?;
   let config: Config = serde_json::from_str(&config_json)?;

@@ -8,7 +8,7 @@ use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use serde::Deserialize;
 use tokio::{
-  io::{AsyncRead, AsyncWrite},
+  io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
   net::TcpStream,
 };
 use tokio_util::compat::FuturesAsyncReadCompatExt;
@@ -95,7 +95,62 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     .await
     .expect("Failed to connect to TCP server");
 
+  let (mut tcp_read, mut tcp_write) = tcp_stream.split();
+
+  let (mut socket_read, mut socket_write) = tokio::io::split(socket);
+
+  let client_to_server = async {
+    // tokio::io::copy(&mut socket_read, &mut tcp_write).await.unwrap();
+
+    let mut buf = [0; 4096];
+    loop {
+      let n = socket_read.read(&mut buf).await.unwrap();
+      if n == 0 {
+        debug!("close client_to_server");
+        break;
+      }
+      if n > 0 {
+        let data = &buf[..n];
+        debug!("write to server");
+        tcp_write.write_all(data).await.unwrap();
+      }
+    }
+  };
+
+  let server_to_client = async {
+    // tokio::io::copy(&mut tcp_read, &mut socket_write).await.unwrap();
+
+    let mut buf = [0; 4096];
+    loop {
+      let n = tcp_read.read(&mut buf).await.unwrap();
+      if n == 0 {
+        debug!("close server_to_client");
+        break;
+      }
+      if n > 0 {
+        let data = &buf[..n];
+        debug!("write to client");
+        socket_write.write_all(data).await.unwrap();
+      }
+    }
+  };
+
+  // client_to_server.await;
+  // server_to_client.await;
+
+  tokio::join!(client_to_server, server_to_client);
+
+  // send from socket to tcp_stream, then return from tcp_stream to socket
+
+  //  TokioIo::new(socket)
+
   // TODO better error handling
-  tokio::io::copy_bidirectional(&mut socket, &mut tcp_stream).await.unwrap();
+  // tokio::io::copy_bidirectional(&mut socket, &mut tcp_stream).await.unwrap();
+
+  // let (r, w) = tcp_stream.split();
+
+  // tokio::io::copy(&mut socket, &mut tcp_stream).await.unwrap();
+  // tokio::io::copy(&mut socket, &mut tcp_socketait.unwrtcp_stream
+
   Ok(())
 }

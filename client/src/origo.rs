@@ -85,6 +85,8 @@ pub async fn prover_inner_origo(
   };
   tokio::spawn(handled_tls_fut);
 
+  // let x_task = tokio::spawn(tls_fut);
+
   use tokio_util::compat::FuturesAsyncReadCompatExt;
 
   let (mut request_sender, connection) =
@@ -98,17 +100,21 @@ pub async fn prover_inner_origo(
     let _ = connection_sender.send(result);
   };
   tokio::spawn(handled_connection_fut);
+  // let y_task = tokio::spawn(connection.without_shutdown());
+
+  debug!("1");
 
   let response = request_sender.send_request(config.to_request()).await.unwrap();
 
+  debug!("2");
   assert_eq!(response.status(), StatusCode::OK);
 
   let payload = response.into_body().collect().await.unwrap().to_bytes();
   debug!("Response: {:?}", payload);
 
   // Close the connection to the server
-  let mut client_socket = connection_receiver.await.unwrap().unwrap().io.into_inner();
-  client_socket.close().await.unwrap();
+  // let mut client_socket = connection_receiver.await.unwrap().unwrap().io.into_inner();
+  // client_socket.close().await.unwrap();
 
   todo!("return something");
 }

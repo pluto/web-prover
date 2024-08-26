@@ -174,7 +174,10 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
 
                     // By convention if `AsyncRead::read` returns 0, it means EOF, i.e. the peer
                     // has closed the socket.  Also close on received_close_notify, else we hang.
+                    
+                    // TODO change from tracy:
                     if received == 0 || client.received_close_notify() {
+                    // if received == 0  {
                         #[cfg(feature = "tracing")]
                         debug!("server closed connection");
                         server_closed = true;
