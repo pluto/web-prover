@@ -104,6 +104,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 
     let mut buf = [0; 4096];
     loop {
+      debug!("read1");
       let n = socket_read.read(&mut buf).await.unwrap();
       if n == 0 {
         debug!("close client_to_server");
@@ -122,6 +123,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 
     let mut buf = [0; 4096];
     loop {
+      debug!("read2");
       let n = tcp_read.read(&mut buf).await.unwrap();
       if n == 0 {
         debug!("close server_to_client");

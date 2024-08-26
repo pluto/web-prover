@@ -1,8 +1,9 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::{body::HttpBody, StatusCode};
 use tlsn_core::proof::TlsProof;
+use tokio::time;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::debug;
 
@@ -76,35 +77,43 @@ pub async fn prover_inner_origo(
     tls_client_async2::bind_client(notary_tls_socket.compat(), client);
 
   // TODO: What do with tls_fut? what do with tls_receiver?
-  let (tls_sender, tls_receiver) = oneshot::channel();
-  let handled_tls_fut = async {
-    let result = tls_fut.await;
-    // Triggered when the server shuts the connection.
-    debug!("tls_sender.send({:?})", result);
-    let _ = tls_sender.send(result);
-  };
-  tokio::spawn(handled_tls_fut);
+  // let (tls_sender, tls_receiver) = oneshot::channel();
+  // let handled_tls_fut = async {
+  //   // time::sleep(Duration::from_millis(5000)).await;
+  //   let result = tls_fut.await;
+  //   // time::sleep(Duration::from_millis(5000)).await;
+  //   // Triggered when the server shuts the connection.
+  //   debug!("tls_sender.send({:?})", result);
+  //   let _ = tls_sender.send(result);
+  // };
+  // tokio::spawn(handled_tls_fut);
 
-  // let x_task = tokio::spawn(tls_fut);
+  let x_task = tokio::spawn(tls_fut);
 
   use tokio_util::compat::FuturesAsyncReadCompatExt;
 
   let (mut request_sender, connection) =
     hyper::client::conn::handshake(client_tls_conn.compat()).await.unwrap();
 
-  let (connection_sender, connection_receiver) = oneshot::channel();
-  let connection_fut = connection.without_shutdown();
-  let handled_connection_fut = async {
-    let result = connection_fut.await;
-    debug!("connection_sender.send({:?})", result);
-    let _ = connection_sender.send(result);
-  };
-  tokio::spawn(handled_connection_fut);
-  // let y_task = tokio::spawn(connection.without_shutdown());
+  // let (connection_sender, connection_receiver) = oneshot::channel();
+  // let connection_fut = connection.without_shutdown();
+  // let handled_connection_fut = async {
+  //   // time::sleep(Duration::from_millis(5000)).await;
+  //   let result = connection_fut.await;
+  //   // time::sleep(Duration::from_millis(5000)).await;
+  //   debug!("connection_sender.send({:?})", result);
+  //   let _ = connection_sender.send(result);
+  // };
+  // tokio::spawn(handled_connection_fut);
+  let y_task = tokio::spawn(connection.without_shutdown());
 
   debug!("1");
+  // connection_receiver.await.unwrap();
 
   let response = request_sender.send_request(config.to_request()).await.unwrap();
+
+  let _ = y_task.await.unwrap();
+  let _ = x_task.await.unwrap();
 
   debug!("2");
   assert_eq!(response.status(), StatusCode::OK);

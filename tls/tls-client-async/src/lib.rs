@@ -174,7 +174,13 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
 
                     // By convention if `AsyncRead::read` returns 0, it means EOF, i.e. the peer
                     // has closed the socket.  Also close on received_close_notify, else we hang.
-                    
+
+                    // if client.received_close_notify() {
+                        // break 'conn;
+                        // client_closed = true;
+                        // rx_tls_fut = Fuse::terminated();
+                    // }
+
                     // TODO change from tracy:
                     if received == 0 || client.received_close_notify() {
                     // if received == 0  {
