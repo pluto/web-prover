@@ -20,6 +20,7 @@ jobs:
 
     - name: Install dependencies
       run: |
+        cd proofs
         npm install
         npm install -g snarkjs
 
