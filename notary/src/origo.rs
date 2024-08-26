@@ -4,7 +4,6 @@ use axum::{
   extract::{Query, State},
   response::Response,
 };
-use futures::io;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use serde::Deserialize;
@@ -12,7 +11,7 @@ use tokio::{
   io::{AsyncRead, AsyncWrite},
   net::TcpStream,
 };
-use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
+use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{debug, error, info};
 use ws_stream_tungstenite::WsStream;
 
@@ -83,8 +82,6 @@ pub async fn tcp_notarize(
   }
 }
 
-// use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
 pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   mut socket: S,
   session_id: &str,
@@ -97,23 +94,8 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   let mut tcp_stream = TcpStream::connect(format!("{}:{}", target_host, target_port))
     .await
     .expect("Failed to connect to TCP server");
-  // let (mut tcp_read, mut tcp_write) = tcp_stream.split();
 
-  // let client_to_server = async {
-  //   tokio::io::copy(&mut socket, &mut tcp_write).await;
-  // };
-
-  //   let client_to_server = tokio::spawn(async move {
-  //     tokio::io::copy(&mut socket, &mut tcp_write).await
-  // });
-
-  // let server_to_client = async {
-  //   tokio::io::copy(reader, writer)
-  // };
-
+  // TODO better error handling
   tokio::io::copy_bidirectional(&mut socket, &mut tcp_stream).await.unwrap();
-
-  // tokio::join!(client_to_server, server_to_client);
-
   Ok(())
 }
