@@ -51,10 +51,12 @@ pub async fn prover_inner_origo(
 
   let request = hyper::Request::builder()
     .uri(format!(
-      "https://{}:{}/v1/origo?session_id={}",
+      "https://{}:{}/v1/origo?session_id={}&target_host={}&target_port={}",
       config.notary_host.clone(),
       config.notary_port.clone(),
       session_id.clone(),
+      config.target_host(),
+      config.target_port(),
     ))
     .method("GET")
     .header("Host", config.notary_host.clone())
