@@ -9,7 +9,7 @@
   "dependencies": {
     "circomkit": "0.2.1",
     "circomlib": "^2.0.5",
-    "extractor": "github:pluto/extractor#main",
+    "extractor": "github:pluto/extractor#4473a8b",
     "aes-proof": "github:pluto/aes-proof#feat/npm-git-package"
   },
   "devDependencies": {
