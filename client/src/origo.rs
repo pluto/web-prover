@@ -1,11 +1,14 @@
 use std::{sync::Arc, time::Duration};
 
+use async_tls::TlsConnector;
+// use ws_stream_wasm::WsMeta;
+use async_tungstenite::async_std::connect_async_with_tls_connector;
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::{body::HttpBody, StatusCode};
 use tlsn_core::proof::TlsProof;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::debug;
-use ws_stream_wasm::WsMeta;
+use ws_stream_tungstenite::WsStream;
 
 use crate::{config, errors};
 
@@ -29,7 +32,7 @@ pub async fn prover_inner_origo(
   .unwrap();
 
   let url = format!(
-    "https://{}:{}/v1/origo?session_id={}&target_host={}&target_port={}",
+    "wss://{}:{}/v1/origo?session_id={}&target_host={}&target_port={}",
     config.notary_host.clone(),
     config.notary_port.clone(),
     session_id.clone(),
@@ -37,20 +40,23 @@ pub async fn prover_inner_origo(
     config.target_port(),
   );
 
-  let (_, ws_stream) = WsMeta::connect(url.to_string(), None).await.unwrap();
-
   let client_notary_config = rustls::ClientConfig::builder()
     .with_safe_defaults()
     .with_root_certificates(crate::prover::default_root_store())
     .with_no_client_auth();
 
+  let connector = TlsConnector::from(Arc::new(client_notary_config.clone()));
+
+  let (ws_stream, _) = connect_async_with_tls_connector(url, Some(connector)).await.unwrap();
+  let ws_connection = WsStream::new(ws_stream);
+
   // let notary_connector =
-    // tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));
+  // tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));
 
   // let notary_socket =
-    // tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port.clone()))
-      // .await
-      // .unwrap();
+  // tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port.clone()))
+  // .await
+  // .unwrap();
 
   // let notary_tls_socket = notary_connector
   //   .connect(rustls::ServerName::try_from(config.notary_host.as_str()).unwrap(), notary_socket)
@@ -61,7 +67,6 @@ pub async fn prover_inner_origo(
   //   hyper::client::conn::handshake(notary_tls_socket).await.unwrap();
   // let connection_task = tokio::spawn(connection.without_shutdown());
 
-
   // let response = request_sender.send_request(request).await.unwrap();
   // assert!(response.status() == hyper::StatusCode::SWITCHING_PROTOCOLS);
 
@@ -69,8 +74,7 @@ pub async fn prover_inner_origo(
   // let hyper::client::conn::Parts { io: notary_tls_socket, .. } =
   //   connection_task.await.unwrap().unwrap();
 
-  let (client_tls_conn, tls_fut) =
-    tls_client_async2::bind_client(ws_stream.into_io(), client);
+  let (client_tls_conn, tls_fut) = tls_client_async2::bind_client(ws_connection, client);
 
   // TODO: What do with tls_fut? what do with tls_receiver?
   // let (tls_sender, tls_receiver) = oneshot::channel();
@@ -86,7 +90,9 @@ pub async fn prover_inner_origo(
 
   let x_task = tokio::spawn(tls_fut);
 
+  // use hyper_util::rt::TokioIo;
   use tokio_util::compat::FuturesAsyncReadCompatExt;
+  // let client_tls_conn = TokioIo::new(client_tls_conn.compat());
 
   let (mut request_sender, connection) =
     hyper::client::conn::handshake(client_tls_conn.compat()).await.unwrap();
@@ -101,21 +107,22 @@ pub async fn prover_inner_origo(
   //   let _ = connection_sender.send(result);
   // };
   // tokio::spawn(handled_connection_fut);
-  let y_task = tokio::spawn(connection.without_shutdown());
+  let y_task = tokio::spawn(connection);
 
   debug!("1");
   // connection_receiver.await.unwrap();
 
   let response = request_sender.send_request(config.to_request()).await.unwrap();
 
-  let _ = y_task.await.unwrap();
-  let _ = x_task.await.unwrap();
 
   debug!("2");
   assert_eq!(response.status(), StatusCode::OK);
 
   let payload = response.into_body().collect().await.unwrap().to_bytes();
   debug!("Response: {:?}", payload);
+
+  // let _ = y_task.await.unwrap();
+  let _ = x_task.await.unwrap();
 
   // Close the connection to the server
   // let mut client_socket = connection_receiver.await.unwrap().unwrap().io.into_inner();

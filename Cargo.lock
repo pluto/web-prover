@@ -904,6 +904,7 @@ name = "client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-tls",
  "async-tungstenite 0.25.1",
  "base64 0.22.1",
  "cfg-if",

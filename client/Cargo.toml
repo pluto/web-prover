@@ -11,8 +11,8 @@ websocket=[]
 # used for local development
 notary_ca_cert=[]
 
-[patch.crates-io]
-ws_stream_wasm = { git = "https://github.com/tlsnotary/ws_stream_wasm.git", rev = "2ed12aad9f0236e5321f577672f309920b2aef51" }
+# [patch.crates-io]
+# ws_stream_wasm = { git = "https://github.com/tlsnotary/ws_stream_wasm.git", rev = "2ed12aad9f0236e5321f577672f309920b2aef51" }
 
 # Shared dependencies for all targets
 [dependencies]
@@ -50,7 +50,9 @@ p256={ version="0.13", features=["pem", "ecdsa"] }
 version         ="1.10.0"
 default-features=false
 features        =["v4"]
-ws_stream_wasm = "0.7.4"
+
+# ws_stream_wasm = "0.7.4"
+
 
 ####################################################################################################
 # Target-specific configuration
@@ -71,6 +73,9 @@ async-tungstenite    ={ version="0.25.1", features=["async-std-runtime", "async-
 ws_stream_tungstenite={ version="0.13.0", features=["tokio_io"] }
 clap                 ={ version="4.5.13", features=["derive"] }
 anyhow               ="1.0.86"
+
+async-tls = "0.13.0"
+# async-tungstenite = { version="0.25.1", features=["async-std-runtime", "async-tls"]}
 
 #- Wasm target configuration ----------------------------------------------------------------------#
 [target.'cfg(target_arch = "wasm32")'.dependencies]
