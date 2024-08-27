@@ -49,3 +49,10 @@ dump
 /target
 
 rustls_acme_cache
+
+# Circom junk files
+proofs/node_modules/*
+proofs/build/*
+proofs/ptau/*
+proofs/circuits/test/*.circom
+proofs/circuits/main/*
