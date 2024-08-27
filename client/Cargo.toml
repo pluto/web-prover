@@ -11,6 +11,9 @@ websocket=[]
 # used for local development
 notary_ca_cert=[]
 
+[patch.crates-io]
+ws_stream_wasm = { git = "https://github.com/tlsnotary/ws_stream_wasm.git", rev = "2ed12aad9f0236e5321f577672f309920b2aef51" }
+
 # Shared dependencies for all targets
 [dependencies]
 # TLSN
@@ -47,6 +50,7 @@ p256={ version="0.13", features=["pem", "ecdsa"] }
 version         ="1.10.0"
 default-features=false
 features        =["v4"]
+ws_stream_wasm = "0.7.4"
 
 ####################################################################################################
 # Target-specific configuration

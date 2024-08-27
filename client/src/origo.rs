@@ -3,9 +3,9 @@ use std::{sync::Arc, time::Duration};
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::{body::HttpBody, StatusCode};
 use tlsn_core::proof::TlsProof;
-use tokio::time;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::debug;
+use ws_stream_wasm::WsMeta;
 
 use crate::{config, errors};
 
@@ -28,53 +28,49 @@ pub async fn prover_inner_origo(
   )
   .unwrap();
 
+  let url = format!(
+    "https://{}:{}/v1/origo?session_id={}&target_host={}&target_port={}",
+    config.notary_host.clone(),
+    config.notary_port.clone(),
+    session_id.clone(),
+    config.target_host(),
+    config.target_port(),
+  );
+
+  let (_, ws_stream) = WsMeta::connect(url.to_string(), None).await.unwrap();
+
   let client_notary_config = rustls::ClientConfig::builder()
     .with_safe_defaults()
     .with_root_certificates(crate::prover::default_root_store())
     .with_no_client_auth();
 
-  let notary_connector =
-    tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));
+  // let notary_connector =
+    // tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));
 
-  let notary_socket =
-    tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port.clone()))
-      .await
-      .unwrap();
+  // let notary_socket =
+    // tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port.clone()))
+      // .await
+      // .unwrap();
 
-  let notary_tls_socket = notary_connector
-    .connect(rustls::ServerName::try_from(config.notary_host.as_str()).unwrap(), notary_socket)
-    .await
-    .unwrap();
+  // let notary_tls_socket = notary_connector
+  //   .connect(rustls::ServerName::try_from(config.notary_host.as_str()).unwrap(), notary_socket)
+  //   .await
+  //   .unwrap();
 
-  let (mut request_sender, connection) =
-    hyper::client::conn::handshake(notary_tls_socket).await.unwrap();
-  let connection_task = tokio::spawn(connection.without_shutdown());
+  // let (mut request_sender, connection) =
+  //   hyper::client::conn::handshake(notary_tls_socket).await.unwrap();
+  // let connection_task = tokio::spawn(connection.without_shutdown());
 
-  let request = hyper::Request::builder()
-    .uri(format!(
-      "https://{}:{}/v1/origo?session_id={}&target_host={}&target_port={}",
-      config.notary_host.clone(),
-      config.notary_port.clone(),
-      session_id.clone(),
-      config.target_host(),
-      config.target_port(),
-    ))
-    .method("GET")
-    .header("Host", config.notary_host.clone())
-    .header("Connection", "Upgrade")
-    .header("Upgrade", "TCP")
-    .body(hyper::Body::empty())
-    .unwrap();
 
-  let response = request_sender.send_request(request).await.unwrap();
-  assert!(response.status() == hyper::StatusCode::SWITCHING_PROTOCOLS);
+  // let response = request_sender.send_request(request).await.unwrap();
+  // assert!(response.status() == hyper::StatusCode::SWITCHING_PROTOCOLS);
 
-  // Claim back the TLS socket after the HTTP to TCP upgrade is done
-  let hyper::client::conn::Parts { io: notary_tls_socket, .. } =
-    connection_task.await.unwrap().unwrap();
+  // // Claim back the TLS socket after the HTTP to TCP upgrade is done
+  // let hyper::client::conn::Parts { io: notary_tls_socket, .. } =
+  //   connection_task.await.unwrap().unwrap();
 
   let (client_tls_conn, tls_fut) =
-    tls_client_async2::bind_client(notary_tls_socket.compat(), client);
+    tls_client_async2::bind_client(ws_stream.into_io(), client);
 
   // TODO: What do with tls_fut? what do with tls_receiver?
   // let (tls_sender, tls_receiver) = oneshot::channel();

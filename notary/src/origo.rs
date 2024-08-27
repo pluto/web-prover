@@ -4,16 +4,17 @@ use axum::{
   extract::{Query, State},
   response::Response,
 };
+use futures_util::{SinkExt, StreamExt};
+use hex;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use serde::Deserialize;
 use tokio::{
-  io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+  io::{AsyncReadExt, AsyncWriteExt},
   net::TcpStream,
 };
-use tokio_util::compat::FuturesAsyncReadCompatExt;
+use tokio_tungstenite::{tungstenite::protocol::Message, WebSocketStream};
 use tracing::{debug, error, info};
-use ws_stream_tungstenite::WsStream;
 
 use crate::{
   axum_websocket::WebSocket,
@@ -54,8 +55,7 @@ pub async fn websocket_notarize(
   target_port: u16,
 ) {
   debug!("Upgraded to websocket connection");
-  let stream = WsStream::new(socket.into_inner()).compat();
-  match proxy_service(stream, &session_id, &target_host, target_port).await {
+  match proxy_service(socket.into_inner(), &session_id, &target_host, target_port).await {
     Ok(_) => {
       info!(?session_id, "Successful notarization using websocket!");
     },
@@ -72,18 +72,19 @@ pub async fn tcp_notarize(
   target_port: u16,
 ) {
   debug!("Upgraded to tcp connection");
-  match proxy_service(stream, &session_id, &target_host, target_port).await {
-    Ok(_) => {
-      info!(?session_id, "Successful notarization using tcp!");
-    },
-    Err(err) => {
-      error!(?session_id, "Failed notarization using tcp: {err}");
-    },
-  }
+  todo!("tcp_notarize");
+  // match proxy_service(stream, &session_id, &target_host, target_port).await {
+  //   Ok(_) => {
+  //     info!(?session_id, "Successful notarization using tcp!");
+  //   },
+  //   Err(err) => {
+  //     error!(?session_id, "Failed notarization using tcp: {err}");
+  //   },
+  // }
 }
 
-pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
-  mut socket: S,
+pub async fn proxy_service(
+  socket: WebSocketStream<TokioIo<Upgraded>>,
   session_id: &str,
   target_host: &str,
   target_port: u16,
@@ -95,64 +96,43 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     .await
     .expect("Failed to connect to TCP server");
 
-  let (mut tcp_read, mut tcp_write) = tcp_stream.split();
+  let mut tcp_buf = [0; 4096];
 
-  let (mut socket_read, mut socket_write) = tokio::io::split(socket);
+  let (mut ws_sink, mut ws_stream) = socket.split();
+  loop {
+    tokio::select! {
+        Some(ws_msg) = ws_stream.next() => {
+            let ws_msg = ws_msg.expect("failed to read ws");
 
-  let client_to_server = async {
-    // tokio::io::copy(&mut socket_read, &mut tcp_write).await.unwrap();
+            // TODO: dedup me
+            if let Message::Binary(data) = ws_msg {
+                println!("=== forward binary message === bytes={:?}, msg={:?}", data.len(), hex::encode(&data));
+                tcp_stream.write_all(&data).await.expect("failed to write target server");
+                let n = tcp_stream.read(&mut tcp_buf).await.expect("failed to read target server");
+                println!("=== received response from server === bytes={:?}, message={:?}", n, hex::encode(tcp_buf[..n].to_vec()));
 
-    let mut buf = [0; 4096];
-    loop {
-      debug!("read1");
-      let n = socket_read.read(&mut buf).await.unwrap();
-      if n == 0 {
-        debug!("close client_to_server");
-        break;
-      }
-      if n > 0 {
-        let data = &buf[..n];
-        debug!("write to server");
-        tcp_write.write_all(data).await.unwrap();
-      }
+                if n == 0 {
+                    println!("=== CLOSING SOCKET === bytes={:?}, message={:?}, buf_len={:?}", n, hex::encode(tcp_buf[..n].to_vec()), tcp_buf.len());
+                    ws_sink.close().await.expect("failed to close socket");
+                } else {
+                    ws_sink.send(Message::Binary(tcp_buf[..n].to_vec())).await.expect("failed to forward to socket");
+                }
+            } else if let Message::Text(data) = ws_msg {
+                println!("forward text message: {:?}", data);
+                tcp_stream.write(data.as_bytes()).await.expect("failed to write to server");
+                let n = tcp_stream.read(&mut tcp_buf).await.expect("failed to read target server");
+                let msg = String::from_utf8(tcp_buf[..n].to_vec()).expect("failed to parse str");
+                ws_sink.send(Message::Text(msg)).await.expect("failed to forward to socket");
+            } else if let Message::Close(_) = ws_msg {
+                println!("=== Client sent close message === {:?}", ws_msg);
+                ws_sink.close().await.expect("failed to close socket");
+            } else {
+                println!("receiving data of unhandled format: {:?}", ws_msg);
+            }
+        },
+        else => break,
     }
-  };
-
-  let server_to_client = async {
-    // tokio::io::copy(&mut tcp_read, &mut socket_write).await.unwrap();
-
-    let mut buf = [0; 4096];
-    loop {
-      debug!("read2");
-      let n = tcp_read.read(&mut buf).await.unwrap();
-      if n == 0 {
-        debug!("close server_to_client");
-        break;
-      }
-      if n > 0 {
-        let data = &buf[..n];
-        debug!("write to client");
-        socket_write.write_all(data).await.unwrap();
-      }
-    }
-  };
-
-  // client_to_server.await;
-  // server_to_client.await;
-
-  tokio::join!(client_to_server, server_to_client);
-
-  // send from socket to tcp_stream, then return from tcp_stream to socket
-
-  //  TokioIo::new(socket)
-
-  // TODO better error handling
-  // tokio::io::copy_bidirectional(&mut socket, &mut tcp_stream).await.unwrap();
-
-  // let (r, w) = tcp_stream.split();
-
-  // tokio::io::copy(&mut socket, &mut tcp_stream).await.unwrap();
-  // tokio::io::copy(&mut socket, &mut tcp_socketait.unwrtcp_stream
+  }
 
   Ok(())
 }
