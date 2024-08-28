@@ -915,7 +915,7 @@ dependencies = [
  "futures-util",
  "getrandom",
  "http-body-util",
- "hyper 0.14.30",
+ "hyper 1.4.1",
  "hyper-util",
  "js-sys",
  "p256",
