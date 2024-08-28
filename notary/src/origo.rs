@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{io::Write, sync::Arc};
 
 use axum::{
   extract::{Query, State},
@@ -18,7 +18,7 @@ use ws_stream_tungstenite::WsStream;
 use crate::{
   axum_websocket::WebSocket,
   tlsn::{NotaryServerError, ProtocolUpgrade},
-  SharedState,
+  OrigoSession, SharedState,
 };
 
 #[derive(Deserialize)]
@@ -39,10 +39,16 @@ pub async fn proxy(
 
   match protocol_upgrade {
     ProtocolUpgrade::Ws(ws) => ws.on_upgrade(move |socket| {
-      websocket_notarize(socket, session_id, query.target_host.clone(), query.target_port.clone())
+      websocket_notarize(
+        socket,
+        session_id,
+        query.target_host.clone(),
+        query.target_port.clone(),
+        state,
+      )
     }),
     ProtocolUpgrade::Tcp(tcp) => tcp.on_upgrade(move |stream| {
-      tcp_notarize(stream, session_id, query.target_host.clone(), query.target_port.clone())
+      tcp_notarize(stream, session_id, query.target_host.clone(), query.target_port.clone(), state)
     }),
   }
 }
@@ -52,10 +58,11 @@ pub async fn websocket_notarize(
   session_id: String,
   target_host: String,
   target_port: u16,
+  state: Arc<SharedState>,
 ) {
   debug!("Upgraded to websocket connection");
   let stream = WsStream::new(socket.into_inner()).compat();
-  match proxy_service(stream, &session_id, &target_host, target_port).await {
+  match proxy_service(stream, &session_id, &target_host, target_port, state).await {
     Ok(_) => {
       info!(?session_id, "Successful notarization using websocket!");
     },
@@ -70,9 +77,10 @@ pub async fn tcp_notarize(
   session_id: String,
   target_host: String,
   target_port: u16,
+  state: Arc<SharedState>,
 ) {
   debug!("Upgraded to tcp connection");
-  match proxy_service(stream, &session_id, &target_host, target_port).await {
+  match proxy_service(stream, &session_id, &target_host, target_port, state).await {
     Ok(_) => {
       info!(?session_id, "Successful notarization using tcp!");
     },
@@ -87,6 +95,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   session_id: &str,
   target_host: &str,
   target_port: u16,
+  state: Arc<SharedState>,
 ) -> Result<(), NotaryServerError> {
   debug!(?session_id, "Starting notarization...");
 
@@ -98,6 +107,9 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   let (mut tcp_read, mut tcp_write) = tcp_stream.split();
 
   let (mut socket_read, mut socket_write) = tokio::io::split(socket);
+
+  let mut request_buf = vec![0u8; 0];
+  let mut response_buf = vec![0u8; 0];
 
   let client_to_server = async {
     // tokio::io::copy(&mut socket_read, &mut tcp_write).await.unwrap();
@@ -114,6 +126,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
         let data = &buf[..n];
         debug!("write to server");
         tcp_write.write_all(data).await.unwrap();
+        std::io::Write::write_all(&mut request_buf, data).unwrap();
       }
     }
   };
@@ -133,6 +146,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
         let data = &buf[..n];
         debug!("write to client");
         socket_write.write_all(data).await.unwrap();
+        std::io::Write::write_all(&mut response_buf, data).unwrap();
       }
     }
   };
@@ -141,6 +155,12 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   // server_to_client.await;
 
   tokio::join!(client_to_server, server_to_client);
+
+  state
+    .origo_sessions
+    .lock()
+    .unwrap()
+    .insert(session_id.to_string(), OrigoSession { request: request_buf, response: response_buf });
 
   // send from socket to tcp_stream, then return from tcp_stream to socket
 

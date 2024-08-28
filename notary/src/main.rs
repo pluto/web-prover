@@ -1,4 +1,8 @@
-use std::{fs, io, sync::Arc};
+use std::{
+  collections::HashMap,
+  fs, io,
+  sync::{Arc, Mutex},
+};
 
 use axum::{extract::Request, http::StatusCode, response::IntoResponse, routing::get, Router};
 use hyper::{body::Incoming, server::conn::http1};
@@ -29,6 +33,13 @@ struct SharedState {
   notary_signing_key: SigningKey,
   tlsn_max_sent_data: usize,
   tlsn_max_recv_data: usize,
+  origo_sessions:     Arc<Mutex<HashMap<String, OrigoSession>>>,
+}
+
+#[derive(Debug, Clone)]
+struct OrigoSession {
+  request:  Vec<u8>,
+  response: Vec<u8>,
 }
 
 #[tokio::main]
@@ -49,6 +60,7 @@ async fn main() {
     notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
     tlsn_max_sent_data: c.tlsn_max_sent_data,
     tlsn_max_recv_data: c.tlsn_max_recv_data,
+    origo_sessions:     Default::default(),
   });
 
   let router = Router::new()
