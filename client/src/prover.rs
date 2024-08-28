@@ -73,7 +73,10 @@ pub async fn setup_tcp_connection(
   let hyper::client::conn::http1::Parts { io: notary_tls_socket, .. } =
     connection_task.await.unwrap().unwrap();
 
-  let prover = Prover::new(prover_config).setup(notary_tls_socket.inner().compat()).await.unwrap();
+  // TODO notary_tls_socket needs to implement futures::AsyncRead/Write, find a better wrapper here
+  let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
+
+  let prover = Prover::new(prover_config).setup(notary_tls_socket.compat()).await.unwrap();
 
   let client_socket =
     tokio::net::TcpStream::connect((config.target_host(), config.target_port())).await.unwrap();

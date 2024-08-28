@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::Full;
-use hyper::{body::{Bytes, HttpBody}, Request, StatusCode};
+use hyper::{body::Bytes, Request, StatusCode};
 use tlsn_core::proof::TlsProof;
 use tokio::time;
 use tokio_util::compat::TokioAsyncReadCompatExt;
@@ -76,8 +76,11 @@ pub async fn prover_inner_origo(
   let hyper::client::conn::http1::Parts { io: notary_tls_socket, .. } =
     connection_task.await.unwrap().unwrap();
 
+  // TODO notary_tls_socket needs to implement futures::AsyncRead/Write, find a better wrapper here
+  let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
+
   let (client_tls_conn, tls_fut) =
-    tls_client_async2::bind_client(notary_tls_socket.inner().compat(), client);
+    tls_client_async2::bind_client(notary_tls_socket.compat(), client);
 
   // TODO: What do with tls_fut? what do with tls_receiver?
   // let (tls_sender, tls_receiver) = oneshot::channel();
