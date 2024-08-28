@@ -136,7 +136,7 @@ pub async fn prover_inner_origo(
   // let mut client_socket = connection_receiver.await.unwrap().unwrap().io.into_inner();
   // client_socket.close().await.unwrap();
 
-  todo!("return something");
+  todo!("return TLS proof");
 }
 
 #[cfg(feature = "notary_ca_cert")]
