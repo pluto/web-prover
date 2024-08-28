@@ -8,7 +8,8 @@ pub mod errors;
 
 use std::time::Duration;
 
-use hyper::Request;
+use http_body_util::BodyExt;
+use hyper::{body::Bytes, Request};
 use p256::pkcs8::DecodePublicKey;
 use serde::{Deserialize, Serialize};
 use tlsn_core::proof::SessionProof;
@@ -130,8 +131,8 @@ pub async fn verify(proof: TlsProof, notary_pubkey_str: &str) -> VerifyResult {
 }
 
 async fn send_request(
-  mut request_sender: hyper::client::conn::SendRequest<hyper::Body>,
-  request: Request<hyper::Body>,
+  mut request_sender: hyper::client::conn::http1::SendRequest<http_body_util::Full<Bytes>>,
+  request: Request<http_body_util::Full<Bytes>>,
 ) {
   // TODO: Clean up this logging and error handling
   match request_sender.send_request(request).await {
@@ -179,8 +180,8 @@ fn default_root_store() -> tls_client::RootCertStore {
   root_store
 }
 
-async fn body_to_string(res: hyper::Response<hyper::Body>) -> String {
-  let body_bytes = hyper::body::to_bytes(res.into_body()).await.unwrap(); // TODO fix unwrap
+async fn body_to_string(res: hyper::Response<hyper::body::Incoming>) -> String {
+  let body_bytes = res.into_body().collect().await.unwrap().to_bytes();
   String::from_utf8(body_bytes.to_vec()).unwrap()
 }
 

@@ -1,7 +1,8 @@
 use std::{sync::Arc, time::Duration};
 
 use futures::{channel::oneshot, AsyncWriteExt};
-use hyper::{body::HttpBody, StatusCode};
+use http_body_util::Full;
+use hyper::{body::{Bytes, HttpBody}, Request, StatusCode};
 use tlsn_core::proof::TlsProof;
 use tokio::time;
 use tokio_util::compat::TokioAsyncReadCompatExt;
@@ -46,11 +47,13 @@ pub async fn prover_inner_origo(
     .await
     .unwrap();
 
+  let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
+
   let (mut request_sender, connection) =
-    hyper::client::conn::handshake(notary_tls_socket).await.unwrap();
+    hyper::client::conn::http1::handshake(notary_tls_socket).await.unwrap();
   let connection_task = tokio::spawn(connection.without_shutdown());
 
-  let request = hyper::Request::builder()
+  let request: Request<Full<Bytes>> = hyper::Request::builder()
     .uri(format!(
       "https://{}:{}/v1/origo?session_id={}&target_host={}&target_port={}",
       config.notary_host.clone(),
@@ -63,18 +66,18 @@ pub async fn prover_inner_origo(
     .header("Host", config.notary_host.clone())
     .header("Connection", "Upgrade")
     .header("Upgrade", "TCP")
-    .body(hyper::Body::empty())
+    .body(http_body_util::Full::default())
     .unwrap();
 
   let response = request_sender.send_request(request).await.unwrap();
   assert!(response.status() == hyper::StatusCode::SWITCHING_PROTOCOLS);
 
   // Claim back the TLS socket after the HTTP to TCP upgrade is done
-  let hyper::client::conn::Parts { io: notary_tls_socket, .. } =
+  let hyper::client::conn::http1::Parts { io: notary_tls_socket, .. } =
     connection_task.await.unwrap().unwrap();
 
   let (client_tls_conn, tls_fut) =
-    tls_client_async2::bind_client(notary_tls_socket.compat(), client);
+    tls_client_async2::bind_client(notary_tls_socket.inner().compat(), client);
 
   // TODO: What do with tls_fut? what do with tls_receiver?
   // let (tls_sender, tls_receiver) = oneshot::channel();
@@ -91,9 +94,12 @@ pub async fn prover_inner_origo(
   let x_task = tokio::spawn(tls_fut);
 
   use tokio_util::compat::FuturesAsyncReadCompatExt;
+  // use tokio::io::AsyncReadExt;
+
+  let client_tls_conn = hyper_util::rt::TokioIo::new(client_tls_conn.compat());
 
   let (mut request_sender, connection) =
-    hyper::client::conn::handshake(client_tls_conn.compat()).await.unwrap();
+    hyper::client::conn::http1::handshake(client_tls_conn).await.unwrap();
 
   // let (connection_sender, connection_receiver) = oneshot::channel();
   // let connection_fut = connection.without_shutdown();
@@ -117,6 +123,8 @@ pub async fn prover_inner_origo(
 
   debug!("2");
   assert_eq!(response.status(), StatusCode::OK);
+
+  use http_body_util::BodyExt;
 
   let payload = response.into_body().collect().await.unwrap().to_bytes();
   debug!("Response: {:?}", payload);

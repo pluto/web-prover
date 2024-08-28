@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use base64::prelude::*;
-use hyper::Request;
+use http_body_util::Full;
+use hyper::{body::Bytes, Request};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -54,7 +55,7 @@ impl Config {
     target_url.scheme() == "https"
   }
 
-  pub fn to_request(&self) -> Request<hyper::Body> {
+  pub fn to_request(&self) -> Request<Full<Bytes>> {
     let mut request =
       Request::builder().method(self.target_method.as_str()).uri(self.target_url.clone());
 
@@ -78,9 +79,9 @@ impl Config {
     }
 
     let body = if self.target_body.is_empty() {
-      hyper::Body::empty()
+      Full::default()
     } else {
-      hyper::Body::from(BASE64_STANDARD.decode(&self.target_body).unwrap())
+      Full::from(BASE64_STANDARD.decode(&self.target_body).unwrap())
     };
 
     request.body(body).unwrap()
