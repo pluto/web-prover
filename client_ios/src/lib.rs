@@ -9,12 +9,16 @@ struct Output {
 }
 
 #[no_mangle]
+#[allow(clippy::missing_safety_doc)]
+pub unsafe extern "C" fn setup_tracing() {
+  let collector = tracing_subscriber::fmt().with_max_level(tracing::Level::TRACE).finish();
+  tracing::subscriber::set_global_default(collector).map_err(|e| panic!("{e:?}")).unwrap();
+}
+
+#[no_mangle]
 // TODO: We should probably clarify this safety doc
 #[allow(clippy::missing_safety_doc)]
 pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
-  let collector = tracing_subscriber::fmt().with_max_level(tracing::Level::TRACE).finish();
-  tracing::subscriber::set_global_default(collector).map_err(|e| panic!("{e:?}")).unwrap();
-
   let result: Result<client::TlsProof, ClientErrors> =
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
       let config_str = unsafe {
