@@ -1,4 +1,4 @@
-use std::{io::Write, sync::Arc};
+use std::{io::Write, sync::Arc, time::SystemTime};
 
 use axum::{
   extract::{Query, State},
@@ -156,11 +156,11 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 
   tokio::join!(client_to_server, server_to_client);
 
-  state
-    .origo_sessions
-    .lock()
-    .unwrap()
-    .insert(session_id.to_string(), OrigoSession { request: request_buf, response: response_buf });
+  state.origo_sessions.lock().unwrap().insert(session_id.to_string(), OrigoSession {
+    request:   request_buf,
+    response:  response_buf,
+    timestamp: SystemTime::now(),
+  });
 
   // send from socket to tcp_stream, then return from tcp_stream to socket
 

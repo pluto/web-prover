@@ -2,6 +2,7 @@ use std::{
   collections::HashMap,
   fs, io,
   sync::{Arc, Mutex},
+  time::SystemTime,
 };
 
 use axum::{extract::Request, http::StatusCode, response::IntoResponse, routing::get, Router};
@@ -38,8 +39,9 @@ struct SharedState {
 
 #[derive(Debug, Clone)]
 struct OrigoSession {
-  request:  Vec<u8>,
-  response: Vec<u8>,
+  request:   Vec<u8>,
+  response:  Vec<u8>,
+  timestamp: SystemTime,
 }
 
 #[tokio::main]
