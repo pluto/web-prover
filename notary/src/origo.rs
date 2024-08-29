@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::SystemTime};
+use std::{io::Cursor, sync::Arc, time::SystemTime};
 
 use axum::{
   extract::{Query, State},
@@ -185,10 +185,15 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   tokio::join!(client_to_server, server_to_client);
 
   state.origo_sessions.lock().unwrap().insert(session_id.to_string(), OrigoSession {
-    request:   request_buf,
+    request:   request_buf.clone(),
     response:  response_buf,
     timestamp: SystemTime::now(),
   });
+
+  extract_tls_handshake(&request_buf);
+  // let r = tls_parser::parse_tls_raw_record(&request_buf).unwrap();
+  // dbg!(r.1.hdr.record_type);
+  // dbg!(r);
 
   // send from socket to tcp_stream, then return from tcp_stream to socket
 
@@ -203,4 +208,24 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   // tokio::io::copy(&mut socket, &mut tcp_socketait.unwrtcp_stream
 
   Ok(())
+}
+
+fn extract_tls_handshake(bytes: &[u8]) {
+  let mut cursor = Cursor::new(bytes);
+
+  while cursor.position() < bytes.len() as u64 {
+    match tls_parser::parse_tls_raw_record(&cursor.get_ref()[cursor.position() as usize..]) {
+      Ok((_, record)) => {
+        println!("{}", record.hdr.record_type);
+
+        if record.hdr.record_type == tls_parser::TlsRecordType::Handshake {
+          // record.data
+        }
+
+        let record_length = record.hdr.len as usize + record.data.len(); // is this correct?
+        cursor.set_position(cursor.position() + record_length as u64);
+      },
+      Err(e) => println!("{:?}", e),
+    }
+  }
 }
