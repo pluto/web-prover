@@ -1,12 +1,14 @@
-use std::{io::Write, sync::Arc, time::SystemTime};
+use std::{sync::Arc, time::SystemTime};
 
 use axum::{
   extract::{Query, State},
   response::Response,
+  Json,
 };
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
-use serde::Deserialize;
+use p256::ecdsa::{signature::SignerMut, Signature};
+use serde::{Deserialize, Serialize};
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
   net::TcpStream,
@@ -20,6 +22,32 @@ use crate::{
   tlsn::{NotaryServerError, ProtocolUpgrade},
   OrigoSession, SharedState,
 };
+
+#[derive(Deserialize)]
+pub struct SignQuery {
+  session_id: String,
+}
+
+#[derive(Serialize)]
+pub struct SignReply {
+  signature: String,
+}
+
+pub async fn sign(
+  query: Query<SignQuery>,
+  State(state): State<Arc<SharedState>>,
+) -> Json<SignReply> {
+  let session = state.origo_sessions.lock().unwrap().get(&query.session_id).unwrap();
+
+  // TODO transform session and sign it
+
+  let signature: Signature = state.notary_signing_key.clone().sign(&[1, 2, 3]); // TODO what do you want to sign?
+  let signature_raw = hex::encode(signature.to_der().as_bytes());
+
+  let response = SignReply { signature: signature_raw };
+
+  Json(response)
+}
 
 #[derive(Deserialize)]
 pub struct NotarizeQuery {

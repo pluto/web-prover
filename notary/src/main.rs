@@ -70,6 +70,7 @@ async fn main() {
     .route("/v1/tlsnotary", get(tlsn::notarize))
     .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
     .route("/v1/origo", get(origo::proxy))
+    .route("/v1/origo/sign", get(origo::sign))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
 
