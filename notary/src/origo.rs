@@ -1,4 +1,8 @@
-use std::{io::Cursor, sync::Arc, time::SystemTime};
+use std::{
+  io::{Cursor, Read},
+  sync::{Arc, Mutex},
+  time::SystemTime,
+};
 
 use axum::{
   extract::{self, Query, State},
@@ -50,6 +54,7 @@ pub async fn sign(
 
   // TODO transform session and sign it
 
+  println!("\n\n{}\n\n", hex::encode(&session.request));
   extract_tls_handshake(&session.request, payload);
 
   let signature: Signature = state.notary_signing_key.clone().sign(&[1, 2, 3]); // TODO what do you want to sign?
@@ -63,18 +68,35 @@ pub async fn sign(
 use base64::prelude::BASE64_STANDARD;
 
 fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
+  dbg!(payload.server_aes_key.clone(), payload.server_aes_iv.clone());
+
   let server_aes_key = BASE64_STANDARD.decode(payload.server_aes_key).unwrap();
   let server_aes_iv = BASE64_STANDARD.decode(payload.server_aes_iv).unwrap();
 
   let mut cursor = Cursor::new(bytes);
 
+  let mut seq = 0;
+  let mut skip = 1;
   while cursor.position() < bytes.len() as u64 {
     match tls_parser::parse_tls_raw_record(&cursor.get_ref()[cursor.position() as usize..]) {
       Ok((_, record)) => {
         println!("{}", record.hdr.record_type);
 
-        if record.hdr.record_type == tls_parser::TlsRecordType::Handshake {
-          // record.data
+        // let (r, x) = tls_parser::parse_tls_record_with_header(&cursor.get_ref()[cursor.position()
+        // as usize..], &record.hdr).unwrap(); let header_len = r.len();
+
+        // println!("Handshake:\n\n{}\n\n", hex::encode(record.data));
+
+        if record.hdr.record_type == tls_parser::TlsRecordType::ApplicationData {
+          //   // record.data
+          if skip > 0 {
+            skip = skip - 1;
+            println!("skip");
+            let record_length = 5 + record.hdr.len; // 5 is record header length
+            cursor.set_position(cursor.position() + record_length as u64);
+            continue;
+          }
+          println!("go for it");
 
           let d = tls_client2::Decrypter2::new(
             server_aes_key[..16].try_into().unwrap(),
@@ -82,17 +104,29 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
             tls_client2::CipherSuite::TLS13_AES_128_CCM_SHA256,
           );
 
+          println!("Record data:\n{:?}\n", hex::encode(record.data.to_vec()));
           let msg = OpaqueMessage {
-            typ:     tls_client2::tls_core::msgs::enums::ContentType::Handshake,
-            version: tls_client2::ProtocolVersion::TLSv1_3,
+            typ:     tls_client2::tls_core::msgs::enums::ContentType::ApplicationData,
+            version: tls_client2::ProtocolVersion::TLSv1_2,
             payload: Payload(record.data.to_vec()),
           };
-          let (plain_message, meta) = d.decrypt_tls13_aes(&msg, 0).unwrap();
 
-          // tls/tls-client/src/backend/standard13.rs make_nonce(iv: [u8; 12], seq: u64) -> [u8; 12]
+          match d.decrypt_tls13_aes(&msg, seq) {
+            Ok((plain_message, meta)) => {
+              panic!("Plain Message: {:?}", plain_message);
+            },
+            Err(e) => {
+              println!("not working: {:?}", e);
+            },
+          }
+
+          //   // tls/tls-client/src/backend/standard13.rs make_nonce(iv: [u8; 12], seq: u64) ->
+          // [u8;
+
+          // seq += 1;
         }
 
-        let record_length = record.hdr.len as usize + record.data.len(); // is this correct?
+        let record_length = 5 + record.hdr.len; // 5 is record header length
         cursor.set_position(cursor.position() + record_length as u64);
       },
       Err(e) => println!("{:?}", e),
@@ -205,7 +239,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 
   let (mut socket_read, mut socket_write) = tokio::io::split(socket);
 
-  let mut request_buf = vec![0u8; 0];
+  let mut request_buf = Arc::new(Mutex::new(vec![0u8; 0]));
   let mut response_buf = vec![0u8; 0];
 
   let client_to_server = async {
@@ -221,7 +255,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
         let data = &buf[..n];
         debug!("write to server");
         tcp_write.write_all(data).await.unwrap();
-        std::io::Write::write_all(&mut request_buf, data).unwrap();
+        request_buf.lock().unwrap().extend(data);
       }
     }
   };
@@ -239,7 +273,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
         let data = &buf[..n];
         debug!("write to client");
         socket_write.write_all(data).await.unwrap();
-        std::io::Write::write_all(&mut response_buf, data).unwrap();
+        request_buf.lock().unwrap().extend(data);
       }
     }
   };
@@ -247,7 +281,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   tokio::join!(client_to_server, server_to_client);
 
   state.origo_sessions.lock().unwrap().insert(session_id.to_string(), OrigoSession {
-    request:   request_buf,
+    request:   request_buf.lock().unwrap().to_vec(),
     response:  response_buf,
     timestamp: SystemTime::now(),
   });
