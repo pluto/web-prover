@@ -68,19 +68,26 @@ pub async fn sign(
 use base64::prelude::BASE64_STANDARD;
 
 fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
-  dbg!(payload.server_aes_key.clone(), payload.server_aes_iv.clone());
+  
 
   let server_aes_key = BASE64_STANDARD.decode(payload.server_aes_key).unwrap();
   let server_aes_iv = BASE64_STANDARD.decode(payload.server_aes_iv).unwrap();
+  println!("server_key={}, server_iv={}", hex::encode(server_aes_key.clone()), hex::encode(server_aes_iv.clone()));
 
   let mut cursor = Cursor::new(bytes);
 
   let mut seq = 0;
-  let mut skip = 1;
   while cursor.position() < bytes.len() as u64 {
     match tls_parser::parse_tls_raw_record(&cursor.get_ref()[cursor.position() as usize..]) {
       Ok((_, record)) => {
         println!("{}", record.hdr.record_type);
+
+        // NOTE: 
+        // The first 3 messages are typically
+        // handshake, handshake, changecipherspec
+        //
+        // These are plaintext. The first encrypted message is an extension from the server
+        // which is labeled application data, like all subsequent encrypted messages in TLS1.3
 
         // let (r, x) = tls_parser::parse_tls_record_with_header(&cursor.get_ref()[cursor.position()
         // as usize..], &record.hdr).unwrap(); let header_len = r.len();
@@ -88,14 +95,6 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
         // println!("Handshake:\n\n{}\n\n", hex::encode(record.data));
 
         if record.hdr.record_type == tls_parser::TlsRecordType::ApplicationData {
-          //   // record.data
-          if skip > 0 {
-            skip = skip - 1;
-            println!("skip");
-            let record_length = 5 + record.hdr.len; // 5 is record header length
-            cursor.set_position(cursor.position() + record_length as u64);
-            continue;
-          }
           println!("go for it");
 
           let d = tls_client2::Decrypter2::new(
@@ -113,17 +112,14 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
 
           match d.decrypt_tls13_aes(&msg, seq) {
             Ok((plain_message, meta)) => {
-              panic!("Plain Message: {:?}", plain_message);
+              println!("Plain Message: {:?}", plain_message);
             },
             Err(e) => {
               println!("not working: {:?}", e);
             },
           }
 
-          //   // tls/tls-client/src/backend/standard13.rs make_nonce(iv: [u8; 12], seq: u64) ->
-          // [u8;
-
-          // seq += 1;
+          seq += 1;
         }
 
         let record_length = 5 + record.hdr.len; // 5 is record header length
@@ -133,24 +129,6 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
     }
   }
 }
-
-//   /// Derive an encrypter from the given keys
-//   pub fn get_encrypter(&self, keys: &TlsKeys) -> Encrypter {
-//     Encrypter::new(
-//         keys.client_key.buf[..16].try_into().unwrap(),
-//         keys.client_iv.buf[..12].try_into().unwrap(),
-//         self.cipher_suite.unwrap().suite(),
-//     )
-// }
-
-// /// Derive an decrypter from the given keys
-// pub fn get_decrypter(&self, keys: &TlsKeys) -> Decrypter {
-//     Decrypter::new(
-//         keys.server_key.buf[..16].try_into().unwrap(),
-//         keys.server_iv.buf[..12].try_into().unwrap(),
-//         self.cipher_suite.unwrap().suite(),
-//     )
-// }
 
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
