@@ -368,6 +368,7 @@ pub use tls_core::{
     suites::{SupportedCipherSuite, ALL_CIPHER_SUITES},
     versions::{SupportedProtocolVersion, ALL_VERSIONS},
 };
+pub use backend::Decrypter2;
 //pub use crate::stream::{Stream, StreamOwned};
 //pub use crate::ticketer::Ticketer;
 

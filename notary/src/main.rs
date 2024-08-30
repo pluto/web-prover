@@ -5,7 +5,7 @@ use std::{
   time::SystemTime,
 };
 
-use axum::{extract::Request, http::StatusCode, response::IntoResponse, routing::get, Router};
+use axum::{extract::Request, http::StatusCode, response::IntoResponse, routing::{get, post}, Router};
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
@@ -70,7 +70,7 @@ async fn main() {
     .route("/v1/tlsnotary", get(tlsn::notarize))
     .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
     .route("/v1/origo", get(origo::proxy))
-    .route("/v1/origo/sign", get(origo::sign))
+    .route("/v1/origo/sign", post(origo::sign))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
 

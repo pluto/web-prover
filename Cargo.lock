@@ -2604,6 +2604,7 @@ dependencies = [
  "serde_json",
  "sha1",
  "thiserror",
+ "tls-client",
  "tls-parser",
  "tlsn-verifier",
  "tokio",
