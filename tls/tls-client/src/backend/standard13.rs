@@ -248,7 +248,7 @@ impl RustCryptoBackend13 {
   /// Derive keys for a given mode. Depends on pre_master_secret.
   pub fn derive_keys(&mut self) -> TlsKeys {
     self.witness.DHE = BASE64_STANDARD.encode(self.pre_master_secret.unwrap());
-    debug!("setting DHE to {:?}", self.witness.DHE);
+    trace!("setting DHE to {:?}", self.witness.DHE);
     if self.pre_master_secret.is_none() {
       panic!("attempt to derive keys without pre_master_secret");
     }
@@ -258,26 +258,26 @@ impl RustCryptoBackend13 {
       // ES = hkdf-extract(nil, nil).
       let es = self.hkdf_provider.hmac_sign(&okm_block, &[0u8; 32]);
       self.witness.ES = BASE64_STANDARD.encode(es); // warning: rather suspect!
-      debug!("setting ES to {:?}", self.witness.ES);
+      trace!("setting ES to {:?}", self.witness.ES);
     }
 
     // initialize empty hash context
     let mut hasher = Sha256::new();
     hasher.update(b"");
     let context = hasher.finalize();
-    debug!("empty salt ctxt={:?}", BASE64_STANDARD.encode(context));
+    trace!("empty salt ctxt={:?}", BASE64_STANDARD.encode(context));
 
     let current = self.hkdf_provider.extract_from_zero_ikm(Some(okm_block.as_ref()));
     let k0_salt = hkdf_expand_label_block(current.as_ref(), b"derived", &context);
     self.witness.dES = BASE64_STANDARD.encode(k0_salt.clone()); // warning: suspect! dES not derived from ES.
-    debug!("setting dES to {:?}", self.witness.dES);
+    trace!("setting dES to {:?}", self.witness.dES);
     let k0_secret = self
       .hkdf_provider
       .extract_from_secret(Some(k0_salt.as_ref()), &self.pre_master_secret.unwrap());
     {
       let hs_tag = self.hkdf_provider.hmac_sign(&k0_salt, &self.pre_master_secret.unwrap().clone());
       self.witness.HS = BASE64_STANDARD.encode(hs_tag);
-      debug!("setting HS to {:?}", self.witness.HS);
+      trace!("setting HS to {:?}", self.witness.HS);
     }
 
     // Choose master secret and key labels. This is expanded into the AES keys for the connection.
@@ -287,13 +287,13 @@ impl RustCryptoBackend13 {
         // When deriving the application keys, we need to derive a k+1 salt and master secret
         let k1_salt = hkdf_expand_label_block(k0_secret.as_ref(), b"derived", &context);
         self.witness.dHS = BASE64_STANDARD.encode(k1_salt.as_ref());
-        debug!("setting dHS to {:?}", self.witness.dHS);
+        trace!("setting dHS to {:?}", self.witness.dHS);
 
         let k1_secret = self.hkdf_provider.extract_from_secret(Some(k1_salt.as_ref()), &[0u8; 32]);
 
         let ms = self.hkdf_provider.hmac_sign(&k1_salt, &[0u8; 32]);
         self.witness.MS = BASE64_STANDARD.encode(ms);
-        debug!("setting MS to {:?}", self.witness.MS);
+        trace!("setting MS to {:?}", self.witness.MS);
 
         (k1_secret, b"c ap traffic", b"s ap traffic")
       } else {
@@ -305,7 +305,7 @@ impl RustCryptoBackend13 {
     // Expand the master secret into two labeled secrets
     // expect: context / handshake hash = h3 at handshake layer
     let context = self.ems_seed.clone().unwrap();
-    debug!("context={:?}", BASE64_STANDARD.encode(context.clone()));
+    debug!("context={:?}", hex::encode(context.clone()));
     let client_secret = hkdf_expand_label_block(master_secret.as_ref(), client_label, &context);
     let server_secret = hkdf_expand_label_block(master_secret.as_ref(), server_label, &context);
 
@@ -314,18 +314,18 @@ impl RustCryptoBackend13 {
       self.witness.H2 = BASE64_STANDARD.encode(self.ems_seed.clone().unwrap());
       self.witness.CHTS = BASE64_STANDARD.encode(client_secret.clone());
       self.witness.SHTS = BASE64_STANDARD.encode(server_secret.clone());
-      debug!("setting CHTS to {:?}", self.witness.CHTS);
-      debug!("setting SHTS to {:?}", self.witness.SHTS);
-      debug!("setting H2 to {:?}", self.witness.H2);
+      trace!("setting CHTS to {:?}", self.witness.CHTS);
+      trace!("setting SHTS to {:?}", self.witness.SHTS);
+      trace!("setting H2 to {:?}", self.witness.H2);
       self.client_hs_secret = Some(client_secret.clone());
       self.server_hs_secret = Some(server_secret.clone());
     } else {
       self.witness.H3 = BASE64_STANDARD.encode(self.ems_seed.clone().unwrap());
       self.witness.CATS = BASE64_STANDARD.encode(client_secret.clone());
       self.witness.SATS = BASE64_STANDARD.encode(server_secret.clone());
-      debug!("setting CATS to {:?}", self.witness.CATS);
-      debug!("setting SATS to {:?}", self.witness.SATS);
-      debug!("setting H3 to {:?}", self.witness.H3);
+      trace!("setting CATS to {:?}", self.witness.CATS);
+      trace!("setting SATS to {:?}", self.witness.SATS);
+      trace!("setting H3 to {:?}", self.witness.H3);
     }
 
     debug!("intermediate witness set during encrypt_mode: {:?}", self.encrypt_mode);
@@ -366,14 +366,15 @@ impl RustCryptoBackend13 {
       format!("{:?}:server_aes_iv", self.encrypt_mode).to_string(),
       BASE64_STANDARD.encode(server_aes_iv.buf).into(),
     );
+
     trace!(
       "server_aes_key={:?}, iv_len={:?}",
       BASE64_STANDARD.encode(server_aes_key.buf),
-      server_aes_iv.buf.len()
+      server_aes_key.buf.len()
     );
     self.logger.lock().unwrap().set_secret(
       format!("{:?}:server_aes_key", self.encrypt_mode).to_string(),
-      BASE64_STANDARD.encode(client_aes_iv.buf).into(),
+      BASE64_STANDARD.encode(server_aes_key.buf).into(),
     );
 
     TlsKeys {
@@ -542,7 +543,7 @@ impl Backend for RustCryptoBackend13 {
           if let Some(meta) = record_meta {
             self.insert_record(meta);
           }
-          trace!("[SUCCESS] Decrypted message: {:?}", plain_message);
+          debug!("[SUCCESS] Decrypted message: {:?}", plain_message);
           return Ok(plain_message);
         },
         version => {
@@ -557,7 +558,7 @@ impl Backend for RustCryptoBackend13 {
 
   // Switch between handshake and application keys.
   fn set_encrypt_decrypt(&mut self, mode: EncryptMode) -> Result<(), BackendError> {
-    trace!("toggling encrypt mode: {:?}", mode);
+    debug!("toggling encrypt mode: {:?}", mode);
     self.encrypt_mode = mode;
 
     if matches!(self.encrypt_mode, EncryptMode::Application | EncryptMode::Handshake) {
@@ -567,7 +568,7 @@ impl Backend for RustCryptoBackend13 {
     }
 
     if matches!(self.encrypt_mode, EncryptMode::Application) {
-      tk_dbg_with_context(&self.witness);
+    //   tk_dbg_with_context(&self.witness);
     }
 
     Ok(())
@@ -606,14 +607,14 @@ impl Backend for RustCryptoBackend13 {
   }
 
   fn set_hs_hash_client_key_exchange(&mut self, hash: Vec<u8>) -> Result<(), BackendError> {
-    trace!("Setting Client KX Hash: {:x?}", BASE64_STANDARD.encode(hash.clone()));
+    debug!("Setting Client KX Hash: {:x?}", BASE64_STANDARD.encode(hash.clone()));
 
     self.ems_seed = Some(hash.to_vec());
     Ok(())
   }
 
   fn set_hs_hash_server_hello(&mut self, hash: Vec<u8>) -> Result<(), BackendError> {
-    trace!("Setting Server Hello Hash: {:?}", BASE64_STANDARD.encode(hash.clone()));
+    debug!("Setting Server Hello Hash: {:?}", BASE64_STANDARD.encode(hash.clone()));
     self.hs_hello_seed = Some(hash.to_vec());
     Ok(())
   }
@@ -633,7 +634,7 @@ impl Backend for RustCryptoBackend13 {
 
   fn set_witness_h7(&mut self, h7: &[u8]) -> Result<(), BackendError> {
     self.witness.H7 = BASE64_STANDARD.encode(h7);
-    debug!("setting H7 to {:?}", self.witness.H7);
+    trace!("setting H7 to {:?}", self.witness.H7);
     Ok(())
   }
 }
@@ -713,21 +714,21 @@ impl Encrypter {
     let aad = make_tls13_aad(total_len);
     let nonce = make_nonce(self.write_iv, seq);
 
-    trace!(
+    debug!(
       "ENC: msg={:?}, msg_len={:?}, seq={:?}",
-      BASE64_STANDARD.encode(m.payload.0.clone()),
+      hex::encode(m.payload.0.clone()),
       m.payload.0.len(),
       seq
     );
-    trace!(
+    debug!(
       "ENC: iv={:?}, dec_key={:?}",
-      BASE64_STANDARD.encode(self.write_iv),
-      BASE64_STANDARD.encode(self.write_key)
+      hex::encode(self.write_iv),
+      hex::encode(self.write_key)
     );
-    trace!(
+    debug!(
       "ENC: nonce={:?}, aad={:?}",
-      BASE64_STANDARD.encode(nonce.as_ref()),
-      BASE64_STANDARD.encode(aad.as_ref())
+      hex::encode(nonce.as_ref()),
+      hex::encode(aad.as_ref())
     );
 
     let mut payload = Vec::with_capacity(total_len);
@@ -742,9 +743,9 @@ impl Encrypter {
       .encrypt(nonce, aes_payload)
       .map_err(|e| BackendError::EncryptionError(e.to_string()))?;
 
-    trace!(
+    debug!(
       "ENC: cipher_text={:?}, cipher_len={:?}",
-      BASE64_STANDARD.encode(ciphertext.clone()),
+      hex::encode(ciphertext.clone()),
       ciphertext.len()
     );
     let om = OpaqueMessage {
@@ -803,21 +804,22 @@ impl Decrypter {
     let aad = make_tls13_aad(m.payload.0.len());
     let nonce = make_nonce(self.write_iv, seq);
 
-    trace!(
+    use hex;
+    debug!(
       "DEC: msg={:?}, msg_len={:?}, seq={:?}",
-      BASE64_STANDARD.encode(m.payload.0.clone()),
+      hex::encode(m.payload.0.clone()),
       m.payload.0.len(),
       seq
     );
-    trace!(
+    debug!(
       "DEC: iv={:?}, dec_key={:?}",
-      BASE64_STANDARD.encode(self.write_iv),
-      BASE64_STANDARD.encode(self.write_key)
+      hex::encode(self.write_iv),
+      hex::encode(self.write_key)
     );
-    trace!(
+    debug!(
       "DEC: nonce={:?}, aad={:?}",
-      BASE64_STANDARD.encode(nonce.as_ref()),
-      BASE64_STANDARD.encode(aad.as_ref())
+      hex::encode(nonce.as_ref()),
+      hex::encode(aad.as_ref())
     );
 
     let aes_payload = Payload { msg: &m.payload.0, aad: &aad };
@@ -841,7 +843,7 @@ impl Decrypter {
         if plaintext[0] == 20u8 {
           // hc.setRecordMeta(additionalData, hc.trafficSecret, ciphertextCopy, tmp_nonce, "SF")
           let meta = RecordMeta::new(&aad, "SF", &plaintext, &m.payload.0, &nonce.to_vec());
-          debug!("record_meta={:?}", meta);
+        //   debug!("record_meta={:?}", meta);
           Some(meta)
         } else {
           None
@@ -850,15 +852,15 @@ impl Decrypter {
       ContentType::ApplicationData => {
         // hc.setRecordMeta(additionalData, plaintext, ciphertextCopy, tmp_nonce, "SR")
         let meta = RecordMeta::new(&aad, "SR", &plaintext, &m.payload.0, &nonce.to_vec());
-        debug!("record_meta={:?}", meta);
+        // debug!("record_meta={:?}", meta);
         Some(meta)
       },
       _ => None,
     };
 
-    trace!(
+    debug!(
       "DEC: plain_text={:?}, plain_len={:?}",
-      BASE64_STANDARD.encode(plaintext.clone()),
+      hex::encode(plaintext.clone()),
       plaintext.len()
     );
     Ok((
