@@ -42,5 +42,7 @@ thiserror="1"
 hex = "0.4"
 tls-parser = "0.12.0"
 
+tls-client2={ path="../tls/tls-client", package="tls-client" }
+
 [dev-dependencies]
 tower="0.4.13"

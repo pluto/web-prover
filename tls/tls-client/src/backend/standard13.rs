@@ -55,7 +55,7 @@ pub struct RustCryptoBackend13 {
     encrypt_mode: EncryptMode,
     hkdf_provider: &'static dyn super::tls13::Hkdf,
 
-    logger: OrigoConnection,
+    logger: std::sync::Arc<std::sync::Mutex<OrigoConnection>>,
 
     buffer_incoming: VecDeque<OpaqueMessage>,
 
@@ -204,7 +204,7 @@ where
 
 impl RustCryptoBackend13 {
     /// Creates new instance of RustCrypto backend
-    pub fn new(origo: OrigoConnection) -> Self {
+    pub fn new(origo: std::sync::Arc<std::sync::Mutex<OrigoConnection>>) -> Self {
         Self {
             client_random: None,
             server_random: None,
@@ -352,21 +352,25 @@ impl RustCryptoBackend13 {
             BASE64_STANDARD.encode(client_aes_iv.buf),
             client_aes_iv.buf.len()
         );
+        self.logger.lock().unwrap().set_secret("client_aes_iv".to_string(), BASE64_STANDARD.encode(client_aes_iv.buf).into());
         trace!(
             "client_aes_key={:?}, iv_len={:?}",
             BASE64_STANDARD.encode(client_aes_key.buf),
             client_aes_iv.buf.len()
         );
+        self.logger.lock().unwrap().set_secret("client_aes_key".to_string(), BASE64_STANDARD.encode(client_aes_key.buf).into());
         trace!(
             "server_aes_iv={:?}, iv_len={:?}",
             BASE64_STANDARD.encode(server_aes_iv.buf),
             server_aes_iv.buf.len()
         );
+        self.logger.lock().unwrap().set_secret("server_aes_iv".to_string(), BASE64_STANDARD.encode(server_aes_iv.buf).into());
         trace!(
             "server_aes_key={:?}, iv_len={:?}",
             BASE64_STANDARD.encode(server_aes_key.buf),
             server_aes_iv.buf.len()
         );
+        self.logger.lock().unwrap().set_secret("server_aes_key".to_string(), BASE64_STANDARD.encode(client_aes_iv.buf).into());
 
         TlsKeys {
             client_key: client_aes_key,
@@ -594,6 +598,7 @@ impl Backend for RustCryptoBackend13 {
     async fn get_client_random(&mut self) -> Result<Random, BackendError> {
         let r = Random(thread_rng().gen());
         self.client_random = Some(r);
+        self.logger.lock().unwrap().set_secret("client_random".to_string(), r.0.to_vec());
         Ok(r)
     }
 
@@ -665,6 +670,7 @@ impl Backend for RustCryptoBackend13 {
 }
 
 fn tk_dbg_with_context(witness: &Witness) {
+    return;
     let expected = [
         ("DHE", "vC4GIYWwM1k4WJnIuW29+OpFLGJdzIJeuWnkE93wYQM="),
         ("ES", "M60KHGB+wDsJ5s2Yk2gM4hCt8wCqHyZg4bIuEPFw+So="),
@@ -831,7 +837,7 @@ impl Decrypter {
         }
     }
 
-    fn decrypt_tls13_aes(
+    pub fn decrypt_tls13_aes(
         &self,
         m: &OpaqueMessage,
         seq: u64,

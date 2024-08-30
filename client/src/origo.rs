@@ -3,6 +3,7 @@ use std::{sync::Arc, time::Duration};
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::Full;
 use hyper::{body::Bytes, Request, StatusCode};
+use serde::Serialize;
 use tlsn_core::proof::TlsProof;
 use tokio::time;
 use tokio_util::compat::TokioAsyncReadCompatExt;
@@ -21,10 +22,10 @@ pub async fn prover_inner_origo(
     .with_root_certificates(root_store)
     .with_no_client_auth();
 
-  let origo_conn = tls_proxy2::OrigoConnection::new();
+  let origo_conn = Arc::new(std::sync::Mutex::new(tls_proxy2::OrigoConnection::new()));
   let client = tls_client2::ClientConnection::new(
     Arc::new(client_config),
-    Box::new(tls_client2::RustCryptoBackend13::new(origo_conn)),
+    Box::new(tls_client2::RustCryptoBackend13::new(origo_conn.clone())),
     tls_client2::ServerName::try_from(config.target_host().as_str()).unwrap(),
   )
   .unwrap();
@@ -135,6 +136,59 @@ pub async fn prover_inner_origo(
   // Close the connection to the server
   // let mut client_socket = connection_receiver.await.unwrap().unwrap().io.into_inner();
   // client_socket.close().await.unwrap();
+
+  // call sign endpoint
+
+  let notary_socket =
+    tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port.clone()))
+      .await
+      .unwrap();
+
+  let notary_tls_socket = notary_connector
+    .connect(rustls::ServerName::try_from(config.notary_host.as_str()).unwrap(), notary_socket)
+    .await
+    .unwrap();
+
+  let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
+
+  let (mut request_sender, connection) =
+    hyper::client::conn::http1::handshake(notary_tls_socket).await.unwrap();
+  let _ = tokio::spawn(connection);
+
+  #[derive(Serialize)]
+  struct SignBody {
+    server_aes_iv:  String,
+    server_aes_key: String,
+  }
+
+  let server_aes_iv = origo_conn.lock().unwrap().secret_map.get("server_aes_iv").unwrap().clone();
+  let server_aes_key = origo_conn.lock().unwrap().secret_map.get("server_aes_key").unwrap().clone();
+
+  let sb = SignBody {
+    server_aes_iv:  String::from_utf8(server_aes_iv.to_vec())
+      .unwrap(),
+    server_aes_key: String::from_utf8(server_aes_key.to_vec())
+      .unwrap(),
+  };
+
+  let request: Request<Full<Bytes>> = hyper::Request::builder()
+    .uri(format!(
+      "https://{}:{}/v1/origo/sign?session_id={}",
+      config.notary_host.clone(),
+      config.notary_port.clone(),
+      session_id.clone(),
+    ))
+    .method("POST")
+    .header("Host", config.notary_host.clone())
+    .header("Content-type", "application/json")
+    .body(http_body_util::Full::from(serde_json::to_string(&sb).unwrap()))
+    .unwrap();
+
+  let response = request_sender.send_request(request).await.unwrap();
+  assert!(response.status() == hyper::StatusCode::OK);
+
+  let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+  println!("\n{}\n\n", String::from_utf8(body_bytes.to_vec()).unwrap());
 
   todo!("return TLS proof");
 }
