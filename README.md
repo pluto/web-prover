@@ -9,18 +9,29 @@ TODO: Explain project layout
 make wasm
 make ios
 cargo run --release -p notary -- --config ./fixture/notary-config.toml
+NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" cargo run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
 cargo run --release --bin mock_server
-NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" cargo run -p client -- --config ./fixture/client.tlsn_tcp_local.json
 ```
 
 ## WASM Demo
 
 ```
 cargo run --release -p notary -- --config ./fixture/notary-config.toml
-cargo run --release --bin mock_server
 NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" make wasm
 make wasm-demo
 open https://localhost:8090
+```
+
+## Native Client Demo
+
+```
+cargo run --release -p notary -- --config ./fixture/notary-config.toml
+
+# TLS Notary flow
+NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" cargo run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
+
+# Origo flow
+NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" cargo run --release -p client -- --config ./fixture/client.origo_tcp_local.json
 ```
 
 ## Feature flags
