@@ -140,8 +140,6 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   let mut response_buf = vec![0u8; 0];
 
   let client_to_server = async {
-    // tokio::io::copy(&mut socket_read, &mut tcp_write).await.unwrap();
-
     let mut buf = [0; 4096];
     loop {
       debug!("read1");
@@ -160,8 +158,6 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   };
 
   let server_to_client = async {
-    // tokio::io::copy(&mut tcp_read, &mut socket_write).await.unwrap();
-
     let mut buf = [0; 4096];
     loop {
       debug!("read2");
@@ -179,9 +175,6 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     }
   };
 
-  // client_to_server.await;
-  // server_to_client.await;
-
   tokio::join!(client_to_server, server_to_client);
 
   state.origo_sessions.lock().unwrap().insert(session_id.to_string(), OrigoSession {
@@ -190,26 +183,12 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     timestamp: SystemTime::now(),
   });
 
-  extract_tls_handshake(&request_buf);
-  // let r = tls_parser::parse_tls_raw_record(&request_buf).unwrap();
-  // dbg!(r.1.hdr.record_type);
-  // dbg!(r);
-
-  // send from socket to tcp_stream, then return from tcp_stream to socket
-
-  //  TokioIo::new(socket)
-
-  // TODO better error handling
-  // tokio::io::copy_bidirectional(&mut socket, &mut tcp_stream).await.unwrap();
-
-  // let (r, w) = tcp_stream.split();
-
-  // tokio::io::copy(&mut socket, &mut tcp_stream).await.unwrap();
-  // tokio::io::copy(&mut socket, &mut tcp_socketait.unwrtcp_stream
+  // extract_tls_handshake(&request_buf);
 
   Ok(())
 }
 
+// TODO
 fn extract_tls_handshake(bytes: &[u8]) {
   let mut cursor = Cursor::new(bytes);
 
