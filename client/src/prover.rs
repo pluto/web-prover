@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use futures::AsyncWriteExt;
+use http_body_util::Full;
+use hyper::{body::Bytes, Request};
 use rustls::ClientConfig;
 use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
 use tokio_rustls::TlsConnector;
@@ -43,11 +44,13 @@ pub async fn setup_tcp_connection(
     .await
     .unwrap();
 
+  let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
+
   let (mut request_sender, connection) =
-    hyper::client::conn::handshake(notary_tls_socket).await.unwrap();
+    hyper::client::conn::http1::handshake(notary_tls_socket).await.unwrap();
   let connection_task = tokio::spawn(connection.without_shutdown());
 
-  let request = hyper::Request::builder()
+  let request: Request<Full<Bytes>> = hyper::Request::builder()
     .uri(format!(
       "https://{}:{}/v1/tlsnotary?session_id={}",
       config.notary_host.clone(),
@@ -58,15 +61,18 @@ pub async fn setup_tcp_connection(
     .header("Host", config.notary_host.clone())
     .header("Connection", "Upgrade")
     .header("Upgrade", "TCP")
-    .body(hyper::Body::empty())
+    .body(http_body_util::Full::default())
     .unwrap();
 
   let response = request_sender.send_request(request).await.unwrap();
   assert!(response.status() == hyper::StatusCode::SWITCHING_PROTOCOLS);
 
   // Claim back the TLS socket after the HTTP to TCP upgrade is done
-  let hyper::client::conn::Parts { io: notary_tls_socket, .. } =
+  let hyper::client::conn::http1::Parts { io: notary_tls_socket, .. } =
     connection_task.await.unwrap().unwrap();
+
+  // TODO notary_tls_socket needs to implement futures::AsyncRead/Write, find a better wrapper here
+  let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
 
   let prover = Prover::new(prover_config).setup(notary_tls_socket.compat()).await.unwrap();
 
@@ -77,15 +83,19 @@ pub async fn setup_tcp_connection(
 
   let prover_task = tokio::spawn(prover_fut);
 
+  let mpc_tls_connection = hyper_util::rt::TokioIo::new(mpc_tls_connection.compat());
+
   let (request_sender, connection) =
-    hyper::client::conn::handshake(mpc_tls_connection.compat()).await.unwrap();
+    hyper::client::conn::http1::handshake(mpc_tls_connection).await.unwrap();
 
   let connection_task = tokio::spawn(connection.without_shutdown());
 
   send_request(request_sender, config.to_request()).await;
 
-  let mut client_socket = connection_task.await.unwrap().unwrap().io.into_inner();
-  client_socket.close().await.unwrap();
+  let client_socket = connection_task.await.unwrap().unwrap().io.into_inner();
+
+  use futures::AsyncWriteExt;
+  client_socket.compat().close().await.unwrap();
 
   prover_task.await.unwrap().unwrap()
 }
@@ -99,7 +109,7 @@ const NOTARY_CA_CERT: &[u8] = include_bytes!(env!("NOTARY_CA_CERT_PATH"));
 // implementation is the same.
 
 /// Default root store using mozilla certs.
-fn default_root_store() -> rustls::RootCertStore {
+pub fn default_root_store() -> rustls::RootCertStore {
   let mut root_store = rustls::RootCertStore::empty();
   root_store.add_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
     rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(

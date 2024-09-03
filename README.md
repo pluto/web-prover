@@ -10,7 +10,7 @@ make wasm
 make ios
 cargo run --release -p notary -- --config ./fixture/notary-config.toml
 cargo run --release --bin mock_server
-NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" cargo run -p client -- --config ./fixture/client.tcp_local.json
+NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" cargo run -p client -- --config ./fixture/client.tlsn_tcp_local.json
 ```
 
 ## WASM Demo

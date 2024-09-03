@@ -42,3 +42,5 @@ wrap_comments         =true  # wrap comments at `comment_width`
 # tabs and spaces
 hard_tabs =false # (def: false) use spaces over tabs
 tab_spaces=2     # 2 > 4, it's just math.
+
+ignore=["tls"]

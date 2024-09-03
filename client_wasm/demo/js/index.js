@@ -32,6 +32,7 @@ start();
 
 // Config for local development
 const proof = await prover({
+  mode: "TLSN",
   notary_host: "localhost",
   notary_port: 7443,
   target_method: "GET",
@@ -41,15 +42,13 @@ const proof = await prover({
   target_body: "",
   // websocket_proxy_url: "wss://ws.alpha4.tlsnotary.pluto.dev",
   websocket_proxy_url: "wss://localhost:7443/v1/tlsnotary/websocket_proxy",
-  notarization_session_request: {
-    client_type: "Websocket",
-    max_sent_data: 10000,
-    max_recv_data: 10000,
-  },
+  max_sent_data: 10000,
+  max_recv_data: 10000,
 });
 
 // Config using notary.pluto.dev
 // const proof = await prover({
+//   mode: "TLSN",
 //   notary_host: "notary.pluto.dev",
 //   notary_port: 443,
 //   target_method: "GET",
@@ -57,11 +56,8 @@ const proof = await prover({
 //   target_headers: {},
 //   target_body: "",
 //   websocket_proxy_url: "wss://notary.pluto.dev/v1/tlsnotary/websocket_proxy",
-//   notarization_session_request: {
-//     client_type: "Websocket",
-//     max_sent_data: 10000,
-//     max_recv_data: 10000,
-//   },
+//   max_sent_data: 10000,
+//   max_recv_data: 10000,
 // });
 
 end();

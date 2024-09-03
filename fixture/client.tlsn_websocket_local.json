@@ -1,4 +1,5 @@
 {
+	"mode": "TLSN",
 	"notary_host": "localhost",
 	"notary_port": 7443,
 	"target_method": "GET",
@@ -6,9 +7,6 @@
 	"target_headers": {},
 	"target_body": "",
 	"websocket_proxy_url": "wss://localhost:7443/v1/tlsnotary/websocket_proxy",
-	"notarization_session_request": {
-		"client_type": "Websocket",
-		"max_sent_data": 10000,
-		"max_recv_data": 10000
-	}
+	"max_sent_data": 10000,
+	"max_recv_data": 10000
 }

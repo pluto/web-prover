@@ -780,7 +780,7 @@ impl Encrypter {
             ciphertext.len()
         );
         let om = OpaqueMessage {
-            typ: m.typ,
+            typ: ContentType::ApplicationData, // Always send Application Data label
             version: ProtocolVersion::TLSv1_2, // Opaque Messages lie.
             payload: TLSPayload::new(ciphertext),
         };

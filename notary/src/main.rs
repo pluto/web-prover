@@ -1,4 +1,9 @@
-use std::{fs, io, sync::Arc};
+use std::{
+  collections::HashMap,
+  fs, io,
+  sync::{Arc, Mutex},
+  time::SystemTime,
+};
 
 use axum::{extract::Request, http::StatusCode, response::IntoResponse, routing::get, Router};
 use hyper::{body::Incoming, server::conn::http1};
@@ -19,6 +24,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod axum_websocket;
 mod config;
+mod origo;
 mod tcp;
 mod tlsn;
 mod websocket_proxy;
@@ -28,6 +34,14 @@ struct SharedState {
   notary_signing_key: SigningKey,
   tlsn_max_sent_data: usize,
   tlsn_max_recv_data: usize,
+  origo_sessions:     Arc<Mutex<HashMap<String, OrigoSession>>>,
+}
+
+#[derive(Debug, Clone)]
+struct OrigoSession {
+  request:   Vec<u8>,
+  response:  Vec<u8>,
+  timestamp: SystemTime,
 }
 
 #[tokio::main]
@@ -48,15 +62,17 @@ async fn main() {
     notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
     tlsn_max_sent_data: c.tlsn_max_sent_data,
     tlsn_max_recv_data: c.tlsn_max_recv_data,
+    origo_sessions:     Default::default(),
   });
 
   let router = Router::new()
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
     .route("/v1/tlsnotary", get(tlsn::notarize))
     .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
+    .route("/v1/origo", get(origo::proxy))
+    .route("/v1/origo/sign", get(origo::sign))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
-  // .route("/v1/origo", post(todo!("call into origo")));
 
   if &c.server_cert != "" || &c.server_key != "" {
     listen(listener, router, &c.server_cert, &c.server_key).await;

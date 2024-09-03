@@ -1,13 +1,15 @@
 #[cfg(not(target_arch = "wasm32"))] mod prover;
 #[cfg(target_arch = "wasm32")] mod prover_wasm32;
 
+#[cfg(not(target_arch = "wasm32"))] mod origo;
+
 pub mod config;
 pub mod errors;
 
 use std::time::Duration;
 
-use config::ClientType;
-use hyper::Request;
+use http_body_util::BodyExt;
+use hyper::{body::Bytes, Request};
 use p256::pkcs8::DecodePublicKey;
 use serde::{Deserialize, Serialize};
 use tlsn_core::proof::SessionProof;
@@ -15,19 +17,33 @@ pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
 use tracing::{debug, info};
 
-pub async fn prover_inner(mut config: config::Config) -> Result<TlsProof, errors::ClientErrors> {
+pub async fn prover_inner(config: config::Config) -> Result<TlsProof, errors::ClientErrors> {
   info!("GIT_HASH: {}", env!("GIT_HASH"));
+  match config.mode {
+    config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
+    config::NotaryMode::Origo => prover_inner_origo(config).await,
+  }
+}
 
+pub async fn prover_inner_origo(config: config::Config) -> Result<TlsProof, errors::ClientErrors> {
+  // TODO
+  #[cfg(not(target_arch = "wasm32"))]
+  return origo::prover_inner_origo(config).await;
+
+  #[cfg(target_arch = "wasm32")]
+  todo!("todo")
+}
+
+pub async fn prover_inner_tlsn(
+  mut config: config::Config,
+) -> Result<TlsProof, errors::ClientErrors> {
   let root_store = default_root_store();
 
   let prover_config = ProverConfig::builder()
     .id(config.session_id())
     .root_cert_store(root_store)
     .server_dns(config.target_host())
-    .max_transcript_size(
-      config.notarization_session_request.max_sent_data.unwrap()
-        + config.notarization_session_request.max_recv_data.unwrap(),
-    )
+    .max_transcript_size(config.max_sent_data.unwrap() + config.max_recv_data.unwrap())
     .build()
     .unwrap();
 
@@ -35,9 +51,10 @@ pub async fn prover_inner(mut config: config::Config) -> Result<TlsProof, errors
   let prover = prover_wasm32::setup_connection(&mut config, prover_config).await;
 
   #[cfg(not(target_arch = "wasm32"))]
-  let prover = match config.notarization_session_request.client_type {
-    ClientType::Tcp => prover::setup_tcp_connection(&mut config, prover_config).await,
-    ClientType::Websocket => prover::setup_websocket_connection(&mut config, prover_config).await,
+  let prover = if config.websocket_proxy_url.is_some() {
+    prover::setup_websocket_connection(&mut config, prover_config).await
+  } else {
+    prover::setup_tcp_connection(&mut config, prover_config).await
   };
 
   notarize(prover).await
@@ -114,8 +131,8 @@ pub async fn verify(proof: TlsProof, notary_pubkey_str: &str) -> VerifyResult {
 }
 
 async fn send_request(
-  mut request_sender: hyper::client::conn::SendRequest<hyper::Body>,
-  request: Request<hyper::Body>,
+  mut request_sender: hyper::client::conn::http1::SendRequest<http_body_util::Full<Bytes>>,
+  request: Request<http_body_util::Full<Bytes>>,
 ) {
   // TODO: Clean up this logging and error handling
   match request_sender.send_request(request).await {
@@ -163,8 +180,8 @@ fn default_root_store() -> tls_client::RootCertStore {
   root_store
 }
 
-async fn body_to_string(res: hyper::Response<hyper::Body>) -> String {
-  let body_bytes = hyper::body::to_bytes(res.into_body()).await.unwrap(); // TODO fix unwrap
+async fn body_to_string(res: hyper::Response<hyper::body::Incoming>) -> String {
+  let body_bytes = res.into_body().collect().await.unwrap().to_bytes();
   String::from_utf8(body_bytes.to_vec()).unwrap()
 }
 

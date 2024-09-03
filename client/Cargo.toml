@@ -14,7 +14,13 @@ notary_ca_cert=[]
 # Shared dependencies for all targets
 [dependencies]
 # TLSN
-tls-client  ={ workspace=true }
+tls-client={ workspace=true }
+tls-client2={ path="../tls/tls-client", package="tls-client" }
+tls-client-async2={ path="../tls/tls-client-async", package="tls-client-async", features=[
+  "tracing",
+] }
+tls-proxy2={ path="../tls/tls-proxy", package="tls-proxy" }
+
 webpki-roots="0.26.1"
 pki-types   ={ package="rustls-pki-types", version="1.7" }
 cfg-if      ="1.0.0"
@@ -23,7 +29,7 @@ serde.workspace     =true
 serde_json.workspace=true
 # Web
 url           ="2.5"
-hyper         ={ version="0.14", features=["client", "http1"] }
+hyper         ={ version="1.4", features=["client", "http1"] }
 http-body-util="0.1"
 # Logging and errors
 tracing.workspace           =true
