@@ -1,5 +1,5 @@
 use std::{
-  io::{Cursor, Read},
+  io::Cursor,
   sync::{Arc, Mutex},
   time::SystemTime,
 };
@@ -68,11 +68,13 @@ pub async fn sign(
 use base64::prelude::BASE64_STANDARD;
 
 fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
-  
-
   let server_aes_key = BASE64_STANDARD.decode(payload.server_aes_key).unwrap();
   let server_aes_iv = BASE64_STANDARD.decode(payload.server_aes_iv).unwrap();
-  println!("server_key={}, server_iv={}", hex::encode(server_aes_key.clone()), hex::encode(server_aes_iv.clone()));
+  println!(
+    "server_key={}, server_iv={}",
+    hex::encode(server_aes_key.clone()),
+    hex::encode(server_aes_iv.clone())
+  );
 
   let mut cursor = Cursor::new(bytes);
 
@@ -82,7 +84,7 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
       Ok((_, record)) => {
         println!("{}", record.hdr.record_type);
 
-        // NOTE: 
+        // NOTE:
         // The first 3 messages are typically
         // handshake, handshake, changecipherspec
         //
@@ -200,7 +202,7 @@ pub async fn tcp_notarize(
 }
 
 pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
-  mut socket: S,
+  socket: S,
   session_id: &str,
   target_host: &str,
   target_port: u16,
@@ -217,11 +219,10 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 
   let (mut socket_read, mut socket_write) = tokio::io::split(socket);
 
-  let mut request_buf = Arc::new(Mutex::new(vec![0u8; 0]));
-  let mut response_buf = vec![0u8; 0];
+  let request_buf = Arc::new(Mutex::new(vec![0u8; 0]));
 
   let client_to_server = async {
-    let mut buf = [0; 4096];
+    let mut buf = [0; 8192];
     loop {
       debug!("read1");
       let n = socket_read.read(&mut buf).await.unwrap();
@@ -239,7 +240,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   };
 
   let server_to_client = async {
-    let mut buf = [0; 4096];
+    let mut buf = [0; 8192];
     loop {
       debug!("read2");
       let n = tcp_read.read(&mut buf).await.unwrap();
@@ -259,33 +260,10 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   tokio::join!(client_to_server, server_to_client);
 
   state.origo_sessions.lock().unwrap().insert(session_id.to_string(), OrigoSession {
+    // TODO currently request is both, request and response. will this become a problem?
     request:   request_buf.lock().unwrap().to_vec(),
-    response:  response_buf,
     timestamp: SystemTime::now(),
   });
 
-  // extract_tls_handshake(&request_buf);
-
   Ok(())
-}
-
-// TODO
-fn extract_tls_handshake(bytes: &[u8]) {
-  let mut cursor = Cursor::new(bytes);
-
-  while cursor.position() < bytes.len() as u64 {
-    match tls_parser::parse_tls_raw_record(&cursor.get_ref()[cursor.position() as usize..]) {
-      Ok((_, record)) => {
-        println!("{}", record.hdr.record_type);
-
-        if record.hdr.record_type == tls_parser::TlsRecordType::Handshake {
-          // record.data
-        }
-
-        let record_length = record.hdr.len as usize + record.data.len(); // is this correct?
-        cursor.set_position(cursor.position() + record_length as u64);
-      },
-      Err(e) => println!("{:?}", e),
-    }
-  }
 }
