@@ -9,18 +9,21 @@ use axum::{
   response::Response,
   Json,
 };
-use base64::Engine;
+use base64::{prelude::BASE64_STANDARD, Engine};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use p256::ecdsa::{signature::SignerMut, Signature};
 use serde::{Deserialize, Serialize};
-use tls_client2::tls_core::msgs::{base::Payload, message::OpaqueMessage};
+use tls_client2::tls_core::msgs::{
+  base::Payload,
+  message::{OpaqueMessage, PlainMessage},
+};
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
   net::TcpStream,
 };
 use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, trace};
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
@@ -52,11 +55,9 @@ pub async fn sign(
 ) -> Json<SignReply> {
   let session = state.origo_sessions.lock().unwrap().get(&query.session_id).unwrap().clone();
 
-  // TODO transform session and sign it
-
-  println!("\n\n{}\n\n", hex::encode(&session.request));
   extract_tls_handshake(&session.request, payload);
 
+  // TODO
   let signature: Signature = state.notary_signing_key.clone().sign(&[1, 2, 3]); // TODO what do you want to sign?
   let signature_raw = hex::encode(signature.to_der().as_bytes());
 
@@ -65,24 +66,18 @@ pub async fn sign(
   Json(response)
 }
 
-use base64::prelude::BASE64_STANDARD;
-
 fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
   let server_aes_key = BASE64_STANDARD.decode(payload.server_aes_key).unwrap();
   let server_aes_iv = BASE64_STANDARD.decode(payload.server_aes_iv).unwrap();
-  println!(
-    "server_key={}, server_iv={}",
-    hex::encode(server_aes_key.clone()),
-    hex::encode(server_aes_iv.clone())
-  );
 
   let mut cursor = Cursor::new(bytes);
+  let mut plain_messages: Vec<PlainMessage> = vec![];
 
   let mut seq = 0;
   while cursor.position() < bytes.len() as u64 {
     match tls_parser::parse_tls_raw_record(&cursor.get_ref()[cursor.position() as usize..]) {
       Ok((_, record)) => {
-        println!("{}", record.hdr.record_type);
+        trace!("TLS record type: {}", record.hdr.record_type);
 
         // NOTE:
         // The first 3 messages are typically
@@ -91,21 +86,13 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
         // These are plaintext. The first encrypted message is an extension from the server
         // which is labeled application data, like all subsequent encrypted messages in TLS1.3
 
-        // let (r, x) = tls_parser::parse_tls_record_with_header(&cursor.get_ref()[cursor.position()
-        // as usize..], &record.hdr).unwrap(); let header_len = r.len();
-
-        // println!("Handshake:\n\n{}\n\n", hex::encode(record.data));
-
         if record.hdr.record_type == tls_parser::TlsRecordType::ApplicationData {
-          println!("go for it");
-
           let d = tls_client2::Decrypter2::new(
             server_aes_key[..16].try_into().unwrap(),
             server_aes_iv[..12].try_into().unwrap(),
             tls_client2::CipherSuite::TLS13_AES_128_CCM_SHA256,
           );
 
-          println!("Record data:\n{:?}\n", hex::encode(record.data.to_vec()));
           let msg = OpaqueMessage {
             typ:     tls_client2::tls_core::msgs::enums::ContentType::ApplicationData,
             version: tls_client2::ProtocolVersion::TLSv1_2,
@@ -113,22 +100,30 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
           };
 
           match d.decrypt_tls13_aes(&msg, seq) {
-            Ok((plain_message, meta)) => {
-              println!("Plain Message: {:?}", plain_message);
+            Ok((plain_message, _meta)) => {
+              plain_messages.push(plain_message);
             },
-            Err(e) => {
-              println!("not working: {:?}", e);
+            Err(_) => {
+              // ignore
             },
           }
 
           seq += 1;
         }
 
-        let record_length = 5 + record.hdr.len; // 5 is record header length
-        cursor.set_position(cursor.position() + record_length as u64);
+        // 5 is the record header length
+        cursor.set_position(cursor.position() + 5 + record.hdr.len as u64);
       },
-      Err(e) => println!("{:?}", e),
+      Err(_) => {
+        // ignore
+      },
     }
+  }
+
+  assert!(plain_messages.len() > 0); // TODO return an actual error
+
+  for msg in plain_messages {
+    println!("{:?}", msg.typ);
   }
 }
 

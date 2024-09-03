@@ -348,6 +348,7 @@ impl RustCryptoBackend13 {
       format!("{:?}:client_aes_iv", self.encrypt_mode).to_string(),
       BASE64_STANDARD.encode(client_aes_iv.buf).into(),
     );
+
     trace!(
       "client_aes_key={:?}, iv_len={:?}",
       BASE64_STANDARD.encode(client_aes_key.buf),
@@ -357,6 +358,7 @@ impl RustCryptoBackend13 {
       format!("{:?}:client_aes_key", self.encrypt_mode).to_string(),
       BASE64_STANDARD.encode(client_aes_key.buf).into(),
     );
+
     trace!(
       "server_aes_iv={:?}, iv_len={:?}",
       BASE64_STANDARD.encode(server_aes_iv.buf),
