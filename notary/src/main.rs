@@ -5,7 +5,13 @@ use std::{
   time::SystemTime,
 };
 
-use axum::{extract::Request, http::StatusCode, response::IntoResponse, routing::{get, post}, Router};
+use axum::{
+  extract::Request,
+  http::StatusCode,
+  response::IntoResponse,
+  routing::{get, post},
+  Router,
+};
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
