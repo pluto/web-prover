@@ -27,10 +27,6 @@ name   ="webprover"
 edition="2021"
 
 [[bin]]
-name="origo"
-path="bin/origo.rs"
-
-[[bin]]
 name="mock_server"
 path="bin/mock_server.rs"
 
