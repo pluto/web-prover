@@ -57,7 +57,13 @@ pub async fn sign(
 
   extract_tls_handshake(&session.request, payload);
 
-  // TODO
+  // TODO verify signature for handshake
+  // TODO check OSCP and CT
+  // TODO check target_name matches SNI and/or cert name
+
+  // TODO create merkletree and sign it
+
+  // TODO 
   let signature: Signature = state.notary_signing_key.clone().sign(&[1, 2, 3]); // TODO what do you want to sign?
   let signature_raw = hex::encode(signature.to_der().as_bytes());
 
@@ -122,9 +128,12 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
 
   assert!(plain_messages.len() > 0); // TODO return an actual error
 
+
+  // TODO parse handshake data
   for msg in plain_messages {
     println!("{:?}", msg.typ);
   }
+
 }
 
 #[derive(Deserialize)]
