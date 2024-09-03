@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
+#[derive(Clone)]
 pub struct OrigoConnection {
-    secret_map: HashMap<String, Vec<u8>>,
+    pub secret_map: HashMap<String, Vec<u8>>,
 }
 
 impl OrigoConnection {
@@ -13,7 +14,9 @@ impl OrigoConnection {
         };
     }
 
-    pub fn set_secret(self: &Self, name: String, val: Vec<u8>) {
+    pub fn set_secret(self: &mut Self, name: String, val: Vec<u8>) {
+        println!("set_secret: {}", name);
+        self.secret_map.insert(name, val);
         // Part 1 ==
         // 1. "DHE" - Record the key from the handshake (sharedKey)
         // 2. "ES" - Early secret (potentially the randomness?)
