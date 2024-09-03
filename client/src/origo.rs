@@ -145,14 +145,14 @@ pub async fn prover_inner_origo(
     server_aes_key: String,
   }
 
-  let server_aes_iv = origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_iv").unwrap().clone();
-  let server_aes_key = origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_key").unwrap().clone();
+  let server_aes_iv =
+    origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_iv").unwrap().clone();
+  let server_aes_key =
+    origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_key").unwrap().clone();
 
   let sb = SignBody {
-    server_aes_iv:  String::from_utf8(server_aes_iv.to_vec())
-      .unwrap(),
-    server_aes_key: String::from_utf8(server_aes_key.to_vec())
-      .unwrap(),
+    server_aes_iv:  String::from_utf8(server_aes_iv.to_vec()).unwrap(),
+    server_aes_key: String::from_utf8(server_aes_key.to_vec()).unwrap(),
   };
 
   let request: Request<Full<Bytes>> = hyper::Request::builder()
