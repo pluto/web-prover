@@ -88,6 +88,10 @@ pub async fn sign(
           println!("Payload");
           // TODO what's the payload?
           // println!("Finished Payload:\n{}", String::from_utf8_lossy(&finished_payload.0))
+
+          // Note from Tracy:
+          // I believe this is verification data from either the server or client that it has finished the handshake
+          // Essentially it’s a hash of the data up to that point hmac signed by the derived handshake AES key
         },
 
         // TODO auto completed branch arms, delete if not needed
