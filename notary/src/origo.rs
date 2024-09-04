@@ -16,7 +16,7 @@ use p256::ecdsa::{signature::SignerMut, Signature};
 use serde::{Deserialize, Serialize};
 use tls_client2::tls_core::msgs::{
   base::Payload,
-  message::{OpaqueMessage, PlainMessage},
+  message::{Message, OpaqueMessage, PlainMessage},
 };
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
@@ -55,7 +55,12 @@ pub async fn sign(
 ) -> Json<SignReply> {
   let session = state.origo_sessions.lock().unwrap().get(&query.session_id).unwrap().clone();
 
-  extract_tls_handshake(&session.request, payload);
+  let messages = extract_tls_handshake(&session.request, payload);
+
+  for msg in messages {
+    // logs: https://gist.github.com/mattes/2cebefa32ed9d992ace4831cb6542d72
+    println!("{:?}", msg.payload);
+  }
 
   // TODO verify signature for handshake
   // TODO check OSCP and CT
@@ -63,7 +68,7 @@ pub async fn sign(
 
   // TODO create merkletree and sign it
 
-  // TODO 
+  // TODO
   let signature: Signature = state.notary_signing_key.clone().sign(&[1, 2, 3]); // TODO what do you want to sign?
   let signature_raw = hex::encode(signature.to_der().as_bytes());
 
@@ -72,12 +77,12 @@ pub async fn sign(
   Json(response)
 }
 
-fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
+fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
   let server_aes_key = BASE64_STANDARD.decode(payload.server_aes_key).unwrap();
   let server_aes_iv = BASE64_STANDARD.decode(payload.server_aes_iv).unwrap();
 
   let mut cursor = Cursor::new(bytes);
-  let mut plain_messages: Vec<PlainMessage> = vec![];
+  let mut messages: Vec<Message> = vec![];
 
   let mut seq = 0;
   while cursor.position() < bytes.len() as u64 {
@@ -107,7 +112,8 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
 
           match d.decrypt_tls13_aes(&msg, seq) {
             Ok((plain_message, _meta)) => {
-              plain_messages.push(plain_message);
+              let message: Message = plain_message.try_into().unwrap(); // TODO unwrap
+              messages.push(message);
             },
             Err(_) => {
               // ignore
@@ -126,14 +132,8 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
     }
   }
 
-  assert!(plain_messages.len() > 0); // TODO return an actual error
-
-
-  // TODO parse handshake data
-  for msg in plain_messages {
-    println!("{:?}", msg.typ);
-  }
-
+  assert!(messages.len() > 0); // TODO return an actual error
+  messages
 }
 
 #[derive(Deserialize)]
