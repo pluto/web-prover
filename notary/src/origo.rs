@@ -92,6 +92,7 @@ pub async fn sign(
           // Note from Tracy:
           // I believe this is verification data from either the server or client that it has finished the handshake
           // Essentially it’s a hash of the data up to that point hmac signed by the derived handshake AES key
+          // https://github.com/rustls/rustls/blob/8c04dba680d19d203a7eda1951ad596f5fc2ae59/rustls/src/client/tls13.rs#L1234
         },
 
         // TODO auto completed branch arms, delete if not needed
