@@ -16,7 +16,9 @@ use p256::ecdsa::{signature::SignerMut, Signature};
 use serde::{Deserialize, Serialize};
 use tls_client2::tls_core::msgs::{
   base::Payload,
-  message::{Message, OpaqueMessage, PlainMessage},
+  enums::{ContentType, HandshakeType},
+  handshake::{HandshakeMessagePayload, HandshakePayload},
+  message::{Message, MessagePayload, OpaqueMessage, PlainMessage},
 };
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
@@ -58,17 +60,69 @@ pub async fn sign(
   let messages = extract_tls_handshake(&session.request, payload);
 
   for msg in messages {
+    // TODO remove:
     // logs: https://gist.github.com/mattes/2cebefa32ed9d992ace4831cb6542d72
-    println!("{:?}", msg.payload);
+    // println!("{:?}", msg.payload);
+
+    match msg.payload {
+      MessagePayload::Handshake(handshake) => match handshake.payload {
+        HandshakePayload::Certificate(certificate_payload) => {
+          // TODO vector of certificates (cert chain)
+          // TODO for some reason this is not hit, but CertificateTLS13 is hit
+          println!("Certificate");
+        },
+        HandshakePayload::CertificateTLS13(certificate_payload) => {
+          // TODO vector of certificates (cert chain)
+          println!("CertificateTLS13");
+        },
+        HandshakePayload::CertificateVerify(digitally_signed_struct) => {
+          // TODO signed certificate chain, verify signature
+          println!("CertificateVerify");
+        },
+        HandshakePayload::EncryptedExtensions(encrypted_extensions) => {
+          // TODO can probably ignore
+          println!("EncryptedExtensions");
+        },
+        // HandshakePayload::KeyUpdate(_) => todo!(),
+        HandshakePayload::Finished(finished_payload) => {
+          println!("Payload");
+          // TODO what's the payload?
+          // println!("Finished Payload:\n{}", String::from_utf8_lossy(&finished_payload.0))
+        },
+
+        // TODO auto completed branch arms, delete if not needed
+        // HandshakePayload::ServerHelloDone => todo!(),
+        // HandshakePayload::EndOfEarlyData => todo!(),
+        // HandshakePayload::ClientKeyExchange(_) => todo!(),
+        // HandshakePayload::NewSessionTicket(_) => todo!(),
+        // HandshakePayload::NewSessionTicketTLS13(_) => todo!(),
+        // HandshakePayload::ServerKeyExchange(_) => todo!(),
+        // HandshakePayload::CertificateRequest(_) => todo!(),
+        // HandshakePayload::CertificateRequestTLS13(_) => todo!(),
+        // HandshakePayload::HelloRequest => todo!(),
+        // HandshakePayload::ClientHello(_) => todo!(),
+        // HandshakePayload::ServerHello(_) => todo!(),
+        // HandshakePayload::HelloRetryRequest(_) => todo!(),
+        // HandshakePayload::CertificateStatus(_) => todo!(),
+        // HandshakePayload::MessageHash(_) => todo!(),
+        // HandshakePayload::Unknown(_) => todo!(),
+        _ => {
+          println!("unhandled {:?}", handshake.typ); // TODO probably just ignore
+        },
+      },
+      _ => {
+        // TODO just ignore? should be handshakes only
+      },
+    }
   }
 
   // TODO verify signature for handshake
-  // TODO check OSCP and CT
-  // TODO check target_name matches SNI and/or cert name
+  // TODO check OSCP and CT (maybe)
+  // TODO check target_name matches SNI and/or cert name (let's discuss)
 
-  // TODO create merkletree and sign it
+  // TODO create merkletree and sign it (let's discuss)
 
-  // TODO
+  // TODO sign something useful and return signature back to calling client
   let signature: Signature = state.notary_signing_key.clone().sign(&[1, 2, 3]); // TODO what do you want to sign?
   let signature_raw = hex::encode(signature.to_der().as_bytes());
 
