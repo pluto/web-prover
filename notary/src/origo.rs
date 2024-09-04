@@ -16,9 +16,8 @@ use p256::ecdsa::{signature::SignerMut, Signature};
 use serde::{Deserialize, Serialize};
 use tls_client2::tls_core::msgs::{
   base::Payload,
-  enums::{ContentType, HandshakeType},
-  handshake::{HandshakeMessagePayload, HandshakePayload},
-  message::{Message, MessagePayload, OpaqueMessage, PlainMessage},
+  handshake::HandshakePayload,
+  message::{Message, MessagePayload, OpaqueMessage},
 };
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
@@ -90,8 +89,9 @@ pub async fn sign(
           // println!("Finished Payload:\n{}", String::from_utf8_lossy(&finished_payload.0))
 
           // Note from Tracy:
-          // I believe this is verification data from either the server or client that it has finished the handshake
-          // Essentially it’s a hash of the data up to that point hmac signed by the derived handshake AES key
+          // I believe this is verification data from either the server or client that it has
+          // finished the handshake Essentially it’s a hash of the data up to that point
+          // hmac signed by the derived handshake AES key
           // https://github.com/rustls/rustls/blob/8c04dba680d19d203a7eda1951ad596f5fc2ae59/rustls/src/client/tls13.rs#L1234
         },
 
