@@ -14,11 +14,13 @@ use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use p256::ecdsa::{signature::SignerMut, Signature};
 use serde::{Deserialize, Serialize};
-use tls_client2::tls_core::msgs::{
+use tls_client2::{
+  internal::msgs::hsjoiner::HandshakeJoiner, 
+  tls_core::msgs::{
   base::Payload,
   handshake::HandshakePayload,
   message::{Message, MessagePayload, OpaqueMessage},
-};
+}};
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
   net::TcpStream,
@@ -171,8 +173,11 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
 
           match d.decrypt_tls13_aes(&msg, seq) {
             Ok((plain_message, _meta)) => {
-              let message: Message = plain_message.try_into().unwrap(); // TODO unwrap
-              messages.push(message);
+              let mut handshake_joiner = HandshakeJoiner::new();
+              handshake_joiner.take_message(plain_message);
+              while let Some(msg) = handshake_joiner.frames.pop_front() {
+                messages.push(msg);
+              }
             },
             Err(_) => {
               // ignore
@@ -287,40 +292,40 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   let client_to_server = async {
     let mut buf = [0; 8192];
     loop {
-      debug!("read1");
-      let n = socket_read.read(&mut buf).await.unwrap();
+      let n = socket_read.read(&mut buf).await?;
       if n == 0 {
-        debug!("close client_to_server");
-        break;
+        break; // Client closed the connection
       }
-      if n > 0 {
-        let data = &buf[..n];
-        debug!("write to server");
-        tcp_write.write_all(data).await.unwrap();
-        request_buf.lock().unwrap().extend(data);
-      }
+      debug!("write to client len={}, data={}", n, hex::encode(&buf[..n]));
+      request_buf.lock().unwrap().extend_from_slice(&buf[..n]);
+      tcp_write.write_all(&buf[..n]).await?;
     }
+    Ok::<(), tokio::io::Error>(())
   };
 
   let server_to_client = async {
     let mut buf = [0; 8192];
     loop {
-      debug!("read2");
-      let n = tcp_read.read(&mut buf).await.unwrap();
+      let n = tcp_read.read(&mut buf).await?;
       if n == 0 {
-        debug!("close server_to_client");
-        break;
-      }
-      if n > 0 {
-        let data = &buf[..n];
-        debug!("write to client");
-        socket_write.write_all(data).await.unwrap();
-        request_buf.lock().unwrap().extend(data);
-      }
+        break; // Server closed the connection
+      } 
+      debug!("write to server len={}, data={}", n, hex::encode(&buf[..n]));
+      // Write the mirrored data into the response buffer
+      request_buf.lock().unwrap().extend_from_slice(&buf[..n]);
+      // Send the data to the client
+      socket_write.write_all(&buf[..n]).await?;
     }
+    Err::<(), tokio::io::Error>(tokio::io::Error::new(tokio::io::ErrorKind::Other, "fuck"))
   };
 
-  tokio::join!(client_to_server, server_to_client);
+  debug!("wait try_join");
+  match tokio::try_join!(client_to_server, server_to_client) {
+    Ok((a, b)) => {},
+    Err(e) => {
+      println!("{:?}", e);
+    },
+  }
 
   state.origo_sessions.lock().unwrap().insert(session_id.to_string(), OrigoSession {
     // TODO currently request is both, request and response. will this become a problem?

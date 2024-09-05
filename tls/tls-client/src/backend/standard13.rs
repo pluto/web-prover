@@ -745,9 +745,9 @@ impl Encrypter {
       .encrypt(nonce, aes_payload)
       .map_err(|e| BackendError::EncryptionError(e.to_string()))?;
 
-        trace!(
+        debug!(
             "ENC: cipher_text={:?}, cipher_len={:?}",
-            BASE64_STANDARD.encode(ciphertext.clone()),
+            hex::encode(ciphertext.clone()),
             ciphertext.len()
         );
         let om = OpaqueMessage {
