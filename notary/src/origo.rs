@@ -14,9 +14,13 @@ use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use p256::ecdsa::{signature::SignerMut, Signature};
 use serde::{Deserialize, Serialize};
-use tls_client2::tls_core::msgs::{
-  base::Payload,
-  message::{OpaqueMessage, PlainMessage},
+use tls_client2::{
+  internal::msgs::hsjoiner::HandshakeJoiner,
+  tls_core::msgs::{
+    base::Payload,
+    handshake::HandshakePayload,
+    message::{Message, MessagePayload, OpaqueMessage},
+  },
 };
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
@@ -55,9 +59,78 @@ pub async fn sign(
 ) -> Json<SignReply> {
   let session = state.origo_sessions.lock().unwrap().get(&query.session_id).unwrap().clone();
 
-  extract_tls_handshake(&session.request, payload);
+  let messages = extract_tls_handshake(&session.request, payload);
 
-  // TODO
+  for msg in messages {
+    // TODO remove:
+    // logs: https://gist.github.com/mattes/2cebefa32ed9d992ace4831cb6542d72
+    // println!("{:?}", msg.payload);
+
+    match msg.payload {
+      MessagePayload::Handshake(handshake) => match handshake.payload {
+        HandshakePayload::Certificate(certificate_payload) => {
+          // TODO vector of certificates (cert chain)
+          // TODO for some reason this is not hit, but CertificateTLS13 is hit
+          println!("Certificate");
+        },
+        HandshakePayload::CertificateTLS13(certificate_payload) => {
+          // TODO vector of certificates (cert chain)
+          println!("CertificateTLS13");
+        },
+        HandshakePayload::CertificateVerify(digitally_signed_struct) => {
+          // TODO signed certificate chain, verify signature
+          println!("CertificateVerify");
+        },
+        HandshakePayload::EncryptedExtensions(encrypted_extensions) => {
+          // TODO can probably ignore
+          println!("EncryptedExtensions");
+        },
+        // HandshakePayload::KeyUpdate(_) => todo!(),
+        HandshakePayload::Finished(finished_payload) => {
+          println!("Payload");
+          // TODO what's the payload?
+          // println!("Finished Payload:\n{}", String::from_utf8_lossy(&finished_payload.0))
+
+          // Note from Tracy:
+          // I believe this is verification data from either the server or client that it has
+          // finished the handshake Essentially it’s a hash of the data up to that point
+          // hmac signed by the derived handshake AES key
+          // https://github.com/rustls/rustls/blob/8c04dba680d19d203a7eda1951ad596f5fc2ae59/rustls/src/client/tls13.rs#L1234
+        },
+
+        // TODO auto completed branch arms, delete if not needed
+        // HandshakePayload::ServerHelloDone => todo!(),
+        // HandshakePayload::EndOfEarlyData => todo!(),
+        // HandshakePayload::ClientKeyExchange(_) => todo!(),
+        // HandshakePayload::NewSessionTicket(_) => todo!(),
+        // HandshakePayload::NewSessionTicketTLS13(_) => todo!(),
+        // HandshakePayload::ServerKeyExchange(_) => todo!(),
+        // HandshakePayload::CertificateRequest(_) => todo!(),
+        // HandshakePayload::CertificateRequestTLS13(_) => todo!(),
+        // HandshakePayload::HelloRequest => todo!(),
+        // HandshakePayload::ClientHello(_) => todo!(),
+        // HandshakePayload::ServerHello(_) => todo!(),
+        // HandshakePayload::HelloRetryRequest(_) => todo!(),
+        // HandshakePayload::CertificateStatus(_) => todo!(),
+        // HandshakePayload::MessageHash(_) => todo!(),
+        // HandshakePayload::Unknown(_) => todo!(),
+        _ => {
+          println!("unhandled {:?}", handshake.typ); // TODO probably just ignore
+        },
+      },
+      _ => {
+        // TODO just ignore? should be handshakes only
+      },
+    }
+  }
+
+  // TODO verify signature for handshake
+  // TODO check OSCP and CT (maybe)
+  // TODO check target_name matches SNI and/or cert name (let's discuss)
+
+  // TODO create merkletree and sign it (let's discuss)
+
+  // TODO sign something useful and return signature back to calling client
   let signature: Signature = state.notary_signing_key.clone().sign(&[1, 2, 3]); // TODO what do you want to sign?
   let signature_raw = hex::encode(signature.to_der().as_bytes());
 
@@ -66,12 +139,12 @@ pub async fn sign(
   Json(response)
 }
 
-fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
+fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
   let server_aes_key = BASE64_STANDARD.decode(payload.server_aes_key).unwrap();
   let server_aes_iv = BASE64_STANDARD.decode(payload.server_aes_iv).unwrap();
 
   let mut cursor = Cursor::new(bytes);
-  let mut plain_messages: Vec<PlainMessage> = vec![];
+  let mut messages: Vec<Message> = vec![];
 
   let mut seq = 0;
   while cursor.position() < bytes.len() as u64 {
@@ -101,7 +174,11 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
 
           match d.decrypt_tls13_aes(&msg, seq) {
             Ok((plain_message, _meta)) => {
-              plain_messages.push(plain_message);
+              let mut handshake_joiner = HandshakeJoiner::new();
+              handshake_joiner.take_message(plain_message);
+              while let Some(msg) = handshake_joiner.frames.pop_front() {
+                messages.push(msg);
+              }
             },
             Err(_) => {
               // ignore
@@ -120,11 +197,8 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) {
     }
   }
 
-  assert!(plain_messages.len() > 0); // TODO return an actual error
-
-  for msg in plain_messages {
-    println!("{:?}", msg.typ);
-  }
+  assert!(messages.len() > 0); // TODO return an actual error
+  messages
 }
 
 #[derive(Deserialize)]
@@ -219,40 +293,43 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   let client_to_server = async {
     let mut buf = [0; 8192];
     loop {
-      debug!("read1");
-      let n = socket_read.read(&mut buf).await.unwrap();
+      let n = socket_read.read(&mut buf).await?;
       if n == 0 {
-        debug!("close client_to_server");
-        break;
+        break; // Client closed the connection
       }
-      if n > 0 {
-        let data = &buf[..n];
-        debug!("write to server");
-        tcp_write.write_all(data).await.unwrap();
-        request_buf.lock().unwrap().extend(data);
-      }
+      debug!("write to client len={}, data={}", n, hex::encode(&buf[..n]));
+      request_buf.lock().unwrap().extend_from_slice(&buf[..n]);
+      tcp_write.write_all(&buf[..n]).await?;
     }
+    Ok::<(), tokio::io::Error>(())
   };
 
   let server_to_client = async {
     let mut buf = [0; 8192];
     loop {
-      debug!("read2");
-      let n = tcp_read.read(&mut buf).await.unwrap();
+      let n = tcp_read.read(&mut buf).await?;
       if n == 0 {
-        debug!("close server_to_client");
-        break;
+        break; // Server closed the connection
       }
-      if n > 0 {
-        let data = &buf[..n];
-        debug!("write to client");
-        socket_write.write_all(data).await.unwrap();
-        request_buf.lock().unwrap().extend(data);
-      }
+      debug!("write to server len={}, data={}", n, hex::encode(&buf[..n]));
+      // Write the mirrored data into the response buffer
+      request_buf.lock().unwrap().extend_from_slice(&buf[..n]);
+      // Send the data to the client
+      socket_write.write_all(&buf[..n]).await?;
     }
+    Err::<(), tokio::io::Error>(tokio::io::Error::new(
+      tokio::io::ErrorKind::Other,
+      "server closed before client",
+    ))
   };
 
-  tokio::join!(client_to_server, server_to_client);
+  debug!("wait try_join");
+  match tokio::try_join!(client_to_server, server_to_client) {
+    Ok((a, b)) => {},
+    Err(e) => {
+      println!("{:?}", e);
+    },
+  }
 
   state.origo_sessions.lock().unwrap().insert(session_id.to_string(), OrigoSession {
     // TODO currently request is both, request and response. will this become a problem?

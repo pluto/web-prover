@@ -17,7 +17,18 @@ pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
 use tracing::{debug, info};
 
-pub async fn prover_inner(config: config::Config) -> Result<TlsProof, errors::ClientErrors> {
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct OrigoProof {
+  // TODO
+}
+
+#[derive(Debug, Serialize)]
+pub enum Proof {
+  TLSN(TlsProof),
+  Origo(OrigoProof),
+}
+
+pub async fn prover_inner(config: config::Config) -> Result<Proof, errors::ClientErrors> {
   info!("GIT_HASH: {}", env!("GIT_HASH"));
   match config.mode {
     config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
@@ -25,7 +36,7 @@ pub async fn prover_inner(config: config::Config) -> Result<TlsProof, errors::Cl
   }
 }
 
-pub async fn prover_inner_origo(config: config::Config) -> Result<TlsProof, errors::ClientErrors> {
+pub async fn prover_inner_origo(config: config::Config) -> Result<Proof, errors::ClientErrors> {
   // TODO
   #[cfg(not(target_arch = "wasm32"))]
   return origo::prover_inner_origo(config).await;
@@ -34,9 +45,7 @@ pub async fn prover_inner_origo(config: config::Config) -> Result<TlsProof, erro
   todo!("todo")
 }
 
-pub async fn prover_inner_tlsn(
-  mut config: config::Config,
-) -> Result<TlsProof, errors::ClientErrors> {
+pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let root_store = default_root_store();
 
   let prover_config = ProverConfig::builder()
@@ -57,7 +66,8 @@ pub async fn prover_inner_tlsn(
     prover::setup_tcp_connection(&mut config, prover_config).await
   };
 
-  notarize(prover).await
+  let p = notarize(prover).await.unwrap();
+  Ok(Proof::TLSN(p))
 }
 
 async fn notarize(prover: Prover<Closed>) -> Result<TlsProof, errors::ClientErrors> {

@@ -81,7 +81,9 @@ impl Config {
     let body = if self.target_body.is_empty() {
       Full::default()
     } else {
-      Full::from(BASE64_STANDARD.decode(&self.target_body).unwrap())
+      let body = BASE64_STANDARD.decode(&self.target_body).unwrap();
+      h.insert("Content-Length", body.len().into());
+      Full::from(body)
     };
 
     request.body(body).unwrap()
