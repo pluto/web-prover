@@ -316,7 +316,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
       // Send the data to the client
       socket_write.write_all(&buf[..n]).await?;
     }
-    Err::<(), tokio::io::Error>(tokio::io::Error::new(tokio::io::ErrorKind::Other, "fuck"))
+    Err::<(), tokio::io::Error>(tokio::io::Error::new(tokio::io::ErrorKind::Other, "server closed before client"))
   };
 
   debug!("wait try_join");
