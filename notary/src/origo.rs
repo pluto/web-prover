@@ -15,12 +15,13 @@ use hyper_util::rt::TokioIo;
 use p256::ecdsa::{signature::SignerMut, Signature};
 use serde::{Deserialize, Serialize};
 use tls_client2::{
-  internal::msgs::hsjoiner::HandshakeJoiner, 
+  internal::msgs::hsjoiner::HandshakeJoiner,
   tls_core::msgs::{
-  base::Payload,
-  handshake::HandshakePayload,
-  message::{Message, MessagePayload, OpaqueMessage},
-}};
+    base::Payload,
+    handshake::HandshakePayload,
+    message::{Message, MessagePayload, OpaqueMessage},
+  },
+};
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
   net::TcpStream,
@@ -309,14 +310,17 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
       let n = tcp_read.read(&mut buf).await?;
       if n == 0 {
         break; // Server closed the connection
-      } 
+      }
       debug!("write to server len={}, data={}", n, hex::encode(&buf[..n]));
       // Write the mirrored data into the response buffer
       request_buf.lock().unwrap().extend_from_slice(&buf[..n]);
       // Send the data to the client
       socket_write.write_all(&buf[..n]).await?;
     }
-    Err::<(), tokio::io::Error>(tokio::io::Error::new(tokio::io::ErrorKind::Other, "server closed before client"))
+    Err::<(), tokio::io::Error>(tokio::io::Error::new(
+      tokio::io::ErrorKind::Other,
+      "server closed before client",
+    ))
   };
 
   debug!("wait try_join");
