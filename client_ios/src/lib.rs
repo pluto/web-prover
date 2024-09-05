@@ -43,9 +43,9 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
       let out = Output {
         proof: None,
         error: if let Some(e) = err.downcast_ref::<&str>() {
-          Some(format!("Error: {}\n\nStack:\n{}", e, backtrace))
+          Some(format!("Captured Panic\nError: {}\n\nStack:\n{}", e, backtrace))
         } else {
-          Some(format!("{:#?}\n\nStack:\n{}", err, backtrace))
+          Some(format!("Captured Panic\n{:#?}\n\nStack:\n{}", err, backtrace))
         },
       };
       let out_json = serde_json::to_string_pretty(&out).unwrap(); // should never panic
