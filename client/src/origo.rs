@@ -4,15 +4,12 @@ use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::Full;
 use hyper::{body::Bytes, Request, StatusCode};
 use serde::Serialize;
-use tlsn_core::proof::TlsProof;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::debug;
 
-use crate::{config, errors};
+use crate::{config, errors, OrigoProof, Proof};
 
-pub async fn prover_inner_origo(
-  mut config: config::Config,
-) -> Result<TlsProof, errors::ClientErrors> {
+pub async fn prover_inner_origo(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
   let root_store = default_root_store();
 
@@ -112,10 +109,10 @@ pub async fn prover_inner_origo(
 
   assert_eq!(response.status(), StatusCode::OK);
 
-  use http_body_util::BodyExt;
-
   let payload = response.into_body().collect().await.unwrap().to_bytes();
   debug!("Response: {:?}", payload);
+
+  use http_body_util::BodyExt;
 
   // Close the connection to the server
   let mut client_socket = connection_receiver.await.unwrap().unwrap().io.into_inner().into_inner();
@@ -174,7 +171,8 @@ pub async fn prover_inner_origo(
   let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
   println!("\n{}\n\n", String::from_utf8(body_bytes.to_vec()).unwrap());
 
-  todo!("return origo TLS proof");
+  // std::process::exit(0);
+  Ok(Proof::Origo(OrigoProof {})) // TODO
 }
 
 #[cfg(feature = "notary_ca_cert")]

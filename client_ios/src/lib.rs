@@ -19,7 +19,7 @@ pub unsafe extern "C" fn setup_tracing() {
 // TODO: We should probably clarify this safety doc
 #[allow(clippy::missing_safety_doc)]
 pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
-  let result: Result<client::TlsProof, ClientErrors> =
+  let result: Result<client::Proof, ClientErrors> =
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
       let config_str = unsafe {
         assert!(!config_json.is_null());
