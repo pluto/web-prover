@@ -10,8 +10,8 @@ ios:
 	-cargo install cbindgen
 	rustup target add aarch64-apple-ios
 	rustup target add aarch64-apple-ios-sim
-	cargo build -p client_ios --release --target aarch64-apple-ios # builds target/aarch64-apple-ios/release/libclient_ios.a
-	cargo build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
+	RUSTFLAGS="-C panic=unwind -C debuginfo=2" cargo build -p client_ios --release --target aarch64-apple-ios # builds target/aarch64-apple-ios/release/libclient_ios.a
+	RUSTFLAGS="-C panic=unwind -C debuginfo=2" cargo build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
 	~/.cargo/bin/cbindgen --lang c --crate client_ios --output target/aarch64-apple-ios/release/libclient_ios.h
 	-rm -r target/aarch64-apple-ios/release/libclient_ios.xcframework
 	xcodebuild -create-xcframework \
