@@ -1,16 +1,24 @@
 use std::sync::Arc;
 
 use futures::{channel::oneshot, AsyncWriteExt};
-use http_body_util::Full;
+use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use serde::Serialize;
-use tokio_util::compat::TokioAsyncReadCompatExt;
+use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
 use crate::{config, errors, OrigoProof, Proof};
 
 pub async fn prover_inner_origo(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
+
+  let (server_aes_key, server_aes_iv) =
+    prover_inner_proxy(config.clone(), session_id.clone()).await;
+
+  prover_inner_sign(config.clone(), session_id.clone(), server_aes_key, server_aes_iv).await
+}
+
+async fn prover_inner_proxy(config: config::Config, session_id: String) -> (Vec<u8>, Vec<u8>) {
   let root_store = default_root_store();
 
   let client_config = tls_client2::ClientConfig::builder()
@@ -89,8 +97,6 @@ pub async fn prover_inner_origo(mut config: config::Config) -> Result<Proof, err
   };
   tokio::spawn(handled_tls_fut);
 
-  use tokio_util::compat::FuturesAsyncReadCompatExt;
-
   let client_tls_conn = hyper_util::rt::TokioIo::new(client_tls_conn.compat());
 
   let (mut request_sender, connection) =
@@ -112,45 +118,70 @@ pub async fn prover_inner_origo(mut config: config::Config) -> Result<Proof, err
   let payload = response.into_body().collect().await.unwrap().to_bytes();
   debug!("Response: {:?}", payload);
 
-  use http_body_util::BodyExt;
-
   // Close the connection to the server
   let mut client_socket = connection_receiver.await.unwrap().unwrap().io.into_inner().into_inner();
   client_socket.close().await.unwrap();
-
-  // call sign endpoint
-
-  let notary_socket =
-    tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port.clone()))
-      .await
-      .unwrap();
-
-  let notary_tls_socket = notary_connector
-    .connect(rustls::ServerName::try_from(config.notary_host.as_str()).unwrap(), notary_socket)
-    .await
-    .unwrap();
-
-  let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
-
-  let (mut request_sender, connection) =
-    hyper::client::conn::http1::handshake(notary_tls_socket).await.unwrap();
-  let _ = tokio::spawn(connection);
-
-  #[derive(Serialize)]
-  struct SignBody {
-    server_aes_iv:  String,
-    server_aes_key: String,
-  }
 
   let server_aes_iv =
     origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_iv").unwrap().clone();
   let server_aes_key =
     origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_key").unwrap().clone();
 
+  (server_aes_key, server_aes_iv)
+}
+
+async fn prover_inner_sign(
+  config: config::Config,
+  session_id: String,
+  server_aes_key: Vec<u8>,
+  server_aes_iv: Vec<u8>,
+) -> Result<Proof, errors::ClientErrors> {
+  // call sign endpoint
+  debug!("call sign endpoint");
+
+  let client_notary_config = rustls::ClientConfig::builder()
+    .with_safe_defaults()
+    .with_root_certificates(crate::prover::default_root_store())
+    .with_no_client_auth();
+
+  let notary_connector =
+    tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));
+
+  let notary_socket =
+    tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port.clone()))
+      .await
+      .unwrap();
+
+  debug!("1");
+
+  let notary_tls_socket = notary_connector
+    .connect(rustls::ServerName::try_from(config.notary_host.as_str()).unwrap(), notary_socket)
+    .await
+    .unwrap();
+
+  debug!("2");
+  let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
+
+  debug!("3");
+  let (mut request_sender, connection) =
+    hyper::client::conn::http1::handshake(notary_tls_socket).await.unwrap();
+  let _ = tokio::spawn(connection);
+
+  debug!("4");
+  #[derive(Serialize)]
+  struct SignBody {
+    server_aes_iv:  String,
+    server_aes_key: String,
+  }
+
+  debug!("5");
+
   let sb = SignBody {
     server_aes_iv:  String::from_utf8(server_aes_iv.to_vec()).unwrap(),
     server_aes_key: String::from_utf8(server_aes_key.to_vec()).unwrap(),
   };
+
+  debug!("7");
 
   let request: Request<Full<Bytes>> = hyper::Request::builder()
     .uri(format!(
@@ -165,13 +196,18 @@ pub async fn prover_inner_origo(mut config: config::Config) -> Result<Proof, err
     .body(http_body_util::Full::from(serde_json::to_string(&sb).unwrap()))
     .unwrap();
 
+  debug!("8");
+
   let response = request_sender.send_request(request).await.unwrap();
   assert!(response.status() == hyper::StatusCode::OK);
+
+  debug!("9");
 
   let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
   println!("\n{}\n\n", String::from_utf8(body_bytes.to_vec()).unwrap());
 
-  // std::process::exit(0);
+  debug!("10");
+
   Ok(Proof::Origo(OrigoProof {})) // TODO
 }
 
