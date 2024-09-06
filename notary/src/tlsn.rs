@@ -39,6 +39,7 @@ where S: Send + Sync
   type Rejection = NotaryServerError;
 
   async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+    info!("from_request_parts");
     // Extract tcp connection for websocket client
     if header_eq(&parts.headers, header::UPGRADE, "websocket") {
       let extractor = WebSocketUpgrade::from_request_parts(parts, state)
