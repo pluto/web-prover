@@ -52,25 +52,14 @@ pub struct SignBody {
   server_aes_key: String,
 }
 
-// pub async fn foobar() -> Json<SignReply> {
-//   info!("foobar called");
-//   Json(SignReply { signature: "foobar".to_string() })
-// }
-
 pub async fn sign(
   query: Query<SignQuery>,
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<SignBody>,
 ) -> Json<SignReply> {
   let session = state.origo_sessions.lock().unwrap().get(&query.session_id).unwrap().clone();
-
   let messages = extract_tls_handshake(&session.request, payload);
-
   for msg in messages {
-    // TODO remove:
-    // logs: https://gist.github.com/mattes/2cebefa32ed9d992ace4831cb6542d72
-    // println!("{:?}", msg.payload);
-
     match msg.payload {
       MessagePayload::Handshake(handshake) => match handshake.payload {
         HandshakePayload::Certificate(certificate_payload) => {
@@ -298,14 +287,14 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let request_buf = Arc::new(Mutex::new(vec![0u8; 0]));
 
   let client_to_server = async {
-    let mut tmp_buf = [0u8; 8192];
+    let mut buf = [0u8; 8192];
     loop {
-      match socket_read.read(&mut tmp_buf).await {
+      match socket_read.read(&mut buf).await {
         Ok(0) => break,
         Ok(n) => {
-          tcp_write.write_all(&tmp_buf[..n]).await?;
+          tcp_write.write_all(&buf[..n]).await?;
           let mut buffer = request_buf.lock().unwrap();
-          buffer.extend_from_slice(&tmp_buf[..n]);
+          buffer.extend_from_slice(&buf[..n]);
         },
         Err(e) => return Err(e),
       }
@@ -315,14 +304,14 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   };
 
   let server_to_client = async {
-    let mut tmp_buf = [0u8; 8192];
+    let mut buf = [0u8; 8192];
     loop {
-      match tcp_read.read(&mut tmp_buf).await {
+      match tcp_read.read(&mut buf).await {
         Ok(0) => break,
         Ok(n) => {
-          socket_write.write_all(&tmp_buf[..n]).await?;
+          socket_write.write_all(&buf[..n]).await?;
           let mut buffer = request_buf.lock().unwrap();
-          buffer.extend_from_slice(&tmp_buf[..n]);
+          buffer.extend_from_slice(&buf[..n]);
         },
         Err(e) => return Err(e),
       }
