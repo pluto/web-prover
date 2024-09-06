@@ -139,7 +139,7 @@ use nom::{bytes::streaming::take, Err, IResult};
 /// See: https://github.com/rusticata/tls-parser/issues/72
 fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
   let (i, hdr) = tls_parser::parse_tls_record_header(i).unwrap();
-  if hdr.len > (2 << 14) + 256 {
+  if hdr.len > (1 << 14) + 256 {
     panic!("oversized payload");
   }
 
