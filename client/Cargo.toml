@@ -79,6 +79,7 @@ hyper-util={ version="0.1", features=["http1"] }
 ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wasm", rev="2ed12aad9f0236e5321f577672f309920b2aef51" }
 # Serde
 serde-wasm-bindgen="0.6.5"
+reqwest           ={ version="0.12", features=["json"] }
 
 # Other
 ring          ={ version="0.17", default-features=false, features=["wasm32_unknown_unknown_js"] }
