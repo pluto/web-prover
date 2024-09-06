@@ -25,7 +25,8 @@ use web_sys::{Headers, Request as WebsysRequest, RequestInit, RequestMode, Respo
 use web_time::Instant;
 use ws_stream_wasm::*;
 
-use crate::{config::Config, send_request};
+use crate::config::Config;
+use crate::tlsn::send_request;
 
 // uses websockets to connect to notary and websocket proxy
 pub async fn setup_connection(config: &mut Config, prover_config: ProverConfig) -> Prover<Closed> {

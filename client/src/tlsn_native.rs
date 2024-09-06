@@ -8,7 +8,7 @@ use tokio_rustls::TlsConnector;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug; // needed for notary_ca_cert feature below
 
-use crate::{config::Config, send_request};
+use crate::{config::Config, tlsn::send_request};
 
 // uses websocket to connect to notary
 // TODO decide if that means it's using the websocket proxy as well?
@@ -16,7 +16,7 @@ pub async fn setup_websocket_connection(
   _config: &mut Config,
   _prover_config: ProverConfig,
 ) -> Prover<Closed> {
-  todo!("client type websocket not implemented for non-wasm target");
+  todo!("client type websocket not implemented for native target");
 }
 
 // uses raw TCP socket to connect to notary
