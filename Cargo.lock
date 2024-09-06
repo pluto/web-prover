@@ -2687,6 +2687,8 @@ dependencies = [
  "http 1.1.0",
  "hyper 1.4.1",
  "hyper-util",
+ "nom",
+ "nom-derive",
  "p256",
  "rustls 0.23.12",
  "rustls-acme",

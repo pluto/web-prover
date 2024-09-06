@@ -24,6 +24,9 @@ tokio-tungstenite={ version="0.23.1", features=["stream"] }
 ws_stream_tungstenite={ git="https://github.com/pluto/ws_stream_tungstenite.git", branch="latest", features=[
 	"tokio",
 ] }
+nom = "7.0"
+nom-derive = "0.10"
+
 async-trait="0.1.67"
 axum={ version="0.7", features=["ws", "json"] }
 axum-core="0.4"
