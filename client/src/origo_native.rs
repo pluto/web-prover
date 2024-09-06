@@ -157,7 +157,9 @@ async fn sign(
 
   #[cfg(feature = "notary_ca_cert")]
   let client = reqwest::ClientBuilder::new()
-    .add_root_certificate(reqwest::tls::Certificate::from_der(&crate::tls::NOTARY_CA_CERT.to_vec()).unwrap())
+    .add_root_certificate(
+      reqwest::tls::Certificate::from_der(&crate::tls::NOTARY_CA_CERT.to_vec()).unwrap(),
+    )
     .build()
     .unwrap();
 
