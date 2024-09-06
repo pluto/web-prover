@@ -1,11 +1,6 @@
 // logic common to wasm32 and native
 
-use futures::{channel::oneshot, AsyncWriteExt};
-use http_body_util::{BodyExt, Full};
-use hyper::{body::Bytes, Request, StatusCode};
 use serde::Serialize;
-use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
-use tracing::debug;
 
 pub async fn sign(
   config: crate::config::Config,

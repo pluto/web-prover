@@ -3,11 +3,10 @@ use std::sync::Arc;
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
-use serde::Serialize;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
-use crate::{config, errors, OrigoProof, Proof};
+use crate::{config, errors, Proof};
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();

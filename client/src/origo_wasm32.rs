@@ -1,9 +1,3 @@
-// TODO
-
-// connect with websocket to origo proxy
-// call sign
-// update client_wasm?
-
 use std::sync::Arc;
 
 use futures::{channel::oneshot, AsyncWriteExt};
