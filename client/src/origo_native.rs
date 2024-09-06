@@ -16,7 +16,7 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
 }
 
 async fn proxy(config: config::Config, session_id: String) -> (Vec<u8>, Vec<u8>) {
-  let root_store = default_root_store();
+  let root_store = crate::tls::tls_client2_default_root_store();
 
   let client_config = tls_client2::ClientConfig::builder()
     .with_safe_defaults()
@@ -33,7 +33,7 @@ async fn proxy(config: config::Config, session_id: String) -> (Vec<u8>, Vec<u8>)
 
   let client_notary_config = rustls::ClientConfig::builder()
     .with_safe_defaults()
-    .with_root_certificates(crate::tlsn_native::default_root_store())
+    .with_root_certificates(crate::tls::rustls_default_root_store())
     .with_no_client_auth();
 
   let notary_connector =
@@ -55,6 +55,7 @@ async fn proxy(config: config::Config, session_id: String) -> (Vec<u8>, Vec<u8>)
     hyper::client::conn::http1::handshake(notary_tls_socket).await.unwrap();
   let connection_task = tokio::spawn(connection.without_shutdown());
 
+  // TODO build sanitized query
   let request: Request<Full<Bytes>> = hyper::Request::builder()
     .uri(format!(
       "https://{}:{}/v1/origo?session_id={}&target_host={}&target_port={}",
@@ -156,7 +157,7 @@ async fn sign(
 
   #[cfg(feature = "notary_ca_cert")]
   let client = reqwest::ClientBuilder::new()
-    .add_root_certificate(reqwest::tls::Certificate::from_der(&NOTARY_CA_CERT.to_vec()).unwrap())
+    .add_root_certificate(reqwest::tls::Certificate::from_der(&crate::tls::NOTARY_CA_CERT.to_vec()).unwrap())
     .build()
     .unwrap();
 
@@ -167,32 +168,4 @@ async fn sign(
   println!("\n{}\n\n", String::from_utf8(response.bytes().await.unwrap().to_vec()).unwrap());
 
   Ok(Proof::Origo(OrigoProof {})) // TODO
-}
-
-#[cfg(feature = "notary_ca_cert")]
-const NOTARY_CA_CERT: &[u8] = include_bytes!(env!("NOTARY_CA_CERT_PATH"));
-
-// TODO default_root_store is duplicated in prover.rs because of
-// tls_client::RootCertStore vs rustls::RootCertStore
-
-/// Default root store using mozilla certs.
-fn default_root_store() -> tls_client2::RootCertStore {
-  let mut root_store = tls_client2::RootCertStore::empty();
-  root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
-    tls_client2::OwnedTrustAnchor::from_subject_spki_name_constraints(
-      ta.subject.as_ref(),
-      ta.subject_public_key_info.as_ref(),
-      ta.name_constraints.as_ref().map(|nc| nc.as_ref()),
-    )
-  }));
-
-  #[cfg(feature = "notary_ca_cert")]
-  {
-    debug!("notary_ca_cert feature enabled");
-    let certificate = pki_types::CertificateDer::from(NOTARY_CA_CERT.to_vec());
-    let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
-    assert_eq!(added, 1); // TODO there is probably a better way
-  }
-
-  root_store
 }

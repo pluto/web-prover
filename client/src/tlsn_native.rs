@@ -25,7 +25,7 @@ pub async fn setup_tcp_connection(
   prover_config: ProverConfig,
 ) -> Prover<Closed> {
   let session_id = config.session_id();
-  let root_store = default_root_store();
+  let root_store = crate::tls::rustls_default_root_store();
 
   let client_notary_config = ClientConfig::builder()
     .with_safe_defaults()
@@ -98,34 +98,4 @@ pub async fn setup_tcp_connection(
   client_socket.compat().close().await.unwrap();
 
   prover_task.await.unwrap().unwrap()
-}
-
-#[cfg(feature = "notary_ca_cert")]
-const NOTARY_CA_CERT: &[u8] = include_bytes!(env!("NOTARY_CA_CERT_PATH"));
-
-// TODO default_root_store() duplicates lib.rs::default_root_store() but returns
-// rustls::RootCertStore instead of tls_client::RootCertStore. Can we make the ClientConfig
-// above accept the tls_client version or can we somehow convert types? The underlying
-// implementation is the same.
-
-/// Default root store using mozilla certs.
-pub fn default_root_store() -> rustls::RootCertStore {
-  let mut root_store = rustls::RootCertStore::empty();
-  root_store.add_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
-    rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
-      ta.subject.as_ref(),
-      ta.subject_public_key_info.as_ref(),
-      ta.name_constraints.as_ref().map(|nc| nc.as_ref()),
-    )
-  }));
-
-  #[cfg(feature = "notary_ca_cert")]
-  {
-    debug!("notary_ca_cert feature enabled");
-    let certificate = pki_types::CertificateDer::from(NOTARY_CA_CERT.to_vec());
-    let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
-    assert_eq!(added, 1); // TODO there is probably a better way
-  }
-
-  root_store
 }

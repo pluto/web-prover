@@ -105,34 +105,6 @@ pub async fn send_request(
   };
 }
 
-#[cfg(feature = "notary_ca_cert")]
-const NOTARY_CA_CERT: &[u8] = include_bytes!(env!("NOTARY_CA_CERT_PATH"));
-
-// TODO default_root_store is duplicated in prover.rs because of
-// tls_client::RootCertStore vs rustls::RootCertStore
-
-/// Default root store using mozilla certs.
-pub fn default_root_store() -> tls_client::RootCertStore {
-  let mut root_store = tls_client::RootCertStore::empty();
-  root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
-    tls_client::OwnedTrustAnchor::from_subject_spki_name_constraints(
-      ta.subject.as_ref(),
-      ta.subject_public_key_info.as_ref(),
-      ta.name_constraints.as_ref().map(|nc| nc.as_ref()),
-    )
-  }));
-
-  #[cfg(feature = "notary_ca_cert")]
-  {
-    debug!("notary_ca_cert feature enabled");
-    let certificate = pki_types::CertificateDer::from(NOTARY_CA_CERT.to_vec());
-    let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
-    assert_eq!(added, 1); // TODO there is probably a better way
-  }
-
-  root_store
-}
-
 async fn body_to_string(res: hyper::Response<hyper::body::Incoming>) -> String {
   let body_bytes = res.into_body().collect().await.unwrap().to_bytes();
   String::from_utf8(body_bytes.to_vec()).unwrap()

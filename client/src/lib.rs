@@ -8,6 +8,7 @@ pub mod origo;
 
 pub mod config;
 pub mod errors;
+mod tls;
 
 use serde::Serialize;
 pub use tlsn_core::proof::TlsProof;
@@ -34,7 +35,7 @@ pub async fn prover_inner(config: config::Config) -> Result<Proof, errors::Clien
 }
 
 pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
-  let root_store = tlsn::default_root_store();
+  let root_store = crate::tls::tls_client_default_root_store();
 
   let prover_config = ProverConfig::builder()
     .id(config.session_id())
@@ -60,7 +61,7 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, erro
 
 pub async fn prover_inner_origo(config: config::Config) -> Result<Proof, errors::ClientErrors> {
   #[cfg(target_arch = "wasm32")]
-  todo!("todo");
+  return origo_wasm32::proxy_and_sign(config).await;
 
   #[cfg(not(target_arch = "wasm32"))]
   return origo_native::proxy_and_sign(config).await;
