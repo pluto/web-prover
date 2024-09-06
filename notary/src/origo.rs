@@ -133,6 +133,20 @@ pub async fn sign(
   Json(response)
 }
 
+use nom::{bytes::streaming::take, Err, IResult};
+
+/// Due to a bug in the tls_parser, we must override.
+/// See: https://github.com/rusticata/tls-parser/issues/72
+fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
+  let (i, hdr) = tls_parser::parse_tls_record_header(i).unwrap();
+  if hdr.len > (2 << 14) + 256 {
+    panic!("oversized payload");
+  }
+
+  let (i, data) = take(hdr.len as usize)(i)?;
+  Ok((i, tls_parser::TlsRawRecord { hdr, data }))
+}
+
 fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
   let server_aes_key = BASE64_STANDARD.decode(payload.server_aes_key).unwrap();
   let server_aes_iv = BASE64_STANDARD.decode(payload.server_aes_iv).unwrap();
@@ -141,16 +155,13 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
   let mut messages: Vec<Message> = vec![];
 
   let mut seq = 0;
-
-  // TODO seq < 10 is not really a solution but works
-  while cursor.position() < bytes.len() as u64 && seq < 10 {
-    match tls_parser::parse_tls_raw_record(&cursor.get_ref()[cursor.position() as usize..]) {
+  while cursor.position() < bytes.len() as u64 {
+    match local_parse_record(&cursor.get_ref()[cursor.position() as usize..]) {
       Ok((_, record)) => {
         trace!("TLS record type: {}", record.hdr.record_type);
 
         // NOTE:
-        // The first 3 messages are typically
-        // handshake, handshake, changecipherspec
+        // The first 3 messages are typically: handshake, handshake, changecipherspec
         //
         // These are plaintext. The first encrypted message is an extension from the server
         // which is labeled application data, like all subsequent encrypted messages in TLS1.3
@@ -177,7 +188,9 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
               }
             },
             Err(_) => {
-              // ignore
+              // This occurs once we pass the handshake records, we will no longer
+              // have the correct keys to decrypt. We want to continue logging the ciphertext.
+              trace!("Unable to decrypt record. Skipping.");
             },
           }
 
@@ -187,8 +200,14 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
         // 5 is the record header length
         cursor.set_position(cursor.position() + 5 + record.hdr.len as u64);
       },
-      Err(_) => {
-        // ignore
+      Err(e) => {
+        let remaining = &cursor.get_ref().len() - (cursor.position() as usize);
+        panic!(
+          "Unable to parse record! position={}, remaining={}, e={}, ",
+          cursor.position(),
+          remaining,
+          e
+        );
       },
     }
   }
