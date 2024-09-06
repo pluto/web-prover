@@ -153,39 +153,27 @@ async fn listen(
   let tls_acceptor = TlsAcceptor::from(Arc::new(server_config));
 
   loop {
-    info!("main1");
     let (tcp_stream, _) = listener.accept().await.unwrap();
     let tls_acceptor = tls_acceptor.clone();
     let tower_service = router.clone();
     let protocol = protocol.clone();
-    info!("main2");
 
     tokio::spawn(async move {
-      info!("main3");
       match tls_acceptor.accept(tcp_stream).await {
         Ok(tls_stream) => {
-          info!("main4");
           let io = TokioIo::new(tls_stream);
           let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
-            info!("main5");
-            let x = tower_service.clone().call(request);
-            info!("main5a");
-            x
+            tower_service.clone().call(request)
           });
-          info!("main5b");
           // TODO should we check returned Result here?
           let _ = protocol.serve_connection(io, hyper_service).with_upgrades().await;
-          info!("main7");
         },
         Err(err) => {
           error!("{err:#}"); // TODO format this better
         },
       }
     });
-    info!("main8");
   }
-
-  info!("exit loop");
 }
 
 fn load_certs(filename: &str) -> io::Result<Vec<CertificateDer<'static>>> {

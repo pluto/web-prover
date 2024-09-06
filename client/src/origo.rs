@@ -15,7 +15,6 @@ pub async fn prover_inner_origo(mut config: config::Config) -> Result<Proof, err
   let (server_aes_key, server_aes_iv) =
     prover_inner_proxy(config.clone(), session_id.clone()).await;
 
-  // return Ok(Proof::Origo(OrigoProof {}));
   prover_inner_sign(config.clone(), session_id.clone(), server_aes_key, server_aes_iv).await
 }
 
@@ -103,15 +102,14 @@ async fn prover_inner_proxy(config: config::Config, session_id: String) -> (Vec<
   let (mut request_sender, connection) =
     hyper::client::conn::http1::handshake(client_tls_conn).await.unwrap();
 
-  // let (connection_sender, connection_receiver) = oneshot::channel();
-  // let connection_fut = connection.without_shutdown();
-  // let handled_connection_fut = async {
-  //   let result = connection_fut.await;
-  //   // debug!("connection_sender.send({:?})", result);
-  //   let _ = connection_sender.send(result);
-  // };
-  // tokio::spawn(handled_connection_fut);
-  tokio::spawn(connection);
+  let (connection_sender, connection_receiver) = oneshot::channel();
+  let connection_fut = connection.without_shutdown();
+  let handled_connection_fut = async {
+    let result = connection_fut.await;
+    // debug!("connection_sender.send({:?})", result);
+    let _ = connection_sender.send(result);
+  };
+  tokio::spawn(handled_connection_fut);
 
   let response = request_sender.send_request(config.to_request()).await.unwrap();
 
@@ -121,10 +119,9 @@ async fn prover_inner_proxy(config: config::Config, session_id: String) -> (Vec<
   debug!("Response: {:?}", payload);
 
   // Close the connection to the server
-
-  // let mut client_socket =
-  // connection_receiver.await.unwrap().unwrap().io.into_inner().into_inner(); client_socket.
-  // close().await.unwrap();
+  // TODO this closes the TLS Connection, do we want to maybe close the TCP stream instead?
+  let mut client_socket = connection_receiver.await.unwrap().unwrap().io.into_inner().into_inner();
+  client_socket.close().await.unwrap();
 
   let server_aes_iv =
     origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_iv").unwrap().clone();
@@ -140,68 +137,16 @@ async fn prover_inner_sign(
   server_aes_key: Vec<u8>,
   server_aes_iv: Vec<u8>,
 ) -> Result<Proof, errors::ClientErrors> {
-  // call sign endpoint
-  debug!("call sign endpoint");
-
-  // let client_notary_config = rustls::ClientConfig::builder()
-  //   .with_safe_defaults()
-  //   .with_root_certificates(crate::prover::default_root_store())
-  //   .with_no_client_auth();
-
-  // let notary_connector =
-  //   tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));
-
-  // let notary_socket =
-  //   tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port.clone()))
-  //     .await
-  //     .unwrap();
-
-  // debug!("1");
-
-  // let notary_tls_socket = notary_connector
-  //   .connect(rustls::ServerName::try_from(config.notary_host.as_str()).unwrap(), notary_socket)
-  //   .await
-  //   .unwrap();
-
-  // debug!("2");
-  // let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
-
-  // debug!("3");
-  // let (mut request_sender, connection) =
-  //   hyper::client::conn::http1::handshake(notary_tls_socket).await.unwrap();
-  // let _ = tokio::spawn(connection);
-
-  debug!("4");
   #[derive(Serialize)]
   struct SignBody {
     server_aes_iv:  String,
     server_aes_key: String,
   }
 
-  debug!("5");
-
   let sb = SignBody {
     server_aes_iv:  String::from_utf8(server_aes_iv.to_vec()).unwrap(),
     server_aes_key: String::from_utf8(server_aes_key.to_vec()).unwrap(),
   };
-
-  debug!("7");
-
-  // let request: Request<Full<Bytes>> = hyper::Request::builder()
-  //   .uri(format!(
-  //     "https://{}:{}/v1/origo/sign?session_id={}",
-  //     config.notary_host.clone(),
-  //     config.notary_port.clone(),
-  //     session_id.clone(),
-  //   ))
-  //   .method("POST")
-  //   .header("Host", config.notary_host.clone())
-  //   .header("Content-type", "application/json")
-  //   .header("Connection", "close")
-  //   .body(http_body_util::Full::from(serde_json::to_string(&sb).unwrap()))
-  //   .unwrap();
-
-  debug!("8");
 
   let url = format!(
     "https://{}:{}/v1/origo/sign?session_id={}",
@@ -210,27 +155,19 @@ async fn prover_inner_sign(
     session_id.clone(),
   );
 
-  let foo: Vec<u8> = Default::default();
+  let client = reqwest::ClientBuilder::new().build().unwrap();
 
   #[cfg(feature = "notary_ca_cert")]
-  let foo = NOTARY_CA_CERT.to_vec();
-
-  let cert = reqwest::tls::Certificate::from_der(&foo).unwrap();
-
-  let client = reqwest::ClientBuilder::new().add_root_certificate(cert).build().unwrap();
+  let client = reqwest::ClientBuilder::new()
+    .add_root_certificate(reqwest::tls::Certificate::from_der(&NOTARY_CA_CERT.to_vec()).unwrap())
+    .build()
+    .unwrap();
 
   let response = client.post(url).json(&sb).send().await.unwrap();
-
-  // let response = request_sender.send_request(request).await.unwrap();
   assert!(response.status() == hyper::StatusCode::OK);
 
-  debug!("9");
+  // TODO remove debug log line
   println!("\n{}\n\n", String::from_utf8(response.bytes().await.unwrap().to_vec()).unwrap());
-
-  // let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
-  // println!("\n{}\n\n", String::from_utf8(body_bytes.to_vec()).unwrap());
-
-  debug!("10");
 
   Ok(Proof::Origo(OrigoProof {})) // TODO
 }
