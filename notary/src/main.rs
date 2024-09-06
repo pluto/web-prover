@@ -25,7 +25,7 @@ use tokio_rustls::{LazyConfigAcceptor, TlsAcceptor};
 use tokio_stream::StreamExt;
 use tower_http::cors::CorsLayer;
 use tower_service::Service;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod axum_websocket;

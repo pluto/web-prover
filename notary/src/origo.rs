@@ -58,14 +58,8 @@ pub async fn sign(
   extract::Json(payload): extract::Json<SignBody>,
 ) -> Json<SignReply> {
   let session = state.origo_sessions.lock().unwrap().get(&query.session_id).unwrap().clone();
-
   let messages = extract_tls_handshake(&session.request, payload);
-
   for msg in messages {
-    // TODO remove:
-    // logs: https://gist.github.com/mattes/2cebefa32ed9d992ace4831cb6542d72
-    // println!("{:?}", msg.payload);
-
     match msg.payload {
       MessagePayload::Handshake(handshake) => match handshake.payload {
         HandshakePayload::Certificate(certificate_payload) => {
@@ -147,7 +141,9 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
   let mut messages: Vec<Message> = vec![];
 
   let mut seq = 0;
-  while cursor.position() < bytes.len() as u64 {
+
+  // TODO seq < 10 is not really a solution but works
+  while cursor.position() < bytes.len() as u64 && seq < 10 {
     match tls_parser::parse_tls_raw_record(&cursor.get_ref()[cursor.position() as usize..]) {
       Ok((_, record)) => {
         trace!("TLS record type: {}", record.hdr.record_type);
@@ -215,7 +211,7 @@ pub async fn proxy(
 ) -> Response {
   let session_id = query.session_id.clone();
 
-  debug!("Starting notarize with ID: {}", session_id);
+  info!("Starting notarize with ID: {}", session_id);
 
   match protocol_upgrade {
     ProtocolUpgrade::Ws(ws) => ws.on_upgrade(move |socket| {
@@ -270,7 +266,7 @@ pub async fn tcp_notarize(
   }
 }
 
-pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
+pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   socket: S,
   session_id: &str,
   target_host: &str,
@@ -291,45 +287,42 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   let request_buf = Arc::new(Mutex::new(vec![0u8; 0]));
 
   let client_to_server = async {
-    let mut buf = [0; 8192];
+    let mut buf = [0u8; 8192];
     loop {
-      let n = socket_read.read(&mut buf).await?;
-      if n == 0 {
-        break; // Client closed the connection
+      match socket_read.read(&mut buf).await {
+        Ok(0) => break,
+        Ok(n) => {
+          tcp_write.write_all(&buf[..n]).await?;
+          let mut buffer = request_buf.lock().unwrap();
+          buffer.extend_from_slice(&buf[..n]);
+        },
+        Err(e) => return Err(e),
       }
-      debug!("write to client len={}, data={}", n, hex::encode(&buf[..n]));
-      request_buf.lock().unwrap().extend_from_slice(&buf[..n]);
-      tcp_write.write_all(&buf[..n]).await?;
     }
-    Ok::<(), tokio::io::Error>(())
+    tcp_write.shutdown().await.unwrap();
+    Ok(())
   };
 
   let server_to_client = async {
-    let mut buf = [0; 8192];
+    let mut buf = [0u8; 8192];
     loop {
-      let n = tcp_read.read(&mut buf).await?;
-      if n == 0 {
-        break; // Server closed the connection
+      match tcp_read.read(&mut buf).await {
+        Ok(0) => break,
+        Ok(n) => {
+          socket_write.write_all(&buf[..n]).await?;
+          let mut buffer = request_buf.lock().unwrap();
+          buffer.extend_from_slice(&buf[..n]);
+        },
+        Err(e) => return Err(e),
       }
-      debug!("write to server len={}, data={}", n, hex::encode(&buf[..n]));
-      // Write the mirrored data into the response buffer
-      request_buf.lock().unwrap().extend_from_slice(&buf[..n]);
-      // Send the data to the client
-      socket_write.write_all(&buf[..n]).await?;
     }
-    Err::<(), tokio::io::Error>(tokio::io::Error::new(
-      tokio::io::ErrorKind::Other,
-      "server closed before client",
-    ))
+    socket_write.shutdown().await.unwrap();
+    Ok(())
   };
 
-  debug!("wait try_join");
-  match tokio::try_join!(client_to_server, server_to_client) {
-    Ok((a, b)) => {},
-    Err(e) => {
-      println!("{:?}", e);
-    },
-  }
+  use futures::{future::select, pin_mut};
+  pin_mut!(client_to_server, server_to_client);
+  let _ = select(client_to_server, server_to_client).await.factor_first().0;
 
   state.origo_sessions.lock().unwrap().insert(session_id.to_string(), OrigoSession {
     // TODO currently request is both, request and response. will this become a problem?
