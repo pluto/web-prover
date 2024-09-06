@@ -32,7 +32,7 @@ start();
 
 // Config for local development
 const proof = await prover({
-  mode: "TLSN",
+  mode: "Origo",
   notary_host: "localhost",
   notary_port: 7443,
   target_method: "GET",
@@ -40,10 +40,23 @@ const proof = await prover({
     "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json", // "https://localhost:8085/health",
   target_headers: {},
   target_body: "",
-  websocket_proxy_url: "wss://localhost:7443/v1/tlsnotary/websocket_proxy",
   max_sent_data: 10000,
   max_recv_data: 10000,
 });
+
+// const proof = await prover({
+//   mode: "TLSN",
+//   notary_host: "localhost",
+//   notary_port: 7443,
+//   target_method: "GET",
+//   target_url:
+//     "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json", // "https://localhost:8085/health",
+//   target_headers: {},
+//   target_body: "",
+//   websocket_proxy_url: "wss://localhost:7443/v1/tlsnotary/websocket_proxy",
+//   max_sent_data: 10000,
+//   max_recv_data: 10000,
+// });
 
 // Config using notary.pluto.dev
 // const proof = await prover({
@@ -70,6 +83,6 @@ const pubkey =
   "cRzMG5kaTeHGoSzDu6cFqx3uEWYpFGo6C0EOUgf+mEgbktLrXocv5yHzKg==\n" +
   "-----END PUBLIC KEY-----\n";
 
-const verifyResult = JSON.parse(await verify(proof, pubkey));
+// const verifyResult = JSON.parse(await verify(proof, pubkey));
 
-console.log(verifyResult);
+// console.log(verifyResult);
