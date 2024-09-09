@@ -11,7 +11,8 @@ struct Output {
 #[no_mangle]
 #[allow(clippy::missing_safety_doc)]
 pub unsafe extern "C" fn setup_tracing() {
-  let collector = tracing_subscriber::fmt().with_max_level(tracing::Level::TRACE).finish();
+  let collector =
+    tracing_subscriber::fmt().with_ansi(false).with_max_level(tracing::Level::TRACE).finish();
   tracing::subscriber::set_global_default(collector).map_err(|e| panic!("{e:?}")).unwrap();
 }
 
