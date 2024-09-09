@@ -4,16 +4,18 @@ use std::{
   time::SystemTime,
 };
 
+use alloy_primitives::{utils::keccak256, Keccak256};
 use axum::{
   extract::{self, Query, State},
   response::Response,
   Json,
 };
 use base64::{prelude::BASE64_STANDARD, Engine};
+use hex;
 use hyper::{ext, upgrade::Upgraded};
 use hyper_util::rt::TokioIo;
 use p256::ecdsa::{signature::SignerMut, Signature};
-use rustls::crypto::verify_tls13_signature;
+use rs_merkle::{Hasher, MerkleTree};
 use serde::{Deserialize, Serialize};
 use tls_client2::{
   hash_hs::{HandshakeHash, HandshakeHashBuffer},
@@ -59,7 +61,13 @@ pub struct SignQuery {
 
 #[derive(Serialize)]
 pub struct SignReply {
-  signature: String,
+  merkle_root: String,
+  leaves:      Vec<String>,
+  signature:   String,
+  signature_r: String,
+  signature_s: String,
+  signature_v: u8,
+  signer:      String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -158,22 +166,64 @@ pub async fn sign(
     }
   }
 
-  // TODO verify signature for handshake
+  // TODO verify signature for handshake, don't return if verification fails
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
 
-  // TODO create merkletree and sign it (let's discuss)
+  let leaves: Vec<String> = vec!["request".to_string(), "response".to_string()]; // TODO
 
-  // TODO sign something useful and return signature back to calling client
-  let signature: Signature = state.notary_signing_key.clone().sign(&[1, 2, 3]); // TODO what do you want to sign?
-  let signature_raw = hex::encode(signature.to_der().as_bytes());
+  let leaf_hashes: Vec<[u8; 32]> =
+    leaves.iter().map(|leaf| KeccakHasher::hash(leaf.as_bytes())).collect();
 
-  let response = SignReply { signature: signature_raw };
+  let merkle_tree = MerkleTree::<KeccakHasher>::from_leaves(&leaf_hashes);
+  let merkle_root = merkle_tree.root().unwrap();
+
+  // need secp256k1 here for Solidity
+  let (signature, recover_id) =
+    state.origo_signing_key.clone().sign_prehash_recoverable(&merkle_root).unwrap();
+
+  let signer_address =
+    alloy_primitives::Address::from_public_key(state.origo_signing_key.verifying_key());
+
+  let verifying_key =
+    k256::ecdsa::VerifyingKey::recover_from_prehash(&merkle_root.clone(), &signature, recover_id)
+      .unwrap();
+
+  assert_eq!(state.origo_signing_key.verifying_key(), &verifying_key);
+
+  // TODO is this right? we need lower form S for sure though
+  let s = if signature.normalize_s().is_some() {
+    hex::encode(signature.normalize_s().unwrap().to_bytes())
+  } else {
+    hex::encode(signature.s().to_bytes())
+  };
+
+  let response = SignReply {
+    merkle_root: "0x".to_string() + &hex::encode(merkle_root),
+    leaves,
+    signature: "0x".to_string() + &hex::encode(signature.to_der().as_bytes()),
+    signature_r: "0x".to_string() + &hex::encode(signature.r().to_bytes()),
+    signature_s: "0x".to_string() + &s,
+
+    // the good old +27
+    // https://docs.openzeppelin.com/contracts/4.x/api/utils#ECDSA-tryRecover-bytes32-bytes-
+    signature_v: recover_id.to_byte() + 27,
+    signer: "0x".to_string() + &hex::encode(signer_address),
+  };
 
   Json(response)
 }
 
-use nom::{bytes::streaming::take, Err, IResult};
+#[derive(Clone)]
+struct KeccakHasher;
+
+impl Hasher for KeccakHasher {
+  type Hash = [u8; 32];
+
+  fn hash(data: &[u8]) -> Self::Hash { keccak256(data).into() }
+}
+
+use nom::{bytes::streaming::take, Err, HexDisplay, IResult};
 
 /// Due to a bug in the tls_parser, we must override.
 /// See: https://github.com/rusticata/tls-parser/issues/72
