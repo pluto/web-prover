@@ -49,6 +49,10 @@ pub struct SignReply {
   merkle_root: String,
   leaves:      Vec<String>,
   signature:   String,
+  signature_r: String,
+  signature_s: String,
+  signature_v: String,
+  signer:      String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -136,23 +140,24 @@ pub async fn sign(
   let merkle_root = merkle_tree.root().unwrap();
 
   // need secp256k1 here for Solidity
-  let signature: k256::ecdsa::Signature = state.origo_signing_key.clone().sign(&merkle_root);
+  let (signature, recover_id) =
+    state.origo_signing_key.clone().sign_prehash_recoverable(&merkle_root).unwrap();
 
-  // signature.r()
-  // signature.s()
-  // TODO signature recover id?
-
-  // let public_key_bytes = state.origo_signing_key.clone()
-  // .to_encoded_point(false).as_bytes().to_vec();
+  // create signer address from verifying key
   let pubkey = k256::ecdsa::VerifyingKey::from(&state.origo_signing_key.clone());
-  let pubkey_bytes = pubkey.to_encoded_point(false).as_bytes();
-  let pubkey_hash = keccak256(&pubkey_bytes[1..]);
-  let signer_address = &pubkey_hash[12..];
+  let point = pubkey.to_encoded_point(false);
+  let pubkey_bytes = point.as_bytes();
+  let pubkey_hash = keccak256(&pubkey_bytes[1..]); // skip the first byte (0x04 for uncompressed)
+  let signer_address = &pubkey_hash[12..]; // last 20 bytes of the 32-byte Keccak256 hash
 
   let response = SignReply {
     merkle_root: hex::encode(merkle_root),
     leaves,
     signature: hex::encode(signature.to_der().as_bytes()),
+    signature_r: hex::encode(signature.r().to_bytes()),
+    signature_s: hex::encode(signature.s().to_bytes()),
+    signature_v: hex::encode([recover_id.to_byte()]),
+    signer: hex::encode(signer_address),
   };
 
   Json(response)
