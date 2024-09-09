@@ -51,7 +51,7 @@ pub struct SignReply {
   signature:   String,
   signature_r: String,
   signature_s: String,
-  signature_v: String,
+  signature_v: u8,
   signer:      String,
 }
 
@@ -143,21 +143,33 @@ pub async fn sign(
   let (signature, recover_id) =
     state.origo_signing_key.clone().sign_prehash_recoverable(&merkle_root).unwrap();
 
-  // create signer address from verifying key
-  let pubkey = k256::ecdsa::VerifyingKey::from(&state.origo_signing_key.clone());
-  let point = pubkey.to_encoded_point(false);
-  let pubkey_bytes = point.as_bytes();
-  let pubkey_hash = keccak256(&pubkey_bytes[1..]); // skip the first byte (0x04 for uncompressed)
-  let signer_address = &pubkey_hash[12..]; // last 20 bytes of the 32-byte Keccak256 hash
+  let signer_address =
+    alloy_primitives::Address::from_public_key(state.origo_signing_key.verifying_key());
+
+  let verifying_key =
+    k256::ecdsa::VerifyingKey::recover_from_prehash(&merkle_root.clone(), &signature, recover_id)
+      .unwrap();
+
+  assert_eq!(state.origo_signing_key.verifying_key(), &verifying_key);
+
+  // TODO is this right? we need lower form S for sure though
+  let s = if signature.normalize_s().is_some() {
+    hex::encode(signature.normalize_s().unwrap().to_bytes())
+  } else {
+    hex::encode(signature.s().to_bytes())
+  };
 
   let response = SignReply {
-    merkle_root: hex::encode(merkle_root),
+    merkle_root: "0x".to_string() + &hex::encode(merkle_root),
     leaves,
-    signature: hex::encode(signature.to_der().as_bytes()),
-    signature_r: hex::encode(signature.r().to_bytes()),
-    signature_s: hex::encode(signature.s().to_bytes()),
-    signature_v: hex::encode([recover_id.to_byte()]),
-    signer: hex::encode(signer_address),
+    signature: "0x".to_string() + &hex::encode(signature.to_der().as_bytes()),
+    signature_r: "0x".to_string() + &hex::encode(signature.r().to_bytes()),
+    signature_s: "0x".to_string() + &s,
+
+    // the good old +27
+    // https://docs.openzeppelin.com/contracts/4.x/api/utils#ECDSA-tryRecover-bytes32-bytes-
+    signature_v: recover_id.to_byte() + 27,
+    signer: "0x".to_string() + &hex::encode(signer_address),
   };
 
   Json(response)
@@ -172,7 +184,7 @@ impl Hasher for KeccakHasher {
   fn hash(data: &[u8]) -> Self::Hash { keccak256(data).into() }
 }
 
-use nom::{bytes::streaming::take, Err, IResult};
+use nom::{bytes::streaming::take, Err, HexDisplay, IResult};
 
 /// Due to a bug in the tls_parser, we must override.
 /// See: https://github.com/rusticata/tls-parser/issues/72
