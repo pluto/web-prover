@@ -4,15 +4,18 @@ use std::{
   time::SystemTime,
 };
 
+use alloy_primitives::{utils::keccak256, Keccak256};
 use axum::{
   extract::{self, Query, State},
   response::Response,
   Json,
 };
 use base64::{prelude::BASE64_STANDARD, Engine};
+use hex;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use p256::ecdsa::{signature::SignerMut, Signature};
+use rs_merkle::{Hasher, MerkleTree};
 use serde::{Deserialize, Serialize};
 use tls_client2::{
   internal::msgs::hsjoiner::HandshakeJoiner,
@@ -43,7 +46,9 @@ pub struct SignQuery {
 
 #[derive(Serialize)]
 pub struct SignReply {
-  signature: String,
+  merkle_root: String,
+  leaves:      Vec<String>,
+  signature:   String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -118,19 +123,48 @@ pub async fn sign(
     }
   }
 
-  // TODO verify signature for handshake
+  // TODO verify signature for handshake, don't return if verification fails
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
 
-  // TODO create merkletree and sign it (let's discuss)
+  let leaves: Vec<String> = vec!["request".to_string(), "response".to_string()]; // TODO
 
-  // TODO sign something useful and return signature back to calling client
-  let signature: Signature = state.notary_signing_key.clone().sign(&[1, 2, 3]); // TODO what do you want to sign?
-  let signature_raw = hex::encode(signature.to_der().as_bytes());
+  let leaf_hashes: Vec<[u8; 32]> =
+    leaves.iter().map(|leaf| KeccakHasher::hash(leaf.as_bytes())).collect();
 
-  let response = SignReply { signature: signature_raw };
+  let merkle_tree = MerkleTree::<KeccakHasher>::from_leaves(&leaf_hashes);
+  let merkle_root = merkle_tree.root().unwrap();
+
+  // need secp256k1 here for Solidity
+  let signature: k256::ecdsa::Signature = state.origo_signing_key.clone().sign(&merkle_root);
+
+  // signature.r()
+  // signature.s()
+  // TODO signature recover id?
+
+  // let public_key_bytes = state.origo_signing_key.clone()
+  // .to_encoded_point(false).as_bytes().to_vec();
+  let pubkey = k256::ecdsa::VerifyingKey::from(&state.origo_signing_key.clone());
+  let pubkey_bytes = pubkey.to_encoded_point(false).as_bytes();
+  let pubkey_hash = keccak256(&pubkey_bytes[1..]);
+  let signer_address = &pubkey_hash[12..];
+
+  let response = SignReply {
+    merkle_root: hex::encode(merkle_root),
+    leaves,
+    signature: hex::encode(signature.to_der().as_bytes()),
+  };
 
   Json(response)
+}
+
+#[derive(Clone)]
+struct KeccakHasher;
+
+impl Hasher for KeccakHasher {
+  type Hash = [u8; 32];
+
+  fn hash(data: &[u8]) -> Self::Hash { keccak256(data).into() }
 }
 
 use nom::{bytes::streaming::take, Err, IResult};

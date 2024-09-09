@@ -16,6 +16,7 @@ pub struct Config {
   pub server_key:         String,
   pub listen:             String,
   pub notary_signing_key: String,
+  pub origo_signing_key:  String,
 
   pub tlsn_max_sent_data: usize,
   pub tlsn_max_recv_data: usize,

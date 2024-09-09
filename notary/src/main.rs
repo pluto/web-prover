@@ -1,6 +1,7 @@
 use std::{
   collections::HashMap,
-  fs, io,
+  fs,
+  io::{self, Read},
   sync::{Arc, Mutex},
   time::SystemTime,
 };
@@ -14,6 +15,7 @@ use axum::{
 };
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
+use k256::ecdsa::SigningKey as Secp256k1SigningKey;
 use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
 use rustls::{
   pki_types::{CertificateDer, PrivateKeyDer},
@@ -38,6 +40,7 @@ mod websocket_proxy;
 #[derive(Debug, Clone)]
 struct SharedState {
   notary_signing_key: SigningKey,
+  origo_signing_key:  Secp256k1SigningKey,
   tlsn_max_sent_data: usize,
   tlsn_max_recv_data: usize,
   origo_sessions:     Arc<Mutex<HashMap<String, OrigoSession>>>,
@@ -65,6 +68,7 @@ async fn main() {
 
   let shared_state = Arc::new(SharedState {
     notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
+    origo_signing_key:  load_origo_signing_key(&c.origo_signing_key),
     tlsn_max_sent_data: c.tlsn_max_sent_data,
     tlsn_max_recv_data: c.tlsn_max_recv_data,
     origo_sessions:     Default::default(),
@@ -194,4 +198,9 @@ fn error(err: String) -> io::Error { io::Error::new(io::ErrorKind::Other, err) }
 
 pub fn load_notary_signing_key(private_key_pem_path: &str) -> SigningKey {
   SigningKey::read_pkcs8_pem_file(private_key_pem_path).unwrap()
+}
+
+pub fn load_origo_signing_key(private_key_pem_path: &str) -> Secp256k1SigningKey {
+  let raw = fs::read_to_string(private_key_pem_path).unwrap();
+  Secp256k1SigningKey::from_pkcs8_pem(&raw).unwrap()
 }
