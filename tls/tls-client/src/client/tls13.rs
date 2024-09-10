@@ -308,7 +308,6 @@ impl State<ClientConnectionData> for ExpectEncryptedExtensions {
             HandshakeType::EncryptedExtensions,
             HandshakePayload::EncryptedExtensions
         )?;
-        debug!("TLS1.3 encrypted extensions: {:?}", exts);
         self.transcript.add_message(&m);
 
         validate_encrypted_extensions(cx.common, &self.hello, exts).await?;
@@ -628,7 +627,7 @@ impl State<ClientConnectionData> for ExpectCertificateVerify {
 
         // 2. Verify their signature on the handshake.
         let handshake_hash = self.transcript.get_current_hash();
-        println!(
+        debug!(
             "*** transcript hash h7 candidate: {:?}",
             BASE64_STANDARD.encode(self.transcript.get_current_hash().as_ref())
         );
@@ -644,7 +643,7 @@ impl State<ClientConnectionData> for ExpectCertificateVerify {
         cx.common.peer_certificates = Some(self.server_cert.cert_chain().to_vec());
         self.transcript.add_message(&m);
         let h7 = self.transcript.get_current_hash().as_ref().to_vec();
-        println!(
+        debug!(
             "*** transcript hash h7 candidate: {:?}",
             BASE64_STANDARD.encode(&h7)
         );

@@ -4,7 +4,7 @@ use std::{
   time::SystemTime,
 };
 
-use alloy_primitives::{utils::keccak256, Keccak256};
+use alloy_primitives::utils::keccak256;
 use axum::{
   extract::{self, Query, State},
   response::Response,
@@ -12,13 +12,13 @@ use axum::{
 };
 use base64::{prelude::BASE64_STANDARD, Engine};
 use hex;
-use hyper::{ext, upgrade::Upgraded};
+use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
-use p256::ecdsa::{signature::SignerMut, Signature};
+use nom::{bytes::streaming::take, IResult};
 use rs_merkle::{Hasher, MerkleTree};
 use serde::{Deserialize, Serialize};
 use tls_client2::{
-  hash_hs::{HandshakeHash, HandshakeHashBuffer},
+  hash_hs::HandshakeHashBuffer,
   internal::msgs::hsjoiner::HandshakeJoiner,
   tls_core::{
     msgs::{
@@ -35,11 +35,7 @@ use tls_client2::{
   },
   Certificate, CipherSuite,
 };
-use tls_parser::{
-  parse_tls_client_hello_extensions, parse_tls_extensions, parse_tls_message_handshake,
-  parse_tls_plaintext, parse_tls_record_with_header, parse_tls_server_hello_extensions,
-  ClientHello, TlsMessage, TlsMessageHandshake,
-};
+use tls_parser::{parse_tls_message_handshake, ClientHello, TlsMessage, TlsMessageHandshake};
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
   net::TcpStream,
@@ -80,10 +76,11 @@ pub async fn sign(
   query: Query<SignQuery>,
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<SignBody>,
-) -> Json<SignReply> {
+) -> Result<Json<SignReply>, String> {
   let session = state.origo_sessions.lock().unwrap().get(&query.session_id).unwrap().clone();
   let messages = extract_tls_handshake(&session.request, payload);
   let handshake_hash_buffer = HandshakeHashBuffer::new();
+  // TODO: get hash algorithm from cipher suite in a better way
   let mut transcript =
     handshake_hash_buffer.start_hash(&tls_client2::tls_core::suites::HashAlgorithm::SHA256);
   let mut server_certificate: Certificate = Certificate(vec![]);
@@ -91,47 +88,42 @@ pub async fn sign(
   for msg in messages {
     match msg.payload {
       MessagePayload::Handshake(ref handshake) => match handshake.payload {
-        HandshakePayload::ClientHello(ref client_hello_payload) => {
-          println!("Client Hello");
+        HandshakePayload::ClientHello(_) => {
+          debug!("ClientHello");
           transcript.add_message(&msg);
         },
-        HandshakePayload::ServerHello(ref server_hello_payload) => {
-          println!("Server Hello");
-          // TODO: get hash algorithm from cipher suite in a better way
+        HandshakePayload::ServerHello(_) => {
+          debug!("ServerHello");
           transcript.add_message(&msg);
         },
-        HandshakePayload::Certificate(ref certificate_payload) => {
-          // TODO vector of certificates (cert chain)
+        HandshakePayload::Certificate(_) => {
           // TODO for some reason this is not hit, but CertificateTLS13 is hit
-          println!("Certificate");
+          debug!("Certificate");
         },
         HandshakePayload::CertificateTLS13(ref certificate_payload) => {
-          // TODO vector of certificates (cert chain)
-          println!("CertificateTLS13: {}", certificate_payload.entries.len());
+          debug!("CertificateTLS13: {}", certificate_payload.entries.len());
           transcript.add_message(&msg);
           server_certificate = certificate_payload.entries[0].cert.clone();
         },
         HandshakePayload::CertificateVerify(ref digitally_signed_struct) => {
-          // TODO signed certificate chain, verify signature
-          println!(
-            "CertificateVerify: {:?}, {:?}",
-            digitally_signed_struct.scheme, digitally_signed_struct.sig
-          );
-          let sig_verified = verify_tls13(
+          debug!("CertificateVerify");
+
+          // send error back to client if signature verification fails
+          match verify_tls13(
             &construct_tls13_server_verify_message(&transcript.get_current_hash()),
             &server_certificate,
             &digitally_signed_struct,
-          );
-
-          println!("server cert sig verified: {:?}", sig_verified);
+          ) {
+            Ok(_) => (),
+            Err(e) => return Err(String::from("invalid certificate signature")),
+          };
         },
-        HandshakePayload::EncryptedExtensions(ref encrypted_extensions) => {
-          // TODO can probably ignore
-          println!("EncryptedExtensions");
+        HandshakePayload::EncryptedExtensions(_) => {
+          debug!("EncryptedExtensions");
+          transcript.add_message(&msg);
         },
-        // HandshakePayload::KeyUpdate(_) => todo!(),
-        HandshakePayload::Finished(ref finished_payload) => {
-          println!("Payload");
+        HandshakePayload::Finished(_) => {
+          debug!("Payload");
           // TODO what's the payload?
           // println!("Finished Payload:\n{}", String::from_utf8_lossy(&finished_payload.0))
 
@@ -142,7 +134,10 @@ pub async fn sign(
           // https://github.com/rustls/rustls/blob/8c04dba680d19d203a7eda1951ad596f5fc2ae59/rustls/src/client/tls13.rs#L1234
         },
 
-        // TODO auto completed branch arms, delete if not needed
+        // TODO: some of these (CertificateRequest, HelloRetryRequest) are not considered in happy
+        // path, handle later
+
+        // HandshakePayload::KeyUpdate(_) => todo!(),
         // HandshakePayload::ServerHelloDone => todo!(),
         // HandshakePayload::EndOfEarlyData => todo!(),
         // HandshakePayload::ClientKeyExchange(_) => todo!(),
@@ -166,7 +161,6 @@ pub async fn sign(
     }
   }
 
-  // TODO verify signature for handshake, don't return if verification fails
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
 
@@ -211,7 +205,7 @@ pub async fn sign(
     signer: "0x".to_string() + &hex::encode(signer_address),
   };
 
-  Json(response)
+  Ok(Json(response))
 }
 
 #[derive(Clone)]
@@ -222,8 +216,6 @@ impl Hasher for KeccakHasher {
 
   fn hash(data: &[u8]) -> Self::Hash { keccak256(data).into() }
 }
-
-use nom::{bytes::streaming::take, Err, HexDisplay, IResult};
 
 /// Due to a bug in the tls_parser, we must override.
 /// See: https://github.com/rusticata/tls-parser/issues/72
@@ -261,7 +253,7 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
             Ok((_data, parse_tls_message)) => {
               match parse_tls_message {
                 TlsMessage::Handshake(TlsMessageHandshake::ClientHello(ch)) => {
-                  println!("Client Hello");
+                  println!("parsing ClientHello");
                   // TODO: write this better
                   let ch_random_bytes: [u8; 32] =
                     ch.random().try_into().expect("ch random bytes not of correct size");
@@ -279,11 +271,6 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
                   let compressions_methods: Vec<Compression> =
                     ch.comp().iter().map(|method| Compression::from(method.0)).collect();
 
-                  let (_, ch_extensions) = parse_tls_client_hello_extensions(
-                    ch.ext().expect("unable to get client hello extensions"),
-                  )
-                  .expect("unable to parse extensions");
-
                   let extension_byte: &[u8] =
                     ch.ext().expect("invalid client hello extension payload");
                   let mut extension_byte = extension_byte.to_vec();
@@ -293,8 +280,6 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
                   let mut r = Reader::init(&extension_byte);
                   let extensions = codec::read_vec_u16::<ClientExtension>(&mut r)
                     .expect("unable to read client extension payload");
-
-                  println!("extensions: {:?}", extensions);
 
                   let client_hello_message = Message {
                     version: tls_client2::ProtocolVersion::from(ch.version.0),
@@ -314,7 +299,7 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
                   messages.push(client_hello_message);
                 },
                 TlsMessage::Handshake(TlsMessageHandshake::ServerHello(sh)) => {
-                  println!("Server hello");
+                  println!("parsing ServerHello");
 
                   let sh_random_bytes: [u8; 32] =
                     sh.random.try_into().expect("ch random bytes not of correct size");
@@ -326,12 +311,6 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
                   let session_id = SessionID::read_bytes(&sh_session_id)
                     .expect("can't read session id from bytes");
 
-                  let (_, sh_extensions) = parse_tls_server_hello_extensions(
-                    sh.ext.expect("unable to get server hello extensions"),
-                  )
-                  .expect("unable to parse extensions");
-                  println!("sh_extensions: {:?}", sh_extensions);
-
                   let extension_byte: &[u8] =
                     sh.ext.expect("invalid server hello extension payload");
                   let mut extension_byte = extension_byte.to_vec();
@@ -341,7 +320,6 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
                   let mut r = Reader::init(&extension_byte);
                   let extensions = codec::read_vec_u16::<ServerExtension>(&mut r)
                     .expect("unable to read server extension payload");
-                  println!("extensions: {:?}", extensions);
 
                   let server_hello_message = Message {
                     version: tls_client2::ProtocolVersion::from(sh.version.0),
