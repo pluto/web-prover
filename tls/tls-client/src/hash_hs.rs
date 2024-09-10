@@ -14,7 +14,7 @@ use tls_core::{
 /// Before we know the hash algorithm to use to verify the handshake, we just buffer the messages.
 /// During the handshake, we may restart the transcript due to a HelloRetryRequest, reverting
 /// from the `HandshakeHash` to a `HandshakeHashBuffer` again.
-pub(crate) struct HandshakeHashBuffer {
+pub struct HandshakeHashBuffer {
     buffer: Vec<u8>,
     client_auth_enabled: bool,
 }
@@ -30,7 +30,7 @@ fn map_algorithm(algorithm: &'static HashAlgorithm) -> &'static digest::Algorith
 }
 
 impl HandshakeHashBuffer {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             buffer: Vec::new(),
             client_auth_enabled: false,
@@ -44,7 +44,7 @@ impl HandshakeHashBuffer {
     }
 
     /// Hash/buffer a handshake message.
-    pub(crate) fn add_message(&mut self, m: &Message) {
+    pub fn add_message(&mut self, m: &Message) {
         if let MessagePayload::Handshake(hs) = &m.payload {
             self.buffer.extend_from_slice(&hs.get_encoding());
         }
@@ -69,7 +69,7 @@ impl HandshakeHashBuffer {
     }
 
     /// We now know what hash function the verify_data will use.
-    pub(crate) fn start_hash(self, alg: &'static HashAlgorithm) -> HandshakeHash {
+    pub fn start_hash(self, alg: &'static HashAlgorithm) -> HandshakeHash {
         let mut ctx = digest::Context::new(map_algorithm(alg));
         ctx.update(&self.buffer);
         HandshakeHash {
@@ -89,7 +89,7 @@ impl HandshakeHashBuffer {
 ///
 /// For client auth, we also need to buffer all the messages.
 /// This is disabled in cases where client auth is not possible.
-pub(crate) struct HandshakeHash {
+pub struct HandshakeHash {
     /// None before we know what hash function we're using
     ctx: digest::Context,
 
@@ -105,7 +105,7 @@ impl HandshakeHash {
     }
 
     /// Hash/buffer a handshake message.
-    pub(crate) fn add_message(&mut self, m: &Message) -> &mut Self {
+    pub fn add_message(&mut self, m: &Message) -> &mut Self {
         if let MessagePayload::Handshake(hs) = &m.payload {
             let buf = hs.get_encoding();
             self.update_raw(&buf);
@@ -158,7 +158,7 @@ impl HandshakeHash {
     }
 
     /// Get the current hash value.
-    pub(crate) fn get_current_hash(&self) -> digest::Digest {
+    pub fn get_current_hash(&self) -> digest::Digest {
         self.ctx.clone().finish()
     }
 

@@ -26,7 +26,7 @@ async fn main() -> Result<()> {
     "trace" => Level::TRACE,
     _ => Level::TRACE,
   };
-  tracing_subscriber::fmt().with_max_level(log_level).init();
+  tracing_subscriber::fmt().with_max_level(log_level).with_line_number(true).init();
 
   let config_json = std::fs::read_to_string(args.config)?;
   let config: Config = serde_json::from_str(&config_json)?;

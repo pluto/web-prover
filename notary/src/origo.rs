@@ -4,7 +4,7 @@ use std::{
   time::SystemTime,
 };
 
-use alloy_primitives::{utils::keccak256, Keccak256};
+use alloy_primitives::utils::keccak256;
 use axum::{
   extract::{self, Query, State},
   response::Response,
@@ -14,17 +14,28 @@ use base64::{prelude::BASE64_STANDARD, Engine};
 use hex;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
-use p256::ecdsa::{signature::SignerMut, Signature};
+use nom::{bytes::streaming::take, IResult};
 use rs_merkle::{Hasher, MerkleTree};
 use serde::{Deserialize, Serialize};
 use tls_client2::{
+  hash_hs::HandshakeHashBuffer,
   internal::msgs::hsjoiner::HandshakeJoiner,
-  tls_core::msgs::{
-    base::Payload,
-    handshake::HandshakePayload,
-    message::{Message, MessagePayload, OpaqueMessage},
+  tls_core::{
+    msgs::{
+      base::Payload,
+      codec::{self, Codec, Reader},
+      enums::Compression,
+      handshake::{
+        ClientExtension, ClientHelloPayload, HandshakeMessagePayload, HandshakePayload, Random,
+        ServerExtension, ServerHelloPayload, SessionID,
+      },
+      message::{Message, MessagePayload, OpaqueMessage},
+    },
+    verify::{construct_tls13_server_verify_message, verify_tls13},
   },
+  Certificate, CipherSuite,
 };
+use tls_parser::{parse_tls_message_handshake, ClientHello, TlsMessage, TlsMessageHandshake};
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
   net::TcpStream,
@@ -35,7 +46,8 @@ use ws_stream_tungstenite::WsStream;
 
 use crate::{
   axum_websocket::WebSocket,
-  tlsn::{NotaryServerError, ProtocolUpgrade},
+  errors::{NotaryServerError, ProxyError},
+  tlsn::ProtocolUpgrade,
   OrigoSession, SharedState,
 };
 
@@ -65,32 +77,54 @@ pub async fn sign(
   query: Query<SignQuery>,
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<SignBody>,
-) -> Json<SignReply> {
+) -> Result<Json<SignReply>, ProxyError> {
   let session = state.origo_sessions.lock().unwrap().get(&query.session_id).unwrap().clone();
-  let messages = extract_tls_handshake(&session.request, payload);
+  let messages = extract_tls_handshake(&session.request, payload)?;
+  let handshake_hash_buffer = HandshakeHashBuffer::new();
+  // TODO: get hash algorithm from cipher suite in a better way
+  let mut transcript =
+    handshake_hash_buffer.start_hash(&tls_client2::tls_core::suites::HashAlgorithm::SHA256);
+  let mut server_certificate: Certificate = Certificate(vec![]);
+
   for msg in messages {
     match msg.payload {
-      MessagePayload::Handshake(handshake) => match handshake.payload {
-        HandshakePayload::Certificate(certificate_payload) => {
-          // TODO vector of certificates (cert chain)
+      MessagePayload::Handshake(ref handshake) => match handshake.payload {
+        HandshakePayload::ClientHello(_) => {
+          debug!("ClientHello");
+          transcript.add_message(&msg);
+        },
+        HandshakePayload::ServerHello(_) => {
+          debug!("ServerHello");
+          transcript.add_message(&msg);
+        },
+        HandshakePayload::Certificate(_) => {
           // TODO for some reason this is not hit, but CertificateTLS13 is hit
-          println!("Certificate");
+          debug!("Certificate");
         },
-        HandshakePayload::CertificateTLS13(certificate_payload) => {
-          // TODO vector of certificates (cert chain)
-          println!("CertificateTLS13");
+        HandshakePayload::CertificateTLS13(ref certificate_payload) => {
+          debug!("CertificateTLS13: {}", certificate_payload.entries.len());
+          transcript.add_message(&msg);
+          server_certificate = certificate_payload.entries[0].cert.clone();
         },
-        HandshakePayload::CertificateVerify(digitally_signed_struct) => {
-          // TODO signed certificate chain, verify signature
-          println!("CertificateVerify");
+        HandshakePayload::CertificateVerify(ref digitally_signed_struct) => {
+          debug!("CertificateVerify");
+
+          // send error back to client if signature verification fails
+          match verify_tls13(
+            &construct_tls13_server_verify_message(&transcript.get_current_hash()),
+            &server_certificate,
+            &digitally_signed_struct,
+          ) {
+            Ok(_) => (),
+            Err(e) => return Err(ProxyError::Sign(Box::new(e))),
+          };
         },
-        HandshakePayload::EncryptedExtensions(encrypted_extensions) => {
-          // TODO can probably ignore
-          println!("EncryptedExtensions");
+        HandshakePayload::EncryptedExtensions(_) => {
+          debug!("EncryptedExtensions");
+          transcript.add_message(&msg);
         },
-        // HandshakePayload::KeyUpdate(_) => todo!(),
-        HandshakePayload::Finished(finished_payload) => {
-          println!("Payload");
+        HandshakePayload::Finished(_) => {
+          debug!("Payload");
           // TODO what's the payload?
           // println!("Finished Payload:\n{}", String::from_utf8_lossy(&finished_payload.0))
 
@@ -101,7 +135,10 @@ pub async fn sign(
           // https://github.com/rustls/rustls/blob/8c04dba680d19d203a7eda1951ad596f5fc2ae59/rustls/src/client/tls13.rs#L1234
         },
 
-        // TODO auto completed branch arms, delete if not needed
+        // TODO: some of these (CertificateRequest, HelloRetryRequest) are not considered in happy
+        // path, handle later
+
+        // HandshakePayload::KeyUpdate(_) => todo!(),
         // HandshakePayload::ServerHelloDone => todo!(),
         // HandshakePayload::EndOfEarlyData => todo!(),
         // HandshakePayload::ClientKeyExchange(_) => todo!(),
@@ -111,8 +148,6 @@ pub async fn sign(
         // HandshakePayload::CertificateRequest(_) => todo!(),
         // HandshakePayload::CertificateRequestTLS13(_) => todo!(),
         // HandshakePayload::HelloRequest => todo!(),
-        // HandshakePayload::ClientHello(_) => todo!(),
-        // HandshakePayload::ServerHello(_) => todo!(),
         // HandshakePayload::HelloRetryRequest(_) => todo!(),
         // HandshakePayload::CertificateStatus(_) => todo!(),
         // HandshakePayload::MessageHash(_) => todo!(),
@@ -127,7 +162,6 @@ pub async fn sign(
     }
   }
 
-  // TODO verify signature for handshake, don't return if verification fails
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
 
@@ -172,7 +206,7 @@ pub async fn sign(
     signer: "0x".to_string() + &hex::encode(signer_address),
   };
 
-  Json(response)
+  Ok(Json(response))
 }
 
 #[derive(Clone)]
@@ -184,12 +218,10 @@ impl Hasher for KeccakHasher {
   fn hash(data: &[u8]) -> Self::Hash { keccak256(data).into() }
 }
 
-use nom::{bytes::streaming::take, Err, HexDisplay, IResult};
-
 /// Due to a bug in the tls_parser, we must override.
 /// See: https://github.com/rusticata/tls-parser/issues/72
 fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
-  let (i, hdr) = tls_parser::parse_tls_record_header(i).unwrap();
+  let (i, hdr) = tls_parser::parse_tls_record_header(i)?;
   if hdr.len > (1 << 14) + 256 {
     panic!("oversized payload");
   }
@@ -198,9 +230,9 @@ fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
   Ok((i, tls_parser::TlsRawRecord { hdr, data }))
 }
 
-fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
-  let server_aes_key = BASE64_STANDARD.decode(payload.server_aes_key).unwrap();
-  let server_aes_iv = BASE64_STANDARD.decode(payload.server_aes_iv).unwrap();
+fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>, ProxyError> {
+  let server_aes_key = BASE64_STANDARD.decode(payload.server_aes_key)?;
+  let server_aes_iv = BASE64_STANDARD.decode(payload.server_aes_iv)?;
 
   let mut cursor = Cursor::new(bytes);
   let mut messages: Vec<Message> = vec![];
@@ -209,14 +241,121 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
   while cursor.position() < bytes.len() as u64 {
     match local_parse_record(&cursor.get_ref()[cursor.position() as usize..]) {
       Ok((_, record)) => {
-        trace!("TLS record type: {}", record.hdr.record_type);
+        info!("TLS record type: {}", record.hdr.record_type);
 
         // NOTE:
         // The first 3 messages are typically: handshake, handshake, changecipherspec
         //
         // These are plaintext. The first encrypted message is an extension from the server
         // which is labeled application data, like all subsequent encrypted messages in TLS1.3
+        if record.hdr.record_type == tls_parser::TlsRecordType::Handshake {
+          let rec = parse_tls_message_handshake(record.data);
+          match rec {
+            Ok((_data, parse_tls_message)) => {
+              match parse_tls_message {
+                TlsMessage::Handshake(TlsMessageHandshake::ClientHello(ch)) => {
+                  // parses `TlsParser::TlsClientHelloContents` to `Message`
+                  debug!("parsing ClientHello");
 
+                  // TODO: write this better
+                  let ch_random_bytes: [u8; 32] =
+                    ch.random().try_into().expect("ch random bytes not of correct size");
+                  let ch_random = Random(ch_random_bytes);
+
+                  // parse session id by adding byte length to TlsParser output
+                  let ch_session_id = ch.session_id().expect("incorrect session_id");
+                  let mut ch_session_id = ch_session_id.to_vec();
+                  ch_session_id.insert(0, ch_session_id.len() as u8);
+                  let session_id = SessionID::read_bytes(&ch_session_id)
+                    .expect("can't read session id from bytes");
+
+                  let cipher_suites: Vec<CipherSuite> =
+                    ch.ciphers().iter().map(|suite| CipherSuite::from(suite.0)).collect();
+
+                  let compressions_methods: Vec<Compression> =
+                    ch.comp().iter().map(|method| Compression::from(method.0)).collect();
+
+                  // Read ClientHelloPayload extensions from TlsParser by preprending byte length
+                  // for TLS codec
+                  let extension_byte: &[u8] =
+                    ch.ext().expect("invalid client hello extension payload");
+                  let mut extension_byte = extension_byte.to_vec();
+                  let ch_extension_len: [u8; 2] = (extension_byte.len() as u16).to_be_bytes();
+                  extension_byte.splice(0..0, ch_extension_len);
+
+                  // create the reader which can decode extensions byte
+                  let mut r = Reader::init(&extension_byte);
+                  let extensions = codec::read_vec_u16::<ClientExtension>(&mut r)
+                    .expect("unable to read client extension payload");
+
+                  let client_hello_message = Message {
+                    version: tls_client2::ProtocolVersion::from(ch.version.0),
+                    payload: MessagePayload::Handshake(HandshakeMessagePayload {
+                      typ:     tls_client2::tls_core::msgs::enums::HandshakeType::ClientHello,
+                      payload: HandshakePayload::ClientHello(ClientHelloPayload {
+                        client_version: tls_client2::ProtocolVersion::from(ch.version.0),
+                        random: ch_random,
+                        session_id,
+                        cipher_suites,
+                        compression_methods: compressions_methods,
+                        extensions,
+                      }),
+                    }),
+                  };
+
+                  messages.push(client_hello_message);
+                },
+                TlsMessage::Handshake(TlsMessageHandshake::ServerHello(sh)) => {
+                  // parses `TlsParser::TlsServerHelloContents` to `Message`
+                  debug!("parsing ServerHello");
+
+                  let sh_random_bytes: [u8; 32] =
+                    sh.random.try_into().expect("ch random bytes not of correct size");
+                  let sh_random = Random(sh_random_bytes);
+
+                  let sh_session_id = sh.session_id.expect("incorrect session_id");
+                  let mut sh_session_id = sh_session_id.to_vec();
+                  sh_session_id.insert(0, sh_session_id.len() as u8);
+                  let session_id = SessionID::read_bytes(&sh_session_id)
+                    .expect("can't read session id from bytes");
+
+                  let extension_byte: &[u8] =
+                    sh.ext.expect("invalid server hello extension payload");
+                  let mut extension_byte = extension_byte.to_vec();
+                  let sh_extension_len: [u8; 2] = (extension_byte.len() as u16).to_be_bytes();
+                  extension_byte.splice(0..0, sh_extension_len);
+
+                  let mut r = Reader::init(&extension_byte);
+                  let extensions = codec::read_vec_u16::<ServerExtension>(&mut r)
+                    .expect("unable to read server extension payload");
+
+                  let server_hello_message = Message {
+                    version: tls_client2::ProtocolVersion::from(sh.version.0),
+                    payload: MessagePayload::Handshake(HandshakeMessagePayload {
+                      typ:     tls_client2::tls_core::msgs::enums::HandshakeType::ServerHello,
+                      payload: HandshakePayload::ServerHello(ServerHelloPayload {
+                        legacy_version: tls_client2::ProtocolVersion::from(sh.version.0),
+                        random: sh_random,
+                        session_id,
+                        cipher_suite: CipherSuite::from(sh.cipher.0),
+                        compression_method: Compression::from(sh.compression.0),
+                        extensions,
+                      }),
+                    }),
+                  };
+
+                  messages.push(server_hello_message);
+                },
+                _ => {
+                  println!("{:?}", parse_tls_message);
+                },
+              }
+            },
+            Err(err) => {
+              error!("can't parse tls raw record: {}", err);
+            },
+          }
+        }
         if record.hdr.record_type == tls_parser::TlsRecordType::ApplicationData {
           let d = tls_client2::Decrypter2::new(
             server_aes_key[..16].try_into().unwrap(),
@@ -226,7 +365,7 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
 
           let msg = OpaqueMessage {
             typ:     tls_client2::tls_core::msgs::enums::ContentType::ApplicationData,
-            version: tls_client2::ProtocolVersion::TLSv1_2,
+            version: tls_client2::ProtocolVersion::TLSv1_3,
             payload: Payload(record.data.to_vec()),
           };
 
@@ -253,18 +392,20 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
       },
       Err(e) => {
         let remaining = &cursor.get_ref().len() - (cursor.position() as usize);
-        panic!(
-          "Unable to parse record! position={}, remaining={}, e={}, ",
-          cursor.position(),
+        return Err(ProxyError::TlsParser {
+          position: cursor.position(),
           remaining,
-          e
-        );
+          e: e.to_string(),
+        });
       },
     }
   }
 
-  assert!(messages.len() > 0); // TODO return an actual error
-  messages
+  if messages.len() > 0 {
+    Ok(messages)
+  } else {
+    Err(ProxyError::TlsHandshakeExtract(String::from("empty handshake messages")))
+  }
 }
 
 #[derive(Deserialize)]

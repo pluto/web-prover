@@ -1,7 +1,7 @@
 use std::{
   collections::HashMap,
   fs,
-  io::{self, Read},
+  io::{self},
   sync::{Arc, Mutex},
   time::SystemTime,
 };
@@ -27,11 +27,12 @@ use tokio_rustls::{LazyConfigAcceptor, TlsAcceptor};
 use tokio_stream::StreamExt;
 use tower_http::cors::CorsLayer;
 use tower_service::Service;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod axum_websocket;
 mod config;
+mod errors;
 mod origo;
 mod tcp;
 mod tlsn;
@@ -55,7 +56,7 @@ struct OrigoSession {
 #[tokio::main]
 async fn main() {
   tracing_subscriber::registry()
-    .with(tracing_subscriber::fmt::layer())
+    .with(tracing_subscriber::fmt::layer().with_line_number(true))
     .with(tracing_subscriber::EnvFilter::from_default_env()) // set via RUST_LOG=INFO etc
     .init();
 

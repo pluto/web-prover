@@ -316,7 +316,7 @@ mod backend;
 mod cipher;
 mod conn;
 mod error;
-mod hash_hs;
+pub mod hash_hs;
 mod limited_cache;
 mod msgs;
 mod rand;

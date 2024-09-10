@@ -29,10 +29,12 @@ pub async fn sign(
   let client = reqwest::ClientBuilder::new().build().unwrap();
 
   #[cfg(feature = "notary_ca_cert")]
+  // TODO: recheck use of rustls backend
   let client = reqwest::ClientBuilder::new()
     .add_root_certificate(
       reqwest::tls::Certificate::from_der(&crate::tls::NOTARY_CA_CERT.to_vec()).unwrap(),
     )
+    .use_rustls_tls()
     .build()
     .unwrap();
 

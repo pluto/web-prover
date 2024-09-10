@@ -565,7 +565,7 @@ fn construct_tls13_verify_message(
     msg
 }
 
-fn verify_tls13(
+pub fn verify_tls13(
     msg: &[u8],
     cert: &Certificate,
     dss: &DigitallySignedStruct,
