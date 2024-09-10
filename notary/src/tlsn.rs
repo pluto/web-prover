@@ -1,17 +1,16 @@
-use std::{error::Error, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::{
   extract::{FromRequestParts, Query, State},
-  http::{header, request::Parts, StatusCode},
-  response::{IntoResponse, Response},
+  http::{header, request::Parts},
+  response::Response,
 };
-use eyre::Report;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use p256::ecdsa::{Signature, SigningKey};
 use serde::Deserialize;
-use tlsn_verifier::tls::{Verifier, VerifierConfig, VerifierConfigBuilderError, VerifierError};
+use tlsn_verifier::tls::{Verifier, VerifierConfig};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::{debug, error, info};
@@ -19,6 +18,7 @@ use ws_stream_tungstenite::WsStream;
 
 use crate::{
   axum_websocket::{WebSocket, WebSocketUpgrade},
+  errors::NotaryServerError,
   tcp::{header_eq, TcpUpgrade},
   SharedState,
 };
@@ -147,40 +147,5 @@ pub async fn tcp_notarize(
     Err(err) => {
       error!(?session_id, "Failed notarization using tcp: {err}");
     },
-  }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum NotaryServerError {
-  #[error(transparent)]
-  Unexpected(#[from] Report),
-  #[error("Failed to connect to prover: {0}")]
-  Connection(String),
-  #[error("Error occurred during notarization: {0}")]
-  Notarization(Box<dyn Error + Send + 'static>),
-  #[error("Invalid request from prover: {0}")]
-  BadProverRequest(String),
-  #[error("Unauthorized request from prover: {0}")]
-  UnauthorizedProverRequest(String),
-}
-
-impl From<VerifierError> for NotaryServerError {
-  fn from(error: VerifierError) -> Self { Self::Notarization(Box::new(error)) }
-}
-
-impl From<VerifierConfigBuilderError> for NotaryServerError {
-  fn from(error: VerifierConfigBuilderError) -> Self { Self::Notarization(Box::new(error)) }
-}
-
-/// Trait implementation to convert this error into an axum http response
-impl IntoResponse for NotaryServerError {
-  fn into_response(self) -> Response {
-    match self {
-      bad_request_error @ NotaryServerError::BadProverRequest(_) =>
-        (StatusCode::BAD_REQUEST, bad_request_error.to_string()).into_response(),
-      unauthorized_request_error @ NotaryServerError::UnauthorizedProverRequest(_) =>
-        (StatusCode::UNAUTHORIZED, unauthorized_request_error.to_string()).into_response(),
-      _ => (StatusCode::INTERNAL_SERVER_ERROR, "Something wrong happened.").into_response(),
-    }
   }
 }

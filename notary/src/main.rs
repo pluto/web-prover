@@ -32,6 +32,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod axum_websocket;
 mod config;
+mod errors;
 mod origo;
 mod tcp;
 mod tlsn;

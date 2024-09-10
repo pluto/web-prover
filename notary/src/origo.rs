@@ -46,7 +46,8 @@ use ws_stream_tungstenite::WsStream;
 
 use crate::{
   axum_websocket::WebSocket,
-  tlsn::{NotaryServerError, ProtocolUpgrade},
+  errors::{NotaryServerError, ProxyError},
+  tlsn::ProtocolUpgrade,
   OrigoSession, SharedState,
 };
 
@@ -76,9 +77,9 @@ pub async fn sign(
   query: Query<SignQuery>,
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<SignBody>,
-) -> Result<Json<SignReply>, String> {
+) -> Result<Json<SignReply>, ProxyError> {
   let session = state.origo_sessions.lock().unwrap().get(&query.session_id).unwrap().clone();
-  let messages = extract_tls_handshake(&session.request, payload);
+  let messages = extract_tls_handshake(&session.request, payload)?;
   let handshake_hash_buffer = HandshakeHashBuffer::new();
   // TODO: get hash algorithm from cipher suite in a better way
   let mut transcript =
@@ -115,7 +116,7 @@ pub async fn sign(
             &digitally_signed_struct,
           ) {
             Ok(_) => (),
-            Err(e) => return Err(String::from("invalid certificate signature")),
+            Err(e) => return Err(ProxyError::Sign(Box::new(e))),
           };
         },
         HandshakePayload::EncryptedExtensions(_) => {
@@ -220,7 +221,7 @@ impl Hasher for KeccakHasher {
 /// Due to a bug in the tls_parser, we must override.
 /// See: https://github.com/rusticata/tls-parser/issues/72
 fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
-  let (i, hdr) = tls_parser::parse_tls_record_header(i).unwrap();
+  let (i, hdr) = tls_parser::parse_tls_record_header(i)?;
   if hdr.len > (1 << 14) + 256 {
     panic!("oversized payload");
   }
@@ -229,9 +230,9 @@ fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
   Ok((i, tls_parser::TlsRawRecord { hdr, data }))
 }
 
-fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
-  let server_aes_key = BASE64_STANDARD.decode(payload.server_aes_key).unwrap();
-  let server_aes_iv = BASE64_STANDARD.decode(payload.server_aes_iv).unwrap();
+fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>, ProxyError> {
+  let server_aes_key = BASE64_STANDARD.decode(payload.server_aes_key)?;
+  let server_aes_iv = BASE64_STANDARD.decode(payload.server_aes_iv)?;
 
   let mut cursor = Cursor::new(bytes);
   let mut messages: Vec<Message> = vec![];
@@ -253,12 +254,15 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
             Ok((_data, parse_tls_message)) => {
               match parse_tls_message {
                 TlsMessage::Handshake(TlsMessageHandshake::ClientHello(ch)) => {
-                  println!("parsing ClientHello");
+                  // parses `TlsParser::TlsClientHelloContents` to `Message`
+                  debug!("parsing ClientHello");
+
                   // TODO: write this better
                   let ch_random_bytes: [u8; 32] =
                     ch.random().try_into().expect("ch random bytes not of correct size");
                   let ch_random = Random(ch_random_bytes);
 
+                  // parse session id by adding byte length to TlsParser output
                   let ch_session_id = ch.session_id().expect("incorrect session_id");
                   let mut ch_session_id = ch_session_id.to_vec();
                   ch_session_id.insert(0, ch_session_id.len() as u8);
@@ -271,12 +275,15 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
                   let compressions_methods: Vec<Compression> =
                     ch.comp().iter().map(|method| Compression::from(method.0)).collect();
 
+                  // Read ClientHelloPayload extensions from TlsParser by preprending byte length
+                  // for TLS codec
                   let extension_byte: &[u8] =
                     ch.ext().expect("invalid client hello extension payload");
                   let mut extension_byte = extension_byte.to_vec();
                   let ch_extension_len: [u8; 2] = (extension_byte.len() as u16).to_be_bytes();
                   extension_byte.splice(0..0, ch_extension_len);
 
+                  // create the reader which can decode extensions byte
                   let mut r = Reader::init(&extension_byte);
                   let extensions = codec::read_vec_u16::<ClientExtension>(&mut r)
                     .expect("unable to read client extension payload");
@@ -299,7 +306,8 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
                   messages.push(client_hello_message);
                 },
                 TlsMessage::Handshake(TlsMessageHandshake::ServerHello(sh)) => {
-                  println!("parsing ServerHello");
+                  // parses `TlsParser::TlsServerHelloContents` to `Message`
+                  debug!("parsing ServerHello");
 
                   let sh_random_bytes: [u8; 32] =
                     sh.random.try_into().expect("ch random bytes not of correct size");
@@ -384,18 +392,20 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Vec<Message> {
       },
       Err(e) => {
         let remaining = &cursor.get_ref().len() - (cursor.position() as usize);
-        panic!(
-          "Unable to parse record! position={}, remaining={}, e={}, ",
-          cursor.position(),
+        return Err(ProxyError::TlsParser {
+          position: cursor.position(),
           remaining,
-          e
-        );
+          e: e.to_string(),
+        });
       },
     }
   }
 
-  assert!(messages.len() > 0); // TODO return an actual error
-  messages
+  if messages.len() > 0 {
+    Ok(messages)
+  } else {
+    Err(ProxyError::TlsHandshakeExtract(String::from("empty handshake messages")))
+  }
 }
 
 #[derive(Deserialize)]
