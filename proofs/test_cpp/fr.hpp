@@ -130,7 +130,7 @@ public:
     Element inline add(const Element &a, int b) { return add(a, set(b));};
     Element inline sub(const Element &a, int b) { return sub(a, set(b));};
     Element inline mul(const Element &a, int b) { return mul(a, set(b));};
-    
+
     void inline mul1(Element &r, const Element &a, uint64_t b) { Fr_rawMMul1(r.v, a.v, b); };
     void inline neg(Element &r, const Element &a) { Fr_rawNeg(r.v, a.v); };
     void inline square(Element &r, const Element &a) { Fr_rawMSquare(r.v, a.v); };
@@ -148,9 +148,9 @@ public:
 
     int toRprBE(const Element &element, uint8_t *data, int bytes);
     int fromRprBE(Element &element, const uint8_t *data, int bytes);
-    
+
     int bytes ( void ) { return Fr_N64 * 8; };
-    
+
     void fromUI(Element &r, unsigned long int v);
 
     static RawFr field;
