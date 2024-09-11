@@ -86,6 +86,7 @@ pub(super) async fn handle_server_hello(
         return Err(cx.common.illegal_param("wrong group for key share").await?);
     }
 
+    // TODO: REMOVE ME!!! 
     {
         // spooof the master secret and transcript hash to test against golang codebase
         // witness values
@@ -117,6 +118,8 @@ pub(super) async fn handle_server_hello(
     cx.common
         .backend
         .set_hs_hash_client_key_exchange(transcript.get_current_hash().as_ref().to_vec())?;
+
+    // NOTE: This "corrects" the pinned master secret from above. 
     cx.common
         .backend
         .set_server_key_share(their_key_share.clone().into())

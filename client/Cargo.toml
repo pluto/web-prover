@@ -13,6 +13,7 @@ notary_ca_cert=[]
 
 # Shared dependencies for all targets
 [dependencies]
+
 # TLSN
 tls-client={ workspace=true }
 tls-client2={ path="../tls/tls-client", package="tls-client" }
@@ -28,6 +29,7 @@ cfg-if      ="1.0.0"
 serde.workspace     =true
 serde_json.workspace=true
 # Web
+hex = "0.4"
 url           ="2.5"
 hyper         ={ version="1.4", features=["client", "http1"] }
 http-body-util="0.1"

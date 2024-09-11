@@ -1,23 +1,26 @@
 // logic common to wasm32 and native
 
+use tls_proxy2::WitnessData;
 use serde::Serialize;
+use tracing::debug;
+use crate::errors;
+
+#[derive(Serialize)]
+pub struct SignBody {
+  pub hs_server_aes_iv:  String,
+  pub hs_server_aes_key: String,
+}
 
 pub async fn sign(
   config: crate::config::Config,
   session_id: String,
-  server_aes_key: Vec<u8>,
-  server_aes_iv: Vec<u8>,
+  sb: SignBody,
+  witness: WitnessData,
 ) -> Result<crate::Proof, crate::errors::ClientErrors> {
-  #[derive(Serialize)]
-  struct SignBody {
-    server_aes_iv:  String,
-    server_aes_key: String,
-  }
-
-  let sb = SignBody {
-    server_aes_iv:  String::from_utf8(server_aes_iv.to_vec()).unwrap(),
-    server_aes_key: String::from_utf8(server_aes_key.to_vec()).unwrap(),
-  };
+  // let sb = SignBody {
+  //   server_aes_iv:  String::from_utf8(server_aes_iv.to_vec()).unwrap(),
+  //   server_aes_key: String::from_utf8(server_aes_key.to_vec()).unwrap(),
+  // };
 
   let url = format!(
     "https://{}:{}/v1/origo/sign?session_id={}",
@@ -44,5 +47,13 @@ pub async fn sign(
   // TODO remove debug log line
   println!("\n{}\n\n", String::from_utf8(response.bytes().await.unwrap().to_vec()).unwrap());
 
+  let r = generate_proof(witness).await.unwrap();
+  
   Ok(crate::Proof::Origo(crate::OrigoProof {})) // TODO
+}
+
+pub async fn generate_proof(witness: WitnessData) -> Result<(), errors::ClientErrors> {
+  debug!("data={:?}", witness);
+
+  Ok(())
 }
