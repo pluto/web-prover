@@ -56,3 +56,4 @@ proofs/build/*
 proofs/ptau/*
 proofs/circuits/test/*.circom
 proofs/circuits/main/*
+!proofs/build/test/test.r1cs

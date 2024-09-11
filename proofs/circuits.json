@@ -2,5 +2,16 @@
   "proof": {
     "file": "proof",
     "template": "Proof"
+  },
+  "test": {
+    "file": "test",
+    "template": "ExtractValue",
+    "params": [
+      40,
+      2,
+      4,
+      1,
+      3
+    ]
   }
 }
