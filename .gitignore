@@ -52,8 +52,8 @@ rustls_acme_cache
 
 # Circom junk files
 proofs/node_modules/*
+!./proofs/build/test/test.r1cs
 proofs/build/*
 proofs/ptau/*
 proofs/circuits/test/*.circom
 proofs/circuits/main/*
-!proofs/build/test/test.r1cs
