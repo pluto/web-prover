@@ -16,33 +16,35 @@ fn run_test(circuit_filepath: String, witness_gen_filepath: String) {
     witness_gen_filepath,
     std::any::type_name::<G1>()
   );
-  let iteration_count = 5;
+  let iteration_count = 40;
   let root = current_dir().unwrap();
 
   let circuit_file = root.join(circuit_filepath);
-
-  // println!("before load");
   let r1cs = load_r1cs::<G1, G2>(&FileLocation::PathBuf(circuit_file));
-  println!("Loaded r1cs!");
   let witness_generator_file = root.join(witness_gen_filepath);
 
-  println!("r1cs num inputs: {:?}", r1cs.num_inputs);
-
-  let mut private_input = HashMap::new();
-  private_input.insert(
-    "data".to_string(),
-    json!([
-      123, 10, 32, 32, 32, 32, 34, 107, 101, 121, 49, 34, 58, 32, 34, 97, 98, 99, 34, 44, 10, 32,
-      32, 32, 32, 34, 107, 101, 121, 50, 34, 58, 32, 34, 100, 101, 102, 34, 10, 125
-    ]),
-  );
-  private_input.insert("key1".to_string(), json!([107, 101, 121, 49]));
-
+  // Private input bytes are raw bytes from JSON
+  let data: [i32; 40] = [
+    123, 10, 32, 32, 32, 32, 34, 107, 101, 121, 49, 34, 58, 32, 34, 97, 98, 99, 34, 44, 10, 32, 32,
+    32, 32, 34, 107, 101, 121, 50, 34, 58, 32, 34, 100, 101, 102, 34, 10, 125,
+  ];
   let mut private_inputs = Vec::new();
-  private_inputs.push(private_input);
-  println!("Added private inputs!");
+  for i in 0..iteration_count {
+    let mut private_input = HashMap::new();
+    private_input.insert("byte".to_string(), json!(data[i]));
+    private_inputs.push(private_input);
+  }
 
-  let start_public_input = [];
+  // Initial public input is the stack machine init:
+  // ---
+  // component State;
+  // State        = StateUpdate(1);
+  // State.byte <== byte;
+  // State.stack[0]   <== [step_in[0], step_in[1]];
+  // State.parsing_string <== step_in[2];
+  // State.parsing_number <== step_in[3];
+  // ---
+  let start_public_input = [F::<G1>::from(0), F::<G1>::from(0), F::<G1>::from(0), F::<G1>::from(0)];
 
   let pp: PublicParams<G1, G2, _, _> = create_public_params(r1cs.clone());
 
@@ -52,8 +54,6 @@ fn run_test(circuit_filepath: String, witness_gen_filepath: String) {
   println!("Number of variables per step (primary circuit): {}", pp.num_variables().0);
   println!("Number of variables per step (secondary circuit): {}", pp.num_variables().1);
 
-  // ------------------------------------------------------------------------------------------ //
-  // RECURSIVE STUFF
   println!("Creating a RecursiveSNARK...");
   let start = Instant::now();
   let mut recursive_snark = create_recursive_circuit(
@@ -67,7 +67,7 @@ fn run_test(circuit_filepath: String, witness_gen_filepath: String) {
   println!("RecursiveSNARK creation took {:?}", start.elapsed());
 
   // TODO: empty?
-  let z0_secondary = [];
+  let z0_secondary = [F::<G2>::from(0)];
 
   // verify the recursive SNARK
   println!("Verifying a RecursiveSNARK...");
@@ -78,30 +78,35 @@ fn run_test(circuit_filepath: String, witness_gen_filepath: String) {
 
   let z_last = res.unwrap().0;
 
-  assert_eq!(z_last[0], F::<G1>::from(20));
-  assert_eq!(z_last[1], F::<G1>::from(70));
-  // ------------------------------------------------------------------------------------------ //
+  println!("z_last: {:?}", z_last);
 
-  // // produce a compressed SNARK
-  // println!("Generating a CompressedSNARK using Spartan with IPA-PC...");
-  // let start = Instant::now();
-  // let (pk, vk) = CompressedSNARK::<_, _, _, _, S<G1>, S<G2>>::setup(&pp).unwrap();
-  // let res = CompressedSNARK::<_, _, _, _, S<G1>, S<G2>>::prove(&pp, &pk, &recursive_snark);
-  // println!("CompressedSNARK::prove: {:?}, took {:?}", res.is_ok(), start.elapsed());
-  // assert!(res.is_ok());
-  // let compressed_snark = res.unwrap();
+  assert_eq!(z_last[0], F::<G1>::from(0));
+  assert_eq!(z_last[1], F::<G1>::from(0));
+  assert_eq!(z_last[1], F::<G1>::from(0));
+  assert_eq!(z_last[1], F::<G1>::from(0));
 
-  // // verify the compressed SNARK
-  // println!("Verifying a CompressedSNARK...");
-  // let start = Instant::now();
-  // let res = compressed_snark.verify(
-  //   &vk,
-  //   iteration_count,
-  //   start_public_input.to_vec(),
-  //   z0_secondary.to_vec(),
-  // );
-  // println!("CompressedSNARK::verify: {:?}, took {:?}", res.is_ok(), start.elapsed());
-  // assert!(res.is_ok());
+  println!("I am here");
+
+  // produce a compressed SNARK
+  println!("Generating a CompressedSNARK using Spartan with IPA-PC...");
+  let start = Instant::now();
+  let (pk, vk) = CompressedSNARK::<_, _, _, _, S<G1>, S<G2>>::setup(&pp).unwrap();
+  let res = CompressedSNARK::<_, _, _, _, S<G1>, S<G2>>::prove(&pp, &pk, &recursive_snark);
+  println!("CompressedSNARK::prove: {:?}, took {:?}", res.is_ok(), start.elapsed());
+  assert!(res.is_ok());
+  let compressed_snark = res.unwrap();
+
+  // verify the compressed SNARK
+  println!("Verifying a CompressedSNARK...");
+  let start = Instant::now();
+  let res = compressed_snark.verify(
+    &vk,
+    iteration_count,
+    start_public_input.to_vec(),
+    z0_secondary.to_vec(),
+  );
+  println!("CompressedSNARK::verify: {:?}, took {:?}", res.is_ok(), start.elapsed());
+  assert!(res.is_ok());
 
   // // continue recursive circuit by adding 2 further steps
   // println!("Adding steps to our RecursiveSNARK...");
@@ -144,10 +149,6 @@ fn run_test(circuit_filepath: String, witness_gen_filepath: String) {
   // assert_eq!(res.unwrap().0[1], F::<G1>::from(115));
 }
 
-pub fn main() {
-  let group_name = "bn254";
-
-  println!("Starting example...");
-  let circuit_filepath = run_test(format!("test.r1cs"), format!("test_js/test.wasm"));
-  println!("Done!");
+fn main() {
+  run_test("parse_fold.r1cs".to_string(), "parse_fold_js/parse_fold.wasm".to_string());
 }
