@@ -1,5 +1,5 @@
 pub mod handler;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use clap::Parser;
 use handler::run_circuit;
@@ -15,13 +15,13 @@ pub struct Args {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CircuitData {
-  #[serde(rename = "witness")]
-  pub witness_json: Value,
   #[serde(rename = "r1cs")]
   pub r1cs_path: PathBuf,
   #[serde(rename = "wgen")]
   pub wgen_path: PathBuf,
+  pub private_input: HashMap<String, Value>,
   pub num_folds: usize,
+  pub init_step_in: Vec<u64>,
 }
 
 // Note:
@@ -29,8 +29,8 @@ pub struct CircuitData {
 // from the `./proofs/` dir.
 fn main() {
   let file = Args::parse().input_file;
+  println!("Using file: {:?}", file);
   let read = std::fs::read(file).unwrap();
   let circuit_data: CircuitData = serde_json::from_slice(&read).unwrap();
-  // dbg!(circuit_data.clone());
   run_circuit(circuit_data);
 }
