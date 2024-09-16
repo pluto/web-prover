@@ -5,6 +5,7 @@ use nova_scotia::{
   circom::reader::load_r1cs, create_public_params, create_recursive_circuit, FileLocation, F, S,
 };
 use nova_snark::{provider, CompressedSNARK, PublicParams};
+use serde_json::json;
 
 use crate::CircuitData;
 
@@ -22,12 +23,20 @@ pub fn run_circuit(circuit_data: CircuitData) {
   // Map `private_input`
   let mut private_inputs: Vec<HashMap<String, Value>> = Vec::new();
   for (key, values) in circuit_data.private_input.clone() {
-    for val in values.as_array().unwrap() {
+    let batch_size = circuit_data.private_input.get(&key).unwrap().as_array().unwrap().len()
+      / circuit_data.num_folds;
+    println!("batch size: {}", batch_size);
+    for val in values.as_array().unwrap().chunks(batch_size) {
       let mut map: HashMap<String, Value> = HashMap::new();
-      map.insert(key.clone(), val.clone());
+      let mut data: Vec<Value> = Vec::new();
+      for individual in val {
+        data.push(individual.clone());
+      }
+      map.insert(key.clone(), json!(data));
       private_inputs.push(map);
     }
   }
+  // dbg!(private_inputs.clone());
 
   // Map `step_in` public input
   let init_step_in: Vec<F<G1>> = circuit_data.init_step_in.into_iter().map(F::<G1>::from).collect();
@@ -59,7 +68,7 @@ pub fn run_circuit(circuit_data: CircuitData) {
   println!("Verifying a RecursiveSNARK...");
   let start = Instant::now();
   let res = recursive_snark.verify(&pp, folds, &init_step_in, &z0_secondary);
-  println!("RecursiveSNARK::verify: {:?}, took {:?}", res, start.elapsed());
+  println!("RecursiveSNARK::verify took {:?}", start.elapsed());
   assert!(res.is_ok());
 
   // produce a compressed SNARK

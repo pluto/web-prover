@@ -1,13 +1,3 @@
-/*
-Data {
-    keys: [
-        String(
-            "key2",
-        ),
-    ],
-    value_type: String,
-}
-*/
 pragma circom 2.1.9;
 
 include "parser-attestor/circuits/json/parser/parser.circom";
@@ -32,7 +22,6 @@ template ParseFold() {
     step_out[3] <== State.next_stack[1][1];
     step_out[4] <== State.next_parsing_string;
     step_out[5] <== State.next_parsing_number;
-
 }
 
 
