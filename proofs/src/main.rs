@@ -30,8 +30,6 @@ pub struct CircuitData {
   pub cbuild_path: PathBuf,
   #[serde(rename = "wgen")]
   pub wgen_path: PathBuf,
-  // #[serde(rename = "wgen_type")]
-  // pub wgen_type: WitnessgenType,
   #[serde(rename = "graph")]
   pub graph_path: PathBuf,
   pub private_input: HashMap<String, Value>,

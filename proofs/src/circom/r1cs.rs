@@ -4,12 +4,12 @@ use fs::OpenOptions;
 
 use super::*;
 
+// This was borrowed from `nova-scotia`. Big thank you for this middleware!
 // some codes borrowed from https://github.com/poma/zkutil/blob/master/src/r1cs_reader.rs
 
 use crate::circom::circuit::Constraint;
 use byteorder::{LittleEndian, ReadBytesExt};
 use ff::PrimeField;
-// use hex_literal::hex;
 use nova_snark::traits::Group;
 use std::{
   collections::HashMap,
@@ -41,7 +41,6 @@ pub struct R1CSFile<Fr: PrimeField> {
 pub(crate) fn read_field<R: Read, Fr: PrimeField>(mut reader: R) -> Result<Fr> {
   let mut repr = Fr::ZERO.to_repr();
   for digit in repr.as_mut().iter_mut() {
-    // TODO: may need to reverse order?
     *digit = reader.read_u8()?;
   }
   let fr = Fr::from_repr(repr).unwrap();

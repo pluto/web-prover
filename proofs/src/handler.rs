@@ -72,24 +72,6 @@ pub fn run_circuit(circuit_data: CircuitData) {
 
   println!("Creating a RecursiveSNARK...");
   let start = Instant::now();
-  // let recursive_snark = match circuit_data.wgen_type {
-  //   WitnessgenType::Node => create_recursive_circuit(
-  //     witness_generator_file,
-  //     r1cs.clone(),
-  //     private_inputs,
-  //     init_step_in.clone(),
-  //     &pp,
-  //   )
-  //   .unwrap(),
-  //   WitnessgenType::CircomWitnesscalc => create_recursive_circuit_witnesscalc::<G1, G2>(
-  //     witness_generator_file.clone(),
-  //     r1cs.clone(),
-  //     private_inputs,
-  //     init_step_in.clone(),
-  //     &pp,
-  //   )
-  //   .unwrap(),
-  // };
   let recursive_snark = create_recursive_circuit(
     witness_generator_file,
     r1cs.clone(),
