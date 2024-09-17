@@ -2,9 +2,5 @@
   "proof": {
     "file": "proof",
     "template": "Proof"
-  },
-  "parse_raw": {
-    "file": "parse_raw",
-    "template": "ParseRaw"
   }
 }

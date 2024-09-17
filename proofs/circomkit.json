@@ -1,5 +1,5 @@
 {
   "version": "2.1.2",
   "proofSystem": "plonk",
-  "curve": "secq256k1"
+  "curve": "bn128"
 }
