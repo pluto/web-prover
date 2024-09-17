@@ -8,9 +8,8 @@ use std::{
 use crate::circom::reader::generate_witness_from_bin;
 use circom::circuit::{CircomCircuit, R1CS};
 use ff::Field;
-use nova_snark::traits::circuit::StepCircuit;
 use nova_snark::{
-  provider::{Bn256EngineIPA, Bn256EngineKZG, GrumpkinEngine},
+  provider::{Bn256EngineIPA, GrumpkinEngine},
   traits::{circuit::TrivialCircuit, snark::RelaxedR1CSSNARKTrait, Engine, Group},
   PublicParams, RecursiveSNARK,
 };
