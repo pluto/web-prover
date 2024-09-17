@@ -8,5 +8,5 @@ nova-scotia={ git="https://github.com/nalinbhardwaj/Nova-Scotia.git" }
 # bellperson ={ version="0.25", default-features=false }
 serde     ="1.0.210"
 serde_json="1.0.128"
-nova-snark="0.23.0"
+nova-snark={ version="0.23.0", features=["opencl"] }
 clap      ={ version="4.5.16", features=["derive"] }
