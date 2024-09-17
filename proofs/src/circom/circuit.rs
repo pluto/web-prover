@@ -1,16 +1,17 @@
+use std::{collections::BTreeMap, str};
+
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, LinearCombination, SynthesisError};
 use ff::PrimeField;
 use nova_snark::traits::circuit::StepCircuit;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, str};
 
 #[derive(Serialize, Deserialize)]
 pub struct CircuitJson {
-  pub constraints: Vec<Vec<BTreeMap<String, String>>>,
+  pub constraints:   Vec<Vec<BTreeMap<String, String>>>,
   #[serde(rename = "nPubInputs")]
-  pub num_inputs: usize,
+  pub num_inputs:    usize,
   #[serde(rename = "nOutputs")]
-  pub num_outputs: usize,
+  pub num_outputs:   usize,
   #[serde(rename = "nVars")]
   pub num_variables: usize,
 }
@@ -19,15 +20,15 @@ pub type Constraint<Fr> = (Vec<(usize, Fr)>, Vec<(usize, Fr)>, Vec<(usize, Fr)>)
 
 #[derive(Clone)]
 pub struct R1CS<Fr: PrimeField> {
-  pub num_inputs: usize,
-  pub num_aux: usize,
+  pub num_inputs:    usize,
+  pub num_aux:       usize,
   pub num_variables: usize,
-  pub constraints: Vec<Constraint<Fr>>,
+  pub constraints:   Vec<Constraint<Fr>>,
 }
 
 #[derive(Clone)]
 pub struct CircomCircuit<Fr: PrimeField> {
-  pub r1cs: R1CS<Fr>,
+  pub r1cs:    R1CS<Fr>,
   pub witness: Option<Vec<Fr>>,
 }
 
@@ -130,9 +131,7 @@ impl<Fr: PrimeField> CircomCircuit<Fr> {
 }
 
 impl<Fr: PrimeField> StepCircuit<Fr> for CircomCircuit<Fr> {
-  fn arity(&self) -> usize {
-    (self.r1cs.num_inputs - 1) / 2
-  }
+  fn arity(&self) -> usize { (self.r1cs.num_inputs - 1) / 2 }
 
   fn synthesize<CS: ConstraintSystem<Fr>>(
     &self,
