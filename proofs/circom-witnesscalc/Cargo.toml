@@ -1,0 +1,49 @@
+[package]
+name = "circom_witnesscalc"
+version = "0.2.0"
+edition = "2021"
+repository = "https://github.com/iden3/circom-witnesscalc"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ark-bn254 = { version = "0.4.0", features = ["std"] }
+ark-ff = { version = "0.4.0", features = ["std"] }
+ark-serialize = { version = "0.4", features = ["derive"] }
+byteorder = "1.4.3"
+hex = "0.4.3"
+postcard = { version = "1.0.8", features = ["use-std"], default-features = false }
+rand = "0.8.5"
+ruint = { version = "1.10.0", features = ["rand", "serde", "ark-ff-04"] }
+serde = { version = "1.0.190", features = ["derive"] }
+serde_json = "1.0.64"
+wtns-file = "0.1.5"
+lazy_static = "1.4.0"
+libc = "0.2.155"
+# circom dependencies
+#compiler = { path = "../circom/compiler" }
+#code_producers = { path = "../circom/code_producers" }
+#program_structure = { path = "../circom/program_structure" }
+#parser = { path = "../circom/parser" }
+#type_analysis = { path = "../circom/type_analysis" }
+#constraint_generation = { path = "../circom/constraint_generation" }
+compiler = { git = "https://github.com/olomix/circom.git", branch = "master" }
+code_producers = { git = "https://github.com/olomix/circom.git", branch = "master" }
+program_structure = { git = "https://github.com/olomix/circom.git", branch = "master" }
+parser = { git = "https://github.com/olomix/circom.git", branch = "master" }
+type_analysis = { git = "https://github.com/olomix/circom.git", branch = "master" }
+constraint_generation = { git = "https://github.com/olomix/circom.git", branch = "master" }
+prost = "0.13.1"
+
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+
+[lib]
+crate-type = ["lib", "staticlib", "cdylib"]
+
+[build-dependencies]
+bindgen = "0.69.4"
+prost-build = "0.13.1"

@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package circom_witnesscalc.proto;
+
+enum DuoOp {
+    Mul = 0;
+    Div = 1;
+    Add = 2;
+    Sub = 3;
+    Pow = 4;
+    Idiv = 5;
+    Mod = 6;
+    Eq = 7;
+    Neq = 8;
+    Lt = 9;
+    Gt = 10;
+    Leq = 11;
+    Geq = 12;
+    Land = 13;
+    Lor = 14;
+    Shl = 15;
+    Shr = 16;
+    Bor = 17;
+    Band = 18;
+    Bxor = 19;
+}
+
+enum UnoOp {
+    Neg = 0;
+    Id = 1;
+}
+
+enum TresOp {
+    TernCond = 0;
+}
+
+message BigUInt {
+  bytes valueLE = 1;
+}
+
+message InputNode {
+  uint32 idx = 1;
+}
+
+message ConstantNode {
+  BigUInt value = 1;
+}
+
+message UnoOpNode {
+  UnoOp op = 1;
+  uint32 aIdx = 2;
+}
+
+message DuoOpNode {
+  DuoOp op = 1;
+  uint32 aIdx = 2;
+  uint32 bIdx = 3;
+}
+
+message TresOpNode {
+  TresOp op = 1;
+  uint32 aIdx = 2;
+  uint32 bIdx = 3;
+  uint32 cIdx = 4;
+}
+
+message Node {
+  oneof node {
+    InputNode input = 1;
+    ConstantNode constant = 2;
+    UnoOpNode unoOp = 3;
+    DuoOpNode duoOp = 4;
+    TresOpNode tresOp = 5;
+  }
+}
+
+message SignalDescription {
+  uint32 offset = 1;
+  uint32 len = 2;
+}
+
+message GraphMetadata {
+  repeated uint32 witnessSignals = 1;
+  map<string, SignalDescription> inputs = 2;
+}
+
+message InputSignalsDescriptions {
+  map<string, SignalDescription> inputs = 1;
+}
+
+//message WitnessContainer {
+//  repeated Node graph = 1;
+//  repeated uint32 witness = 2;
+//  map<string, SignalDescription> signals = 3;
+//}

@@ -5,7 +5,6 @@ use std::{
   path::{Path, PathBuf},
 };
 
-use crate::circom::reader::generate_witness_from_bin;
 use circom::circuit::{CircomCircuit, R1CS};
 use ff::Field;
 use nova_snark::{
@@ -18,9 +17,9 @@ use num_traits::Num;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::circom::reader::generate_witness_from_bin;
 #[cfg(not(target_family = "wasm"))]
 use crate::circom::reader::generate_witness_from_wasm;
-
 #[cfg(target_family = "wasm")]
 use crate::circom::wasm::generate_witness_from_wasm;
 
@@ -90,7 +89,7 @@ where
     generate_witness_from_wasm::<F<G1>>(
       &witness_generator_file,
       &input_json,
-      &witness_generator_output,
+      witness_generator_output,
     )
   } else {
     let witness_generator_file = match &witness_generator_file {
@@ -98,9 +97,9 @@ where
       FileLocation::URL(_) => panic!("unreachable"),
     };
     generate_witness_from_bin::<F<G1>>(
-      &witness_generator_file,
+      witness_generator_file,
       &input_json,
-      &witness_generator_output,
+      witness_generator_output,
     )
   }
 }
@@ -191,13 +190,13 @@ pub fn create_recursive_circuit<G1, G2>(
       E2,
       CircomCircuit<<E1 as Engine>::Scalar>,
       TrivialCircuit<<E2 as Engine>::Scalar>,
-    >::new(&pp, &circuit_0, &circuit_secondary, &start_public_input, &z0_secondary)
+    >::new(pp, &circuit_0, &circuit_secondary, &start_public_input, &z0_secondary)
     .unwrap();
 
-  for i in 0..iteration_count {
+  for private_input in private_inputs.iter().take(iteration_count) {
     let witness = compute_witness::<<E1 as Engine>::GE, <E2 as Engine>::GE>(
       current_public_input.clone(),
-      private_inputs[i].clone(),
+      private_input.clone(),
       witness_generator_file.clone(),
       &witness_generator_output,
     );
@@ -210,7 +209,7 @@ pub fn create_recursive_circuit<G1, G2>(
       .map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string())
       .collect();
 
-    let res = recursive_snark.prove_step(&pp, &circuit, &circuit_secondary);
+    let res = recursive_snark.prove_step(pp, &circuit, &circuit_secondary);
     assert!(res.is_ok());
   }
   fs::remove_file(witness_generator_output)?;

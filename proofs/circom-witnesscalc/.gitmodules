@@ -1,0 +1,9 @@
+[submodule "test_deps/iden3-circuits-authV2"]
+	path = test_deps/iden3-circuits-authV2
+	url = git@github.com:iden3/circuits.git
+[submodule "test_deps/iden3-circuits-master"]
+	path = test_deps/iden3-circuits-master
+	url = git@github.com:iden3/circuits.git
+[submodule "test_deps/circomlib"]
+	path = test_deps/circomlib
+	url = git@github.com:iden3/circomlib.git
