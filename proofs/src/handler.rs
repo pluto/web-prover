@@ -19,7 +19,7 @@ pub fn run_circuit(circuit_data: CircuitData) {
   for (key, values) in circuit_data.private_input.clone() {
     let batch_size = circuit_data.private_input.get(&key).unwrap().as_array().unwrap().len()
       / circuit_data.num_folds;
-    println!("batch size: {}", batch_size);
+    info!("batch size: {}", batch_size);
     for val in values.as_array().unwrap().chunks(batch_size) {
       let mut map: HashMap<String, Value> = HashMap::new();
       let mut data: Vec<Value> = Vec::new();

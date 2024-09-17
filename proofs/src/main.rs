@@ -2,21 +2,20 @@
 
 pub mod circom;
 pub mod handler;
+use std::{collections::HashMap, path::PathBuf};
+
 use circom::circuit::CircomCircuit;
+use clap::Parser;
+use handler::run_circuit;
 use nova_snark::{
   provider::{ipa_pc::EvaluationEngine, Bn256EngineIPA, GrumpkinEngine},
   spartan::snark::RelaxedR1CSSNARK,
   traits::{circuit::TrivialCircuit, Engine, Group},
 };
-use std::{collections::HashMap, path::PathBuf};
-use tracing::Level;
-use tracing_subscriber::FmtSubscriber;
-
-use clap::Parser;
-use handler::run_circuit;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tracing::{debug, info, trace};
+use tracing::{debug, info, trace, Level};
+use tracing_subscriber::FmtSubscriber;
 
 #[derive(Parser, Debug)]
 #[command(name = "prove")]
@@ -33,16 +32,16 @@ pub struct Args {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CircuitData {
   #[serde(rename = "circuit")]
-  pub circuit_path: PathBuf,
+  pub circuit_path:  PathBuf,
   #[serde(rename = "r1cs")]
-  pub r1cs_path: PathBuf,
+  pub r1cs_path:     PathBuf,
   #[serde(rename = "cbuild")]
-  pub cbuild_path: PathBuf,
+  pub cbuild_path:   PathBuf,
   #[serde(rename = "graph")]
-  pub graph_path: PathBuf,
+  pub graph_path:    PathBuf,
   pub private_input: HashMap<String, Value>,
-  pub num_folds: usize,
-  pub init_step_in: Vec<u64>,
+  pub num_folds:     usize,
+  pub init_step_in:  Vec<u64>,
 }
 
 pub type E1 = Bn256EngineIPA;
@@ -65,7 +64,7 @@ pub type C2 = TrivialCircuit<<E2 as Engine>::Scalar>;
 fn main() {
   let args = Args::parse();
   let file = args.input_file;
-  println!("Using file: {:?}", file);
+  info!("Using file: {:?}", file);
 
   // Logging options
   let log_level = match args.verbose {

@@ -1,40 +1,37 @@
-use std::io::BufReader;
-
-use fs::OpenOptions;
-
-use super::*;
-
-// This was borrowed from `nova-scotia`. Big thank you for this middleware!
-// some codes borrowed from https://github.com/poma/zkutil/blob/master/src/r1cs_reader.rs
-
-use crate::circom::circuit::Constraint;
-use byteorder::{LittleEndian, ReadBytesExt};
-use ff::PrimeField;
-use nova_snark::traits::Group;
 use std::{
   collections::HashMap,
-  io::{Error, ErrorKind, Read, Result, Seek, SeekFrom},
+  io::{BufReader, Error, ErrorKind, Read, Result, Seek, SeekFrom},
 };
+
+use byteorder::{LittleEndian, ReadBytesExt};
+use ff::PrimeField;
+use fs::OpenOptions;
+use nova_snark::traits::Group;
+
+use super::*;
+// This was borrowed from `nova-scotia`. Big thank you for this middleware!
+// some codes borrowed from https://github.com/poma/zkutil/blob/master/src/r1cs_reader.rs
+use crate::circom::circuit::Constraint;
 
 // R1CSFile's header
 #[derive(Debug, Default)]
 pub struct Header {
-  pub field_size: u32,
-  pub prime_size: Vec<u8>,
-  pub n_wires: u32,
-  pub n_pub_out: u32,
-  pub n_pub_in: u32,
-  pub n_prv_in: u32,
-  pub n_labels: u64,
+  pub field_size:    u32,
+  pub prime_size:    Vec<u8>,
+  pub n_wires:       u32,
+  pub n_pub_out:     u32,
+  pub n_pub_in:      u32,
+  pub n_prv_in:      u32,
+  pub n_labels:      u64,
   pub n_constraints: u32,
 }
 
 // R1CSFile parse result
 #[derive(Debug, Default)]
 pub struct R1CSFile<Fr: PrimeField> {
-  pub version: u32,
-  pub header: Header,
-  pub constraints: Vec<Constraint<Fr>>,
+  pub version:      u32,
+  pub header:       Header,
+  pub constraints:  Vec<Constraint<Fr>>,
   pub wire_mapping: Vec<u64>,
 }
 
@@ -67,10 +64,7 @@ fn read_header<R: Read>(mut reader: R, size: u64) -> Result<Header> {
   })
 }
 
-fn read_constraint_vec<R: Read, Fr: PrimeField>(
-  mut reader: R,
-  header: &Header,
-) -> Result<Vec<(usize, Fr)>> {
+fn read_constraint_vec<R: Read, Fr: PrimeField>(mut reader: R) -> Result<Vec<(usize, Fr)>> {
   let n_vec = reader.read_u32::<LittleEndian>()? as usize;
   let mut vec = Vec::with_capacity(n_vec);
   for _ in 0..n_vec {
@@ -81,16 +75,15 @@ fn read_constraint_vec<R: Read, Fr: PrimeField>(
 
 fn read_constraints<R: Read, Fr: PrimeField>(
   mut reader: R,
-  size: u64,
   header: &Header,
 ) -> Result<Vec<Constraint<Fr>>> {
   // todo check section size
   let mut vec = Vec::with_capacity(header.n_constraints as usize);
   for _ in 0..header.n_constraints {
     vec.push((
-      read_constraint_vec::<&mut R, Fr>(&mut reader, header)?,
-      read_constraint_vec::<&mut R, Fr>(&mut reader, header)?,
-      read_constraint_vec::<&mut R, Fr>(&mut reader, header)?,
+      read_constraint_vec::<&mut R, Fr>(&mut reader)?,
+      read_constraint_vec::<&mut R, Fr>(&mut reader)?,
+      read_constraint_vec::<&mut R, Fr>(&mut reader)?,
     ));
   }
   Ok(vec)
@@ -110,11 +103,12 @@ fn read_map<R: Read>(mut reader: R, size: u64, header: &Header) -> Result<Vec<u6
   Ok(vec)
 }
 
-pub fn from_reader<R: Read + Seek, G1, G2>(mut reader: R) -> Result<R1CSFile<<G1 as Group>::Scalar>>
+pub fn from_reader<R: Read + Seek, G1, G2>(
+  mut reader: R,
+) -> Result<R1CSFile<<G1 as Group>::Scalar>>
 where
   G1: Group<Base = <G2 as Group>::Scalar>,
-  G2: Group<Base = <G1 as Group>::Scalar>,
-{
+  G2: Group<Base = <G1 as Group>::Scalar>, {
   let mut magic = [0u8; 4];
   reader.read_exact(&mut magic)?;
   if magic != [0x72, 0x31, 0x63, 0x73] {
@@ -137,7 +131,7 @@ where
   for _ in 0..num_sections {
     let section_type = reader.read_u32::<LittleEndian>()?;
     let section_size = reader.read_u64::<LittleEndian>()?;
-    let offset = reader.seek(SeekFrom::Current(0))?;
+    let offset = reader.stream_position()?;
     section_offsets.insert(section_type, offset);
     section_sizes.insert(section_type, section_size);
     reader.seek(SeekFrom::Current(section_size as i64))?;
@@ -154,11 +148,7 @@ where
   }
 
   reader.seek(SeekFrom::Start(*section_offsets.get(&constraint_type).unwrap()))?;
-  let constraints = read_constraints::<&mut R, <G1 as Group>::Scalar>(
-    &mut reader,
-    *section_sizes.get(&constraint_type).unwrap(),
-    &header,
-  )?;
+  let constraints = read_constraints::<&mut R, F<G1>>(&mut reader, &header)?;
 
   reader.seek(SeekFrom::Start(*section_offsets.get(&wire2label_type).unwrap()))?;
   let wire_mapping = read_map(&mut reader, *section_sizes.get(&wire2label_type).unwrap(), &header)?;
@@ -170,8 +160,7 @@ where
 pub(crate) fn load_r1cs(filename: &PathBuf) -> R1CS<<G1 as Group>::Scalar>
 where
   G1: Group<Base = <G2 as Group>::Scalar>,
-  G2: Group<Base = <G1 as Group>::Scalar>,
-{
+  G2: Group<Base = <G1 as Group>::Scalar>, {
   let reader =
     BufReader::new(OpenOptions::new().read(true).open(filename).expect("unable to open."));
 
