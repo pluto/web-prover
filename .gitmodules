@@ -1,0 +1,3 @@
+[submodule "proofs/circom-witnesscalc"]
+	path = proofs/circom-witnesscalc
+	url = https://github.com/iden3/circom-witnesscalc.git
