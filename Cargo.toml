@@ -4,9 +4,9 @@ members=[
 	"client_ios",
 	"client_wasm",
 	"notary",
-	"proofs",
-	"proofs/circom-witnesscalc",
-	"proofs/Nova-Scotia",
+	# "proofs",
+	# "proofs/circom-witnesscalc",
+	# "proofs/Nova-Scotia",
 ]
 # members =["client", "client_wasm"] # config for wasm32 rust analyzer
 # members =["client", "client_ios"] # config for ios rust analyzer

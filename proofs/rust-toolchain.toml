@@ -1,6 +1,0 @@
-[toolchain]
-components=["rustc", "rust-std", "cargo", "rust-docs"]
-channel   ="stable"
-
-[rust]
-version="1.76.0"
