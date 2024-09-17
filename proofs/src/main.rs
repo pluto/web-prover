@@ -22,14 +22,12 @@ pub struct Args {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CircuitData {
-  #[serde(rename = "circom")]
-  pub circom_path: PathBuf,
+  #[serde(rename = "circuit")]
+  pub circuit_path: PathBuf,
   #[serde(rename = "r1cs")]
   pub r1cs_path: PathBuf,
   #[serde(rename = "cbuild")]
   pub cbuild_path: PathBuf,
-  #[serde(rename = "wgen")]
-  pub wgen_path: PathBuf,
   #[serde(rename = "graph")]
   pub graph_path: PathBuf,
   pub private_input: HashMap<String, Value>,

@@ -1,13 +1,8 @@
 use core::str;
 use std::{env::current_dir, ffi::OsStr, time::Instant};
 
-use circom::{
-  circuit::CircomCircuit, create_public_params, create_recursive_circuit, r1cs::load_r1cs,
-};
-use nova_snark::{
-  traits::{circuit::TrivialCircuit, Group},
-  CompressedSNARK,
-};
+use circom::{create_public_params, create_recursive_circuit, r1cs::load_r1cs};
+use nova_snark::CompressedSNARK;
 use serde_json::json;
 
 use super::*;
@@ -58,7 +53,7 @@ pub fn run_circuit(circuit_data: CircuitData) {
   println!("building circuit using witnesscalc: {:?}", circuit_data.cbuild_path.display());
   let output = std::process::Command::new(circuit_data.cbuild_path)
     .args([
-      circuit_data.circom_path.as_os_str(),
+      circuit_data.circuit_path.as_os_str(),
       circuit_data.graph_path.as_os_str(),
       OsStr::new("-l"),
       OsStr::new("node_modules"),

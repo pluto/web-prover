@@ -15,9 +15,6 @@ bellpepper-core = "0.4.0"
 byteorder = "1.5.0"
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
-circom_witnesscalc = { path = "circom-witnesscalc" }
-
+circom_witnesscalc = { git = "https://github.com/iden3/circom-witnesscalc" }
 
 clap = { version = "4.5.16", features = ["derive"] }
-
-[workspace]

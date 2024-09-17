@@ -59,15 +59,7 @@ pub fn create_recursive_circuit(
   private_inputs: Vec<HashMap<String, Value>>,
   start_public_input: Vec<F<G1>>,
   pp: &PublicParams<E1, E2, C1, C2>,
-) -> Result<
-  RecursiveSNARK<
-    E1,
-    E2,
-    CircomCircuit<<E1 as Engine>::Scalar>,
-    TrivialCircuit<<E2 as Engine>::Scalar>,
-  >,
-  std::io::Error,
-> {
+) -> Result<RecursiveSNARK<E1, E2, C1, C2>, std::io::Error> {
   use std::time::Instant;
 
   let iteration_count = private_inputs.len();
