@@ -49,10 +49,6 @@ pub fn create_public_params(
 where
   E1: Engine<Base = <E2 as Engine>::Scalar>,
   E2: Engine<Base = <E1 as Engine>::Scalar>,
-  circom::circuit::CircomCircuit<<E1 as nova_snark::traits::Engine>::Scalar>:
-    nova_snark::traits::circuit::StepCircuit<halo2curves::bn256::Fr>,
-  nova_snark::traits::circuit::TrivialCircuit<<E2 as nova_snark::traits::Engine>::Scalar>:
-    nova_snark::traits::circuit::StepCircuit<halo2curves::bn256::Fq>,
 {
   let circuit_primary = CircomCircuit::<<E1 as Engine>::Scalar> { r1cs, witness: None };
   let circuit_secondary = TrivialCircuit::<<E2 as Engine>::Scalar>::default();
