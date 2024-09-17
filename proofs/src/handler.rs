@@ -1,17 +1,18 @@
-use super::*;
-use std::{env::current_dir, time::Instant};
+use core::str;
+use std::{env::current_dir, ffi::OsStr, time::Instant};
 
 use nova_scotia::{
-  circom::reader::load_r1cs, create_public_params, create_recursive_circuit, FileLocation, F,
+  circom::reader::load_r1cs, create_public_params, create_recursive_circuit,
+  create_recursive_circuit_witnesscalc, FileLocation, F,
 };
 use nova_snark::{
   provider::{Bn256EngineIPA, GrumpkinEngine},
   traits::Engine,
-  CompressedSNARK, PublicParams,
+  CompressedSNARK, RecursiveSNARK,
 };
 use serde_json::json;
 
-use crate::CircuitData;
+use super::*;
 
 pub fn run_circuit(circuit_data: CircuitData) {
   // type G1 = provider::bn256_grumpkin::bn256::Point;
@@ -35,7 +36,17 @@ pub fn run_circuit(circuit_data: CircuitData) {
 
   let circuit_file = root.join(circuit_data.r1cs_path);
   let r1cs = load_r1cs::<G1, G2>(&FileLocation::PathBuf(circuit_file));
-  let witness_generator_file = root.join(circuit_data.wgen_path);
+  println!(
+    "r1cs: {:?}, {:?}, {:?}, {:?}",
+    r1cs.constraints.len(),
+    r1cs.num_aux,
+    r1cs.num_inputs,
+    r1cs.num_variables
+  );
+  let witness_generator_file = match circuit_data.wgen_type {
+    WitnessgenType::Node | WitnessgenType::Cpp => &circuit_data.wgen_path,
+    WitnessgenType::CircomWitnesscalc => &circuit_data.graph_path,
+  };
 
   // Map `private_input`
   let mut private_inputs: Vec<HashMap<String, Value>> = Vec::new();
@@ -66,6 +77,21 @@ pub fn run_circuit(circuit_data: CircuitData) {
   println!("Number of variables per step (primary circuit): {}", pp.num_variables().0);
   println!("Number of variables per step (secondary circuit): {}", pp.num_variables().1);
 
+  println!("building circuit using witnesscalc: {:?}", circuit_data.cbuild_path.display());
+  let output = std::process::Command::new(circuit_data.cbuild_path)
+    .args([
+      circuit_data.circom_path.as_os_str(),
+      circuit_data.graph_path.as_os_str(),
+      OsStr::new("-l"),
+      OsStr::new("node_modules"),
+    ])
+    .output()
+    .expect("failed to execute process");
+  if !output.stdout.is_empty() || !output.stderr.is_empty() {
+    print!("stdout: {}", str::from_utf8(&output.stdout).unwrap());
+    print!("stderr: {}", str::from_utf8(&output.stderr).unwrap());
+  }
+
   println!("Creating a RecursiveSNARK...");
   let start = Instant::now();
   let recursive_snark = create_recursive_circuit::<G1, G2>(
@@ -76,6 +102,14 @@ pub fn run_circuit(circuit_data: CircuitData) {
     &pp,
   )
   .unwrap();
+  // let recursive_snark = create_recursive_circuit_witnesscalc::<G1, G2>(
+  //   FileLocation::PathBuf(witness_generator_file.clone()),
+  //   r1cs.clone(),
+  //   private_inputs,
+  //   init_step_in.clone(),
+  //   &pp,
+  // )
+  // .unwrap();
   println!("RecursiveSNARK creation took {:?}", start.elapsed());
 
   // TODO: This seems like it has to be 0 for some reason lol

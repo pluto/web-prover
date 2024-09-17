@@ -146,7 +146,38 @@ where
 }
 
 #[cfg(not(target_family = "wasm"))]
-pub fn create_recursive_circuit<G1, G2>(
+fn compute_witnesscalc<G1, G2>(
+  current_public_input: Vec<String>,
+  private_input: HashMap<String, Value>,
+  witness_generator_file: &[u8],
+) -> Vec<<G1 as Group>::Scalar>
+where
+  G1: Group<Base = <G2 as Group>::Scalar>,
+  G2: Group<Base = <G1 as Group>::Scalar>,
+{
+  use std::time::{Duration, Instant};
+
+  use ff::PrimeField;
+
+  let decimal_stringified_input: Vec<String> = current_public_input
+    .iter()
+    .map(|x| BigInt::from_str_radix(x, 16).unwrap().to_str_radix(10))
+    .collect();
+
+  let input =
+    CircomInput { step_in: decimal_stringified_input.clone(), extra: private_input.clone() };
+
+  let input_json = serde_json::to_string(&input).unwrap();
+
+  let witness = circom_witnesscalc::calc_witness(&input_json, witness_generator_file).unwrap();
+  witness
+    .iter()
+    .map(|elem| <F<G1> as PrimeField>::from_str_vartime(elem.to_string().as_str()).unwrap())
+    .collect()
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub fn create_recursive_circuit_witnesscalc<G1, G2>(
   witness_generator_file: FileLocation,
   r1cs: R1CS<F<<E1 as Engine>::GE>>,
   private_inputs: Vec<HashMap<String, Value>>,
@@ -161,8 +192,7 @@ pub fn create_recursive_circuit<G1, G2>(
   >,
   std::io::Error,
 > {
-  let root = current_dir().unwrap();
-  let witness_generator_output = root.join("circom_witness.wtns");
+  use std::time::Instant;
 
   let iteration_count = private_inputs.len();
 
@@ -172,12 +202,19 @@ pub fn create_recursive_circuit<G1, G2>(
     .collect::<Vec<String>>();
   let mut current_public_input = start_public_input_hex.clone();
 
-  let witness_0 = compute_witness::<<E1 as Engine>::GE, <E2 as Engine>::GE>(
+  let mut graph_bin = vec![];
+  if let FileLocation::PathBuf(ref graph_path) = witness_generator_file {
+    graph_bin = std::fs::read(graph_path)?;
+  }
+
+  let mut now = Instant::now();
+  println!("private_inputs: {:?}", private_inputs[0]);
+  let witness_0 = compute_witnesscalc::<<E1 as Engine>::GE, <E2 as Engine>::GE>(
     current_public_input.clone(),
     private_inputs[0].clone(),
-    witness_generator_file.clone(),
-    &witness_generator_output,
+    &graph_bin,
   );
+  println!("witness generation for step 0: {:?}, {}", now.elapsed(), witness_0.len());
 
   let circuit_0 =
     CircomCircuit::<<E1 as Engine>::Scalar> { r1cs: r1cs.clone(), witness: Some(witness_0) };
@@ -193,13 +230,14 @@ pub fn create_recursive_circuit<G1, G2>(
     >::new(pp, &circuit_0, &circuit_secondary, &start_public_input, &z0_secondary)
     .unwrap();
 
-  for private_input in private_inputs.iter().take(iteration_count) {
-    let witness = compute_witness::<<E1 as Engine>::GE, <E2 as Engine>::GE>(
+  for (i, private_input) in private_inputs.iter().enumerate().take(iteration_count) {
+    now = Instant::now();
+    let witness = compute_witnesscalc::<<E1 as Engine>::GE, <E2 as Engine>::GE>(
       current_public_input.clone(),
       private_input.clone(),
-      witness_generator_file.clone(),
-      &witness_generator_output,
+      &graph_bin,
     );
+    // println!("witness generation for step {}: {:?}", i, now.elapsed());
 
     let circuit = CircomCircuit { r1cs: r1cs.clone(), witness: Some(witness) };
 
@@ -209,7 +247,88 @@ pub fn create_recursive_circuit<G1, G2>(
       .map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string())
       .collect();
 
+    now = Instant::now();
     let res = recursive_snark.prove_step(pp, &circuit, &circuit_secondary);
+    // println!("proving for step {}: {:?}", i, now.elapsed());
+    assert!(res.is_ok());
+  }
+
+  Ok(recursive_snark)
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub fn create_recursive_circuit<G1, G2>(
+  witness_generator_file: FileLocation,
+  r1cs: R1CS<F<<E1 as Engine>::GE>>,
+  private_inputs: Vec<HashMap<String, Value>>,
+  start_public_input: Vec<F<<E1 as Engine>::GE>>,
+  pp: &PublicParams<E1, E2, C1<<E1 as Engine>::GE>, C2<<E2 as Engine>::GE>>,
+) -> Result<
+  RecursiveSNARK<
+    E1,
+    E2,
+    CircomCircuit<<E1 as Engine>::Scalar>,
+    TrivialCircuit<<E2 as Engine>::Scalar>,
+  >,
+  std::io::Error,
+> {
+  use std::time::Instant;
+
+  let root = current_dir().unwrap();
+  let witness_generator_output = root.join("circom_witness.wtns");
+
+  let iteration_count = private_inputs.len();
+
+  let start_public_input_hex = start_public_input
+    .iter()
+    .map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string())
+    .collect::<Vec<String>>();
+  let mut current_public_input = start_public_input_hex.clone();
+
+  let mut now = Instant::now();
+  let witness_0 = compute_witness::<<E1 as Engine>::GE, <E2 as Engine>::GE>(
+    current_public_input.clone(),
+    private_inputs[0].clone(),
+    witness_generator_file.clone(),
+    &witness_generator_output,
+  );
+  println!("witness generation for step 0: {:?}, {}", now.elapsed(), witness_0.len());
+
+  let circuit_0 =
+    CircomCircuit::<<E1 as Engine>::Scalar> { r1cs: r1cs.clone(), witness: Some(witness_0) };
+  let circuit_secondary = TrivialCircuit::<<E2 as Engine>::Scalar>::default();
+  let z0_secondary = vec![<E2 as Engine>::Scalar::ZERO];
+
+  let mut recursive_snark =
+    RecursiveSNARK::<
+      E1,
+      E2,
+      CircomCircuit<<E1 as Engine>::Scalar>,
+      TrivialCircuit<<E2 as Engine>::Scalar>,
+    >::new(pp, &circuit_0, &circuit_secondary, &start_public_input, &z0_secondary)
+    .unwrap();
+
+  for (i, private_input) in private_inputs.iter().enumerate().take(iteration_count) {
+    now = Instant::now();
+    let witness = compute_witness::<<E1 as Engine>::GE, <E2 as Engine>::GE>(
+      current_public_input.clone(),
+      private_input.clone(),
+      witness_generator_file.clone(),
+      &witness_generator_output,
+    );
+    println!("witness generation for step {}: {:?}", i, now.elapsed());
+
+    let circuit = CircomCircuit { r1cs: r1cs.clone(), witness: Some(witness) };
+
+    let current_public_output = circuit.get_public_outputs();
+    current_public_input = current_public_output
+      .iter()
+      .map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string())
+      .collect();
+
+    now = Instant::now();
+    let res = recursive_snark.prove_step(pp, &circuit, &circuit_secondary);
+    println!("proving for step {}: {:?}", i, now.elapsed());
     assert!(res.is_ok());
   }
   fs::remove_file(witness_generator_output)?;

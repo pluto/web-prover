@@ -163,8 +163,12 @@
             125
         ]
     },
+    "circom": "circuits/parse_fold_batch.circom",
     "r1cs": "parse_fold_batch.r1cs",
+    "cbuild": "../target/release/build-circuit",
+    "wgen_type": "node",
     "wgen": "parse_fold_batch_js/parse_fold_batch.wasm",
+    "graph": "parse_fold_batch.bin",
     "num_folds": 4,
     "init_step_in": [
         0,
