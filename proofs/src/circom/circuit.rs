@@ -1,11 +1,8 @@
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, LinearCombination, SynthesisError};
+use ff::PrimeField;
 use nova_snark::traits::circuit::StepCircuit;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::str;
-
-// use bellperson::{ConstraintSystem, LinearCombination, SynthesisError};
-use ff::PrimeField;
+use std::{collections::BTreeMap, str};
 
 #[derive(Serialize, Deserialize)]
 pub struct CircuitJson {
@@ -32,10 +29,9 @@ pub struct R1CS<Fr: PrimeField> {
 pub struct CircomCircuit<Fr: PrimeField> {
   pub r1cs: R1CS<Fr>,
   pub witness: Option<Vec<Fr>>,
-  // debug symbols
 }
 
-impl<'a, Fr: PrimeField> CircomCircuit<Fr> {
+impl<Fr: PrimeField> CircomCircuit<Fr> {
   pub fn get_public_outputs(&self) -> Vec<Fr> {
     // NOTE: assumes exactly half of the (public inputs + outputs) are outputs
     let pub_output_count = (self.r1cs.num_inputs - 1) / 2;
@@ -63,18 +59,6 @@ impl<'a, Fr: PrimeField> CircomCircuit<Fr> {
     cs: &mut CS,
     z: &[AllocatedNum<Fr>],
   ) -> Result<Vec<AllocatedNum<Fr>>, SynthesisError> {
-    // println!("witness: {:?}", self.witness);
-    // // println!("wire_mapping: {:?}", self.wire_mapping);
-    // // println!("aux_offset: {:?}", self.aux_offset);
-    // println!("num_inputs: {:?}", self.r1cs.num_inputs);
-    // println!("num_aux: {:?}", self.r1cs.num_aux);
-    // println!("num_variables: {:?}", self.r1cs.num_variables);
-    // println!("constraints: {:?}", self.r1cs.constraints);
-    // println!(
-    //     "z: {:?}",
-    //     z.into_iter().map(|x| x.get_value()).collect::<Vec<_>>()
-    // );
-
     let witness = &self.witness;
 
     let mut vars: Vec<AllocatedNum<Fr>> = vec![];
@@ -145,7 +129,7 @@ impl<'a, Fr: PrimeField> CircomCircuit<Fr> {
   }
 }
 
-impl<'a, Fr: PrimeField> StepCircuit<Fr> for CircomCircuit<Fr> {
+impl<Fr: PrimeField> StepCircuit<Fr> for CircomCircuit<Fr> {
   fn arity(&self) -> usize {
     (self.r1cs.num_inputs - 1) / 2
   }
@@ -156,12 +140,6 @@ impl<'a, Fr: PrimeField> StepCircuit<Fr> for CircomCircuit<Fr> {
     z: &[AllocatedNum<Fr>],
   ) -> Result<Vec<AllocatedNum<Fr>>, SynthesisError> {
     // synthesize the circuit
-    let z_out = self.vanilla_synthesize(cs, z);
-
-    z_out
+    self.vanilla_synthesize(cs, z)
   }
-
-  // fn output(&self, _z: &[Fr]) -> Vec<Fr> {
-  //     self.get_public_outputs()
-  // }
 }

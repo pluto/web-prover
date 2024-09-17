@@ -4302,6 +4302,8 @@ dependencies = [
  "num-traits",
  "serde",
  "serde_json",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

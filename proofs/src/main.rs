@@ -1,3 +1,5 @@
+#![feature(internal_output_capture)]
+
 pub mod circom;
 pub mod handler;
 use circom::circuit::CircomCircuit;
@@ -7,17 +9,25 @@ use nova_snark::{
   traits::{circuit::TrivialCircuit, Engine, Group},
 };
 use std::{collections::HashMap, path::PathBuf};
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 
 use clap::Parser;
 use handler::run_circuit;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tracing::{debug, info, trace};
 
 #[derive(Parser, Debug)]
 #[command(name = "prove")]
 pub struct Args {
+  /// Setup file to use for generating proof
   #[arg(long, short, required = true)]
   input_file: PathBuf,
+
+  /// Increase logging verbosity (-v, -vv, -vvv, etc.)
+  #[arg(short, long, action = clap::ArgAction::Count)]
+  verbose: u8,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -53,8 +63,21 @@ pub type C2 = TrivialCircuit<<E2 as Engine>::Scalar>;
 // Run with `cargo run --release -i setup/test.json`
 // from the `./proofs/` dir.
 fn main() {
-  let file = Args::parse().input_file;
+  let args = Args::parse();
+  let file = args.input_file;
   println!("Using file: {:?}", file);
+
+  // Logging options
+  let log_level = match args.verbose {
+    0 => Level::ERROR,
+    1 => Level::WARN,
+    2 => Level::INFO,
+    3 => Level::DEBUG,
+    _ => Level::TRACE,
+  };
+  let subscriber = FmtSubscriber::builder().with_max_level(log_level).finish();
+  tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
   let read = std::fs::read(file).unwrap();
   let circuit_data: CircuitData = serde_json::from_slice(&read).unwrap();
   run_circuit(circuit_data);

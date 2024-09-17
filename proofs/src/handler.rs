@@ -13,14 +13,6 @@ pub fn run_circuit(circuit_data: CircuitData) {
 
   let circuit_file = root.join(circuit_data.r1cs_path);
   let r1cs = load_r1cs(&circuit_file);
-  println!(
-    "r1cs: {:?}, {:?}, {:?}, {:?}",
-    r1cs.constraints.len(),
-    r1cs.num_aux,
-    r1cs.num_inputs,
-    r1cs.num_variables
-  );
-  let witness_generator_file = &circuit_data.graph_path;
 
   // Map `private_input`
   let mut private_inputs: Vec<HashMap<String, Value>> = Vec::new();
@@ -44,13 +36,12 @@ pub fn run_circuit(circuit_data: CircuitData) {
 
   let pp = create_public_params(r1cs.clone());
 
-  println!("Number of constraints per step (primary circuit): {}", pp.num_constraints().0);
-  println!("Number of constraints per step (secondary circuit): {}", pp.num_constraints().1);
+  info!("Number of constraints per step (primary circuit): {}", pp.num_constraints().0);
+  info!("Number of constraints per step (secondary circuit): {}", pp.num_constraints().1);
 
-  println!("Number of variables per step (primary circuit): {}", pp.num_variables().0);
-  println!("Number of variables per step (secondary circuit): {}", pp.num_variables().1);
+  info!("Number of variables per step (primary circuit): {}", pp.num_variables().0);
+  info!("Number of variables per step (secondary circuit): {}", pp.num_variables().1);
 
-  println!("building circuit using witnesscalc: {:?}", circuit_data.cbuild_path.display());
   let output = std::process::Command::new(circuit_data.cbuild_path)
     .args([
       circuit_data.circuit_path.as_os_str(),
@@ -61,45 +52,45 @@ pub fn run_circuit(circuit_data: CircuitData) {
     .output()
     .expect("failed to execute process");
   if !output.stdout.is_empty() || !output.stderr.is_empty() {
-    print!("stdout: {}", str::from_utf8(&output.stdout).unwrap());
-    print!("stderr: {}", str::from_utf8(&output.stderr).unwrap());
+    trace!("stdout: {}", str::from_utf8(&output.stdout).unwrap());
+    trace!("stderr: {}", str::from_utf8(&output.stderr).unwrap());
   }
 
-  println!("Creating a RecursiveSNARK...");
+  debug!("Creating a RecursiveSNARK...");
   let start = Instant::now();
   let recursive_snark = create_recursive_circuit(
-    witness_generator_file,
+    &circuit_data.graph_path,
     r1cs.clone(),
     private_inputs,
     init_step_in.clone(),
     &pp,
   )
   .unwrap();
-  println!("RecursiveSNARK creation took {:?}", start.elapsed());
+  info!("RecursiveSNARK creation took {:?}", start.elapsed());
 
   // TODO: This seems like it has to be 0 for some reason lol
   let z0_secondary = [F::<G2>::from(0)];
 
   // verify the recursive SNARK
-  println!("Verifying a RecursiveSNARK...");
+  debug!("Verifying a RecursiveSNARK...");
   let start = Instant::now();
   let res = recursive_snark.verify(&pp, folds, &init_step_in, &z0_secondary);
-  println!("RecursiveSNARK::verify took {:?}", start.elapsed());
+  info!("RecursiveSNARK::verify took {:?}", start.elapsed());
   assert!(res.is_ok());
 
   // produce a compressed SNARK
-  println!("Generating a CompressedSNARK using Spartan with IPA-PC...");
+  debug!("Generating a CompressedSNARK using Spartan with IPA-PC...");
   let start = Instant::now();
   let (pk, vk) = CompressedSNARK::<_, _, _, _, S1, S2>::setup(&pp).unwrap();
   let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &pk, &recursive_snark);
-  println!("CompressedSNARK::prove: {:?}, took {:?}", res.is_ok(), start.elapsed());
+  info!("CompressedSNARK::prove: {:?}, took {:?}", res.is_ok(), start.elapsed());
   assert!(res.is_ok());
   let compressed_snark = res.unwrap();
 
   // verify the compressed SNARK
-  println!("Verifying a CompressedSNARK...");
+  debug!("Verifying a CompressedSNARK...");
   let start = Instant::now();
   let res = compressed_snark.verify(&vk, folds, &init_step_in, &z0_secondary);
-  println!("CompressedSNARK::verify: {:?}, took {:?}", res.is_ok(), start.elapsed());
+  info!("CompressedSNARK::verify: {:?}, took {:?}", res.is_ok(), start.elapsed());
   assert!(res.is_ok());
 }
