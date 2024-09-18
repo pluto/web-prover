@@ -144,14 +144,17 @@ pub fn run_program(circuit_data: CircuitData) {
     recursive_snark.prove_step(&pp, &circuit_primary, &circuit_secondary).unwrap();
     info!("Single step proof took: {:?}", start.elapsed());
 
+    dbg!(&recursive_snark.zi_primary());
+
     info!("Verifying single step...");
     let start = Instant::now();
     recursive_snark.verify(&pp, &z0_primary_fr, &z0_secondary).unwrap();
     info!("Single step verification took: {:?}", start.elapsed());
 
     // Update everything now for next step
-    memory.curr_private_input = private_inputs[idx].clone();
+    memory.curr_private_input = private_inputs[idx].clone(); // TODO: this is ineffective as it doesn't change in the recursive snark
     z0_primary_fr = circuit_primary.get_public_outputs(memory.rom[idx] as usize);
+    dbg!(&z0_primary_fr);
 
     recursive_snark_option = Some(recursive_snark);
   }
