@@ -141,23 +141,3 @@ impl<Fr: PrimeField> arecibo::traits::circuit::StepCircuit<Fr> for CircomCircuit
     self.vanilla_synthesize(cs, z)
   }
 }
-
-// impl<Fr: PrimeField> arecibo::supernova::StepCircuit<Fr> for CircomCircuit<Fr> {
-//   fn arity(&self) -> usize { (self.r1cs.num_inputs - 1) / 2 }
-
-//   // TODO: Not sure we need this or how to properly use it at least as it has to do with the
-// program   // counter
-//   // TODO: this is clearly fucked but this is getting called when we call `PublicParams::setup`
-// even   // though the enum wrapper should handle this?
-//   fn circuit_index(&self) -> usize { 0 }
-
-//   // TODO: I am explicitly ignoring the program counter here.
-//   fn synthesize<CS: ConstraintSystem<Fr>>(
-//     &self,
-//     cs: &mut CS,
-//     _pc: Option<&AllocatedNum<Fr>>,
-//     z: &[AllocatedNum<Fr>],
-//   ) -> Result<(Option<AllocatedNum<Fr>>, Vec<AllocatedNum<Fr>>), SynthesisError> {
-//     Ok((None, self.vanilla_synthesize(cs, z)?))
-//   }
-// }

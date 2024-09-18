@@ -912,6 +912,17 @@ dependencies = [
 [[package]]
 name = "bellpepper"
 version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ae286c2cb403324ab644c7cc68dceb25fe52ca9429908a726d7ed272c1edf7b"
+dependencies = [
+ "bellpepper-core",
+ "byteorder",
+ "ff",
+]
+
+[[package]]
+name = "bellpepper"
+version = "0.4.1"
 source = "git+https://github.com/argumentcomputer/bellpepper?branch=dev#d0225bf6cb2bb9abaff28ea96a3497f9829815f8"
 dependencies = [
  "bellpepper-core",
@@ -4374,11 +4385,13 @@ name = "proofs"
 version = "0.1.0"
 dependencies = [
  "arecibo",
+ "bellpepper 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bellpepper-core",
  "byteorder",
  "circom_witnesscalc",
  "clap",
  "ff",
+ "itertools 0.13.0",
  "num-bigint 0.4.6",
  "num-traits",
  "serde",
