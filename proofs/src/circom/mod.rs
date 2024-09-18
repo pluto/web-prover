@@ -5,10 +5,10 @@ use std::{
   sync::{Arc, Mutex},
 };
 
-use arecibo::supernova::{NonUniformCircuit, PublicParams, RecursiveSNARK};
+// use arecibo::supernova::{NonUniformCircuit, PublicParams, RecursiveSNARK};
 use arecibo::{
   traits::{circuit::TrivialCircuit, snark::RelaxedR1CSSNARKTrait, Engine, Group},
-  // PublicParams, RecursiveSNARK,
+  PublicParams, RecursiveSNARK,
 };
 use circom::circuit::{CircomCircuit, R1CS};
 use ff::{Field, PrimeField};
@@ -38,7 +38,7 @@ struct CircomInput {
   extra: HashMap<String, Value>,
 }
 
-fn compute_witness(
+pub fn compute_witness(
   current_public_input: Vec<String>,
   private_input: HashMap<String, Value>,
   graph_data: &[u8],
