@@ -3,10 +3,7 @@ use arecibo::{
   traits::snark::RelaxedR1CSSNARKTrait,
 };
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
-use circom::{
-  circuit::{self, R1CS},
-  r1cs::load_r1cs,
-};
+use circom::{circuit::R1CS, r1cs::load_r1cs};
 
 use super::*;
 
@@ -84,6 +81,7 @@ pub fn create_public_params(
 }
 
 pub fn run_program(circuit_data: CircuitData) {
+  info!("inside of supernova");
   let r1cs = load_r1cs(&circuit_data.r1cs_path);
   let circuit = CircomCircuit::<F<G1>> { r1cs: r1cs.clone(), witness: None }; // TODO: idk how to handle witness yet
   let circuit_selector = CircuitSelector::Parser(circuit);
@@ -123,18 +121,7 @@ pub fn run_program(circuit_data: CircuitData) {
     });
 
     recursive_snark.prove_step(&pp, &circuit_primary, &circuit_secondary).unwrap();
-    recursive_snark
-      .verify(&pp, &z0_primary, &z0_secondary)
-    //   .map_err(|err| {
-    //     print_constraints_name_on_error_index(
-    //       &err,
-    //       &pp,
-    //       &circuit_primary,
-    //       &circuit_secondary,
-    //       test_rom.num_circuits(),
-    //     )
-    //   })
-      .unwrap();
+    recursive_snark.verify(&pp, &z0_primary, &z0_secondary).unwrap();
 
     recursive_snark_option = Some(recursive_snark)
   }

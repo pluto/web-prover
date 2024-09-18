@@ -12,7 +12,7 @@ use arecibo::{
 };
 use circom::circuit::CircomCircuit;
 use clap::Parser;
-use ff::{Field, PrimeField};
+use ff::Field;
 use handler::run_circuit;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -29,6 +29,9 @@ pub struct Args {
   /// Increase logging verbosity (-v, -vv, -vvv, etc.)
   #[arg(short, long, action = clap::ArgAction::Count)]
   verbose: u8,
+
+  #[arg(short, long, value_enum)]
+  scheme: Scheme,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -44,6 +47,12 @@ pub struct CircuitData {
   pub private_input: HashMap<String, Value>,
   pub num_folds:     usize,
   pub init_step_in:  Vec<u64>,
+}
+
+#[derive(Clone, Debug, clap::ValueEnum)]
+pub enum Scheme {
+  Nova,
+  SuperNova,
 }
 
 pub type E1 = Bn256EngineIPA;
@@ -66,8 +75,6 @@ pub type C2 = TrivialCircuit<F<G2>>;
 // from the `./proofs/` dir.
 fn main() {
   let args = Args::parse();
-  let file = args.input_file;
-  info!("Using file: {:?}", file);
 
   // Logging options
   let log_level = match args.verbose {
@@ -80,7 +87,13 @@ fn main() {
   let subscriber = FmtSubscriber::builder().with_max_level(log_level).finish();
   tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
+  let file = args.input_file;
+  info!("Using file: {:?}", file);
+
   let read = std::fs::read(file).unwrap();
   let circuit_data: CircuitData = serde_json::from_slice(&read).unwrap();
-  run_circuit(circuit_data);
+  match args.scheme {
+    Scheme::Nova => run_circuit(circuit_data),
+    Scheme::SuperNova => program::run_program(circuit_data),
+  }
 }
