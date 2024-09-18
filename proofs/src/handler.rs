@@ -46,24 +46,34 @@ pub fn run_circuit(circuit_data: CircuitData) {
   info!("Number of variables per step (primary circuit): {}", pp.num_variables().0);
   info!("Number of variables per step (secondary circuit): {}", pp.num_variables().1);
 
-  let output = std::process::Command::new(circuit_data.cbuild_path)
-    .args([
-      circuit_data.circuit_path.as_os_str(),
-      circuit_data.graph_path.as_os_str(),
-      OsStr::new("-l"),
-      OsStr::new("node_modules"),
-    ])
-    .output()
-    .expect("failed to execute process");
-  if !output.stdout.is_empty() || !output.stderr.is_empty() {
-    trace!("stdout: {}", str::from_utf8(&output.stdout).unwrap());
-    trace!("stderr: {}", str::from_utf8(&output.stderr).unwrap());
+  let mut witness_generator_file: PathBuf = circuit_data.graph_path.clone();
+
+  match circuit_data.witness_gen_type {
+    WitnessGenType::CircomWitnesscalc => {
+      let output = std::process::Command::new(circuit_data.cbuild_path)
+        .args([
+          circuit_data.circuit_path.as_os_str(),
+          circuit_data.graph_path.as_os_str(),
+          OsStr::new("-l"),
+          OsStr::new("node_modules"),
+        ])
+        .output()
+        .expect("failed to execute process");
+      if !output.stdout.is_empty() || !output.stderr.is_empty() {
+        trace!("stdout: {}", str::from_utf8(&output.stdout).unwrap());
+        trace!("stderr: {}", str::from_utf8(&output.stderr).unwrap());
+      }
+    },
+    WitnessGenType::Node => {
+      witness_generator_file = circuit_data.witness_gen_file;
+    },
   }
 
   debug!("Creating a RecursiveSNARK...");
   let start = Instant::now();
   let recursive_snark = create_recursive_circuit(
-    &circuit_data.graph_path,
+    circuit_data.witness_gen_type,
+    &witness_generator_file,
     r1cs.clone(),
     private_inputs,
     init_step_in.clone(),
