@@ -1,5 +1,0 @@
-[default]
-extend-ignore-identifiers-re = [
-    # *sigh* this is load-bearing
-    "[Aa]bomonation",
-]
