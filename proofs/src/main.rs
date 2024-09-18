@@ -1,5 +1,6 @@
 #![feature(internal_output_capture)]
 
+pub mod builder;
 pub mod circom;
 pub mod handler;
 use std::{collections::HashMap, path::PathBuf};
@@ -55,8 +56,8 @@ pub type S2 = RelaxedR1CSSNARK<E2, EE2>; // non-preprocessing SNARK
 
 pub type F<G> = <G as Group>::Scalar;
 
-pub type C1 = CircomCircuit<<E1 as Engine>::Scalar>;
-pub type C2 = TrivialCircuit<<E2 as Engine>::Scalar>;
+pub type C1 = CircomCircuit<F<G1>>;
+pub type C2 = TrivialCircuit<F<G2>>;
 
 // Note:
 // Run with `cargo run --release -i setup/test.json`

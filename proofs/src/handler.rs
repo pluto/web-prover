@@ -1,8 +1,8 @@
 use core::str;
 use std::{env::current_dir, ffi::OsStr, time::Instant};
 
-use arecibo::CompressedSNARK;
-// use arecibo::supernova::snark::CompressedSNARK;
+// use arecibo::CompressedSNARK;
+use arecibo::supernova::snark::CompressedSNARK;
 use circom::{create_public_params, create_recursive_circuit, r1cs::load_r1cs};
 use serde_json::json;
 

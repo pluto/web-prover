@@ -5,9 +5,10 @@ use std::{
   sync::{Arc, Mutex},
 };
 
+use arecibo::supernova::{NonUniformCircuit, PublicParams, RecursiveSNARK};
 use arecibo::{
   traits::{circuit::TrivialCircuit, snark::RelaxedR1CSSNARKTrait, Engine, Group},
-  PublicParams, RecursiveSNARK,
+  // PublicParams, RecursiveSNARK,
 };
 use circom::circuit::{CircomCircuit, R1CS};
 use ff::{Field, PrimeField};
