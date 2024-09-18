@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, str};
 
+use arecibo::traits::circuit::StepCircuit;
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, LinearCombination, SynthesisError};
 use ff::PrimeField;
-use nova_snark::traits::circuit::StepCircuit;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]

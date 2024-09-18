@@ -1,22 +1,23 @@
 [package]
-name   ="proofs"
-version="0.1.0"
-edition="2021"
+name = "proofs"
+version = "0.1.0"
+edition = "2021"
 
 [dependencies]
-serde     ="1.0.210"
-serde_json="1.0.128"
+serde = "1.0.210"
+serde_json = "1.0.128"
 
-nova-snark     ={ version="0.37.0", default-features=false }
-ff             ={ version="0.13", features=["derive"] }
-bellpepper-core="0.4.0"
+arecibo = { path = "arecibo", default-features = false }
+# nova-snark = { version = "0.37.0", default-features = false }
+ff = { version = "0.13", features = ["derive"] }
+bellpepper-core = "0.4.0"
 
 # hex-literal = "0.4.1"
-byteorder         ="1.5.0"
-num-bigint        ="0.4.6"
-num-traits        ="0.2.19"
-circom_witnesscalc={ git="https://github.com/pluto/circom-witnesscalc" }
+byteorder = "1.5.0"
+num-bigint = "0.4.6"
+num-traits = "0.2.19"
+circom_witnesscalc = { git = "https://github.com/pluto/circom-witnesscalc" }
 
-clap                        ={ version="4.5.16", features=["derive"] }
-tracing.workspace           =true
-tracing-subscriber.workspace=true
+clap = { version = "4.5.16", features = ["derive"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true

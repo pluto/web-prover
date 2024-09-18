@@ -1,8 +1,9 @@
 use core::str;
 use std::{env::current_dir, ffi::OsStr, time::Instant};
 
+use arecibo::CompressedSNARK;
+// use arecibo::supernova::snark::CompressedSNARK;
 use circom::{create_public_params, create_recursive_circuit, r1cs::load_r1cs};
-use nova_snark::CompressedSNARK;
 use serde_json::json;
 
 use super::*;
@@ -75,14 +76,15 @@ pub fn run_circuit(circuit_data: CircuitData) {
   debug!("Verifying a RecursiveSNARK...");
   let start = Instant::now();
   let res = recursive_snark.verify(&pp, folds, &init_step_in, &z0_secondary);
+  // let res = recursive_snark.verify(&pp, &init_step_in, &z0_secondary); // supernova
   info!("RecursiveSNARK::verify took {:?}", start.elapsed());
   assert!(res.is_ok());
 
   // produce a compressed SNARK
   debug!("Generating a CompressedSNARK using Spartan with IPA-PC...");
   let start = Instant::now();
-  let (pk, vk) = CompressedSNARK::<_, _, _, _, S1, S2>::setup(&pp).unwrap();
-  let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &pk, &recursive_snark);
+  let (pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&pp).unwrap();
+  let res = CompressedSNARK::<E1, S1, S2>::prove(&pp, &pk, &recursive_snark);
   info!("CompressedSNARK::prove: {:?}, took {:?}", res.is_ok(), start.elapsed());
   assert!(res.is_ok());
   let compressed_snark = res.unwrap();

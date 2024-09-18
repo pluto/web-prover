@@ -5,12 +5,12 @@ use std::{
   sync::{Arc, Mutex},
 };
 
-use circom::circuit::{CircomCircuit, R1CS};
-use ff::{Field, PrimeField};
-use nova_snark::{
+use arecibo::{
   traits::{circuit::TrivialCircuit, snark::RelaxedR1CSSNARKTrait, Engine, Group},
   PublicParams, RecursiveSNARK,
 };
+use circom::circuit::{CircomCircuit, R1CS};
+use ff::{Field, PrimeField};
 use num_bigint::BigInt;
 use num_traits::Num;
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,7 @@ use super::*;
 pub mod circuit;
 pub mod r1cs;
 
-pub fn create_public_params(r1cs: R1CS<F<<E1 as Engine>::GE>>) -> PublicParams<E1, E2, C1, C2> {
+pub fn create_public_params(r1cs: R1CS<F<<E1 as Engine>::GE>>) -> PublicParams<E1> {
   let circuit_primary = CircomCircuit::<<E1 as Engine>::Scalar> { r1cs, witness: None };
   let circuit_secondary = TrivialCircuit::<<E2 as Engine>::Scalar>::default();
 
@@ -67,8 +67,8 @@ pub fn create_recursive_circuit(
   r1cs: R1CS<F<G1>>,
   private_inputs: Vec<HashMap<String, Value>>,
   start_public_input: Vec<F<G1>>,
-  pp: &PublicParams<E1, E2, C1, C2>,
-) -> Result<RecursiveSNARK<E1, E2, C1, C2>, std::io::Error> {
+  pp: &PublicParams<E1>,
+) -> Result<RecursiveSNARK<E1>, std::io::Error> {
   use std::time::Instant;
 
   let iteration_count = private_inputs.len();
@@ -87,12 +87,11 @@ pub fn create_recursive_circuit(
     compute_witness(current_public_input.clone(), private_inputs[0].clone(), &graph_bin);
   debug!("witness generation for step 0 took: {:?}, {}", now.elapsed(), witness_0.len());
 
-  let circuit_0 =
-    CircomCircuit::<<E1 as Engine>::Scalar> { r1cs: r1cs.clone(), witness: Some(witness_0) };
-  let circuit_secondary = TrivialCircuit::<<E2 as Engine>::Scalar>::default();
-  let z0_secondary = vec![<E2 as Engine>::Scalar::ZERO];
+  let circuit_0 = CircomCircuit::<F<G1>> { r1cs: r1cs.clone(), witness: Some(witness_0) };
+  let circuit_secondary = TrivialCircuit::<F<G2>>::default();
+  let z0_secondary = vec![<F<G2>>::ZERO];
 
-  let mut recursive_snark = RecursiveSNARK::<E1, E2, C1, C2>::new(
+  let mut recursive_snark = RecursiveSNARK::<E1>::new(
     pp,
     &circuit_0,
     &circuit_secondary,

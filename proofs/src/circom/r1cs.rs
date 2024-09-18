@@ -3,10 +3,10 @@ use std::{
   io::{BufReader, Error, ErrorKind, Read, Result, Seek, SeekFrom},
 };
 
+use arecibo::traits::Group;
 use byteorder::{LittleEndian, ReadBytesExt};
 use ff::PrimeField;
 use fs::OpenOptions;
-use nova_snark::traits::Group;
 
 use super::*;
 // This was borrowed from `nova-scotia`. Big thank you for this middleware!
