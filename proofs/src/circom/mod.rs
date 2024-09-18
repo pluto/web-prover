@@ -43,6 +43,7 @@ pub fn compute_witness(
   private_input: HashMap<String, Value>,
   graph_data: &[u8],
 ) -> Vec<<G1 as Group>::Scalar> {
+  // println!("inside compute witness --> graph_data: {graph_data:?}");
   let decimal_stringified_input: Vec<String> = current_public_input
     .iter()
     .map(|x| BigInt::from_str_radix(x, 16).unwrap().to_str_radix(10))
@@ -53,9 +54,10 @@ pub fn compute_witness(
 
   let input_json = serde_json::to_string(&input).unwrap();
 
-  // let witness = circom_witnesscalc::calc_witness(&input_json, graph_data).unwrap();
-  let witness =
-    capture_and_log(|| circom_witnesscalc::calc_witness(&input_json, graph_data).unwrap());
+  dbg!(&input_json);
+  let witness = circom_witnesscalc::calc_witness(&input_json, graph_data).unwrap();
+  // let witness =
+  //   capture_and_log(|| circom_witnesscalc::calc_witness(&input_json, graph_data).unwrap());
 
   witness
     .iter()

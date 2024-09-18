@@ -6,11 +6,12 @@ use arecibo::{
 };
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::{circuit::R1CS, r1cs::load_r1cs};
+use handler::map_private_inputs;
 use serde_json::json;
 
 use super::*;
 
-const ROM: &[u64] = &[0, 0, 0, 0];
+const ROM: &[u64] = &[0, 0];
 const PARSER_R1CS_PATH: &str = "parse_fold_batch.r1cs";
 
 use arecibo::supernova::{NonUniformCircuit, StepCircuit as SNStepCircuit};
@@ -42,18 +43,16 @@ impl NonUniformCircuit<E1> for Memory {
   fn num_circuits(&self) -> usize { 1 }
 
   fn primary_circuit(&self, circuit_index: usize) -> Self::C1 {
-    println!("checking primary circuit with: {circuit_index}");
+    println!("checking primary circuit with index: {circuit_index}");
     let r1cs = load_r1cs(&PathBuf::from(PARSER_R1CS_PATH));
-    compute_witness(
+    let witness = compute_witness(
       self.curr_public_input.clone(),
       self.curr_private_input.clone(),
       &self.graph_bin,
     );
+    println!("got witness");
     match circuit_index {
-      0 => CircuitSelector::Parser(CircomCircuit::<F<G1>> {
-        r1cs,
-        witness: None, // Some(witness),
-      }),
+      0 => CircuitSelector::Parser(CircomCircuit::<F<G1>> { r1cs, witness: Some(witness) }),
       _ => panic!("Incorrect circuit index provided!"),
     }
   }
@@ -90,56 +89,19 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
   }
 }
 
-pub fn create_public_params(
-  r1cs: R1CS<F<G1>>,
-  public_input: Vec<String>,
-  private_input: HashMap<String, Value>,
-  graph_bin: &[u8],
-) -> PublicParams<E1> {
-  println!("inside this bad boi");
-  //   let witness = compute_witness(public_input, private_input, graph_data); // This didn't seem
-  // to work?
-  //   let non_uniform_circuit = CircuitSelector::Parser(CircomCircuit::<F<G1>> {
-  //     r1cs:    r1cs.clone(),
-  //     witness: None, // Some(witness),
-  //   });
-  let rom = Memory {
-    rom:                ROM.to_vec(),
-    curr_public_input:  public_input,
-    graph_bin:          graph_bin.to_vec(),
-    curr_private_input: private_input,
-  };
-  println!("calling setup");
-  PublicParams::setup(&rom, &*S1::ck_floor(), &*S2::ck_floor())
-}
-
 pub fn run_program(circuit_data: CircuitData) {
   info!("inside of supernova");
   let r1cs = load_r1cs(&circuit_data.r1cs_path);
   //   dbg!(r1cs.clone().num_inputs); // prints
   //   let circuit = CircomCircuit::<F<G1>> { r1cs: r1cs.clone(), witness: None }; // TODO: idk how
   // to handle witness yet   let circuit_selector = CircuitSelector::Parser(circuit);
-  let graph_bin = std::fs::read(circuit_data.graph_path).unwrap(); // graph data for parser probably, this is getting jankj
+  let graph_bin = std::fs::read(&circuit_data.graph_path).unwrap(); // graph data for parser probably, this is getting jankj
   let z0_primary: Vec<String> = circuit_data.init_step_in.iter().map(u64::to_string).collect();
   let z0_primary_fr: Vec<F<G1>> =
     circuit_data.init_step_in.iter().map(|val| F::<G1>::from(*val)).collect();
 
   // Map `private_input`
-  let mut private_inputs: Vec<HashMap<String, Value>> = Vec::new();
-  for (key, values) in circuit_data.private_input.clone() {
-    let batch_size = circuit_data.private_input.get(&key).unwrap().as_array().unwrap().len()
-      / circuit_data.num_folds;
-    info!("batch size: {}", batch_size);
-    for val in values.as_array().unwrap().chunks(batch_size) {
-      let mut map: HashMap<String, Value> = HashMap::new();
-      let mut data: Vec<Value> = Vec::new();
-      for individual in val {
-        data.push(individual.clone());
-      }
-      map.insert(key.clone(), json!(data));
-      private_inputs.push(map);
-    }
-  }
+  let private_inputs = map_private_inputs(&circuit_data);
 
   let memory = Memory {
     rom:                ROM.to_vec(),
@@ -147,19 +109,12 @@ pub fn run_program(circuit_data: CircuitData) {
     graph_bin:          graph_bin.clone(),
     curr_private_input: private_inputs[0].clone(),
   };
-  //   dbg!(graph_data.clone()); // prints
 
-  let pp = create_public_params(r1cs, z0_primary.clone(), circuit_data.private_input, &graph_bin);
-  //   dbg!(&pp);
+  let pp = PublicParams::setup(&memory, &*S1::ck_floor(), &*S2::ck_floor());
 
-  // extend z0_primary with ROM
-  //   z0_primary.push(F::<G1>::ZERO); // rom_index = 0
-  //   z0_primary.extend(ROM.iter().map(|opcode| F::<G1>::from(*opcode)));
-
-  // extend z0 secondary with ROM? (not sure i understand this)
   let z0_secondary = vec![F::<G2>::ZERO];
 
-  let mut recursive_snark_option: Option<RecursiveSNARK<E1>> = None; // TODO: literally no clue what this is
+  let mut recursive_snark_option: Option<RecursiveSNARK<E1>> = None;
 
   for (idx, &op_code) in ROM.iter().enumerate() {
     info!("Step {} of ROM", idx);

@@ -11,25 +11,11 @@ pub fn run_circuit(circuit_data: CircuitData) {
   let folds = circuit_data.num_folds;
   let root = current_dir().unwrap();
 
-  let circuit_file = root.join(circuit_data.r1cs_path);
+  let circuit_file = root.join(&circuit_data.r1cs_path);
   let r1cs = load_r1cs(&circuit_file);
 
   // Map `private_input`
-  let mut private_inputs: Vec<HashMap<String, Value>> = Vec::new();
-  for (key, values) in circuit_data.private_input.clone() {
-    let batch_size = circuit_data.private_input.get(&key).unwrap().as_array().unwrap().len()
-      / circuit_data.num_folds;
-    info!("batch size: {}", batch_size);
-    for val in values.as_array().unwrap().chunks(batch_size) {
-      let mut map: HashMap<String, Value> = HashMap::new();
-      let mut data: Vec<Value> = Vec::new();
-      for individual in val {
-        data.push(individual.clone());
-      }
-      map.insert(key.clone(), json!(data));
-      private_inputs.push(map);
-    }
-  }
+  let private_inputs = map_private_inputs(&circuit_data);
 
   // Map `step_in` public input
   let init_step_in: Vec<F<G1>> = circuit_data.init_step_in.into_iter().map(F::<G1>::from).collect();
@@ -94,4 +80,23 @@ pub fn run_circuit(circuit_data: CircuitData) {
   let res = compressed_snark.verify(&vk, folds, &init_step_in, &z0_secondary);
   info!("CompressedSNARK::verify: {:?}, took {:?}", res.is_ok(), start.elapsed());
   assert!(res.is_ok());
+}
+
+pub fn map_private_inputs(circuit_data: &CircuitData) -> Vec<HashMap<String, Value>> {
+  let mut private_inputs: Vec<HashMap<String, Value>> = Vec::new();
+  for (key, values) in circuit_data.private_input.clone() {
+    let batch_size = circuit_data.private_input.get(&key).unwrap().as_array().unwrap().len()
+      / circuit_data.num_folds;
+    info!("batch size: {}", batch_size);
+    for val in values.as_array().unwrap().chunks(batch_size) {
+      let mut map: HashMap<String, Value> = HashMap::new();
+      let mut data: Vec<Value> = Vec::new();
+      for individual in val {
+        data.push(individual.clone());
+      }
+      map.insert(key.clone(), json!(data));
+      private_inputs.push(map);
+    }
+  }
+  private_inputs
 }
