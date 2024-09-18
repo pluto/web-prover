@@ -22,9 +22,9 @@ use super::*;
 pub mod circuit;
 pub mod r1cs;
 
-pub fn create_public_params(r1cs: R1CS<F<<E1 as Engine>::GE>>) -> PublicParams<E1> {
-  let circuit_primary = CircomCircuit::<<E1 as Engine>::Scalar> { r1cs, witness: None };
-  let circuit_secondary = TrivialCircuit::<<E2 as Engine>::Scalar>::default();
+pub fn create_public_params(r1cs: R1CS<F<G1>>) -> PublicParams<E1> {
+  let circuit_primary = CircomCircuit::<F<G1>> { r1cs, witness: None };
+  let circuit_secondary = TrivialCircuit::<F<G2>>::default();
 
   PublicParams::setup(&circuit_primary, &circuit_secondary, &*S1::ck_floor(), &*S2::ck_floor())
     .unwrap() // nova setup
@@ -80,6 +80,7 @@ pub fn create_recursive_circuit(
     .collect::<Vec<String>>();
   let mut current_public_input = start_public_input_hex.clone();
 
+  // TODO: This should be held in memory instead of read every time.
   let graph_bin = std::fs::read(witness_generator_file)?;
 
   let mut now = Instant::now();

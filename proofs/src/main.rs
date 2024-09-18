@@ -1,6 +1,5 @@
 #![feature(internal_output_capture)]
 
-pub mod builder;
 pub mod circom;
 pub mod handler;
 pub mod program;
@@ -13,6 +12,7 @@ use arecibo::{
 };
 use circom::circuit::CircomCircuit;
 use clap::Parser;
+use ff::{Field, PrimeField};
 use handler::run_circuit;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
