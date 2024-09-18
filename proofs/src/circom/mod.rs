@@ -5,7 +5,7 @@ use std::{
   sync::{Arc, Mutex},
 };
 
-// use arecibo::supernova::{NonUniformCircuit, PublicParams, RecursiveSNARK};
+// use arecibo::supernova::{PublicParams, RecursiveSNARK, TrivialTestCircuit};
 use arecibo::{
   traits::{circuit::TrivialCircuit, snark::RelaxedR1CSSNARKTrait, Engine, Group},
   PublicParams, RecursiveSNARK,
@@ -27,7 +27,7 @@ pub fn create_public_params(r1cs: R1CS<F<<E1 as Engine>::GE>>) -> PublicParams<E
   let circuit_secondary = TrivialCircuit::<<E2 as Engine>::Scalar>::default();
 
   PublicParams::setup(&circuit_primary, &circuit_secondary, &*S1::ck_floor(), &*S2::ck_floor())
-    .unwrap()
+    .unwrap() // nova setup
 }
 
 #[derive(Serialize, Deserialize)]

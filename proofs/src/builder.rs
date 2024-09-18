@@ -31,5 +31,5 @@ impl NonUniformCircuit<E1> for CircuitType {
     }
   }
 
-  fn secondary_circuit(&self) -> Self::C2 { todo!() }
+  fn secondary_circuit(&self) -> Self::C2 { TrivialTestCircuit::default() }
 }

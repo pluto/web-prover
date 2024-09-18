@@ -1,11 +1,8 @@
 use std::{collections::BTreeMap, str};
 
-use arecibo::traits::circuit::StepCircuit;
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, LinearCombination, SynthesisError};
 use ff::PrimeField;
 use serde::{Deserialize, Serialize};
-
-use super::*;
 
 #[derive(Serialize, Deserialize)]
 pub struct CircuitJson {
@@ -132,7 +129,7 @@ impl<Fr: PrimeField> CircomCircuit<Fr> {
   }
 }
 
-impl<Fr: PrimeField> StepCircuit<Fr> for CircomCircuit<Fr> {
+impl<Fr: PrimeField> arecibo::traits::circuit::StepCircuit<Fr> for CircomCircuit<Fr> {
   fn arity(&self) -> usize { (self.r1cs.num_inputs - 1) / 2 }
 
   fn synthesize<CS: ConstraintSystem<Fr>>(
