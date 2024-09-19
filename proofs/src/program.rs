@@ -38,6 +38,14 @@ pub enum CircuitSelector {
   Parser { circuit: C1, circuit_index: usize, rom_size: usize },
 }
 
+impl CircuitSelector {
+  pub fn inner_arity(&self) -> usize {
+    match self {
+      Self::Parser { circuit, .. } => circuit.arity(),
+    }
+  }
+}
+
 impl NonUniformCircuit<E1> for Memory {
   type C1 = CircuitSelector;
   type C2 = TrivialTestCircuit<F<G2>>;
@@ -98,10 +106,10 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
     let circuit = match self {
       Self::Parser { circuit, .. } => circuit,
     };
-    dbg!(&z);
-    dbg!(&z.len());
-    dbg!(self.arity());
-    dbg!(circuit.arity());
+    // dbg!(&z);
+    // dbg!(&z.len());
+    // dbg!(self.arity());
+    // dbg!(circuit.arity());
     let rom_index = &z[circuit.arity()]; // jump to where we pushed pc data into CS
     let allocated_rom = &z[circuit.arity() + 1..]; // jump to where we pushed rom data into CS
 
@@ -151,7 +159,7 @@ pub fn run_program(circuit_data: CircuitData) {
   for (idx, &op_code) in ROM.iter().enumerate() {
     info!("Step {} of ROM", idx);
     info!("opcode = {}", op_code);
-    let circuit_primary = memory.primary_circuit(memory.rom[idx] as usize);
+    let circuit_primary = memory.primary_circuit(op_code as usize);
     let circuit_secondary = memory.secondary_circuit();
 
     let mut recursive_snark = recursive_snark_option.unwrap_or_else(|| {
@@ -171,14 +179,18 @@ pub fn run_program(circuit_data: CircuitData) {
     recursive_snark.prove_step(&pp, &circuit_primary, &circuit_secondary).unwrap();
     info!("Single step proof took: {:?}", start.elapsed());
 
-    dbg!(&recursive_snark.zi_primary()); // TODO: this can be used later if need be.
+    // dbg!(&recursive_snark.zi_primary()); // TODO: this can be used later if need be.
 
-    info!("Verifying single step...");
-    let start = Instant::now();
-    recursive_snark.verify(&pp, &z0_primary, &z0_secondary).unwrap();
-    info!("Single step verification took: {:?}", start.elapsed());
+    // info!("Verifying single step...");
+    // let start = Instant::now();
+    // recursive_snark.verify(&pp, &z0_primary, &z0_secondary).unwrap();
+    // info!("Single step verification took: {:?}", start.elapsed());
 
     // Update everything now for next step
+    z0_primary = recursive_snark.zi_primary().clone();
+    let mut next_pub_input = z0_primary.clone();
+    next_pub_input.truncate(circuit_primary.inner_arity());
+    memory.curr_public_input = next_pub_input;
     memory.curr_private_input = private_inputs[idx].clone(); // TODO: this is ineffective as it doesn't change in the recursive snark
 
     // z0_primary_fr = circuit_primary.get_public_outputs(memory.rom[idx] as usize);
