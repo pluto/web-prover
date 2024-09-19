@@ -13,8 +13,8 @@ pragma circom 2.1.9;
 include "parser-attestor/circuits/json/interpreter.circom";
 
 template ExtractValue(DATA_BYTES, PER_FOLD_LENGTH, MAX_STACK_HEIGHT, keyLen1, depth1, maxValueLen) {
-    // stack, parsing_string, parsing_number, is_key1_match_for_value, value_starting_index, curr_fold_index
-    var fold_input_len = MAX_STACK_HEIGHT*2+5;
+    // stack, parsing_string, parsing_number, is_key1_match_for_value, value_starting_index, curr_fold_index, value_first_chunk
+    var fold_input_len = MAX_STACK_HEIGHT*2+6;
     signal input step_in[fold_input_len];
 
     signal input data[DATA_BYTES];
@@ -36,15 +36,12 @@ template ExtractValue(DATA_BYTES, PER_FOLD_LENGTH, MAX_STACK_HEIGHT, keyLen1, de
     // TODO: add a array match at `CURR_FOLD_INDEX` for data and data_fold
     // signal CURR_FOLD_INDEX <== step_in[MAX_STACK_HEIGHT*2 + 4];
 
-
-    signal value_starting_index[PER_FOLD_LENGTH];
-
     signal mask[PER_FOLD_LENGTH];
-    // mask[0] <== 0;
+    signal value_starting_index[PER_FOLD_LENGTH];
 
     component State[PER_FOLD_LENGTH];
     State[0] = StateUpdate(MAX_STACK_HEIGHT);
-    State[0].byte           <== data[0];
+    State[0].byte           <== data_fold[0];
     for(var i = 0; i < MAX_STACK_HEIGHT; i++) {
         State[0].stack[i]   <== [step_in[i*2], step_in[i*2+1]];
     }
@@ -108,28 +105,38 @@ template ExtractValue(DATA_BYTES, PER_FOLD_LENGTH, MAX_STACK_HEIGHT, keyLen1, de
         data_index[data_idx] <== data_index[data_idx-1] + 1;
         is_key1_match[data_idx] <== KeyMatchAtDepth(DATA_BYTES, MAX_STACK_HEIGHT, keyLen1, depth1)(data, key1, r, data_index[data_idx], parsing_key[data_idx], State[data_idx].next_stack);
         is_next_pair_at_depth1[data_idx] <== NextKVPairAtDepth(MAX_STACK_HEIGHT, depth1)(State[data_idx].next_stack, data_fold[data_idx]);
+        // log("i", data_idx, data_fold[data_idx]);
+        // log("stack", State[data_idx].next_stack[0][0], State[data_idx].next_stack[0][1]);
         // pichla
         is_key1_match_for_value[data_idx+1] <== Mux1()([is_key1_match_for_value[data_idx] * (1-is_next_pair_at_depth1[data_idx]), is_key1_match[data_idx] * (1-is_next_pair_at_depth1[data_idx])], is_key1_match[data_idx]);
+        // log("is_key_match", is_key1_match_for_value[data_idx], is_next_pair_at_depth1[data_idx], is_key1_match[data_idx]);
         is_value_match[data_idx] <== MultiAND(1)([is_key1_match_for_value[data_idx+1]]);
 
 
         // mask[i] = data[i] * parsing_value[i] * is_key_match_for_value[i]
         value_mask[data_idx] <== data_fold[data_idx] * parsing_value[data_idx];
         mask[data_idx] <== value_mask[data_idx] * is_value_match[data_idx];
-        log("mask: ", data_idx, mask[data_idx]);
+        // log("mask: ", mask[data_idx], parsing_value[data_idx], is_value_match[data_idx]);
+        // log("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
     }
 
     signal is_zero_mask[PER_FOLD_LENGTH];
     signal is_prev_starting_index[PER_FOLD_LENGTH];
+    signal is_value_inside_chunk[PER_FOLD_LENGTH];
     value_starting_index[0] <== step_in[MAX_STACK_HEIGHT*2 + 3];
     is_zero_mask[0] <== IsZero()(mask[0]);
+    signal is_value_starting_index_zero <== IsZero()(value_starting_index[0]);
+    is_value_inside_chunk[0] <== (1-is_zero_mask[0]) * is_value_starting_index_zero;
     for (var i=1 ; i<PER_FOLD_LENGTH ; i++) {
         is_zero_mask[i] <== IsZero()(mask[i]);
         is_prev_starting_index[i] <== IsZero()(value_starting_index[i-1]);
+        is_value_inside_chunk[i] <==  is_value_inside_chunk[i-1] + (1-is_zero_mask[i]) * is_prev_starting_index[i];
         value_starting_index[i] <== value_starting_index[i-1] + i * (1-is_zero_mask[i]) * is_prev_starting_index[i];
     }
 
     signal output step_out[fold_input_len];
+
+    // add stack output for next fold
     for (var i=0 ; i<MAX_STACK_HEIGHT ; i++) {
         step_out[i*2] <== State[PER_FOLD_LENGTH-1].next_stack[i][0];
         step_out[i*2+1] <== State[PER_FOLD_LENGTH-1].next_stack[i][1];
@@ -137,10 +144,30 @@ template ExtractValue(DATA_BYTES, PER_FOLD_LENGTH, MAX_STACK_HEIGHT, keyLen1, de
     }
     step_out[MAX_STACK_HEIGHT*2] <== State[PER_FOLD_LENGTH-1].next_parsing_string;
     step_out[MAX_STACK_HEIGHT*2 + 1] <== State[PER_FOLD_LENGTH-1].next_parsing_number;
+
+    // is key matched for the value being parsed with next fold
     step_out[MAX_STACK_HEIGHT*2 + 2] <== is_key1_match_for_value[PER_FOLD_LENGTH];
-    step_out[MAX_STACK_HEIGHT*2 + 3] <== value_starting_index[PER_FOLD_LENGTH-1] + PER_FOLD_LENGTH * step_in[MAX_STACK_HEIGHT*2 + 4];
+
+    // add fold length to value_starting_index if value found in this chunk is non-zero
+    signal prev_found_value <== IsZero()(is_value_inside_chunk[PER_FOLD_LENGTH-1]);
+    // is value found in any of the previous chunk
+    signal is_value_not_found_in_previous_chunks <== IsZero()(step_in[MAX_STACK_HEIGHT*2 + 5]);
+    // is value starting in current chunk
+    signal is_value_starting_in_curr_chunk <== (1 - prev_found_value) * is_value_not_found_in_previous_chunks;
+    signal value_first_chunk <== Mux1()([step_in[MAX_STACK_HEIGHT*2+5], step_in[MAX_STACK_HEIGHT*2 + 4]], is_value_starting_in_curr_chunk);
+
+    signal whether_add_index <== IsZero()(is_value_starting_in_curr_chunk);
+    signal index_addition <== Mux1()([0, PER_FOLD_LENGTH * step_in[MAX_STACK_HEIGHT*2+4]], 1-whether_add_index);
+    step_out[MAX_STACK_HEIGHT*2 + 3] <== value_starting_index[PER_FOLD_LENGTH-1] + index_addition;
+
+    // increment current fold index
     step_out[MAX_STACK_HEIGHT*2 + 4] <== step_in[MAX_STACK_HEIGHT*2 + 4] + 1;
-    log("step_out: ", step_out[MAX_STACK_HEIGHT*2], step_out[MAX_STACK_HEIGHT*2+1], step_out[MAX_STACK_HEIGHT*2+2], step_out[MAX_STACK_HEIGHT*2+3], step_out[MAX_STACK_HEIGHT*2+4]);
+
+    // value found in which chunk
+    step_out[MAX_STACK_HEIGHT*2 + 5] <== value_first_chunk;
+
+    // debug logs
+    // log("step_out: ", step_out[MAX_STACK_HEIGHT*2], step_out[MAX_STACK_HEIGHT*2+1], step_out[MAX_STACK_HEIGHT*2+2], step_out[MAX_STACK_HEIGHT*2+3], step_out[MAX_STACK_HEIGHT*2+4], step_out[MAX_STACK_HEIGHT*2+5]);
 }
 
 // template ExtractStringValue(DATA_BYTES, MAX_STACK_HEIGHT, keyLen1, depth1, maxValueLen) {
@@ -157,4 +184,4 @@ template ExtractValue(DATA_BYTES, PER_FOLD_LENGTH, MAX_STACK_HEIGHT, keyLen1, de
 //     value <== SelectSubArray(DATA_BYTES, maxValueLen)(data, value_starting_index[DATA_BYTES-2]+1, maxValueLen);
 // }
 
-component main { public [step_in] } = ExtractValue(40, 10, 2, 4, 0, 3);
+component main { public [step_in] } = ExtractValue(60, 10, 1, 4, 0, 23);
