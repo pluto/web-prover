@@ -169,6 +169,8 @@
     "r1cs": "parse_fold.r1cs",
     "cbuild": "build-circuit",
     "graph": "parse_fold.bin",
+    "wgen_type": "circom-witnesscalc",
+    "wgen": "build/parse_fold/parse_fold_js/parse_fold.wasm",
     "num_folds": 160,
     "init_step_in": [
         0,
