@@ -15,6 +15,8 @@ template ParseFold() {
     State.parsing_string <== step_in[4];
     State.parsing_number <== step_in[5];
 
+    State: { Stack, ParsingString, ParsingNumber }
+
     signal output step_out[6];
     step_out[0] <== State.next_stack[0][0];
     step_out[1] <== State.next_stack[0][1];

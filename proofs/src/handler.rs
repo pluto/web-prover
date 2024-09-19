@@ -100,3 +100,19 @@ pub fn map_private_inputs(circuit_data: &CircuitData) -> Vec<HashMap<String, Val
   }
   private_inputs
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_map_private_inputs() {
+    let read = std::fs::read("setup/fold_batch.json").unwrap();
+    let circuit_data: CircuitData = serde_json::from_slice(&read).unwrap();
+    // dbg!(circuit_data);
+
+    let inputs = map_private_inputs(&circuit_data);
+    dbg!(inputs.len());
+    dbg!(inputs);
+  }
+}

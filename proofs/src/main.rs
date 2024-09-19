@@ -61,8 +61,7 @@ pub type G1 = <E1 as Engine>::GE;
 pub type G2 = <E2 as Engine>::GE;
 pub type EE1 = EvaluationEngine<E1>;
 pub type EE2 = EvaluationEngine<E2>;
-// pub type S1 = RelaxedR1CSSNARK<E1, EE1>; // non-preprocessing SNARK for nova
-pub type S1 = BatchedRelaxedR1CSSNARK<E1, EE1>;
+pub type S1 = RelaxedR1CSSNARK<E1, EE1>; // non-preprocessing SNARK
 pub type S2 = RelaxedR1CSSNARK<E2, EE2>; // non-preprocessing SNARK
 
 pub type F<G> = <G as Group>::Scalar;

@@ -20,7 +20,7 @@ use serde_json::json;
 
 use super::*;
 
-const ROM: &[u64] = &[0, 0];
+const ROM: &[u64] = &[0, 0, 0, 0];
 const PARSER_R1CS_PATH: &str = "parse_fold_batch.r1cs";
 
 use arecibo::supernova::{NonUniformCircuit, StepCircuit as SNStepCircuit};
@@ -181,20 +181,18 @@ pub fn run_program(circuit_data: CircuitData) {
 
     // dbg!(&recursive_snark.zi_primary()); // TODO: this can be used later if need be.
 
-    // info!("Verifying single step...");
-    // let start = Instant::now();
-    // recursive_snark.verify(&pp, &z0_primary, &z0_secondary).unwrap();
-    // info!("Single step verification took: {:?}", start.elapsed());
+    info!("Verifying single step...");
+    let start = Instant::now();
+    recursive_snark.verify(&pp, &z0_primary, &z0_secondary).unwrap();
+    info!("Single step verification took: {:?}", start.elapsed());
 
     // Update everything now for next step
-    z0_primary = recursive_snark.zi_primary().clone();
-    let mut next_pub_input = z0_primary.clone();
+    // z0_primary = recursive_snark.zi_primary().clone();
+    let mut next_pub_input = recursive_snark.zi_primary().clone();
     next_pub_input.truncate(circuit_primary.inner_arity());
     memory.curr_public_input = next_pub_input;
-    memory.curr_private_input = private_inputs[idx].clone(); // TODO: this is ineffective as it doesn't change in the recursive snark
-
-    // z0_primary_fr = circuit_primary.get_public_outputs(memory.rom[idx] as usize);
-    // dbg!(&z0_primary_fr);
+    // memory.curr_private_input = private_inputs[idx].clone(); // TODO: this is ineffective as it
+    // doesn't change in the recursive snark
 
     recursive_snark_option = Some(recursive_snark);
   }

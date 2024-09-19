@@ -15,6 +15,7 @@ use arecibo::{
   traits::{snark::default_ck_hint, CurveCycleEquipped},
 };
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
+use bellpepper::gadgets::
 use ff::{Field, PrimeField};
 use tap::TapOptional;
 
