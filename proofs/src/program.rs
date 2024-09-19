@@ -31,15 +31,7 @@ struct Memory {
 
 #[derive(Clone)]
 pub enum CircuitSelector {
-  Parser(C1),
-}
-
-impl CircuitSelector {
-  pub fn get_public_outputs(&self, _selector: usize) -> Vec<F<G1>> {
-    match self {
-      Self::Parser(circuit) => circuit.get_public_outputs(),
-    }
-  }
+  Parser { circuit: C1, circuit_index: usize, rom_size: usize },
 }
 
 impl NonUniformCircuit<E1> for Memory {
@@ -59,12 +51,16 @@ impl NonUniformCircuit<E1> for Memory {
     );
     println!("got witness");
     match circuit_index {
-      0 => CircuitSelector::Parser(CircomCircuit::<F<G1>> { r1cs, witness: Some(witness) }),
+      0 => CircuitSelector::Parser {
+        circuit: CircomCircuit::<F<G1>> { r1cs, witness: Some(witness) },
+        circuit_index,
+        rom_size: self.rom.len(),
+      },
       _ => panic!("Incorrect circuit index provided!"),
     }
   }
 
-  fn secondary_circuit(&self) -> Self::C2 { TrivialTestCircuit::default() }
+  fn secondary_circuit(&self) -> Self::C2 { Default::default() }
 
   fn initial_circuit_index(&self) -> usize { self.rom[0] as usize }
 }
@@ -73,13 +69,14 @@ impl NonUniformCircuit<E1> for Memory {
 impl SNStepCircuit<F<G1>> for CircuitSelector {
   fn arity(&self) -> usize {
     match self {
-      Self::Parser(circuit) => circuit.arity(),
+      Self::Parser { circuit, rom_size, .. } => circuit.arity() + rom_size,
     }
   }
 
   fn circuit_index(&self) -> usize {
     match self {
-      Self::Parser(_circuit) => 0, // TODO: i believe index is used for z_i
+      Self::Parser { circuit_index, .. } => *circuit_index, /* TODO: i believe index is
+                                                             * used for z_i */
     }
   }
 
