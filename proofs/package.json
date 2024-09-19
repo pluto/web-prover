@@ -10,7 +10,7 @@
     "circomkit": "0.2.1",
     "circomlib": "^2.0.5",
     "parser-attestor": "github:pluto/parser-attestor#dfd7e62",
-    "aes-proof": "github:pluto/aes-proof#feat/npm-git-package",
+    "aes-proof": "github:pluto/aes-proof#d783078264c72ee59aad31c243acd9a442c2df1d",
     "@zk-email/circuits": "^6.1.1"
   },
   "devDependencies": {

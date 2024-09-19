@@ -16,7 +16,11 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use circom::circuit::{CircomCircuit, R1CS};
 use ff::{Field, PrimeField};
 use nova_snark::{
-  traits::{circuit::TrivialCircuit, snark::RelaxedR1CSSNARKTrait, Engine, Group},
+  traits::{
+    circuit::{StepCircuit, TrivialCircuit},
+    snark::RelaxedR1CSSNARKTrait,
+    Engine, Group,
+  },
   PublicParams, RecursiveSNARK,
 };
 use num_bigint::BigInt;
@@ -232,6 +236,8 @@ pub fn create_recursive_circuit(
 
   let circuit_0 =
     CircomCircuit::<<E1 as Engine>::Scalar> { r1cs: r1cs.clone(), witness: Some(witness_0) };
+
+  println!("circuit_0 arity: {:?}", circuit_0.arity());
   let circuit_secondary = TrivialCircuit::<<E2 as Engine>::Scalar>::default();
   let z0_secondary = vec![<E2 as Engine>::Scalar::ZERO];
 
