@@ -9,8 +9,9 @@
   "dependencies": {
     "circomkit": "0.2.1",
     "circomlib": "^2.0.5",
-    "extractor": "github:pluto/extractor#4473a8b",
-    "aes-proof": "github:pluto/aes-proof#feat/npm-git-package"
+    "parser-attestor": "github:pluto/parser-attestor#dfd7e62",
+    "aes-proof": "github:pluto/aes-proof#feat/npm-git-package",
+    "@zk-email/circuits": "^6.1.1"
   },
   "devDependencies": {
     "@types/mocha": "10.0.7",

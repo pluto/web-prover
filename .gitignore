@@ -56,3 +56,6 @@ proofs/build/*
 proofs/ptau/*
 proofs/circuits/test/*.circom
 proofs/circuits/main/*
+proofs/ir_log/*
+proofs/*.bin
+proofs/log_input_signals.txt
