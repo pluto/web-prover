@@ -51,26 +51,12 @@ impl NonUniformCircuit<E1> for Memory {
   fn primary_circuit(&self, circuit_index: usize) -> Self::C1 {
     match circuit_index {
       0 => CircuitSelector::Add {
-        circuit: CircomCircuit {
-          r1cs:    R1CS::from(ADD_R1CS),
-          witness: Some(compute_witness(
-            self.curr_public_input.clone(),
-            self.curr_private_input.clone(),
-            ADD_GRAPH,
-          )),
-        },
+        circuit: CircomCircuit { r1cs: R1CS::from(ADD_R1CS), witness: None },
         circuit_index,
         rom_size: self.rom.len(),
       },
       1 => CircuitSelector::Square {
-        circuit: CircomCircuit {
-          r1cs:    R1CS::from(SQUARE_R1CS),
-          witness: Some(compute_witness(
-            self.curr_public_input.clone(),
-            self.curr_private_input.clone(),
-            SQUARE_GRAPH,
-          )),
-        },
+        circuit: CircomCircuit { r1cs: R1CS::from(SQUARE_R1CS), witness: None },
         circuit_index,
         rom_size: self.rom.len(),
       },
@@ -106,10 +92,22 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
   ) -> Result<(Option<AllocatedNum<F<G1>>>, Vec<AllocatedNum<F<G1>>>), SynthesisError> {
     println!("inside of synthesize with pc: {pc:?}");
 
-    let circuit = match self {
+    let mut circuit = match self {
       Self::Add { circuit, .. } => circuit,
       Self::Square { circuit, .. } => circuit,
     };
+
+    // TODO: We need to set the witness on this properly, so we probably need to put the pub/priv
+    // inputs into the CircuitSelector itself...
+    if let Some(allocated_num) = pc {
+      if allocated_num.get_value().is_some() {
+        match self {
+          Self::Add { circuit, .. } => {},
+          Self::Square { circuit, .. } => {},
+        }
+      }
+    }
+
     let rom_index = &z[circuit.arity()]; // jump to where we pushed pc data into CS
     let allocated_rom = &z[circuit.arity() + 1..]; // jump to where we pushed rom data into CS
 
