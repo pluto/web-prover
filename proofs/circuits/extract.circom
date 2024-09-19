@@ -14,7 +14,7 @@ include "parser-attestor/circuits/json/interpreter.circom";
 
 template ExtractValue(DATA_BYTES, PER_FOLD_LENGTH, MAX_STACK_HEIGHT, keyLen1, depth1, maxValueLen) {
     // stack, parsing_string, parsing_number, is_key1_match_for_value, value_starting_index, curr_fold_index, value_first_chunk
-    var fold_input_len = MAX_STACK_HEIGHT*2+6;
+    var fold_input_len = MAX_STACK_HEIGHT*2+6 + maxValueLen;
     signal input step_in[fold_input_len];
 
     signal input data[DATA_BYTES];
@@ -168,20 +168,18 @@ template ExtractValue(DATA_BYTES, PER_FOLD_LENGTH, MAX_STACK_HEIGHT, keyLen1, de
 
     // debug logs
     // log("step_out: ", step_out[MAX_STACK_HEIGHT*2], step_out[MAX_STACK_HEIGHT*2+1], step_out[MAX_STACK_HEIGHT*2+2], step_out[MAX_STACK_HEIGHT*2+3], step_out[MAX_STACK_HEIGHT*2+4], step_out[MAX_STACK_HEIGHT*2+5]);
+
+    var last_chunk = DATA_BYTES/PER_FOLD_LENGTH;
+    signal is_last_chunk <== IsEqual()([last_chunk, step_out[MAX_STACK_HEIGHT*2 + 4]]);
+
+    signal tentative_value[maxValueLen];
+    tentative_value <== SelectSubArray(DATA_BYTES, maxValueLen)(data, step_out[MAX_STACK_HEIGHT*2 + 3]+1, maxValueLen);
+    signal value[maxValueLen];
+    value <== ScalarArrayMul(maxValueLen)(tentative_value, is_last_chunk);
+
+    for (var i=0 ; i<maxValueLen ; i++) {
+        step_out[MAX_STACK_HEIGHT*2+6+i] <== value[i];
+    }
 }
-
-// template ExtractStringValue(DATA_BYTES, MAX_STACK_HEIGHT, keyLen1, depth1, maxValueLen) {
-//     signal input data[DATA_BYTES];
-
-//     signal input key1[keyLen1];
-
-//     signal output value[maxValueLen];
-
-//     signal value_starting_index[DATA_BYTES];
-//     value_starting_index <== ExtractValue(DATA_BYTES, MAX_STACK_HEIGHT, keyLen1, depth1, maxValueLen)(data, key1);
-
-
-//     value <== SelectSubArray(DATA_BYTES, maxValueLen)(data, value_starting_index[DATA_BYTES-2]+1, maxValueLen);
-// }
 
 component main { public [step_in] } = ExtractValue(60, 10, 1, 4, 0, 23);
