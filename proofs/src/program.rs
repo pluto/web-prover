@@ -159,6 +159,8 @@ pub fn run_program(circuit_data: CircuitData) {
   for (idx, &op_code) in ROM.iter().enumerate() {
     info!("Step {} of ROM", idx);
     info!("opcode = {}", op_code);
+    memory.curr_private_input = private_inputs[idx].clone();
+
     let circuit_primary = memory.primary_circuit(op_code as usize);
     let circuit_secondary = memory.secondary_circuit();
 
@@ -191,11 +193,10 @@ pub fn run_program(circuit_data: CircuitData) {
     let mut next_pub_input = recursive_snark.zi_primary().clone();
     next_pub_input.truncate(circuit_primary.inner_arity());
     memory.curr_public_input = next_pub_input;
-    // memory.curr_private_input = private_inputs[idx].clone(); // TODO: this is ineffective as it
-    // doesn't change in the recursive snark
 
     recursive_snark_option = Some(recursive_snark);
   }
+  dbg!(recursive_snark_option.unwrap().zi_primary());
 }
 
 fn next_rom_index_and_pc<F: PrimeField, CS: ConstraintSystem<F>>(
