@@ -24,7 +24,7 @@ use circom::compute_witness;
 
 struct Memory {
   rom:                Vec<u64>,
-  curr_public_input:  Vec<String>,
+  curr_public_input:  Vec<F<G1>>,
   curr_private_input: HashMap<String, Value>,
   graph_bin:          Vec<u8>,
 }
@@ -88,7 +88,7 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
   ) -> Result<(Option<AllocatedNum<F<G1>>>, Vec<AllocatedNum<F<G1>>>), SynthesisError> {
     println!("inside of synthesize with pc: {pc:?}");
     match self {
-      Self::Parser(circuit) => Ok((pc.cloned(), circuit.vanilla_synthesize(cs, z)?)),
+      Self::Parser { circuit, .. } => Ok((pc.cloned(), circuit.vanilla_synthesize(cs, z)?)),
     }
   }
 }
@@ -98,8 +98,10 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
 pub fn run_program(circuit_data: CircuitData) {
   info!("Starting SuperNova program...");
   let graph_bin = std::fs::read(&circuit_data.graph_path).unwrap(); // graph data for parser probably, this is getting jankj
-  let z0_primary: Vec<String> = circuit_data.init_step_in.iter().map(u64::to_string).collect();
-  let mut z0_primary_fr: Vec<F<G1>> =
+                                                                    //   let mut z0_primary: Vec<String> =
+                                                                    // circuit_data.init_step_in.iter().map(u64::to_string).collect(); // TODO where do i even use
+                                                                    // this stupid string one
+  let mut z0_primary: Vec<F<G1>> =
     circuit_data.init_step_in.iter().map(|val| F::<G1>::from(*val)).collect();
 
   // Map `private_input`
@@ -113,8 +115,11 @@ pub fn run_program(circuit_data: CircuitData) {
   };
 
   let pp = PublicParams::setup(&memory, &*default_ck_hint(), &*default_ck_hint());
+  // extend z0_primary/secondary with rom content
+  z0_primary.push(F::<G1>::ZERO); // rom_index = 0
+  z0_primary.extend(memory.rom.iter().map(|opcode| <E1 as Engine>::Scalar::from(*opcode)));
 
-  let z0_secondary = vec![F::<G2>::ZERO];
+  let z0_secondary = vec![F::<G2>::ONE];
 
   let mut recursive_snark_option = None;
 
@@ -130,7 +135,7 @@ pub fn run_program(circuit_data: CircuitData) {
         &memory,
         &circuit_primary,
         &circuit_secondary,
-        &z0_primary_fr,
+        &z0_primary,
         &z0_secondary,
       )
       .unwrap()
@@ -141,17 +146,18 @@ pub fn run_program(circuit_data: CircuitData) {
     recursive_snark.prove_step(&pp, &circuit_primary, &circuit_secondary).unwrap();
     info!("Single step proof took: {:?}", start.elapsed());
 
-    dbg!(&recursive_snark.zi_primary());
+    dbg!(&recursive_snark.zi_primary()); // TODO: this can be used later if need be.
 
     info!("Verifying single step...");
     let start = Instant::now();
-    recursive_snark.verify(&pp, &z0_primary_fr, &z0_secondary).unwrap();
+    recursive_snark.verify(&pp, &z0_primary, &z0_secondary).unwrap();
     info!("Single step verification took: {:?}", start.elapsed());
 
     // Update everything now for next step
     memory.curr_private_input = private_inputs[idx].clone(); // TODO: this is ineffective as it doesn't change in the recursive snark
-    z0_primary_fr = circuit_primary.get_public_outputs(memory.rom[idx] as usize);
-    dbg!(&z0_primary_fr);
+
+    // z0_primary_fr = circuit_primary.get_public_outputs(memory.rom[idx] as usize);
+    // dbg!(&z0_primary_fr);
 
     recursive_snark_option = Some(recursive_snark);
   }

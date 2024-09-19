@@ -39,25 +39,25 @@ struct CircomInput {
 }
 
 pub fn compute_witness(
-  current_public_input: Vec<String>,
+  current_public_input: Vec<F<G1>>,
   private_input: HashMap<String, Value>,
   graph_data: &[u8],
 ) -> Vec<<G1 as Group>::Scalar> {
-  // println!("inside compute witness --> graph_data: {graph_data:?}");
+  dbg!(&current_public_input);
   let decimal_stringified_input: Vec<String> = current_public_input
     .iter()
-    .map(|x| BigInt::from_str_radix(x, 16).unwrap().to_str_radix(10))
+    .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
     .collect();
 
-  let input =
-    CircomInput { step_in: decimal_stringified_input.clone(), extra: private_input.clone() };
+  let input = CircomInput { step_in: decimal_stringified_input, extra: private_input.clone() };
 
   let input_json = serde_json::to_string(&input).unwrap();
 
   dbg!(&input_json);
   let witness = circom_witnesscalc::calc_witness(&input_json, graph_data).unwrap();
   // let witness =
-  //   capture_and_log(|| circom_witnesscalc::calc_witness(&input_json, graph_data).unwrap());
+  //   capture_and_log(|| circom_witnesscalc::calc_witness(&input_json, graph_data).unwrap()); //
+  // TODO: helpful if we want tracing crate only to handle stdout
 
   witness
     .iter()
@@ -76,11 +76,11 @@ pub fn create_recursive_circuit(
 
   let iteration_count = private_inputs.len();
 
-  let start_public_input_hex = start_public_input
-    .iter()
-    .map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string())
-    .collect::<Vec<String>>();
-  let mut current_public_input = start_public_input_hex.clone();
+  // let start_public_input_hex = start_public_input
+  //   .iter()
+  //   .map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string())
+  //   .collect::<Vec<String>>();
+  // let mut current_public_input = start_public_input_hex.clone();
 
   // TODO: This should be held in memory instead of read every time.
   let graph_bin = std::fs::read(witness_generator_file)?;
@@ -88,7 +88,7 @@ pub fn create_recursive_circuit(
   let mut now = Instant::now();
   trace!("private_inputs: {:?}", private_inputs[0]);
   let witness_0 =
-    compute_witness(current_public_input.clone(), private_inputs[0].clone(), &graph_bin);
+    compute_witness(start_public_input.clone(), private_inputs[0].clone(), &graph_bin);
   debug!("witness generation for step 0 took: {:?}, {}", now.elapsed(), witness_0.len());
 
   let circuit_0 = CircomCircuit::<F<G1>> { r1cs: r1cs.clone(), witness: Some(witness_0) };
@@ -104,6 +104,8 @@ pub fn create_recursive_circuit(
   )
   .unwrap();
 
+  let mut current_public_input = start_public_input; // TODO: awk
+
   for (i, private_input) in private_inputs.iter().enumerate().take(iteration_count) {
     now = Instant::now();
     let witness = compute_witness(current_public_input.clone(), private_input.clone(), &graph_bin);
@@ -111,11 +113,11 @@ pub fn create_recursive_circuit(
 
     let circuit = CircomCircuit { r1cs: r1cs.clone(), witness: Some(witness) };
 
-    let current_public_output = circuit.get_public_outputs();
-    current_public_input = current_public_output
-      .iter()
-      .map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string())
-      .collect();
+    current_public_input = circuit.get_public_outputs();
+    // current_public_input = current_public_output
+    //   .iter()
+    //   .map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string())
+    //   .collect();
 
     now = Instant::now();
     let res = recursive_snark.prove_step(pp, &circuit, &circuit_secondary);
