@@ -3,6 +3,7 @@
 pub mod circom;
 pub mod handler;
 pub mod program;
+#[cfg(test)] mod tests;
 use std::{collections::HashMap, path::PathBuf};
 
 use arecibo::{
@@ -66,7 +67,7 @@ pub type S2 = RelaxedR1CSSNARK<E2, EE2>; // non-preprocessing SNARK
 
 pub type F<G> = <G as Group>::Scalar;
 
-pub type C1 = CircomCircuit<F<G1>>;
+pub type C1 = CircomCircuit;
 pub type C2 = TrivialCircuit<F<G2>>;
 
 // Note:

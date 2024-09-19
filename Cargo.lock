@@ -912,17 +912,6 @@ dependencies = [
 [[package]]
 name = "bellpepper"
 version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ae286c2cb403324ab644c7cc68dceb25fe52ca9429908a726d7ed272c1edf7b"
-dependencies = [
- "bellpepper-core",
- "byteorder",
- "ff",
-]
-
-[[package]]
-name = "bellpepper"
-version = "0.4.1"
 source = "git+https://github.com/argumentcomputer/bellpepper?branch=dev#d0225bf6cb2bb9abaff28ea96a3497f9829815f8"
 dependencies = [
  "bellpepper-core",
@@ -4385,7 +4374,6 @@ name = "proofs"
 version = "0.1.0"
 dependencies = [
  "arecibo",
- "bellpepper 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bellpepper-core",
  "byteorder",
  "circom_witnesscalc",
@@ -4398,6 +4386,7 @@ dependencies = [
  "serde_json",
  "tracing",
  "tracing-subscriber",
+ "tracing-test",
 ]
 
 [[package]]
@@ -6502,6 +6491,27 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
+]
+
+[[package]]
+name = "tracing-test"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "557b891436fe0d5e0e363427fc7f217abf9ccd510d5136549847bdcbcd011d68"
+dependencies = [
+ "tracing-core",
+ "tracing-subscriber",
+ "tracing-test-macro",
+]
+
+[[package]]
+name = "tracing-test-macro"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04659ddb06c87d233c566112c1c9c5b9e98256d9af50ec3bc9c8327f873a7568"
+dependencies = [
+ "quote",
+ "syn 2.0.77",
 ]
 
 [[package]]

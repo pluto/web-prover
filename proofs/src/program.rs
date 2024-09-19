@@ -1,27 +1,17 @@
 use std::time::Instant;
 
 use arecibo::{
-  supernova::{snark::CompressedSNARK, PublicParams, RecursiveSNARK, TrivialTestCircuit},
-  traits::{
-    circuit::StepCircuit,
-    snark::{default_ck_hint, RelaxedR1CSSNARKTrait},
-  },
+  supernova::{PublicParams, RecursiveSNARK, TrivialTestCircuit},
+  traits::{circuit::StepCircuit, snark::default_ck_hint},
 };
-use bellpepper_core::{
-  boolean::{AllocatedBit, Boolean},
-  num::AllocatedNum,
-  ConstraintSystem, LinearCombination, SynthesisError,
-};
-use circom::{circuit::R1CS, r1cs::load_r1cs};
-use ff::PrimeField;
+use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
+use circom::r1cs::R1CS;
 use handler::map_private_inputs;
-use itertools::Itertools;
-use serde_json::json;
 
 use super::*;
 
 const ROM: &[u64] = &[0, 0, 0, 0];
-const PARSER_R1CS_PATH: &str = "parse_fold_batch.r1cs";
+const PARSER_R1CS: &[u8] = include_bytes!("../parse_fold_batch.r1cs");
 
 use arecibo::supernova::{NonUniformCircuit, StepCircuit as SNStepCircuit};
 use circom::compute_witness;
@@ -50,21 +40,18 @@ impl NonUniformCircuit<E1> for Memory {
   type C1 = CircuitSelector;
   type C2 = TrivialTestCircuit<F<G2>>;
 
-  /// TODO: Afaik, total number of circuits in the enum
   fn num_circuits(&self) -> usize { 1 }
 
   fn primary_circuit(&self, circuit_index: usize) -> Self::C1 {
-    println!("checking primary circuit with index: {circuit_index}");
-    let r1cs = load_r1cs(&PathBuf::from(PARSER_R1CS_PATH));
+    let r1cs = R1CS::from(PARSER_R1CS);
     let witness = compute_witness(
       self.curr_public_input.clone(),
       self.curr_private_input.clone(),
       &self.graph_bin,
     );
-    println!("got witness");
     match circuit_index {
       0 => CircuitSelector::Parser {
-        circuit: CircomCircuit::<F<G1>> { r1cs, witness: Some(witness) },
+        circuit: CircomCircuit { r1cs, witness: Some(witness) },
         circuit_index,
         rom_size: self.rom.len(),
       },
@@ -77,7 +64,6 @@ impl NonUniformCircuit<E1> for Memory {
   fn initial_circuit_index(&self) -> usize { self.rom[0] as usize }
 }
 
-// TODO: This field used here might be wrong
 impl SNStepCircuit<F<G1>> for CircuitSelector {
   fn arity(&self) -> usize {
     match self {
@@ -106,14 +92,10 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
     let circuit = match self {
       Self::Parser { circuit, .. } => circuit,
     };
-    // dbg!(&z);
-    // dbg!(&z.len());
-    // dbg!(self.arity());
-    // dbg!(circuit.arity());
     let rom_index = &z[circuit.arity()]; // jump to where we pushed pc data into CS
     let allocated_rom = &z[circuit.arity() + 1..]; // jump to where we pushed rom data into CS
 
-    let (rom_index_next, pc_next) = next_rom_index_and_pc(
+    let (rom_index_next, pc_next) = utils::next_rom_index_and_pc(
       &mut cs.namespace(|| "next and rom_index and pc"),
       rom_index,
       allocated_rom,
@@ -126,14 +108,9 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
   }
 }
 
-// TODO: Currently this is creating the witness twice in the startup since it is doing that with
-// `PublicParams` or whatever.
 pub fn run_program(circuit_data: CircuitData) {
   info!("Starting SuperNova program...");
-  let graph_bin = std::fs::read(&circuit_data.graph_path).unwrap(); // graph data for parser probably, this is getting jankj
-                                                                    //   let mut z0_primary: Vec<String> =
-                                                                    // circuit_data.init_step_in.iter().map(u64::to_string).collect(); // TODO where do i even use
-                                                                    // this stupid string one
+  let graph_bin = std::fs::read(&circuit_data.graph_path).unwrap();
   let mut z0_primary: Vec<F<G1>> =
     circuit_data.init_step_in.iter().map(|val| F::<G1>::from(*val)).collect();
 
@@ -148,11 +125,10 @@ pub fn run_program(circuit_data: CircuitData) {
   };
 
   let pp = PublicParams::setup(&memory, &*default_ck_hint(), &*default_ck_hint());
-  // extend z0_primary/secondary with rom content
   z0_primary.push(F::<G1>::ZERO); // rom_index = 0
   z0_primary.extend(memory.rom.iter().map(|opcode| <E1 as Engine>::Scalar::from(*opcode)));
 
-  let z0_secondary = vec![F::<G2>::ONE];
+  let z0_secondary = vec![F::<G2>::ZERO];
 
   let mut recursive_snark_option = None;
 
@@ -199,97 +175,108 @@ pub fn run_program(circuit_data: CircuitData) {
   dbg!(recursive_snark_option.unwrap().zi_primary());
 }
 
-fn next_rom_index_and_pc<F: PrimeField, CS: ConstraintSystem<F>>(
-  cs: &mut CS,
-  rom_index: &AllocatedNum<F>,
-  allocated_rom: &[AllocatedNum<F>],
-  pc: &AllocatedNum<F>,
-) -> Result<(AllocatedNum<F>, AllocatedNum<F>), SynthesisError> {
-  // Compute a selector for the current rom_index in allocated_rom
-  let current_rom_selector =
-    get_selector_vec_from_index(cs.namespace(|| "rom selector"), rom_index, allocated_rom.len())?;
+pub mod utils {
+  use bellpepper_core::{
+    boolean::{AllocatedBit, Boolean},
+    LinearCombination,
+  };
+  use itertools::Itertools;
 
-  // Enforce that allocated_rom[rom_index] = pc
-  for (rom, bit) in allocated_rom.iter().zip_eq(current_rom_selector.iter()) {
-    // if bit = 1, then rom = pc
-    // bit * (rom - pc) = 0
-    cs.enforce(
-      || "enforce bit = 1 => rom = pc",
-      |lc| lc + &bit.lc(CS::one(), F::ONE),
-      |lc| lc + rom.get_variable() - pc.get_variable(),
-      |lc| lc,
-    );
-  }
+  use super::*;
 
-  // Get the index of the current rom, or the index of the invalid rom if no match
-  let current_rom_index = current_rom_selector
-    .iter()
-    .position(|bit| bit.get_value().is_some_and(|v| v))
-    .unwrap_or_default();
-  let next_rom_index = current_rom_index + 1;
+  pub fn next_rom_index_and_pc<CS: ConstraintSystem<F<G1>>>(
+    cs: &mut CS,
+    rom_index: &AllocatedNum<F<G1>>,
+    allocated_rom: &[AllocatedNum<F<G1>>],
+    pc: &AllocatedNum<F<G1>>,
+  ) -> Result<(AllocatedNum<F<G1>>, AllocatedNum<F<G1>>), SynthesisError> {
+    // Compute a selector for the current rom_index in allocated_rom
+    let current_rom_selector =
+      get_selector_vec_from_index(cs.namespace(|| "rom selector"), rom_index, allocated_rom.len())?;
 
-  let rom_index_next = AllocatedNum::alloc_infallible(cs.namespace(|| "next rom index"), || {
-    F::from(next_rom_index as u64)
-  });
-  cs.enforce(
-    || " rom_index + 1 - next_rom_index_num = 0",
-    |lc| lc,
-    |lc| lc,
-    |lc| lc + rom_index.get_variable() + CS::one() - rom_index_next.get_variable(),
-  );
+    // Enforce that allocated_rom[rom_index] = pc
+    for (rom, bit) in allocated_rom.iter().zip_eq(current_rom_selector.iter()) {
+      // if bit = 1, then rom = pc
+      // bit * (rom - pc) = 0
+      cs.enforce(
+        || "enforce bit = 1 => rom = pc",
+        |lc| lc + &bit.lc(CS::one(), F::<G1>::ONE),
+        |lc| lc + rom.get_variable() - pc.get_variable(),
+        |lc| lc,
+      );
+    }
 
-  // Allocate the next pc without checking.
-  // The next iteration will check whether the next pc is valid.
-  let pc_next = AllocatedNum::alloc_infallible(cs.namespace(|| "next pc"), || {
-    allocated_rom.get(next_rom_index).and_then(|v| v.get_value()).unwrap_or(-F::ONE)
-  });
-
-  Ok((rom_index_next, pc_next))
-}
-
-pub fn get_selector_vec_from_index<F: PrimeField, CS: ConstraintSystem<F>>(
-  mut cs: CS,
-  target_index: &AllocatedNum<F>,
-  num_indices: usize,
-) -> Result<Vec<Boolean>, SynthesisError> {
-  assert_ne!(num_indices, 0);
-
-  // Compute the selector vector non-deterministically
-  let selector = (0..num_indices)
-    .map(|idx| {
-      // b <- idx == target_index
-      Ok(Boolean::Is(AllocatedBit::alloc(
-        cs.namespace(|| format!("allocate s_{:?}", idx)),
-        target_index.get_value().map(|v| v == F::from(idx as u64)),
-      )?))
-    })
-    .collect::<Result<Vec<Boolean>, SynthesisError>>()?;
-
-  // Enforce ∑ selector[i] = 1
-  {
-    let selected_sum =
-      selector.iter().fold(LinearCombination::zero(), |lc, bit| lc + &bit.lc(CS::one(), F::ONE));
-    cs.enforce(
-      || "exactly-one-selection",
-      |_| selected_sum,
-      |lc| lc + CS::one(),
-      |lc| lc + CS::one(),
-    );
-  }
-
-  // Enforce `target_index - ∑ i * selector[i] = 0``
-  {
-    let selected_value = selector
+    // Get the index of the current rom, or the index of the invalid rom if no match
+    let current_rom_index = current_rom_selector
       .iter()
-      .enumerate()
-      .fold(LinearCombination::zero(), |lc, (i, bit)| lc + &bit.lc(CS::one(), F::from(i as u64)));
+      .position(|bit| bit.get_value().is_some_and(|v| v))
+      .unwrap_or_default();
+    let next_rom_index = current_rom_index + 1;
+
+    let rom_index_next = AllocatedNum::alloc_infallible(cs.namespace(|| "next rom index"), || {
+      F::<G1>::from(next_rom_index as u64)
+    });
     cs.enforce(
-      || "target_index - ∑ i * selector[i] = 0",
+      || " rom_index + 1 - next_rom_index_num = 0",
       |lc| lc,
       |lc| lc,
-      |lc| lc + target_index.get_variable() - &selected_value,
+      |lc| lc + rom_index.get_variable() + CS::one() - rom_index_next.get_variable(),
     );
+
+    // Allocate the next pc without checking.
+    // The next iteration will check whether the next pc is valid.
+    let pc_next = AllocatedNum::alloc_infallible(cs.namespace(|| "next pc"), || {
+      allocated_rom.get(next_rom_index).and_then(|v| v.get_value()).unwrap_or(-F::<G1>::ONE)
+    });
+
+    Ok((rom_index_next, pc_next))
   }
 
-  Ok(selector)
+  pub fn get_selector_vec_from_index<CS: ConstraintSystem<F<G1>>>(
+    mut cs: CS,
+    target_index: &AllocatedNum<F<G1>>,
+    num_indices: usize,
+  ) -> Result<Vec<Boolean>, SynthesisError> {
+    assert_ne!(num_indices, 0);
+
+    // Compute the selector vector non-deterministically
+    let selector = (0..num_indices)
+      .map(|idx| {
+        // b <- idx == target_index
+        Ok(Boolean::Is(AllocatedBit::alloc(
+          cs.namespace(|| format!("allocate s_{:?}", idx)),
+          target_index.get_value().map(|v| v == F::<G1>::from(idx as u64)),
+        )?))
+      })
+      .collect::<Result<Vec<Boolean>, SynthesisError>>()?;
+
+    // Enforce ∑ selector[i] = 1
+    {
+      let selected_sum = selector
+        .iter()
+        .fold(LinearCombination::zero(), |lc, bit| lc + &bit.lc(CS::one(), F::<G1>::ONE));
+      cs.enforce(
+        || "exactly-one-selection",
+        |_| selected_sum,
+        |lc| lc + CS::one(),
+        |lc| lc + CS::one(),
+      );
+    }
+
+    // Enforce `target_index - ∑ i * selector[i] = 0``
+    {
+      let selected_value =
+        selector.iter().enumerate().fold(LinearCombination::zero(), |lc, (i, bit)| {
+          lc + &bit.lc(CS::one(), F::<G1>::from(i as u64))
+        });
+      cs.enforce(
+        || "target_index - ∑ i * selector[i] = 0",
+        |lc| lc,
+        |lc| lc,
+        |lc| lc + target_index.get_variable() - &selected_value,
+      );
+    }
+
+    Ok(selector)
+  }
 }

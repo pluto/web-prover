@@ -7,11 +7,67 @@ use arecibo::traits::Group;
 use byteorder::{LittleEndian, ReadBytesExt};
 use ff::PrimeField;
 use fs::OpenOptions;
+use io::Cursor;
 
 use super::*;
 // This was borrowed from `nova-scotia`. Big thank you for this middleware!
 // some codes borrowed from https://github.com/poma/zkutil/blob/master/src/r1cs_reader.rs
 use crate::circom::circuit::Constraint;
+
+#[derive(Clone)]
+pub struct R1CS {
+  pub num_inputs:    usize,
+  pub num_aux:       usize,
+  pub num_variables: usize,
+  pub constraints:   Vec<Constraint<F<G1>>>,
+}
+
+impl From<&[u8]> for R1CS {
+  fn from(value: &[u8]) -> Self {
+    let mut cursor = Cursor::new(value);
+
+    let mut magic = [0u8; 4];
+    cursor.read_exact(&mut magic).unwrap();
+    assert_eq!(magic, [0x72, 0x31, 0x63, 0x73]);
+
+    let version = cursor.read_u32::<LittleEndian>().unwrap();
+    assert_eq!(version, 1);
+
+    let num_sections = cursor.read_u32::<LittleEndian>().unwrap();
+
+    let mut section_offsets = HashMap::<u32, u64>::new();
+    let mut section_sizes = HashMap::<u32, u64>::new();
+
+    for _ in 0..num_sections {
+      let section_type = cursor.read_u32::<LittleEndian>().unwrap();
+      let section_size = cursor.read_u64::<LittleEndian>().unwrap();
+      let offset = cursor.position();
+      section_offsets.insert(section_type, offset);
+      section_sizes.insert(section_type, section_size);
+      cursor.seek(SeekFrom::Current(section_size as i64)).unwrap();
+    }
+
+    let header_type = 1;
+    let constraint_type = 2;
+    let wire2label_type = 3;
+
+    cursor.seek(SeekFrom::Start(*section_offsets.get(&header_type).unwrap())).unwrap();
+    let header = read_header(&mut cursor, *section_sizes.get(&header_type).unwrap()).unwrap();
+    assert_eq!(header.field_size, 32);
+
+    cursor.seek(SeekFrom::Start(*section_offsets.get(&constraint_type).unwrap())).unwrap();
+    let constraints = read_constraints::<&mut Cursor<&[u8]>, F<G1>>(&mut cursor, &header).unwrap();
+
+    cursor.seek(SeekFrom::Start(*section_offsets.get(&wire2label_type).unwrap())).unwrap();
+    let wire_mapping =
+      read_map(&mut cursor, *section_sizes.get(&wire2label_type).unwrap(), &header).unwrap();
+
+    let num_inputs = (1 + header.n_pub_in + header.n_pub_out) as usize;
+    let num_variables = header.n_wires as usize;
+    let num_aux = num_variables - num_inputs;
+    R1CS { num_aux, num_inputs, num_variables, constraints }
+  }
+}
 
 // R1CSFile's header
 #[derive(Debug, Default)]
@@ -157,7 +213,7 @@ where
 }
 
 /// load r1cs from bin by a reader
-pub(crate) fn load_r1cs(filename: &PathBuf) -> R1CS<<G1 as Group>::Scalar>
+pub(crate) fn load_r1cs(filename: &PathBuf) -> R1CS
 where
   G1: Group<Base = <G2 as Group>::Scalar>,
   G2: Group<Base = <G1 as Group>::Scalar>, {

@@ -10,10 +10,11 @@ use arecibo::{
   traits::{circuit::TrivialCircuit, snark::RelaxedR1CSSNARKTrait, Engine, Group},
   PublicParams, RecursiveSNARK,
 };
-use circom::circuit::{CircomCircuit, R1CS};
+use circom::circuit::CircomCircuit;
 use ff::{Field, PrimeField};
 use num_bigint::BigInt;
 use num_traits::Num;
+use r1cs::R1CS;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -22,8 +23,8 @@ use super::*;
 pub mod circuit;
 pub mod r1cs;
 
-pub fn create_public_params(r1cs: R1CS<F<G1>>) -> PublicParams<E1> {
-  let circuit_primary = CircomCircuit::<F<G1>> { r1cs, witness: None };
+pub fn create_public_params(r1cs: R1CS) -> PublicParams<E1> {
+  let circuit_primary = CircomCircuit { r1cs, witness: None };
   let circuit_secondary = TrivialCircuit::<F<G2>>::default();
 
   PublicParams::setup(&circuit_primary, &circuit_secondary, &*S1::ck_floor(), &*S2::ck_floor())
@@ -67,7 +68,7 @@ pub fn compute_witness(
 
 pub fn create_recursive_circuit(
   witness_generator_file: &PathBuf,
-  r1cs: R1CS<F<G1>>,
+  r1cs: R1CS,
   private_inputs: Vec<HashMap<String, Value>>,
   start_public_input: Vec<F<G1>>,
   pp: &PublicParams<E1>,
@@ -91,7 +92,7 @@ pub fn create_recursive_circuit(
     compute_witness(start_public_input.clone(), private_inputs[0].clone(), &graph_bin);
   debug!("witness generation for step 0 took: {:?}, {}", now.elapsed(), witness_0.len());
 
-  let circuit_0 = CircomCircuit::<F<G1>> { r1cs: r1cs.clone(), witness: Some(witness_0) };
+  let circuit_0 = CircomCircuit { r1cs: r1cs.clone(), witness: Some(witness_0) };
   let circuit_secondary = TrivialCircuit::<F<G2>>::default();
   let z0_secondary = vec![<F<G2>>::ZERO];
 

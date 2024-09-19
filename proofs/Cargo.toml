@@ -26,4 +26,4 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 
 [dev-dependencies]
-bellpepper = "0.4.1"
+tracing-test = "0.2.5"
