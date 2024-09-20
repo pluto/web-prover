@@ -59,3 +59,4 @@ proofs/circuits/main/*
 proofs/ir_log/*
 proofs/*.bin
 proofs/log_input_signals.txt
+proofs/*.wtns

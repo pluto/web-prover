@@ -214,10 +214,7 @@ where
 }
 
 /// load r1cs from bin by a reader
-pub(crate) fn load_r1cs(filename: &PathBuf) -> R1CS
-where
-  G1: Group<Base = <G2 as Group>::Scalar>,
-  G2: Group<Base = <G1 as Group>::Scalar>, {
+pub(crate) fn load_r1cs(filename: &PathBuf) -> R1CS {
   let reader =
     BufReader::new(OpenOptions::new().read(true).open(filename).expect("unable to open."));
 
