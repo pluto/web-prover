@@ -1,13 +1,12 @@
 use std::{
   collections::HashMap,
-  io::{BufReader, Error, ErrorKind, Read, Result, Seek, SeekFrom},
+  io::{BufReader, Cursor, Error, ErrorKind, Read, Result, Seek, SeekFrom},
 };
 
 use arecibo::traits::Group;
 use byteorder::{LittleEndian, ReadBytesExt};
 use ff::PrimeField;
 use fs::OpenOptions;
-use io::Cursor;
 
 use super::*;
 // This was borrowed from `nova-scotia`. Big thank you for this middleware!

@@ -38,16 +38,28 @@ pub struct Args {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CircuitData {
   #[serde(rename = "circuit")]
-  pub circuit_path:  PathBuf,
+  pub circuit_path:     PathBuf,
   #[serde(rename = "r1cs")]
-  pub r1cs_path:     PathBuf,
+  pub r1cs_path:        PathBuf,
   #[serde(rename = "cbuild")]
-  pub cbuild_path:   PathBuf,
+  pub cbuild_path:      PathBuf,
   #[serde(rename = "graph")]
-  pub graph_path:    PathBuf,
-  pub private_input: HashMap<String, Value>,
-  pub num_folds:     usize,
-  pub init_step_in:  Vec<u64>,
+  pub graph_path:       PathBuf,
+  #[serde(rename = "wgen_type")]
+  pub witness_gen_type: WitnessGenType,
+  #[serde(rename = "wgen")]
+  pub witness_gen_file: PathBuf,
+  pub num_folds:        usize,
+  pub private_input:    HashMap<String, Value>,
+  pub init_step_in:     Vec<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum WitnessGenType {
+  #[serde(rename = "node")]
+  Node,
+  #[serde(rename = "circom-witnesscalc")]
+  CircomWitnesscalc,
 }
 
 #[derive(Clone, Debug, clap::ValueEnum)]
