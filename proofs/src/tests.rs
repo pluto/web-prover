@@ -10,13 +10,16 @@ use program::utils::next_rom_index_and_pc;
 
 use super::*;
 
-const ROM: &[u64] = &[0, 1];
+const ROM: &[u64] = &[0, 1, 2, 0, 1, 2];
 
-const ADD_R1CS: &[u8] = include_bytes!("../examples/add.r1cs");
-const ADD_GRAPH: &[u8] = include_bytes!("../examples/add.bin");
+const ADD_INTO_ZEROTH_R1CS: &[u8] = include_bytes!("../examples/addIntoZeroth.r1cs");
+const ADD_INTO_ZEROTH_GRAPH: &[u8] = include_bytes!("../examples/addIntoZeroth.bin");
 
-const SQUARE_R1CS: &[u8] = include_bytes!("../examples/square.r1cs");
-const SQUARE_GRAPH: &[u8] = include_bytes!("../examples/square.bin");
+const SQUARE_ZEROTH_R1CS: &[u8] = include_bytes!("../examples/squareZeroth.r1cs");
+const SQUARE_ZEROTH_GRAPH: &[u8] = include_bytes!("../examples/squareZeroth.bin");
+
+const SWAP_MEMORY_R1CS: &[u8] = include_bytes!("../examples/swapMemory.r1cs");
+const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../examples/swapMemory.bin");
 
 use arecibo::supernova::{NonUniformCircuit, StepCircuit as SNStepCircuit};
 use circom::compute_witness;
@@ -29,15 +32,35 @@ struct Memory {
 
 #[derive(Clone)]
 pub enum CircuitSelector {
-  Add { circuit: C1, circuit_index: usize, rom_size: usize },
-  Square { circuit: C1, circuit_index: usize, rom_size: usize },
+  AddIntoZeroth {
+    circuit:            C1,
+    circuit_index:      usize,
+    rom_size:           usize,
+    curr_public_input:  Vec<F<G1>>,
+    curr_private_input: HashMap<String, Value>,
+  },
+  SquareZeroth {
+    circuit:            C1,
+    circuit_index:      usize,
+    rom_size:           usize,
+    curr_public_input:  Vec<F<G1>>,
+    curr_private_input: HashMap<String, Value>,
+  },
+  SwapMemory {
+    circuit:            C1,
+    circuit_index:      usize,
+    rom_size:           usize,
+    curr_public_input:  Vec<F<G1>>,
+    curr_private_input: HashMap<String, Value>,
+  },
 }
 
 impl CircuitSelector {
   pub fn inner_arity(&self) -> usize {
     match self {
-      Self::Add { circuit, .. } => circuit.arity(),
-      Self::Square { circuit, .. } => circuit.arity(),
+      Self::AddIntoZeroth { circuit, .. } => circuit.arity(),
+      Self::SquareZeroth { circuit, .. } => circuit.arity(),
+      Self::SwapMemory { circuit, .. } => circuit.arity(),
     }
   }
 }
@@ -46,17 +69,32 @@ impl NonUniformCircuit<E1> for Memory {
   type C1 = CircuitSelector;
   type C2 = TrivialTestCircuit<F<G2>>;
 
-  fn num_circuits(&self) -> usize { 2 }
+  fn num_circuits(&self) -> usize { 3 }
 
   fn primary_circuit(&self, circuit_index: usize) -> Self::C1 {
     match circuit_index {
-      0 => CircuitSelector::Add {
-        circuit: CircomCircuit { r1cs: R1CS::from(ADD_R1CS), witness: None },
+      0 => CircuitSelector::AddIntoZeroth {
+        circuit: CircomCircuit {
+          r1cs: R1CS::from(ADD_INTO_ZEROTH_R1CS),
+
+          witness: None,
+        },
+        curr_public_input: self.curr_public_input.clone(),
+        curr_private_input: self.curr_private_input.clone(),
         circuit_index,
         rom_size: self.rom.len(),
       },
-      1 => CircuitSelector::Square {
-        circuit: CircomCircuit { r1cs: R1CS::from(SQUARE_R1CS), witness: None },
+      1 => CircuitSelector::SquareZeroth {
+        circuit: CircomCircuit { r1cs: R1CS::from(SQUARE_ZEROTH_R1CS), witness: None },
+        curr_public_input: self.curr_public_input.clone(),
+        curr_private_input: self.curr_private_input.clone(),
+        circuit_index,
+        rom_size: self.rom.len(),
+      },
+      2 => CircuitSelector::SwapMemory {
+        circuit: CircomCircuit { r1cs: R1CS::from(SWAP_MEMORY_R1CS), witness: None },
+        curr_public_input: self.curr_public_input.clone(),
+        curr_private_input: self.curr_private_input.clone(),
         circuit_index,
         rom_size: self.rom.len(),
       },
@@ -72,15 +110,17 @@ impl NonUniformCircuit<E1> for Memory {
 impl SNStepCircuit<F<G1>> for CircuitSelector {
   fn arity(&self) -> usize {
     match self {
-      Self::Add { circuit, rom_size, .. } => circuit.arity() + 1 + rom_size,
-      Self::Square { circuit, rom_size, .. } => circuit.arity() + 1 + rom_size,
+      Self::AddIntoZeroth { circuit, rom_size, .. } => circuit.arity() + 1 + rom_size,
+      Self::SquareZeroth { circuit, rom_size, .. } => circuit.arity() + 1 + rom_size,
+      Self::SwapMemory { circuit, rom_size, .. } => circuit.arity() + 1 + rom_size,
     }
   }
 
   fn circuit_index(&self) -> usize {
     match self {
-      Self::Add { circuit_index, .. } => *circuit_index,
-      Self::Square { circuit_index, .. } => *circuit_index,
+      Self::AddIntoZeroth { circuit_index, .. } => *circuit_index,
+      Self::SquareZeroth { circuit_index, .. } => *circuit_index,
+      Self::SwapMemory { circuit_index, .. } => *circuit_index,
     }
   }
 
@@ -92,21 +132,52 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
   ) -> Result<(Option<AllocatedNum<F<G1>>>, Vec<AllocatedNum<F<G1>>>), SynthesisError> {
     println!("inside of synthesize with pc: {pc:?}");
 
-    let mut circuit = match self {
-      Self::Add { circuit, .. } => circuit,
-      Self::Square { circuit, .. } => circuit,
-    };
-
     // TODO: We need to set the witness on this properly, so we probably need to put the pub/priv
     // inputs into the CircuitSelector itself...
-    if let Some(allocated_num) = pc {
+    let circuit = if let Some(allocated_num) = pc {
       if allocated_num.get_value().is_some() {
         match self {
-          Self::Add { circuit, .. } => {},
-          Self::Square { circuit, .. } => {},
+          Self::AddIntoZeroth { circuit, curr_private_input, curr_public_input, .. } => {
+            let mut circuit = circuit.clone();
+            let witness = compute_witness(
+              curr_public_input.clone(),
+              curr_private_input.clone(),
+              ADD_INTO_ZEROTH_GRAPH,
+            );
+            circuit.witness = Some(witness);
+            circuit
+          },
+          Self::SquareZeroth { circuit, curr_private_input, curr_public_input, .. } => {
+            let mut circuit = circuit.clone();
+            let witness = compute_witness(
+              curr_public_input.clone(),
+              curr_private_input.clone(),
+              SQUARE_ZEROTH_GRAPH,
+            );
+            circuit.witness = Some(witness);
+            circuit
+          },
+          Self::SwapMemory { circuit, curr_private_input, curr_public_input, .. } => {
+            let mut circuit = circuit.clone();
+            let witness = compute_witness(
+              curr_public_input.clone(),
+              curr_private_input.clone(),
+              SWAP_MEMORY_GRAPH,
+            );
+            circuit.witness = Some(witness);
+            circuit
+          },
+        }
+      } else {
+        match self {
+          Self::AddIntoZeroth { circuit, .. } => circuit.clone(),
+          Self::SquareZeroth { circuit, .. } => circuit.clone(),
+          Self::SwapMemory { circuit, .. } => circuit.clone(),
         }
       }
-    }
+    } else {
+      panic!("allocated num was none?")
+    };
 
     let rom_index = &z[circuit.arity()]; // jump to where we pushed pc data into CS
     let allocated_rom = &z[circuit.arity() + 1..]; // jump to where we pushed rom data into CS
@@ -129,22 +200,20 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
 fn run_program() {
   info!("Starting SuperNova Add/Square test...");
 
-  let init_step_in = vec![F::<G1>::from(0)];
-  //   let init_step_in: Vec<u64> = vec![]; // empty for now because I have no pub inputs which will
-  // probably not work
-
-  let mut z0_primary: Vec<F<G1>> = init_step_in.iter().map(|val| F::<G1>::from(*val)).collect();
+  let mut z0_primary: Vec<F<G1>> =
+    [F::<G1>::from(0), F::<G1>::from(2)].iter().map(|val| F::<G1>::from(*val)).collect();
 
   // Map `private_input`
-  let mut private_inputs = vec![];
-  private_inputs
-    .push(serde_json::from_str::<HashMap<String, Value>>(r#"{ "x": "2", "y": 3}"#).unwrap());
-  private_inputs.push(serde_json::from_str::<HashMap<String, Value>>(r#"{ "x": "1" }"#).unwrap());
+  //   let mut private_inputs = vec![];
+  //   private_inputs
+  //     .push(serde_json::from_str::<HashMap<String, Value>>(r#"{ "x": "2", "y": 3}"#).unwrap());
+  //   private_inputs.push(serde_json::from_str::<HashMap<String, Value>>(r#"{ "x": "1"
+  // }"#).unwrap());
 
   let mut memory = Memory {
     rom:                ROM.to_vec(),
     curr_public_input:  z0_primary.clone(),
-    curr_private_input: private_inputs[0].clone(),
+    curr_private_input: HashMap::new(),
   };
 
   let pp = PublicParams::setup(&memory, &*default_ck_hint(), &*default_ck_hint());
@@ -159,7 +228,7 @@ fn run_program() {
   for (idx, &op_code) in ROM.iter().enumerate() {
     info!("Step {} of ROM", idx);
     info!("opcode = {}", op_code);
-    memory.curr_private_input = private_inputs[idx].clone();
+    // memory.curr_private_input = private_inputs[idx].clone();
 
     let circuit_primary = memory.primary_circuit(op_code as usize);
     let circuit_secondary = memory.secondary_circuit();
@@ -198,5 +267,18 @@ fn run_program() {
 
     recursive_snark_option = Some(recursive_snark);
   }
-  dbg!(recursive_snark_option.unwrap().zi_primary());
+
+  //   dbg!(recursive_snark_option.unwrap().zi_primary());
+  let final_mem = [
+    F::<G1>::from(0),
+    F::<G1>::from(16),
+    F::<G1>::from(6),
+    F::<G1>::from(0),
+    F::<G1>::from(1),
+    F::<G1>::from(2),
+    F::<G1>::from(0),
+    F::<G1>::from(1),
+    F::<G1>::from(2),
+  ];
+  assert_eq!(&final_mem.to_vec(), recursive_snark_option.unwrap().zi_primary());
 }
