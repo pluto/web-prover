@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, str};
 
+use anyhow::Result; // TODO: Replace this with `thiserror`
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, LinearCombination, SynthesisError};
 use serde::{Deserialize, Serialize};
 

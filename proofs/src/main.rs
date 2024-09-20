@@ -37,32 +37,24 @@ pub struct Args {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CircuitData {
-  #[serde(rename = "circuit")]
-  pub circuit_path:     PathBuf,
-  #[serde(rename = "r1cs")]
-  pub r1cs_path:        PathBuf,
-  #[serde(rename = "cbuild")]
-  pub cbuild_path:      PathBuf,
-  #[serde(rename = "graph")]
-  pub graph_path:       PathBuf,
-  #[serde(rename = "wgen_type")]
-  pub witness_gen_type: WitnessGenType,
-  #[serde(rename = "wgen")]
-  pub witness_gen_file: PathBuf,
-  pub num_folds:        usize,
-  pub private_input:    HashMap<String, Value>,
-  pub init_step_in:     Vec<u64>,
+  pub circuit_path:           PathBuf,
+  pub r1cs_path:              PathBuf,
+  pub graph_path:             PathBuf,
+  pub witness_generator_type: WitnessGeneratorType,
+  pub num_folds:              usize,
+  pub initial_public_input:   Vec<u64>,
+  pub private_input:          HashMap<String, Value>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum WitnessGenType {
-  #[serde(rename = "node")]
-  Node,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum WitnessGeneratorType {
+  #[serde(rename = "wasm")]
+  Wasm { path: String, wtns_path: String },
   #[serde(rename = "circom-witnesscalc")]
-  CircomWitnesscalc,
+  CircomWitnesscalc { path: String },
 }
 
-#[derive(Clone, Debug, clap::ValueEnum)]
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
 pub enum Scheme {
   Nova,
   SuperNova,

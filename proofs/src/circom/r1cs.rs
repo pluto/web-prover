@@ -1,10 +1,3 @@
-use std::{
-  collections::HashMap,
-  io::{BufReader, Cursor, Error, ErrorKind, Read, Result, Seek, SeekFrom},
-};
-
-use arecibo::traits::Group;
-use byteorder::{LittleEndian, ReadBytesExt};
 use ff::PrimeField;
 use fs::OpenOptions;
 
@@ -91,6 +84,18 @@ pub struct R1CSFile<Fr: PrimeField> {
   pub wire_mapping: Vec<u64>,
 }
 
+/// load r1cs from bin by a reader
+pub fn load_r1cs_from_bin_file(filename: &PathBuf) -> R1CS {
+  let reader =
+    BufReader::new(OpenOptions::new().read(true).open(filename).expect("unable to open."));
+
+  let file = from_reader(reader).expect("unable to read.");
+  let num_inputs = (1 + file.header.n_pub_in + file.header.n_pub_out) as usize;
+  let num_variables = file.header.n_wires as usize;
+  let num_aux = num_variables - num_inputs;
+  R1CS { num_aux, num_inputs, num_variables, constraints: file.constraints }
+}
+
 pub(crate) fn read_field<R: Read, Fr: PrimeField>(mut reader: R) -> Result<Fr> {
   let mut repr = Fr::ZERO.to_repr();
   for digit in repr.as_mut().iter_mut() {
@@ -159,12 +164,8 @@ fn read_map<R: Read>(mut reader: R, size: u64, header: &Header) -> Result<Vec<u6
   Ok(vec)
 }
 
-pub fn from_reader<R: Read + Seek, G1, G2>(
-  mut reader: R,
-) -> Result<R1CSFile<<G1 as Group>::Scalar>>
-where
-  G1: Group<Base = <G2 as Group>::Scalar>,
-  G2: Group<Base = <G1 as Group>::Scalar>, {
+pub fn from_reader<R: Read + Seek>(mut reader: R) -> Result<R1CSFile<F<G1>>>
+where {
   let mut magic = [0u8; 4];
   reader.read_exact(&mut magic)?;
   if magic != [0x72, 0x31, 0x63, 0x73] {
@@ -210,16 +211,4 @@ where
   let wire_mapping = read_map(&mut reader, *section_sizes.get(&wire2label_type).unwrap(), &header)?;
 
   Ok(R1CSFile { version, header, constraints, wire_mapping })
-}
-
-/// load r1cs from bin by a reader
-pub(crate) fn load_r1cs(filename: &PathBuf) -> R1CS {
-  let reader =
-    BufReader::new(OpenOptions::new().read(true).open(filename).expect("unable to open."));
-
-  let file = from_reader::<_, G1, G2>(reader).expect("unable to read.");
-  let num_inputs = (1 + file.header.n_pub_in + file.header.n_pub_out) as usize;
-  let num_variables = file.header.n_wires as usize;
-  let num_aux = num_variables - num_inputs;
-  R1CS { num_aux, num_inputs, num_variables, constraints: file.constraints }
 }

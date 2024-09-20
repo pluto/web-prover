@@ -12,6 +12,7 @@ use super::*;
 
 const ROM: &[u64] = &[0, 0, 0, 0];
 const PARSER_R1CS: &[u8] = include_bytes!("../parse_fold_batch.r1cs");
+const PARSER_GRAPH: &[u8] = include_bytes!("../parse_fold.bin");
 
 use arecibo::supernova::{NonUniformCircuit, StepCircuit as SNStepCircuit};
 use circom::compute_witness;
