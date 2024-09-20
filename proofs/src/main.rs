@@ -8,7 +8,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use arecibo::{
   provider::{ipa_pc::EvaluationEngine, Bn256EngineIPA, GrumpkinEngine},
-  spartan::{batched::BatchedRelaxedR1CSSNARK, snark::RelaxedR1CSSNARK},
+  spartan::snark::RelaxedR1CSSNARK,
   traits::{circuit::TrivialCircuit, Engine, Group},
 };
 use circom::circuit::CircomCircuit;
