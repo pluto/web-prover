@@ -15,7 +15,7 @@ const PARSER_R1CS: &[u8] = include_bytes!("../parse_fold_batch.r1cs");
 const PARSER_GRAPH: &[u8] = include_bytes!("../parse_fold.bin");
 
 use arecibo::supernova::{NonUniformCircuit, StepCircuit as SNStepCircuit};
-use circom::compute_witness;
+use circom::witness::compute_witness_from_graph;
 
 struct Memory {
   rom:                Vec<u64>,
@@ -45,7 +45,7 @@ impl NonUniformCircuit<E1> for Memory {
 
   fn primary_circuit(&self, circuit_index: usize) -> Self::C1 {
     let r1cs = R1CS::from(PARSER_R1CS);
-    let witness = compute_witness(
+    let witness = compute_witness_from_graph(
       self.curr_public_input.clone(),
       self.curr_private_input.clone(),
       &self.graph_bin,
@@ -113,7 +113,7 @@ pub fn run_program(circuit_data: CircuitData) {
   info!("Starting SuperNova program...");
   let graph_bin = std::fs::read(&circuit_data.graph_path).unwrap();
   let mut z0_primary: Vec<F<G1>> =
-    circuit_data.init_step_in.iter().map(|val| F::<G1>::from(*val)).collect();
+    circuit_data.initial_public_input.iter().map(|val| F::<G1>::from(*val)).collect();
 
   // Map `private_input`
   let private_inputs = map_private_inputs(&circuit_data);

@@ -22,7 +22,7 @@ const SWAP_MEMORY_R1CS: &[u8] = include_bytes!("../examples/swapMemory.r1cs");
 const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../examples/swapMemory.bin");
 
 use arecibo::supernova::{NonUniformCircuit, StepCircuit as SNStepCircuit};
-use circom::compute_witness;
+use circom::witness::compute_witness_from_graph;
 
 struct Memory {
   rom:                Vec<u64>,
@@ -135,7 +135,7 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
         match self {
           Self::AddIntoZeroth { circuit, curr_private_input, curr_public_input, .. } => {
             let mut circuit = circuit.clone();
-            let witness = compute_witness(
+            let witness = compute_witness_from_graph(
               curr_public_input.clone(),
               curr_private_input.clone(),
               ADD_INTO_ZEROTH_GRAPH,
@@ -145,7 +145,7 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
           },
           Self::SquareZeroth { circuit, curr_private_input, curr_public_input, .. } => {
             let mut circuit = circuit.clone();
-            let witness = compute_witness(
+            let witness = compute_witness_from_graph(
               curr_public_input.clone(),
               curr_private_input.clone(),
               SQUARE_ZEROTH_GRAPH,
@@ -155,7 +155,7 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
           },
           Self::SwapMemory { circuit, curr_private_input, curr_public_input, .. } => {
             let mut circuit = circuit.clone();
-            let witness = compute_witness(
+            let witness = compute_witness_from_graph(
               curr_public_input.clone(),
               curr_private_input.clone(),
               SWAP_MEMORY_GRAPH,

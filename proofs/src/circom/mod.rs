@@ -1,6 +1,7 @@
 use std::{
   collections::HashMap,
   env::current_dir,
+  fs,
   io::{BufReader, Cursor, Error, ErrorKind, Read, Result, Seek, SeekFrom},
   path::PathBuf,
   process::Command,

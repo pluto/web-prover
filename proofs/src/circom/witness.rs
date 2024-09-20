@@ -2,6 +2,33 @@ use fs::OpenOptions;
 
 use super::*;
 
+pub fn compute_witness_from_graph(
+  current_public_input: Vec<F<G1>>,
+  private_input: HashMap<String, Value>,
+  graph_data: &[u8],
+) -> Vec<<G1 as Group>::Scalar> {
+  dbg!(&current_public_input);
+  let decimal_stringified_input: Vec<String> = current_public_input
+    .iter()
+    .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
+    .collect();
+
+  let input = CircomInput { step_in: decimal_stringified_input, extra: private_input.clone() };
+
+  let input_json = serde_json::to_string(&input).unwrap();
+
+  dbg!(&input_json);
+  let witness = circom_witnesscalc::calc_witness(&input_json, graph_data).unwrap();
+  // let witness =
+  //   capture_and_log(|| circom_witnesscalc::calc_witness(&input_json, graph_data).unwrap()); //
+  // TODO: helpful if we want tracing crate only to handle stdout
+
+  witness
+    .iter()
+    .map(|elem| <F<G1> as PrimeField>::from_str_vartime(elem.to_string().as_str()).unwrap())
+    .collect()
+}
+
 pub fn compute_witness_from_generator_type(
   public_input: &[F<G1>],
   private_input: &HashMap<String, Value>,
