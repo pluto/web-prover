@@ -184,6 +184,7 @@ pub mod utils {
 
   use super::*;
 
+  #[allow(clippy::type_complexity)]
   pub fn next_rom_index_and_pc<CS: ConstraintSystem<F<G1>>>(
     cs: &mut CS,
     rom_index: &AllocatedNum<F<G1>>,

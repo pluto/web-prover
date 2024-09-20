@@ -74,11 +74,7 @@ impl NonUniformCircuit<E1> for Memory {
   fn primary_circuit(&self, circuit_index: usize) -> Self::C1 {
     match circuit_index {
       0 => CircuitSelector::AddIntoZeroth {
-        circuit: CircomCircuit {
-          r1cs: R1CS::from(ADD_INTO_ZEROTH_R1CS),
-
-          witness: None,
-        },
+        circuit: CircomCircuit { r1cs: R1CS::from(ADD_INTO_ZEROTH_R1CS), witness: None },
         curr_public_input: self.curr_public_input.clone(),
         curr_private_input: self.curr_private_input.clone(),
         circuit_index,
@@ -200,6 +196,7 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
 fn run_program() {
   info!("Starting SuperNova Add/Square test...");
 
+  // Initial `step_in`: [0,2]
   let mut z0_primary: Vec<F<G1>> =
     [F::<G1>::from(0), F::<G1>::from(2)].iter().map(|val| F::<G1>::from(*val)).collect();
 

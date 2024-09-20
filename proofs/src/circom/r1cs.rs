@@ -59,7 +59,8 @@ impl From<&[u8]> for R1CS {
     let constraints = read_constraints::<&mut Cursor<&[u8]>, F<G1>>(&mut cursor, &header).unwrap();
 
     cursor.seek(SeekFrom::Start(*section_offsets.get(&wire2label_type).unwrap())).unwrap();
-    let wire_mapping =
+    // TODO: not using wiremapping is cursed fs
+    let _wire_mapping =
       read_map(&mut cursor, *section_sizes.get(&wire2label_type).unwrap(), &header).unwrap();
 
     let num_inputs = (1 + header.n_pub_in + header.n_pub_out) as usize;

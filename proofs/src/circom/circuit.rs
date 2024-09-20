@@ -1,7 +1,6 @@
 use std::{collections::BTreeMap, str};
 
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, LinearCombination, SynthesisError};
-use ff::PrimeField;
 use serde::{Deserialize, Serialize};
 
 use super::*;

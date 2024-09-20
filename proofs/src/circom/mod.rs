@@ -7,13 +7,12 @@ use std::{
 
 // use arecibo::supernova::{PublicParams, RecursiveSNARK, TrivialTestCircuit};
 use arecibo::{
-  traits::{circuit::TrivialCircuit, snark::RelaxedR1CSSNARKTrait, Engine, Group},
+  traits::{circuit::TrivialCircuit, snark::RelaxedR1CSSNARKTrait, Group},
   PublicParams, RecursiveSNARK,
 };
 use circom::circuit::CircomCircuit;
 use ff::{Field, PrimeField};
 use num_bigint::BigInt;
-use num_traits::Num;
 use r1cs::R1CS;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -129,7 +128,7 @@ pub fn create_recursive_circuit(
   Ok(recursive_snark)
 }
 
-fn capture_and_log<F, T>(f: F) -> T
+fn _capture_and_log<F, T>(f: F) -> T
 where F: FnOnce() -> T {
   // Create a buffer to capture stdout
   let output_buffer = Arc::new(Mutex::new(Vec::new()));
