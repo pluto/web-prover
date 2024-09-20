@@ -52,12 +52,12 @@ pub fn compute_witness_from_generator_type(
 }
 
 pub fn generate_witness_from_witnesscalc_file(
-  witness_input_json: &String,
+  witness_input_json: &str,
   graph_path: &PathBuf,
 ) -> Vec<F<G1>> {
   let mut file = std::fs::File::open(graph_path).unwrap();
   let mut graph_data = Vec::new();
-  file.read_to_end(&mut graph_data);
+  file.read_to_end(&mut graph_data).unwrap();
 
   let witness = circom_witnesscalc::calc_witness(witness_input_json, &graph_data).unwrap();
   witness
@@ -67,7 +67,7 @@ pub fn generate_witness_from_witnesscalc_file(
 }
 
 pub fn generate_witness_from_wasm_file(
-  witness_input_json: &String,
+  witness_input_json: &str,
   wasm_path: &PathBuf,
   wtns_path: &PathBuf,
 ) -> Vec<F<G1>> {

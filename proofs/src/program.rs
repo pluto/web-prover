@@ -12,7 +12,7 @@ use super::*;
 
 const ROM: &[u64] = &[0, 0, 0, 0];
 const PARSER_R1CS: &[u8] = include_bytes!("../parse_fold_batch.r1cs");
-const PARSER_GRAPH: &[u8] = include_bytes!("../parse_fold.bin");
+// const PARSER_GRAPH: &[u8] = include_bytes!("../parse_fold.bin");
 
 use arecibo::supernova::{NonUniformCircuit, StepCircuit as SNStepCircuit};
 use circom::witness::compute_witness_from_graph;
@@ -109,6 +109,7 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
   }
 }
 
+// TODO: Consolidate these entrypoints since we have a test now.
 pub fn run_program(circuit_data: CircuitData) {
   info!("Starting SuperNova program...");
   let graph_bin = std::fs::read(&circuit_data.graph_path).unwrap();
