@@ -60,9 +60,9 @@ fn compute_witness_witnesscalc(
 
   let input_json = serde_json::to_string(&input).unwrap();
 
-  // let witness = circom_witnesscalc::calc_witness(&input_json, graph_data).unwrap();
-  let witness =
-    capture_and_log(|| circom_witnesscalc::calc_witness(&input_json, graph_data).unwrap());
+  let witness = circom_witnesscalc::calc_witness(&input_json, graph_data).unwrap();
+  // let witness =
+  //   capture_and_log(|| circom_witnesscalc::calc_witness(&input_json, graph_data).unwrap());
 
   witness
     .iter()
