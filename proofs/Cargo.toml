@@ -7,9 +7,9 @@ edition = "2021"
 serde = "1.0.210"
 serde_json = "1.0.128"
 
-arecibo = { git = "https://github.com/argumentcomputer/arecibo", default-features = false }
-# arecibo = { path = "arecibo", default-features = false }
-# nova-snark = { version = "0.37.0", default-features = false }
+arecibo = { git = "https://github.com/argumentcomputer/arecibo", default-features = false, features = [
+    "portable",
+] }
 ff = { version = "0.13", features = ["derive"] }
 bellpepper-core = "0.4.0"
 
