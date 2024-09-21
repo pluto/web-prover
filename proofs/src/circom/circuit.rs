@@ -17,8 +17,6 @@ pub struct CircuitJson {
   pub num_variables: usize,
 }
 
-pub type Constraint<Fr> = (Vec<(usize, Fr)>, Vec<(usize, Fr)>, Vec<(usize, Fr)>);
-
 #[derive(Clone)]
 pub struct CircomCircuit {
   pub r1cs:    R1CS,

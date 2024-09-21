@@ -4,14 +4,15 @@ use fs::OpenOptions;
 use super::*;
 // This was borrowed from `nova-scotia`. Big thank you for this middleware!
 // some codes borrowed from https://github.com/poma/zkutil/blob/master/src/r1cs_reader.rs
-use crate::circom::circuit::Constraint;
+
+pub type Constraint = (Vec<(usize, F<G1>)>, Vec<(usize, F<G1>)>, Vec<(usize, F<G1>)>);
 
 #[derive(Clone)]
 pub struct R1CS {
   pub num_inputs:    usize,
   pub num_aux:       usize,
   pub num_variables: usize,
-  pub constraints:   Vec<Constraint<F<G1>>>,
+  pub constraints:   Vec<Constraint>,
 }
 
 impl From<&[u8]> for R1CS {
@@ -48,7 +49,7 @@ impl From<&[u8]> for R1CS {
     assert_eq!(header.field_size, 32);
 
     cursor.seek(SeekFrom::Start(*section_offsets.get(&constraint_type).unwrap())).unwrap();
-    let constraints = read_constraints::<&mut Cursor<&[u8]>, F<G1>>(&mut cursor, &header).unwrap();
+    let constraints = read_constraints(&mut cursor, &header).unwrap();
 
     cursor.seek(SeekFrom::Start(*section_offsets.get(&wire2label_type).unwrap())).unwrap();
     // TODO: not using wiremapping is cursed fs
@@ -77,10 +78,10 @@ pub struct Header {
 
 // R1CSFile parse result
 #[derive(Debug, Default)]
-pub struct R1CSFile<Fr: PrimeField> {
+pub struct R1CSFile {
   pub version:      u32,
   pub header:       Header,
-  pub constraints:  Vec<Constraint<Fr>>,
+  pub constraints:  Vec<Constraint>,
   pub wire_mapping: Vec<u64>,
 }
 
@@ -134,17 +135,14 @@ fn read_constraint_vec<R: Read, Fr: PrimeField>(mut reader: R) -> Result<Vec<(us
   Ok(vec)
 }
 
-fn read_constraints<R: Read, Fr: PrimeField>(
-  mut reader: R,
-  header: &Header,
-) -> Result<Vec<Constraint<Fr>>> {
+fn read_constraints<R: Read>(mut reader: R, header: &Header) -> Result<Vec<Constraint>> {
   // todo check section size
   let mut vec = Vec::with_capacity(header.n_constraints as usize);
   for _ in 0..header.n_constraints {
     vec.push((
-      read_constraint_vec::<&mut R, Fr>(&mut reader)?,
-      read_constraint_vec::<&mut R, Fr>(&mut reader)?,
-      read_constraint_vec::<&mut R, Fr>(&mut reader)?,
+      read_constraint_vec(&mut reader)?,
+      read_constraint_vec(&mut reader)?,
+      read_constraint_vec(&mut reader)?,
     ));
   }
   Ok(vec)
@@ -164,7 +162,7 @@ fn read_map<R: Read>(mut reader: R, size: u64, header: &Header) -> Result<Vec<u6
   Ok(vec)
 }
 
-pub fn from_reader<R: Read + Seek>(mut reader: R) -> Result<R1CSFile<F<G1>>>
+pub fn from_reader<R: Read + Seek>(mut reader: R) -> Result<R1CSFile>
 where {
   let mut magic = [0u8; 4];
   reader.read_exact(&mut magic)?;
@@ -205,7 +203,7 @@ where {
   }
 
   reader.seek(SeekFrom::Start(*section_offsets.get(&constraint_type).unwrap()))?;
-  let constraints = read_constraints::<&mut R, F<G1>>(&mut reader, &header)?;
+  let constraints = read_constraints(&mut reader, &header)?;
 
   reader.seek(SeekFrom::Start(*section_offsets.get(&wire2label_type).unwrap()))?;
   let wire_mapping = read_map(&mut reader, *section_sizes.get(&wire2label_type).unwrap(), &header)?;
