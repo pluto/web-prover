@@ -53,6 +53,7 @@ pub enum WitnessGeneratorType {
   CircomWitnesscalc { path: String },
 }
 
+// TODO: Get rid of this and just leave a supernova entry since it can do everything we want.
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
 pub enum Scheme {
   Nova,
