@@ -3,7 +3,6 @@
 pub mod circom;
 pub mod handler;
 pub mod program;
-#[cfg(test)] mod tests;
 use std::{collections::HashMap, path::PathBuf};
 
 use arecibo::{

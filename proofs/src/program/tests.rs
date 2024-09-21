@@ -1,3 +1,5 @@
+//! This test module is effectively testing a static (comptime) circuit dispatch supernova program
+
 use std::time::Instant;
 
 use arecibo::{
@@ -6,94 +8,76 @@ use arecibo::{
 };
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::r1cs::R1CS;
-use program::utils::next_rom_index_and_pc;
+use program::{utils::next_rom_index_and_pc, RomCircuit};
 
 use super::*;
 
 const ROM: &[u64] = &[0, 1, 2, 0, 1, 2];
 
-const ADD_INTO_ZEROTH_R1CS: &[u8] = include_bytes!("../examples/addIntoZeroth.r1cs");
-const ADD_INTO_ZEROTH_GRAPH: &[u8] = include_bytes!("../examples/addIntoZeroth.bin");
+const ADD_INTO_ZEROTH_R1CS: &[u8] = include_bytes!("../../examples/addIntoZeroth.r1cs");
+const ADD_INTO_ZEROTH_GRAPH: &[u8] = include_bytes!("../../examples/addIntoZeroth.bin");
 
-const SQUARE_ZEROTH_R1CS: &[u8] = include_bytes!("../examples/squareZeroth.r1cs");
-const SQUARE_ZEROTH_GRAPH: &[u8] = include_bytes!("../examples/squareZeroth.bin");
+const SQUARE_ZEROTH_R1CS: &[u8] = include_bytes!("../../examples/squareZeroth.r1cs");
+const SQUARE_ZEROTH_GRAPH: &[u8] = include_bytes!("../../examples/squareZeroth.bin");
 
-const SWAP_MEMORY_R1CS: &[u8] = include_bytes!("../examples/swapMemory.r1cs");
-const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../examples/swapMemory.bin");
+const SWAP_MEMORY_R1CS: &[u8] = include_bytes!("../../examples/swapMemory.r1cs");
+const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../../examples/swapMemory.bin");
 
 use arecibo::supernova::{NonUniformCircuit, StepCircuit as SNStepCircuit};
 use circom::witness::compute_witness_from_graph;
 
-struct Memory {
-  rom:                Vec<u64>,
-  curr_public_input:  Vec<F<G1>>,
-  curr_private_input: HashMap<String, Value>,
+struct TestMemory {
+  pub rom:                Vec<u64>,
+  pub curr_public_input:  Vec<F<G1>>,
+  pub curr_private_input: HashMap<String, Value>,
 }
 
 #[derive(Clone)]
-pub enum CircuitSelector {
-  AddIntoZeroth {
-    circuit:            C1,
-    circuit_index:      usize,
-    rom_size:           usize,
-    curr_public_input:  Vec<F<G1>>,
-    curr_private_input: HashMap<String, Value>,
-  },
-  SquareZeroth {
-    circuit:            C1,
-    circuit_index:      usize,
-    rom_size:           usize,
-    curr_public_input:  Vec<F<G1>>,
-    curr_private_input: HashMap<String, Value>,
-  },
-  SwapMemory {
-    circuit:            C1,
-    circuit_index:      usize,
-    rom_size:           usize,
-    curr_public_input:  Vec<F<G1>>,
-    curr_private_input: HashMap<String, Value>,
-  },
+enum TestCircuitSelector {
+  AddIntoZeroth(RomCircuit),
+  SquareZeroth(RomCircuit),
+  SwapMemory(RomCircuit),
 }
 
-impl CircuitSelector {
+impl TestCircuitSelector {
   pub fn inner_arity(&self) -> usize {
     match self {
-      Self::AddIntoZeroth { circuit, .. } => circuit.arity(),
-      Self::SquareZeroth { circuit, .. } => circuit.arity(),
-      Self::SwapMemory { circuit, .. } => circuit.arity(),
+      Self::AddIntoZeroth(RomCircuit { circuit, .. }) => circuit.arity(),
+      Self::SquareZeroth(RomCircuit { circuit, .. }) => circuit.arity(),
+      Self::SwapMemory(RomCircuit { circuit, .. }) => circuit.arity(),
     }
   }
 }
 
-impl NonUniformCircuit<E1> for Memory {
-  type C1 = CircuitSelector;
+impl NonUniformCircuit<E1> for TestMemory {
+  type C1 = TestCircuitSelector;
   type C2 = TrivialTestCircuit<F<G2>>;
 
   fn num_circuits(&self) -> usize { 3 }
 
   fn primary_circuit(&self, circuit_index: usize) -> Self::C1 {
     match circuit_index {
-      0 => CircuitSelector::AddIntoZeroth {
+      0 => TestCircuitSelector::AddIntoZeroth(RomCircuit {
         circuit: CircomCircuit { r1cs: R1CS::from(ADD_INTO_ZEROTH_R1CS), witness: None },
         curr_public_input: self.curr_public_input.clone(),
         curr_private_input: self.curr_private_input.clone(),
         circuit_index,
         rom_size: self.rom.len(),
-      },
-      1 => CircuitSelector::SquareZeroth {
+      }),
+      1 => TestCircuitSelector::SquareZeroth(RomCircuit {
         circuit: CircomCircuit { r1cs: R1CS::from(SQUARE_ZEROTH_R1CS), witness: None },
         curr_public_input: self.curr_public_input.clone(),
         curr_private_input: self.curr_private_input.clone(),
         circuit_index,
         rom_size: self.rom.len(),
-      },
-      2 => CircuitSelector::SwapMemory {
+      }),
+      2 => TestCircuitSelector::SwapMemory(RomCircuit {
         circuit: CircomCircuit { r1cs: R1CS::from(SWAP_MEMORY_R1CS), witness: None },
         curr_public_input: self.curr_public_input.clone(),
         curr_private_input: self.curr_private_input.clone(),
         circuit_index,
         rom_size: self.rom.len(),
-      },
+      }),
       _ => panic!("Incorrect circuit index provided!"),
     }
   }
@@ -103,20 +87,20 @@ impl NonUniformCircuit<E1> for Memory {
   fn initial_circuit_index(&self) -> usize { self.rom[0] as usize }
 }
 
-impl SNStepCircuit<F<G1>> for CircuitSelector {
+impl SNStepCircuit<F<G1>> for TestCircuitSelector {
   fn arity(&self) -> usize {
     match self {
-      Self::AddIntoZeroth { circuit, rom_size, .. } => circuit.arity() + 1 + rom_size,
-      Self::SquareZeroth { circuit, rom_size, .. } => circuit.arity() + 1 + rom_size,
-      Self::SwapMemory { circuit, rom_size, .. } => circuit.arity() + 1 + rom_size,
+      Self::AddIntoZeroth(RomCircuit { circuit, rom_size, .. }) => circuit.arity() + 1 + rom_size,
+      Self::SquareZeroth(RomCircuit { circuit, rom_size, .. }) => circuit.arity() + 1 + rom_size,
+      Self::SwapMemory(RomCircuit { circuit, rom_size, .. }) => circuit.arity() + 1 + rom_size,
     }
   }
 
   fn circuit_index(&self) -> usize {
     match self {
-      Self::AddIntoZeroth { circuit_index, .. } => *circuit_index,
-      Self::SquareZeroth { circuit_index, .. } => *circuit_index,
-      Self::SwapMemory { circuit_index, .. } => *circuit_index,
+      Self::AddIntoZeroth(RomCircuit { circuit_index, .. }) => *circuit_index,
+      Self::SquareZeroth(RomCircuit { circuit_index, .. }) => *circuit_index,
+      Self::SwapMemory(RomCircuit { circuit_index, .. }) => *circuit_index,
     }
   }
 
@@ -133,7 +117,12 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
     let circuit = if let Some(allocated_num) = pc {
       if allocated_num.get_value().is_some() {
         match self {
-          Self::AddIntoZeroth { circuit, curr_private_input, curr_public_input, .. } => {
+          Self::AddIntoZeroth(RomCircuit {
+            circuit,
+            curr_private_input,
+            curr_public_input,
+            ..
+          }) => {
             let mut circuit = circuit.clone();
             let witness = compute_witness_from_graph(
               curr_public_input.clone(),
@@ -143,7 +132,9 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
             circuit.witness = Some(witness);
             circuit
           },
-          Self::SquareZeroth { circuit, curr_private_input, curr_public_input, .. } => {
+          Self::SquareZeroth(RomCircuit {
+            circuit, curr_private_input, curr_public_input, ..
+          }) => {
             let mut circuit = circuit.clone();
             let witness = compute_witness_from_graph(
               curr_public_input.clone(),
@@ -153,7 +144,9 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
             circuit.witness = Some(witness);
             circuit
           },
-          Self::SwapMemory { circuit, curr_private_input, curr_public_input, .. } => {
+          Self::SwapMemory(RomCircuit {
+            circuit, curr_private_input, curr_public_input, ..
+          }) => {
             let mut circuit = circuit.clone();
             let witness = compute_witness_from_graph(
               curr_public_input.clone(),
@@ -166,9 +159,9 @@ impl SNStepCircuit<F<G1>> for CircuitSelector {
         }
       } else {
         match self {
-          Self::AddIntoZeroth { circuit, .. } => circuit.clone(),
-          Self::SquareZeroth { circuit, .. } => circuit.clone(),
-          Self::SwapMemory { circuit, .. } => circuit.clone(),
+          Self::AddIntoZeroth(RomCircuit { circuit, .. }) => circuit.clone(),
+          Self::SquareZeroth(RomCircuit { circuit, .. }) => circuit.clone(),
+          Self::SwapMemory(RomCircuit { circuit, .. }) => circuit.clone(),
         }
       }
     } else {
@@ -200,6 +193,7 @@ fn run_program() {
   let mut z0_primary: Vec<F<G1>> =
     [F::<G1>::from(0), F::<G1>::from(2)].iter().map(|val| F::<G1>::from(*val)).collect();
 
+  // TODO: Should probably test feeding in private inputs
   // Map `private_input`
   //   let mut private_inputs = vec![];
   //   private_inputs
@@ -207,7 +201,7 @@ fn run_program() {
   //   private_inputs.push(serde_json::from_str::<HashMap<String, Value>>(r#"{ "x": "1"
   // }"#).unwrap());
 
-  let mut memory = Memory {
+  let mut memory = TestMemory {
     rom:                ROM.to_vec(),
     curr_public_input:  z0_primary.clone(),
     curr_private_input: HashMap::new(),
