@@ -86,12 +86,13 @@ pub fn run(program_data: ProgramData) {
 
   // Get the private inputs needed for circuits
   let private_inputs = map_private_inputs(&program_data);
+  dbg!(&private_inputs[0]);
 
   let mut circuits = vec![];
   for (circuit_index, (r1cs_path, witness_generator_type)) in
     program_data.r1cs_paths.iter().zip(program_data.witness_generator_types.iter()).enumerate()
   {
-    let circuit = CircomCircuit { r1cs: load_r1cs_from_file(&r1cs_path), witness: None };
+    let circuit = CircomCircuit { r1cs: load_r1cs_from_file(r1cs_path), witness: None };
     let rom_circuit = RomCircuit {
       circuit,
       circuit_index,

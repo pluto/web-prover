@@ -165,14 +165,23 @@
             ]
         }
     },
-    "circuit": "circuits/parse_fold_batch.circom",
-    "r1cs": "parse_fold_batch.r1cs",
-    "cbuild": "build-circuit",
-    "graph": "parse_fold_batch.bin",
-    "wgen_type": "circom-witnesscalc",
-    "wgen": "build/parse_fold_batch/parse_fold_batch_js/parse_fold_batch.wasm",
-    "num_folds": 4,
-    "init_step_in": [
+    "r1cs_paths": [
+        "examples/parse_fold_batch.r1cs"
+    ],
+    "witness_generator_types": [
+        {
+            "circom-witnesscalc": {
+                "path": "examples/parse_fold_batch.bin"
+            }
+        }
+    ],
+    "rom": [
+        0,
+        0,
+        0,
+        0
+    ],
+    "initial_public_input": [
         0,
         0,
         0,
