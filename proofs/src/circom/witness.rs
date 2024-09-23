@@ -57,16 +57,18 @@ pub fn generate_witness_from_wasm_file(
     .arg(witness_js)
     .arg(wasm_path)
     .arg(&witness_generator_input)
-    .arg("witness_output")
+    .arg(wtns_path)
     .output()
     .expect("failed to execute process");
   if !output.stdout.is_empty() || !output.stderr.is_empty() {
     print!("stdout: {}", std::str::from_utf8(&output.stdout).unwrap());
     print!("stderr: {}", std::str::from_utf8(&output.stderr).unwrap());
   }
-  let _ = fs::remove_file(witness_generator_input);
+  fs::remove_file(witness_generator_input).unwrap();
   let reader = OpenOptions::new().read(true).open(wtns_path).expect("unable to open.");
-  load_witness_from_bin_reader(BufReader::new(reader))
+  let witness = load_witness_from_bin_reader(BufReader::new(reader));
+  fs::remove_file(wtns_path).unwrap();
+  witness
 }
 
 pub(crate) fn load_witness_from_bin_reader<R: Read>(mut reader: R) -> Vec<F<G1>> {

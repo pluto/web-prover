@@ -10,7 +10,7 @@ use utils::{into_input_json, map_private_inputs};
 
 use super::*;
 
-mod tests;
+#[cfg(test)] mod tests;
 pub mod utils;
 
 use arecibo::supernova::{NonUniformCircuit, StepCircuit as SNStepCircuit};

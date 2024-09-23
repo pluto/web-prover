@@ -36,7 +36,7 @@ enum TestCircuitSelector {
 }
 
 impl TestCircuitSelector {
-  pub fn inner_arity(&self) -> usize {
+  fn inner_arity(&self) -> usize {
     match self {
       Self::AddIntoZeroth(RomCircuit { circuit, .. }) => circuit.arity(),
       Self::SquareZeroth(RomCircuit { circuit, .. }) => circuit.arity(),
