@@ -4,6 +4,7 @@ use arecibo::{supernova::TrivialTestCircuit, traits::circuit::StepCircuit};
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::r1cs::R1CS;
 use program::{utils::next_rom_index_and_pc, RomCircuit};
+use utils::into_input_json;
 
 use super::*;
 
@@ -110,14 +111,6 @@ impl SNStepCircuit<F<G1>> for TestCircuitSelector {
     z: &[AllocatedNum<F<G1>>],
   ) -> Result<(Option<AllocatedNum<F<G1>>>, Vec<AllocatedNum<F<G1>>>), SynthesisError> {
     println!("inside of synthesize with pc: {pc:?}");
-    let decimal_stringified_input: Vec<String> = current_public_input
-      .iter()
-      .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
-      .collect();
-
-    let input = CircomInput { step_in: decimal_stringified_input, extra: private_input.clone() };
-
-    let input_json = serde_json::to_string(&input).unwrap();
 
     // TODO: We need to set the witness on this properly, so we probably need to put the pub/priv
     // inputs into the CircuitSelector itself...
@@ -132,8 +125,10 @@ impl SNStepCircuit<F<G1>> for TestCircuitSelector {
           }) => {
             let mut circuit = circuit.clone();
             let witness = generate_witness_from_graph(
-              curr_public_input.clone().unwrap(),
-              curr_private_input.clone().unwrap(),
+              &into_input_json(
+                curr_public_input.as_ref().unwrap(),
+                curr_private_input.as_ref().unwrap(),
+              ),
               ADD_INTO_ZEROTH_GRAPH,
             );
             circuit.witness = Some(witness);
@@ -144,8 +139,10 @@ impl SNStepCircuit<F<G1>> for TestCircuitSelector {
           }) => {
             let mut circuit = circuit.clone();
             let witness = generate_witness_from_graph(
-              curr_public_input.clone().unwrap(),
-              curr_private_input.clone().unwrap(),
+              &into_input_json(
+                curr_public_input.as_ref().unwrap(),
+                curr_private_input.as_ref().unwrap(),
+              ),
               SQUARE_ZEROTH_GRAPH,
             );
             circuit.witness = Some(witness);
@@ -156,8 +153,10 @@ impl SNStepCircuit<F<G1>> for TestCircuitSelector {
           }) => {
             let mut circuit = circuit.clone();
             let witness = generate_witness_from_graph(
-              curr_public_input.clone().unwrap(),
-              curr_private_input.clone().unwrap(),
+              &into_input_json(
+                curr_public_input.as_ref().unwrap(),
+                curr_private_input.as_ref().unwrap(),
+              ),
               SWAP_MEMORY_GRAPH,
             );
             circuit.witness = Some(witness);
