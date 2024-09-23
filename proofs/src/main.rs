@@ -9,7 +9,7 @@ use arecibo::{
   spartan::snark::RelaxedR1CSSNARK,
   traits::{circuit::TrivialCircuit, Engine, Group},
 };
-use circom::circuit::CircomCircuit;
+use circom::CircomCircuit;
 use clap::Parser;
 use ff::Field;
 use serde::{Deserialize, Serialize};

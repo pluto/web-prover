@@ -1,30 +1,30 @@
 use fs::OpenOptions;
 
 use super::*;
+pub fn generate_witness_from_generator_type(
+  input_json: &str,
+  witness_generator_type: &WitnessGeneratorType,
+) -> Vec<F<G1>> {
+  dbg!(input_json);
+  match witness_generator_type {
+    WitnessGeneratorType::Wasm { path, wtns_path } =>
+      generate_witness_from_wasm_file(input_json, &PathBuf::from(path), &PathBuf::from(wtns_path)),
+    WitnessGeneratorType::CircomWitnesscalc { path } =>
+      generate_witness_from_witnesscalc_file(input_json, &PathBuf::from(path)),
+    WitnessGeneratorType::Raw(graph_data) => generate_witness_from_graph(input_json, graph_data),
+  }
+}
 
 pub fn generate_witness_from_graph(
   input_json: &str,
   graph_data: &[u8],
 ) -> Vec<<G1 as Group>::Scalar> {
-  let witness = circom_witnesscalc::calc_witness(&input_json, graph_data).unwrap();
+  let witness = circom_witnesscalc::calc_witness(input_json, graph_data).unwrap();
 
   witness
     .iter()
     .map(|elem| <F<G1> as PrimeField>::from_str_vartime(elem.to_string().as_str()).unwrap())
     .collect()
-}
-
-pub fn compute_witness_from_generator_type(
-  input_json: &str,
-  witness_generator_type: &WitnessGeneratorType,
-) -> Vec<F<G1>> {
-  match witness_generator_type {
-    WitnessGeneratorType::Wasm { path, wtns_path } =>
-      generate_witness_from_wasm_file(&input_json, &PathBuf::from(path), &PathBuf::from(wtns_path)),
-    WitnessGeneratorType::CircomWitnesscalc { path } =>
-      generate_witness_from_witnesscalc_file(&input_json, &PathBuf::from(path)),
-    WitnessGeneratorType::Raw(graph_data) => generate_witness_from_graph(&input_json, graph_data),
-  }
 }
 
 pub fn generate_witness_from_witnesscalc_file(
