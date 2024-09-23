@@ -5,17 +5,16 @@ use arecibo::{
   traits::{circuit::StepCircuit, snark::default_ck_hint},
 };
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
-use circom::r1cs::{load_r1cs_from_file, R1CS};
+use circom::r1cs::load_r1cs_from_file;
 use utils::map_private_inputs;
 
 use super::*;
 pub mod dynamic;
-pub mod r#static;
+// pub mod r#static;
 mod tests;
 pub mod utils;
 
 use arecibo::supernova::{NonUniformCircuit, StepCircuit as SNStepCircuit};
-use circom::witness::compute_witness_from_graph;
 
 pub struct Memory {
   pub rom:      Vec<u64>,
@@ -32,6 +31,48 @@ pub struct RomCircuit {
   pub curr_public_input:      Option<Vec<F<G1>>>,
   pub curr_private_input:     Option<HashMap<String, Value>>,
   pub witness_generator_type: WitnessGeneratorType,
+}
+
+impl NonUniformCircuit<E1> for Memory {
+  type C1 = RomCircuit;
+  type C2 = TrivialTestCircuit<F<G2>>;
+
+  fn num_circuits(&self) -> usize { 1 }
+
+  fn primary_circuit(&self, circuit_index: usize) -> Self::C1 {
+    self.circuits[circuit_index].clone()
+  }
+
+  fn secondary_circuit(&self) -> Self::C2 { Default::default() }
+
+  fn initial_circuit_index(&self) -> usize { self.rom[0] as usize }
+}
+
+impl SNStepCircuit<F<G1>> for RomCircuit {
+  fn arity(&self) -> usize { self.circuit.arity() + 1 + self.rom_size }
+
+  fn circuit_index(&self) -> usize { self.circuit_index }
+
+  fn synthesize<CS: ConstraintSystem<F<G1>>>(
+    &self,
+    cs: &mut CS,
+    pc: Option<&AllocatedNum<F<G1>>>, // TODO: idk how to use the program counter lol
+    z: &[AllocatedNum<F<G1>>],
+  ) -> Result<(Option<AllocatedNum<F<G1>>>, Vec<AllocatedNum<F<G1>>>), SynthesisError> {
+    let rom_index = &z[self.circuit.arity()]; // jump to where we pushed pc data into CS
+    let allocated_rom = &z[self.circuit.arity() + 1..]; // jump to where we pushed rom data into CS
+
+    let (rom_index_next, pc_next) = utils::next_rom_index_and_pc(
+      &mut cs.namespace(|| "next and rom_index and pc"),
+      rom_index,
+      allocated_rom,
+      pc.ok_or(SynthesisError::AssignmentMissing)?,
+    )?;
+    let mut circuit_constraints = self.circuit.vanilla_synthesize(cs, z)?;
+    circuit_constraints.push(rom_index_next);
+    circuit_constraints.extend(z[self.circuit.arity() + 1..].iter().cloned());
+    Ok((Some(pc_next), circuit_constraints))
+  }
 }
 
 pub fn run(program_data: ProgramData) {
@@ -113,7 +154,7 @@ pub fn run(program_data: ProgramData) {
     // Update everything now for next step
     // z0_primary = recursive_snark.zi_primary().clone();
     let mut next_pub_input = recursive_snark.zi_primary().clone();
-    next_pub_input.truncate(circuit_primary.inner_arity());
+    next_pub_input.truncate(circuit_primary.arity());
     memory.circuits[idx].curr_public_input = Some(next_pub_input);
 
     recursive_snark_option = Some(recursive_snark);

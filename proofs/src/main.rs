@@ -44,6 +44,8 @@ pub enum WitnessGeneratorType {
   Wasm { path: String, wtns_path: String },
   #[serde(rename = "circom-witnesscalc")]
   CircomWitnesscalc { path: String },
+  #[serde(skip)]
+  Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
 }
 
 pub type E1 = Bn256EngineIPA;

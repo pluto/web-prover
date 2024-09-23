@@ -2,7 +2,10 @@ use bellpepper_core::{
   boolean::{AllocatedBit, Boolean},
   LinearCombination,
 };
+use circom::CircomInput;
 use itertools::Itertools;
+use num_bigint::BigInt;
+use serde_json::json;
 
 use super::*;
 
@@ -103,15 +106,17 @@ pub fn get_selector_vec_from_index<CS: ConstraintSystem<F<G1>>>(
   Ok(selector)
 }
 
+// TODO: This may not be the best now that we have variable rom and stuff, but I replaced the
+// `num_folds` with `rom.len()` as a simple patch
 pub fn map_private_inputs(circuit_data: &ProgramData) -> Vec<HashMap<String, Value>> {
   let mut private_inputs: Vec<HashMap<String, Value>> = Vec::new();
   let fold_input = circuit_data.private_input.get("fold_input").unwrap().as_object().unwrap();
-  for i in 0..circuit_data.num_folds {
+  for i in 0..circuit_data.rom.len() {
     let mut map = circuit_data.private_input.clone();
     map.remove("fold_input");
 
     for (key, values) in fold_input {
-      let batch_size = values.as_array().unwrap().len() / circuit_data.num_folds;
+      let batch_size = values.as_array().unwrap().len() / circuit_data.rom.len();
       info!("key: {}, batch size: {}", key, batch_size);
       for val in values.as_array().unwrap().chunks(batch_size).skip(i).take(1) {
         let mut data: Vec<Value> = Vec::new();
@@ -124,6 +129,16 @@ pub fn map_private_inputs(circuit_data: &ProgramData) -> Vec<HashMap<String, Val
     private_inputs.push(map);
   }
   private_inputs
+}
+
+pub fn into_input_json(public_input: &[F<G1>], private_input: &HashMap<String, Value>) -> String {
+  let decimal_stringified_input: Vec<String> = public_input
+    .iter()
+    .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
+    .collect();
+
+  let input = CircomInput { step_in: decimal_stringified_input, extra: private_input.clone() };
+  serde_json::to_string(&input).unwrap()
 }
 
 #[cfg(test)]

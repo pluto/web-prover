@@ -16,7 +16,7 @@ use arecibo::{
 use byteorder::{LittleEndian, ReadBytesExt};
 use circom::circuit::CircomCircuit;
 use ff::{Field, PrimeField};
-use num_bigint::BigInt;
+use program::utils::into_input_json;
 use r1cs::R1CS;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -29,11 +29,11 @@ pub mod r1cs;
 pub mod witness;
 
 #[derive(Serialize, Deserialize)]
-struct CircomInput {
-  step_in: Vec<String>,
+pub struct CircomInput {
+  pub step_in: Vec<String>,
 
   #[serde(flatten)]
-  extra: HashMap<String, Value>,
+  pub extra: HashMap<String, Value>,
 }
 
 pub fn create_public_params(r1cs: R1CS) -> PublicParams<E1> {
@@ -57,8 +57,7 @@ pub fn create_recursive_circuit(
 
   let mut now = Instant::now();
   let witness_0 = compute_witness_from_generator_type(
-    initial_public_input,
-    &private_inputs[0],
+    &into_input_json(initial_public_input, &private_inputs[0]),
     &witness_generator_type,
   );
   debug!("Witness generation for step 0 took: {:?}, {}", now.elapsed(), witness_0.len());
@@ -79,8 +78,10 @@ pub fn create_recursive_circuit(
   let mut public_input = initial_public_input.to_vec(); // TODO: Don't need this alloc probably
   for (i, private_input) in private_inputs.iter().enumerate() {
     now = Instant::now();
-    let witness =
-      compute_witness_from_generator_type(&public_input, private_input, &witness_generator_type);
+    let witness = compute_witness_from_generator_type(
+      &into_input_json(&public_input, &private_input),
+      &witness_generator_type,
+    );
     debug!("witness generation for step {} took: {:?}", i, now.elapsed());
 
     let circuit = CircomCircuit { r1cs: r1cs.clone(), witness: Some(witness) };

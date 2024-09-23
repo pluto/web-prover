@@ -2,26 +2,11 @@ use fs::OpenOptions;
 
 use super::*;
 
-pub fn compute_witness_from_graph(
-  current_public_input: Vec<F<G1>>,
-  private_input: HashMap<String, Value>,
+pub fn generate_witness_from_graph(
+  input_json: &str,
   graph_data: &[u8],
 ) -> Vec<<G1 as Group>::Scalar> {
-  dbg!(&current_public_input);
-  let decimal_stringified_input: Vec<String> = current_public_input
-    .iter()
-    .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
-    .collect();
-
-  let input = CircomInput { step_in: decimal_stringified_input, extra: private_input.clone() };
-
-  let input_json = serde_json::to_string(&input).unwrap();
-
-  dbg!(&input_json);
   let witness = circom_witnesscalc::calc_witness(&input_json, graph_data).unwrap();
-  // let witness =
-  //   capture_and_log(|| circom_witnesscalc::calc_witness(&input_json, graph_data).unwrap()); //
-  // TODO: helpful if we want tracing crate only to handle stdout
 
   witness
     .iter()
@@ -30,24 +15,15 @@ pub fn compute_witness_from_graph(
 }
 
 pub fn compute_witness_from_generator_type(
-  public_input: &[F<G1>],
-  private_input: &HashMap<String, Value>,
+  input_json: &str,
   witness_generator_type: &WitnessGeneratorType,
 ) -> Vec<F<G1>> {
-  let decimal_stringified_input: Vec<String> = public_input
-    .iter()
-    .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
-    .collect();
-
-  let input =
-    CircomInput { step_in: decimal_stringified_input.clone(), extra: private_input.clone() };
-
-  let input_json = serde_json::to_string(&input).unwrap();
   match witness_generator_type {
     WitnessGeneratorType::Wasm { path, wtns_path } =>
       generate_witness_from_wasm_file(&input_json, &PathBuf::from(path), &PathBuf::from(wtns_path)),
     WitnessGeneratorType::CircomWitnesscalc { path } =>
       generate_witness_from_witnesscalc_file(&input_json, &PathBuf::from(path)),
+    WitnessGeneratorType::Raw(graph_data) => generate_witness_from_graph(&input_json, graph_data),
   }
 }
 
@@ -67,13 +43,13 @@ pub fn generate_witness_from_witnesscalc_file(
 }
 
 pub fn generate_witness_from_wasm_file(
-  witness_input_json: &str,
+  input_json: &str,
   wasm_path: &PathBuf,
   wtns_path: &PathBuf,
 ) -> Vec<F<G1>> {
   let root = current_dir().unwrap();
   let witness_generator_input = root.join("circom_input.json");
-  fs::write(&witness_generator_input, witness_input_json).unwrap();
+  fs::write(&witness_generator_input, input_json).unwrap();
 
   let witness_js = wasm_path.parent().unwrap().join("generate_witness.js");
 

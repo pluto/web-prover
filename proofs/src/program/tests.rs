@@ -19,7 +19,7 @@ const SWAP_MEMORY_R1CS: &[u8] = include_bytes!("../../examples/swapMemory.r1cs")
 const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../../examples/swapMemory.bin");
 
 use arecibo::supernova::{NonUniformCircuit, StepCircuit as SNStepCircuit};
-use circom::witness::compute_witness_from_graph;
+use circom::witness::generate_witness_from_graph;
 
 struct TestMemory {
   pub rom:                Vec<u64>,
@@ -50,28 +50,32 @@ impl NonUniformCircuit<E1> for TestMemory {
 
   fn num_circuits(&self) -> usize { 3 }
 
+  // TODO: Alright I kinda just wrapped the option in here now which is not ideal
   fn primary_circuit(&self, circuit_index: usize) -> Self::C1 {
     match circuit_index {
       0 => TestCircuitSelector::AddIntoZeroth(RomCircuit {
         circuit: CircomCircuit { r1cs: R1CS::from(ADD_INTO_ZEROTH_R1CS), witness: None },
-        curr_public_input: self.curr_public_input.clone(),
-        curr_private_input: self.curr_private_input.clone(),
+        curr_public_input: Some(self.curr_public_input.clone()),
+        curr_private_input: Some(self.curr_private_input.clone()),
         circuit_index,
         rom_size: self.rom.len(),
+        witness_generator_type: WitnessGeneratorType::Raw(ADD_INTO_ZEROTH_GRAPH.to_vec()),
       }),
       1 => TestCircuitSelector::SquareZeroth(RomCircuit {
         circuit: CircomCircuit { r1cs: R1CS::from(SQUARE_ZEROTH_R1CS), witness: None },
-        curr_public_input: self.curr_public_input.clone(),
-        curr_private_input: self.curr_private_input.clone(),
+        curr_public_input: Some(self.curr_public_input.clone()),
+        curr_private_input: Some(self.curr_private_input.clone()),
         circuit_index,
         rom_size: self.rom.len(),
+        witness_generator_type: WitnessGeneratorType::Raw(SQUARE_ZEROTH_GRAPH.to_vec()),
       }),
       2 => TestCircuitSelector::SwapMemory(RomCircuit {
         circuit: CircomCircuit { r1cs: R1CS::from(SWAP_MEMORY_R1CS), witness: None },
-        curr_public_input: self.curr_public_input.clone(),
-        curr_private_input: self.curr_private_input.clone(),
+        curr_public_input: Some(self.curr_public_input.clone()),
+        curr_private_input: Some(self.curr_private_input.clone()),
         circuit_index,
         rom_size: self.rom.len(),
+        witness_generator_type: WitnessGeneratorType::Raw(SWAP_MEMORY_GRAPH.to_vec()),
       }),
       _ => panic!("Incorrect circuit index provided!"),
     }
@@ -106,6 +110,14 @@ impl SNStepCircuit<F<G1>> for TestCircuitSelector {
     z: &[AllocatedNum<F<G1>>],
   ) -> Result<(Option<AllocatedNum<F<G1>>>, Vec<AllocatedNum<F<G1>>>), SynthesisError> {
     println!("inside of synthesize with pc: {pc:?}");
+    let decimal_stringified_input: Vec<String> = current_public_input
+      .iter()
+      .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
+      .collect();
+
+    let input = CircomInput { step_in: decimal_stringified_input, extra: private_input.clone() };
+
+    let input_json = serde_json::to_string(&input).unwrap();
 
     // TODO: We need to set the witness on this properly, so we probably need to put the pub/priv
     // inputs into the CircuitSelector itself...
@@ -119,9 +131,9 @@ impl SNStepCircuit<F<G1>> for TestCircuitSelector {
             ..
           }) => {
             let mut circuit = circuit.clone();
-            let witness = compute_witness_from_graph(
-              curr_public_input.clone(),
-              curr_private_input.clone(),
+            let witness = generate_witness_from_graph(
+              curr_public_input.clone().unwrap(),
+              curr_private_input.clone().unwrap(),
               ADD_INTO_ZEROTH_GRAPH,
             );
             circuit.witness = Some(witness);
@@ -131,9 +143,9 @@ impl SNStepCircuit<F<G1>> for TestCircuitSelector {
             circuit, curr_private_input, curr_public_input, ..
           }) => {
             let mut circuit = circuit.clone();
-            let witness = compute_witness_from_graph(
-              curr_public_input.clone(),
-              curr_private_input.clone(),
+            let witness = generate_witness_from_graph(
+              curr_public_input.clone().unwrap(),
+              curr_private_input.clone().unwrap(),
               SQUARE_ZEROTH_GRAPH,
             );
             circuit.witness = Some(witness);
@@ -143,9 +155,9 @@ impl SNStepCircuit<F<G1>> for TestCircuitSelector {
             circuit, curr_private_input, curr_public_input, ..
           }) => {
             let mut circuit = circuit.clone();
-            let witness = compute_witness_from_graph(
-              curr_public_input.clone(),
-              curr_private_input.clone(),
+            let witness = generate_witness_from_graph(
+              curr_public_input.clone().unwrap(),
+              curr_private_input.clone().unwrap(),
               SWAP_MEMORY_GRAPH,
             );
             circuit.witness = Some(witness);
