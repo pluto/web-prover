@@ -1,7 +1,6 @@
 #![feature(internal_output_capture)]
 
 pub mod circom;
-pub mod handler;
 pub mod program;
 use std::{collections::HashMap, path::PathBuf};
 
@@ -13,7 +12,6 @@ use arecibo::{
 use circom::circuit::CircomCircuit;
 use clap::Parser;
 use ff::Field;
-use handler::run_circuit;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, info, trace, Level};
@@ -29,20 +27,15 @@ pub struct Args {
   /// Increase logging verbosity (-v, -vv, -vvv, etc.)
   #[arg(short, long, action = clap::ArgAction::Count)]
   verbose: u8,
-
-  #[arg(short, long, value_enum)]
-  scheme: Scheme,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct CircuitData {
-  pub circuit_path:           PathBuf,
-  pub r1cs_path:              PathBuf,
-  pub graph_path:             PathBuf,
-  pub witness_generator_type: WitnessGeneratorType,
-  pub num_folds:              usize,
-  pub initial_public_input:   Vec<u64>,
-  pub private_input:          HashMap<String, Value>,
+pub struct ProgramData {
+  pub r1cs_paths:              Vec<PathBuf>,
+  pub witness_generator_types: Vec<WitnessGeneratorType>,
+  pub rom:                     Vec<u64>,
+  pub initial_public_input:    Vec<u64>,
+  pub private_input:           HashMap<String, Value>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -53,21 +46,14 @@ pub enum WitnessGeneratorType {
   CircomWitnesscalc { path: String },
 }
 
-// TODO: Get rid of this and just leave a supernova entry since it can do everything we want.
-#[derive(Clone, Copy, Debug, clap::ValueEnum)]
-pub enum Scheme {
-  Nova,
-  SuperNova,
-}
-
 pub type E1 = Bn256EngineIPA;
 pub type E2 = GrumpkinEngine;
 pub type G1 = <E1 as Engine>::GE;
 pub type G2 = <E2 as Engine>::GE;
 pub type EE1 = EvaluationEngine<E1>;
 pub type EE2 = EvaluationEngine<E2>;
-pub type S1 = RelaxedR1CSSNARK<E1, EE1>; // non-preprocessing SNARK
-pub type S2 = RelaxedR1CSSNARK<E2, EE2>; // non-preprocessing SNARK
+pub type S1 = RelaxedR1CSSNARK<E1, EE1>;
+pub type S2 = RelaxedR1CSSNARK<E2, EE2>;
 
 pub type F<G> = <G as Group>::Scalar;
 
@@ -91,13 +77,10 @@ fn main() {
   let subscriber = FmtSubscriber::builder().with_max_level(log_level).finish();
   tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
+  // Read in the supernova program data
   let file = args.input_file;
   info!("Using file: {:?}", file);
-
   let read = std::fs::read(file).unwrap();
-  let circuit_data: CircuitData = serde_json::from_slice(&read).unwrap();
-  match args.scheme {
-    Scheme::Nova => run_circuit(circuit_data),
-    Scheme::SuperNova => program::run_program(circuit_data),
-  }
+  let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
+  program::run(program_data);
 }

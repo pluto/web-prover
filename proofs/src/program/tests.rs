@@ -1,11 +1,6 @@
 //! This test module is effectively testing a static (comptime) circuit dispatch supernova program
 
-use std::time::Instant;
-
-use arecibo::{
-  supernova::{PublicParams, RecursiveSNARK, TrivialTestCircuit},
-  traits::{circuit::StepCircuit, snark::default_ck_hint},
-};
+use arecibo::{supernova::TrivialTestCircuit, traits::circuit::StepCircuit};
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::r1cs::R1CS;
 use program::{utils::next_rom_index_and_pc, RomCircuit};

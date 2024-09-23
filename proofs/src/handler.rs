@@ -7,11 +7,12 @@ use serde_json::json;
 use super::*;
 
 pub fn run_circuit(circuit_data: CircuitData) {
-  let folds = circuit_data.num_folds;
+  // Load in R1CS
   let root = current_dir().unwrap();
-
   let r1cs_bin_file = root.join(&circuit_data.r1cs_path);
   let r1cs = load_r1cs_from_bin_file(&r1cs_bin_file);
+
+  let rom = circuit_data.rom;
 
   let public_params = create_public_params(r1cs.clone()); // TODO: Avoid this clone
   info!("Number of constraints per step (primary circuit): {}", public_params.num_constraints().0);
