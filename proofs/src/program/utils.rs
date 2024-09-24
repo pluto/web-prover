@@ -52,7 +52,10 @@ pub fn next_rom_index_and_pc<CS: ConstraintSystem<F<G1>>>(
   // Allocate the next pc without checking.
   // The next iteration will check whether the next pc is valid.
   let pc_next = AllocatedNum::alloc_infallible(cs.namespace(|| "next pc"), || {
-    allocated_rom.get(next_rom_index).and_then(|v| v.get_value()).unwrap_or(-F::<G1>::ONE)
+    allocated_rom
+      .get(next_rom_index)
+      .and_then(|v| v.get_value())
+      .unwrap_or(allocated_rom.get(current_rom_index).unwrap().get_value().unwrap())
   });
 
   Ok((rom_index_next, pc_next))

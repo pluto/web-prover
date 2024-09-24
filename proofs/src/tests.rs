@@ -74,7 +74,7 @@ fn test_run_verify() {
   let (_prover_key, verifier_key, compressed_snark) =
     program::compress(&public_params, &recursive_snark);
   let json = serde_json::to_string(&compressed_snark).unwrap();
-  assert_eq!(json.len(), 28385);
+  assert_eq!(json.len(), 28410);
 
   // Check that it verifies
   let res = compressed_snark.verify(
