@@ -99,6 +99,7 @@ pub struct R1CSFile {
   pub wire_mapping: Vec<u64>,
 }
 
+// TODO: Can simplify
 /// load r1cs from bin by a reader
 pub fn load_r1cs_from_file(filename: &PathBuf) -> R1CS {
   let reader =
@@ -183,6 +184,7 @@ fn read_map<R: Read>(mut reader: R, size: u64, header: &Header) -> Vec<u64> {
   vec
 }
 
+// TODO: Can remove this
 pub fn from_reader<R: Read + Seek>(mut reader: R) -> R1CSFile
 where {
   let mut magic = [0u8; 4];
