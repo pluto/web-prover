@@ -63,7 +63,7 @@ impl From<&[u8]> for R1CS {
     let num_private_inputs = header.n_prv_in as usize;
     let num_public_outputs = header.n_pub_out as usize;
     let num_variables = header.n_wires as usize;
-    let num_inputs = (1 + header.n_pub_in + header.n_pub_out) as usize;
+    let num_inputs = (1 + header.n_pub_in + header.n_pub_out) as usize; // TODO: This seems... odd...
     let num_aux = num_variables - num_inputs;
     R1CS {
       num_private_inputs,
@@ -233,6 +233,7 @@ mod tests {
 
   const PARSE_FOLD_R1CS: &[u8] =
     include_bytes!("../../examples/circuit_data/parse_fold_batch.r1cs");
+  const AES_FOLD_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/aes-gcm-fold.r1cs");
 
   #[test]
   #[tracing_test::traced_test]
@@ -240,5 +241,15 @@ mod tests {
     let r1cs = R1CS::from(PARSE_FOLD_R1CS);
     assert_eq!(r1cs.num_public_inputs, 6);
     assert_eq!(r1cs.num_private_inputs, 40);
+  }
+
+  #[test]
+  #[tracing_test::traced_test]
+  fn test_r1cs_from_bin_aes_fold() {
+    let r1cs = R1CS::from(AES_FOLD_R1CS);
+    assert_eq!(r1cs.num_inputs, 97);
+    assert_eq!(r1cs.num_private_inputs, 60);
+    assert_eq!(r1cs.num_public_inputs, 48);
+    assert_eq!(r1cs.num_public_outputs, 48);
   }
 }

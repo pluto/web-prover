@@ -4315,6 +4315,7 @@ dependencies = [
  "clap",
  "ff",
  "flate2",
+ "halo2curves",
  "itertools 0.13.0",
  "num-bigint 0.4.6",
  "num-traits",

@@ -6,7 +6,7 @@ pub mod program;
 use std::{collections::HashMap, path::PathBuf};
 
 use arecibo::{
-  provider::{ipa_pc::EvaluationEngine, Bn256EngineIPA, GrumpkinEngine},
+  provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
   spartan::batched::BatchedRelaxedR1CSSNARK,
   traits::{circuit::TrivialCircuit, Engine, Group},
 };
@@ -50,12 +50,12 @@ pub enum WitnessGeneratorType {
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
 }
 
-pub type E1 = Bn256EngineIPA;
+pub type E1 = Bn256EngineKZG;
 pub type E2 = GrumpkinEngine;
 pub type G1 = <E1 as Engine>::GE;
 pub type G2 = <E2 as Engine>::GE;
-pub type EE1 = EvaluationEngine<E1>;
-pub type EE2 = EvaluationEngine<E2>;
+pub type EE1 = EvaluationEngine<halo2curves::bn256::Bn256, E1>;
+pub type EE2 = arecibo::provider::ipa_pc::EvaluationEngine<E2>;
 pub type S1 = BatchedRelaxedR1CSSNARK<E1, EE1>;
 pub type S2 = BatchedRelaxedR1CSSNARK<E2, EE2>;
 
