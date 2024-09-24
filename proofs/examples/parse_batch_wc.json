@@ -166,12 +166,12 @@
         }
     },
     "r1cs_paths": [
-        "examples/parse_fold_batch.r1cs"
+        "examples/circuit_data/parse_fold_batch.r1cs"
     ],
     "witness_generator_types": [
         {
             "circom-witnesscalc": {
-                "path": "examples/parse_fold_batch.bin"
+                "path": "examples/circuit_data/parse_fold_batch.bin"
             }
         }
     ],

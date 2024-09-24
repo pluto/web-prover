@@ -47,3 +47,51 @@ fn test_run() {
   ];
   assert_eq!(&final_mem.to_vec(), recursive_snark.zi_primary());
 }
+
+#[test]
+#[tracing_test::traced_test]
+fn test_parse_batch_wc() {
+  let read = std::fs::read("examples/parse_batch_wc.json").unwrap();
+  let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
+
+  let recursive_snark = program::run(program_data);
+
+  let final_mem = [
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(4),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+  ];
+  assert_eq!(&final_mem.to_vec(), recursive_snark.zi_primary());
+}
+
+#[test]
+#[tracing_test::traced_test]
+fn test_parse_batch_wasm() {
+  let read = std::fs::read("examples/parse_batch_wasm.json").unwrap();
+  let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
+
+  let recursive_snark = program::run(program_data);
+
+  let final_mem = [
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(4),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+  ];
+  assert_eq!(&final_mem.to_vec(), recursive_snark.zi_primary());
+}

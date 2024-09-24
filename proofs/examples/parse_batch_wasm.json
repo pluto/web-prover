@@ -166,12 +166,12 @@
         }
     },
     "r1cs_paths": [
-        "examples/parse_fold_batch.r1cs"
+        "examples/circuit_data/parse_fold_batch.r1cs"
     ],
     "witness_generator_types": [
         {
             "wasm": {
-                "path": "parse_fold_batch_js/parse_fold_batch.wasm",
+                "path": "examples/circuit_data/parse_fold_batch_js/parse_fold_batch.wasm",
                 "wtns_path": "witness.wtns"
             }
         }
