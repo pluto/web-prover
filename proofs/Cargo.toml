@@ -10,9 +10,6 @@ serde_json = "1.0.128"
 arecibo = { git = "https://github.com/argumentcomputer/arecibo", default-features = false, features = [
     "portable",
 ] }
-# arecibo = { path = "../../arecibo", default-features = false, features = [
-#     "portable",
-# ] }
 ff = { version = "0.13", features = ["derive"] }
 bellpepper-core = "0.4.0"
 
@@ -27,6 +24,9 @@ itertools = "0.13.0"
 clap = { version = "4.5.16", features = ["derive"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
+
+bincode = "1.3"
+flate2 = "1.0"
 
 anyhow = "1.0.89" # TODO: This should only ever be a dev-dep in my mind
 

@@ -92,7 +92,7 @@ impl SNStepCircuit<F<G1>> for RomCircuit {
   }
 }
 
-pub fn run(program_data: ProgramData) -> (PublicParams<E1>, RecursiveSNARK<E1>) {
+pub fn run(program_data: &ProgramData) -> (PublicParams<E1>, RecursiveSNARK<E1>) {
   info!("Starting SuperNova program...");
 
   // Get the public inputs needed for circuits
@@ -102,7 +102,7 @@ pub fn run(program_data: ProgramData) -> (PublicParams<E1>, RecursiveSNARK<E1>) 
   z0_primary.extend(program_data.rom.iter().map(|opcode| <E1 as Engine>::Scalar::from(*opcode)));
 
   // Get the private inputs needed for circuits
-  let private_inputs = map_private_inputs(&program_data);
+  let private_inputs = map_private_inputs(program_data);
 
   let mut circuits = vec![];
   for (circuit_index, (r1cs_path, witness_generator_type)) in
@@ -177,6 +177,7 @@ pub fn run(program_data: ProgramData) -> (PublicParams<E1>, RecursiveSNARK<E1>) 
   (public_params, recursive_snark_option.unwrap())
 }
 
+#[allow(clippy::type_complexity)]
 pub fn compress(
   public_params: &PublicParams<E1>,
   recursive_snark: &RecursiveSNARK<E1>,

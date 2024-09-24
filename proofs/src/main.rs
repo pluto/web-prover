@@ -86,5 +86,5 @@ fn main() {
   info!("Using file: {:?}", file);
   let read = std::fs::read(file).unwrap();
   let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
-  program::run(program_data);
+  program::run(&program_data);
 }
