@@ -51,28 +51,6 @@ pub struct CircomCircuit {
 }
 
 impl CircomCircuit {
-  pub fn get_public_outputs(&self) -> Vec<F<G1>> {
-    // NOTE: assumes exactly half of the (public inputs + outputs) are outputs
-    let pub_output_count = (self.r1cs.num_inputs - 1) / 2;
-    let mut z_out: Vec<F<G1>> = vec![];
-    for i in 1..self.r1cs.num_inputs {
-      // Public inputs do not exist, so we alloc, and later enforce equality from z values
-      let f: F<G1> = {
-        match &self.witness {
-          None => F::<G1>::ONE,
-          Some(w) => w[i],
-        }
-      };
-
-      if i <= pub_output_count {
-        // public output
-        z_out.push(f);
-      }
-    }
-
-    z_out
-  }
-
   pub fn vanilla_synthesize<CS: ConstraintSystem<F<G1>>>(
     &self,
     cs: &mut CS,
@@ -82,7 +60,7 @@ impl CircomCircuit {
 
     let mut vars: Vec<AllocatedNum<F<G1>>> = vec![];
     let mut z_out: Vec<AllocatedNum<F<G1>>> = vec![];
-    let pub_output_count = (self.r1cs.num_inputs - 1) / 2;
+    let pub_output_count = self.r1cs.num_public_outputs;
 
     for i in 1..self.r1cs.num_inputs {
       // Public inputs do not exist, so we alloc, and later enforce equality from z values
@@ -148,8 +126,9 @@ impl CircomCircuit {
   }
 }
 
+// TODO: We can delete this eventually
 impl arecibo::traits::circuit::StepCircuit<F<G1>> for CircomCircuit {
-  fn arity(&self) -> usize { (self.r1cs.num_inputs - 1) / 2 }
+  fn arity(&self) -> usize { self.r1cs.num_public_inputs }
 
   fn synthesize<CS: ConstraintSystem<F<G1>>>(
     &self,

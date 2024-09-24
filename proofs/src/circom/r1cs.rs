@@ -7,12 +7,15 @@ use super::*;
 
 pub type Constraint = (Vec<(usize, F<G1>)>, Vec<(usize, F<G1>)>, Vec<(usize, F<G1>)>);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct R1CS {
-  pub num_inputs:    usize,
-  pub num_aux:       usize,
-  pub num_variables: usize,
-  pub constraints:   Vec<Constraint>,
+  pub num_private_inputs: usize,
+  pub num_public_inputs:  usize,
+  pub num_public_outputs: usize,
+  pub num_inputs:         usize,
+  pub num_aux:            usize,
+  pub num_variables:      usize,
+  pub constraints:        Vec<Constraint>,
 }
 
 impl From<&[u8]> for R1CS {
@@ -56,10 +59,21 @@ impl From<&[u8]> for R1CS {
     let _wire_mapping =
       read_map(&mut cursor, *section_sizes.get(&wire2label_type).unwrap(), &header);
 
-    let num_inputs = (1 + header.n_pub_in + header.n_pub_out) as usize;
+    let num_public_inputs = header.n_pub_in as usize;
+    let num_private_inputs = header.n_prv_in as usize;
+    let num_public_outputs = header.n_pub_out as usize;
     let num_variables = header.n_wires as usize;
+    let num_inputs = (1 + header.n_pub_in + header.n_pub_out) as usize;
     let num_aux = num_variables - num_inputs;
-    R1CS { num_aux, num_inputs, num_variables, constraints }
+    R1CS {
+      num_private_inputs,
+      num_public_inputs,
+      num_public_outputs,
+      num_inputs,
+      num_aux,
+      num_variables,
+      constraints,
+    }
   }
 }
 
@@ -91,10 +105,21 @@ pub fn load_r1cs_from_file(filename: &PathBuf) -> R1CS {
     BufReader::new(OpenOptions::new().read(true).open(filename).expect("unable to open."));
 
   let file = from_reader(reader);
-  let num_inputs = (1 + file.header.n_pub_in + file.header.n_pub_out) as usize;
+  let num_public_inputs = file.header.n_pub_in as usize;
+  let num_private_inputs = file.header.n_prv_in as usize;
+  let num_public_outputs = file.header.n_pub_out as usize;
   let num_variables = file.header.n_wires as usize;
+  let num_inputs = (1 + file.header.n_pub_in + file.header.n_pub_out) as usize;
   let num_aux = num_variables - num_inputs;
-  R1CS { num_aux, num_inputs, num_variables, constraints: file.constraints }
+  R1CS {
+    num_private_inputs,
+    num_public_inputs,
+    num_public_outputs,
+    num_variables,
+    num_inputs,
+    num_aux,
+    constraints: file.constraints,
+  }
 }
 
 pub(crate) fn read_field<R: Read>(mut reader: R) -> F<G1> {
@@ -198,4 +223,20 @@ where {
   let wire_mapping = read_map(&mut reader, *section_sizes.get(&wire2label_type).unwrap(), &header);
 
   R1CSFile { version, header, constraints, wire_mapping }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  const PARSE_FOLD_R1CS: &[u8] =
+    include_bytes!("../../examples/circuit_data/parse_fold_batch.r1cs");
+
+  #[test]
+  #[tracing_test::traced_test]
+  fn test_r1cs_from_bin() {
+    let r1cs = R1CS::from(PARSE_FOLD_R1CS);
+    assert_eq!(r1cs.num_public_inputs, 6);
+    assert_eq!(r1cs.num_private_inputs, 40);
+  }
 }
