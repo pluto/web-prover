@@ -10,7 +10,6 @@ use utils::{into_input_json, map_private_inputs};
 
 use super::*;
 
-#[cfg(test)] mod tests;
 pub mod utils;
 
 use arecibo::supernova::{NonUniformCircuit, StepCircuit as SNStepCircuit};
@@ -90,7 +89,7 @@ impl SNStepCircuit<F<G1>> for RomCircuit {
   }
 }
 
-pub fn run(program_data: ProgramData) {
+pub fn run(program_data: ProgramData) -> RecursiveSNARK<E1> {
   info!("Starting SuperNova program...");
 
   // Get the public inputs needed for circuits
@@ -161,8 +160,6 @@ pub fn run(program_data: ProgramData) {
     recursive_snark.prove_step(&pp, &circuit_primary, &circuit_secondary).unwrap();
     info!("Single step proof took: {:?}", start.elapsed());
 
-    // dbg!(&recursive_snark.zi_primary()); // TODO: this can be used later if need be.
-
     info!("Verifying single step...");
     let start = Instant::now();
     recursive_snark.verify(&pp, &z0_primary, &z0_secondary).unwrap();
@@ -174,5 +171,5 @@ pub fn run(program_data: ProgramData) {
 
     recursive_snark_option = Some(recursive_snark);
   }
-  dbg!(recursive_snark_option.unwrap().zi_primary());
+  recursive_snark_option.unwrap()
 }

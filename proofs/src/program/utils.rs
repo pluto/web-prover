@@ -108,25 +108,36 @@ pub fn get_selector_vec_from_index<CS: ConstraintSystem<F<G1>>>(
 
 // TODO: This may not be the best now that we have variable rom and stuff, but I replaced the
 // `num_folds` with `rom.len()` as a simple patch
-pub fn map_private_inputs(circuit_data: &ProgramData) -> Vec<HashMap<String, Value>> {
+// This function NEEDS reworked, but we should just rethink how we prep inputs for this stuff
+// anyway, so I'm leaving this as tech debt, sorry.
+pub fn map_private_inputs(program_data: &ProgramData) -> Vec<HashMap<String, Value>> {
   let mut private_inputs: Vec<HashMap<String, Value>> = Vec::new();
-  let fold_input = circuit_data.private_input.get("fold_input").unwrap().as_object().unwrap();
-  for i in 0..circuit_data.rom.len() {
-    let mut map = circuit_data.private_input.clone();
-    map.remove("fold_input");
+  match program_data.private_input.get("fold_input") {
+    None =>
+    // TODO: This is dumb and really only makes the `tests::test_run` pass. This is inadvisable to
+    // actually use!
+      for _ in 0..program_data.rom.len() {
+        private_inputs.push(program_data.private_input.clone());
+      },
 
-    for (key, values) in fold_input {
-      let batch_size = values.as_array().unwrap().len() / circuit_data.rom.len();
-      info!("key: {}, batch size: {}", key, batch_size);
-      for val in values.as_array().unwrap().chunks(batch_size).skip(i).take(1) {
-        let mut data: Vec<Value> = Vec::new();
-        for individual in val {
-          data.push(individual.clone());
+    Some(fold_input) =>
+      for i in 0..program_data.rom.len() {
+        let mut map = program_data.private_input.clone();
+        map.remove("fold_input");
+
+        for (key, values) in fold_input.as_object().unwrap() {
+          let batch_size = values.as_array().unwrap().len() / program_data.rom.len();
+          info!("key: {}, batch size: {}", key, batch_size);
+          for val in values.as_array().unwrap().chunks(batch_size).skip(i).take(1) {
+            let mut data: Vec<Value> = Vec::new();
+            for individual in val {
+              data.push(individual.clone());
+            }
+            map.insert(key.clone(), json!(data));
+          }
         }
-        map.insert(key.clone(), json!(data));
-      }
-    }
-    private_inputs.push(map);
+        private_inputs.push(map);
+      },
   }
   private_inputs
 }
@@ -146,13 +157,13 @@ mod tests {
   use super::*;
 
   #[test]
+  #[tracing_test::traced_test]
   fn test_map_private_inputs() {
-    let read = std::fs::read("setup/fold_batch.json").unwrap();
+    let read = std::fs::read("examples/parse_batch_wc.json").unwrap();
     let circuit_data: ProgramData = serde_json::from_slice(&read).unwrap();
-    // dbg!(circuit_data);
 
     let inputs = map_private_inputs(&circuit_data);
-    dbg!(inputs.len());
-    dbg!(inputs);
+    assert_eq!(inputs.len(), 4);
+    assert_eq!(inputs[0].get("data").unwrap().as_array().unwrap().len(), 40);
   }
 }

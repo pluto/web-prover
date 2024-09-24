@@ -87,6 +87,7 @@ pub struct R1CSFile {
 
 /// load r1cs from bin by a reader
 pub fn load_r1cs_from_file(filename: &PathBuf) -> R1CS {
+  dbg!(filename);
   let reader =
     BufReader::new(OpenOptions::new().read(true).open(filename).expect("unable to open."));
 

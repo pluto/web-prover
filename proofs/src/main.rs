@@ -2,6 +2,7 @@
 
 pub mod circom;
 pub mod program;
+#[cfg(test)] pub mod tests;
 use std::{collections::HashMap, path::PathBuf};
 
 use arecibo::{
@@ -35,7 +36,8 @@ pub struct ProgramData {
   pub witness_generator_types: Vec<WitnessGeneratorType>,
   pub rom:                     Vec<u64>,
   pub initial_public_input:    Vec<u64>,
-  pub private_input:           HashMap<String, Value>,
+  pub private_input:           HashMap<String, Value>, /* TODO: We should probably just make
+                                                        * this a vec here */
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
