@@ -1,7 +1,10 @@
 use std::time::Instant;
 
 use arecibo::{
-  supernova::{PublicParams, RecursiveSNARK, TrivialTestCircuit},
+  supernova::{
+    snark::{CompressedSNARK, ProverKey, VerifierKey},
+    PublicParams, RecursiveSNARK, TrivialTestCircuit,
+  },
   traits::{circuit::StepCircuit, snark::default_ck_hint},
 };
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
@@ -89,7 +92,7 @@ impl SNStepCircuit<F<G1>> for RomCircuit {
   }
 }
 
-pub fn run(program_data: ProgramData) -> RecursiveSNARK<E1> {
+pub fn run(program_data: ProgramData) -> (PublicParams<E1>, RecursiveSNARK<E1>) {
   info!("Starting SuperNova program...");
 
   // Get the public inputs needed for circuits
@@ -127,7 +130,7 @@ pub fn run(program_data: ProgramData) -> RecursiveSNARK<E1> {
 
   let mut memory = Memory { rom: program_data.rom.clone(), circuits };
 
-  let pp = PublicParams::setup(&memory, &*default_ck_hint(), &*default_ck_hint());
+  let public_params = PublicParams::setup(&memory, &*default_ck_hint(), &*default_ck_hint());
 
   let z0_secondary = vec![F::<G2>::ZERO];
 
@@ -145,7 +148,7 @@ pub fn run(program_data: ProgramData) -> RecursiveSNARK<E1> {
 
     let mut recursive_snark = recursive_snark_option.unwrap_or_else(|| {
       RecursiveSNARK::new(
-        &pp,
+        &public_params,
         &memory,
         &circuit_primary,
         &circuit_secondary,
@@ -157,12 +160,12 @@ pub fn run(program_data: ProgramData) -> RecursiveSNARK<E1> {
 
     info!("Proving single step...");
     let start = Instant::now();
-    recursive_snark.prove_step(&pp, &circuit_primary, &circuit_secondary).unwrap();
+    recursive_snark.prove_step(&public_params, &circuit_primary, &circuit_secondary).unwrap();
     info!("Single step proof took: {:?}", start.elapsed());
 
     info!("Verifying single step...");
     let start = Instant::now();
-    recursive_snark.verify(&pp, &z0_primary, &z0_secondary).unwrap();
+    recursive_snark.verify(&public_params, &z0_primary, &z0_secondary).unwrap();
     info!("Single step verification took: {:?}", start.elapsed());
 
     // Update everything now for next step
@@ -171,5 +174,14 @@ pub fn run(program_data: ProgramData) -> RecursiveSNARK<E1> {
 
     recursive_snark_option = Some(recursive_snark);
   }
-  recursive_snark_option.unwrap()
+  (public_params, recursive_snark_option.unwrap())
+}
+
+pub fn compress(
+  public_params: &PublicParams<E1>,
+  recursive_snark: &RecursiveSNARK<E1>,
+) -> (ProverKey<E1, S1, S2>, VerifierKey<E1, S1, S2>, CompressedSNARK<E1, S1, S2>) {
+  let (pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(public_params).unwrap();
+  let proof = CompressedSNARK::<E1, S1, S2>::prove(public_params, &pk, recursive_snark).unwrap();
+  (pk, vk, proof)
 }

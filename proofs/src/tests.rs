@@ -32,7 +32,7 @@ fn test_run() {
     private_input:           HashMap::new(),
   };
 
-  let recursive_snark = program::run(program_data);
+  let (_pp, recursive_snark) = program::run(program_data);
 
   let final_mem = [
     F::<G1>::from(0),
@@ -50,11 +50,49 @@ fn test_run() {
 
 #[test]
 #[tracing_test::traced_test]
+fn test_run_verify() {
+  let z0_primary = vec![1, 2];
+  let program_data = ProgramData {
+    r1cs_paths:              vec![
+      PathBuf::from(ADD_INTO_ZEROTH_R1CS),
+      PathBuf::from(SQUARE_ZEROTH_R1CS),
+      PathBuf::from(SWAP_MEMORY_R1CS),
+    ],
+    witness_generator_types: vec![
+      WitnessGeneratorType::Raw(ADD_INTO_ZEROTH_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(SQUARE_ZEROTH_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(SWAP_MEMORY_GRAPH.to_vec()),
+    ],
+    rom:                     ROM.to_vec(),
+    initial_public_input:    z0_primary.clone(),
+    private_input:           HashMap::new(),
+  };
+
+  let (public_params, recursive_snark) = program::run(program_data);
+
+  // Compress the proof
+  let (_prover_key, verifier_key, compressed_snark) =
+    program::compress(&public_params, &recursive_snark);
+  let json = serde_json::to_string(&compressed_snark).unwrap();
+  assert_eq!(json.len(), 28385);
+
+  // Check that it verifies
+  let res = compressed_snark.verify(
+    &public_params,
+    &verifier_key,
+    z0_primary.into_iter().map(F::<G1>::from).collect::<Vec<_>>().as_slice(),
+    [0].into_iter().map(F::<G2>::from).collect::<Vec<_>>().as_slice(),
+  );
+  assert!(res.is_ok());
+}
+
+#[test]
+#[tracing_test::traced_test]
 fn test_parse_batch_wc() {
   let read = std::fs::read("examples/parse_batch_wc.json").unwrap();
   let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
 
-  let recursive_snark = program::run(program_data);
+  let (_pp, recursive_snark) = program::run(program_data);
 
   let final_mem = [
     F::<G1>::from(0),
@@ -78,7 +116,7 @@ fn test_parse_batch_wasm() {
   let read = std::fs::read("examples/parse_batch_wasm.json").unwrap();
   let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
 
-  let recursive_snark = program::run(program_data);
+  let (_pp, recursive_snark) = program::run(program_data);
 
   let final_mem = [
     F::<G1>::from(0),
