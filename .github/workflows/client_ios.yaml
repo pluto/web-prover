@@ -28,8 +28,7 @@ jobs:
         run: |
           brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
           echo /usr/local/opt/llvm@18/bin >> $GITHUB_PATH
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler libprotobuf-dev
+          brew install protobuf
 
       - uses: Swatinem/rust-cache@v2
 
