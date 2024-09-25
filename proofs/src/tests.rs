@@ -1,31 +1,30 @@
 //! This test module is effectively testing a static (comptime) circuit dispatch supernova program
 
-use arecibo::supernova::{PublicParams, RecursiveSNARK};
-use compress::CompressedVerifier;
 use program::ProgramOutput;
 
 use super::*;
 
 pub const ROM: &[u64] = &[0, 1, 2, 0, 1, 2];
 
-pub const ADD_INTO_ZEROTH_R1CS: &str = "examples/circuit_data/addIntoZeroth.r1cs";
+pub const ADD_INTO_ZEROTH_R1CS: &[u8] =
+  include_bytes!("../examples/circuit_data/addIntoZeroth.r1cs");
 pub const ADD_INTO_ZEROTH_GRAPH: &[u8] =
   include_bytes!("../examples/circuit_data/addIntoZeroth.bin");
 
-pub const SQUARE_ZEROTH_R1CS: &str = "examples/circuit_data/squareZeroth.r1cs";
+pub const SQUARE_ZEROTH_R1CS: &[u8] = include_bytes!("../examples/circuit_data/squareZeroth.r1cs");
 pub const SQUARE_ZEROTH_GRAPH: &[u8] = include_bytes!("../examples/circuit_data/squareZeroth.bin");
 
-pub const SWAP_MEMORY_R1CS: &str = "examples/circuit_data/swapMemory.r1cs";
+pub const SWAP_MEMORY_R1CS: &[u8] = include_bytes!("../examples/circuit_data/swapMemory.r1cs");
 pub const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../examples/circuit_data/swapMemory.bin");
 
 pub const INIT_PUBLIC_INPUT: [u64; 2] = [1, 2];
 
 fn run_entry() -> ProgramOutput {
   let program_data = ProgramData {
-    r1cs_paths:              vec![
-      PathBuf::from(ADD_INTO_ZEROTH_R1CS),
-      PathBuf::from(SQUARE_ZEROTH_R1CS),
-      PathBuf::from(SWAP_MEMORY_R1CS),
+    r1cs_types:              vec![
+      R1CSType::Raw(ADD_INTO_ZEROTH_R1CS.to_vec()),
+      R1CSType::Raw(SQUARE_ZEROTH_R1CS.to_vec()),
+      R1CSType::Raw(SWAP_MEMORY_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
       WitnessGeneratorType::Raw(ADD_INTO_ZEROTH_GRAPH.to_vec()),

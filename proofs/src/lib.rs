@@ -41,12 +41,20 @@ const TEST_JSON: &str = include_str!("../examples/aes_fold.json");
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ProgramData {
-  pub r1cs_paths:              Vec<PathBuf>,
+  pub r1cs_types:              Vec<R1CSType>,
   pub witness_generator_types: Vec<WitnessGeneratorType>,
   pub rom:                     Vec<u64>,
   pub initial_public_input:    Vec<u64>,
   pub private_input:           HashMap<String, Value>, /* TODO: We should probably just make
                                                         * this a vec here */
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum R1CSType {
+  #[serde(rename = "file")]
+  File { path: PathBuf },
+  #[serde(skip)]
+  Raw(Vec<u8>),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

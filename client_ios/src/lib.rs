@@ -12,7 +12,7 @@ use proofs::{
     ADD_INTO_ZEROTH_GRAPH, ADD_INTO_ZEROTH_R1CS, INIT_PUBLIC_INPUT, ROM, SQUARE_ZEROTH_GRAPH,
     SQUARE_ZEROTH_R1CS, SWAP_MEMORY_GRAPH, SWAP_MEMORY_R1CS,
   },
-  ProgramData, WitnessGeneratorType, F, G1, G2,
+  ProgramData, R1CSType, WitnessGeneratorType, F, G1, G2,
 };
 
 #[derive(serde::Serialize)]
@@ -72,10 +72,10 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
 #[allow(clippy::missing_safety_doc)]
 pub unsafe extern "C" fn run_program_ios_void_void() {
   let program_data = ProgramData {
-    r1cs_paths:              vec![
-      PathBuf::from(ADD_INTO_ZEROTH_R1CS),
-      PathBuf::from(SQUARE_ZEROTH_R1CS),
-      PathBuf::from(SWAP_MEMORY_R1CS),
+    r1cs_types:              vec![
+      R1CSType::Raw(ADD_INTO_ZEROTH_R1CS.to_vec()),
+      R1CSType::Raw(SQUARE_ZEROTH_R1CS.to_vec()),
+      R1CSType::Raw(SWAP_MEMORY_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
       WitnessGeneratorType::Raw(ADD_INTO_ZEROTH_GRAPH.to_vec()),
