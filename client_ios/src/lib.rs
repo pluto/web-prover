@@ -1,7 +1,19 @@
-use std::ffi::{c_char, CStr, CString};
+use std::{
+  collections::HashMap,
+  ffi::{c_char, CStr, CString},
+  path::PathBuf,
+};
 
 use client::{config::Config, errors::ClientErrors};
-use proofs::{compress::CompressedVerifier, program, ProgramData};
+use proofs::{
+  compress::CompressedVerifier,
+  program,
+  tests::{
+    ADD_INTO_ZEROTH_GRAPH, ADD_INTO_ZEROTH_R1CS, INIT_PUBLIC_INPUT, ROM, SQUARE_ZEROTH_GRAPH,
+    SQUARE_ZEROTH_R1CS, SWAP_MEMORY_GRAPH, SWAP_MEMORY_R1CS,
+  },
+  ProgramData, WitnessGeneratorType, F, G1, G2,
+};
 
 #[derive(serde::Serialize)]
 struct Output {
@@ -58,33 +70,44 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
 
 #[no_mangle]
 #[allow(clippy::missing_safety_doc)]
-pub unsafe extern "C" fn run_program_ios(program_data_json: *const c_char) -> *const c_char {
-  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-    let program_data_str = unsafe {
-      assert!(!program_data_json.is_null());
-      std::ffi::CStr::from_ptr(program_data_json).to_str().unwrap()
-    };
-    serde_json::from_str::<ProgramData>(program_data_str).unwrap()
-  }));
+pub unsafe extern "C" fn run_program_ios_void_void() {
+  let program_data = ProgramData {
+    r1cs_paths:              vec![
+      PathBuf::from(ADD_INTO_ZEROTH_R1CS),
+      PathBuf::from(SQUARE_ZEROTH_R1CS),
+      PathBuf::from(SWAP_MEMORY_R1CS),
+    ],
+    witness_generator_types: vec![
+      WitnessGeneratorType::Raw(ADD_INTO_ZEROTH_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(SQUARE_ZEROTH_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(SWAP_MEMORY_GRAPH.to_vec()),
+    ],
+    rom:                     ROM.to_vec(),
+    initial_public_input:    INIT_PUBLIC_INPUT.to_vec(),
+    private_input:           HashMap::new(),
+  };
+  let program_output = program::run(&program_data);
+  // Get the CompressedSNARK
+  let compressed_verifier = CompressedVerifier::from(program_output);
 
-  match result {
-    Ok(program_data) => {
-      let program_output = program::run(&program_data);
-      let compressed_verifier = CompressedVerifier::from(program_output);
-      let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
-      std::ffi::CString::new(serialized_compressed_verifier.proof.0).unwrap().into_raw()
-    },
-    Err(err) => {
-      let backtrace = std::backtrace::Backtrace::capture();
+  // Serialize and compress further
+  let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
 
-      let out = if let Some(e) = err.downcast_ref::<&str>() {
-        format!("Captured Panic\nError: {}\n\nStack:\n{}", e, backtrace)
-      } else {
-        format!("Captured Panic\n{:#?}\n\nStack:\n{}", err, backtrace)
-      };
+  // Decompress and deserialize
+  let compressed_verifier = serialized_compressed_verifier.decompress_and_serialize();
 
-      let out_json = serde_json::to_string_pretty(&out).unwrap(); // should never panic
-      std::ffi::CString::new(out_json).unwrap().into_raw() // should never panic
-    },
-  }
+  // Extend the initial state input with the ROM (happens internally inside of `program::run`, so we
+  // do it out here)
+  let mut z0_primary = INIT_PUBLIC_INPUT.to_vec();
+  z0_primary.push(0);
+  z0_primary.extend(ROM.iter());
+
+  // Check that it verifies
+  let res = compressed_verifier.proof.verify(
+    &compressed_verifier.public_params,
+    &compressed_verifier.verifier_key,
+    z0_primary.into_iter().map(F::<G1>::from).collect::<Vec<_>>().as_slice(),
+    [0].into_iter().map(F::<G2>::from).collect::<Vec<_>>().as_slice(),
+  );
+  assert!(res.is_ok());
 }

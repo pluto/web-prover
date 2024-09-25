@@ -3,7 +3,7 @@
 pub mod circom;
 pub mod compress;
 pub mod program;
-#[cfg(test)] mod tests;
+pub mod tests;
 use std::{collections::HashMap, path::PathBuf};
 
 use arecibo::{
@@ -17,6 +17,11 @@ use ff::Field;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, error, info, trace};
+
+use crate::tests::{
+  ADD_INTO_ZEROTH_GRAPH, ADD_INTO_ZEROTH_R1CS, INIT_PUBLIC_INPUT, ROM, SQUARE_ZEROTH_GRAPH,
+  SQUARE_ZEROTH_R1CS, SWAP_MEMORY_GRAPH, SWAP_MEMORY_R1CS,
+};
 
 pub type E1 = Bn256EngineKZG;
 pub type E2 = GrumpkinEngine;
@@ -62,13 +67,13 @@ pub fn run_program(program_data: ProgramData) -> Vec<u8> {
   serialized_compressed_verifier.proof.0
 }
 
-#[no_mangle]
-#[allow(clippy::missing_safety_doc)]
-pub unsafe extern "C" fn setup_tracing() {
-  let collector =
-    tracing_subscriber::fmt().with_ansi(false).with_max_level(tracing::Level::TRACE).finish();
-  tracing::subscriber::set_global_default(collector).map_err(|e| panic!("{e:?}")).unwrap();
-}
+// #[no_mangle]
+// #[allow(clippy::missing_safety_doc)]
+// pub unsafe extern "C" fn setup_tracing() {
+//   let collector =
+//     tracing_subscriber::fmt().with_ansi(false).with_max_level(tracing::Level::TRACE).finish();
+//   tracing::subscriber::set_global_default(collector).map_err(|e| panic!("{e:?}")).unwrap();
+// }
 
 // use std::ffi::c_char;
 
@@ -139,36 +144,76 @@ pub unsafe extern "C" fn setup_tracing() {
 //   }
 // }
 
-#[no_mangle]
-#[allow(clippy::missing_safety_doc)]
-pub unsafe extern "C" fn run_program_ios_void_void() {
-  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-    let program_data_str = unsafe {
-      // assert!(!TEST_JSON.is_null());
-      // std::ffi::CStr::from_ptr(TEST_JSON).to_str().unwrap()
-      println!("test");
-    };
-    let program_data = serde_json::from_str::<ProgramData>(TEST_JSON).unwrap();
-  }));
-  // program::run(&program_data);
-  //   match result {
-  //     Ok(program_data) => {
-  //       let program_output = program::run(&program_data);
-  //       let compressed_verifier = CompressedVerifier::from(program_output);
-  //       let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
-  //       // std::ffi::CString::new(serialized_compressed_verifier.proof.0).unwrap().into_raw()
-  //     },
-  //     Err(err) => {
-  //       let backtrace = std::backtrace::Backtrace::capture();
+// #[no_mangle]
+// #[allow(clippy::missing_safety_doc)]
+// pub unsafe extern "C" fn run_program_ios_void_void() {
+//   // let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+//   //   let program_data_str = unsafe {
+//   //     // assert!(!TEST_JSON.is_null());
+//   //     // std::ffi::CStr::from_ptr(TEST_JSON).to_str().unwrap()
+//   //     println!("test");
+//   //   };
+//   //   let program_data = serde_json::from_str::<ProgramData>(TEST_JSON).unwrap();
+//   // }));
 
-  //       let out = if let Some(e) = err.downcast_ref::<&str>() {
-  //         format!("Captured Panic\nError: {}\n\nStack:\n{}", e, backtrace)
-  //       } else {
-  //         format!("Captured Panic\n{:#?}\n\nStack:\n{}", err, backtrace)
-  //       };
+//   let program_data = ProgramData {
+//     r1cs_paths:              vec![
+//       PathBuf::from(ADD_INTO_ZEROTH_R1CS),
+//       PathBuf::from(SQUARE_ZEROTH_R1CS),
+//       PathBuf::from(SWAP_MEMORY_R1CS),
+//     ],
+//     witness_generator_types: vec![
+//       WitnessGeneratorType::Raw(ADD_INTO_ZEROTH_GRAPH.to_vec()),
+//       WitnessGeneratorType::Raw(SQUARE_ZEROTH_GRAPH.to_vec()),
+//       WitnessGeneratorType::Raw(SWAP_MEMORY_GRAPH.to_vec()),
+//     ],
+//     rom:                     ROM.to_vec(),
+//     initial_public_input:    INIT_PUBLIC_INPUT.to_vec(),
+//     private_input:           HashMap::new(),
+//   };
+//   let program_output = program::run(&program_data);
+//   // Get the CompressedSNARK
+//   let compressed_verifier = CompressedVerifier::from(program_output);
 
-  //       let out_json = serde_json::to_string_pretty(&out).unwrap(); // should never panic
-  //                                                                   //
-  // std::ffi::CString::new(out_json).unwrap().into_raw() // should never panic     },
-  //   }
-}
+//   // Serialize and compress further
+//   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
+
+//   // Decompress and deserialize
+//   let compressed_verifier = serialized_compressed_verifier.decompress_and_serialize();
+
+//   // Extend the initial state input with the ROM (happens internally inside of `program::run`, so
+// we   // do it out here)
+//   let mut z0_primary = INIT_PUBLIC_INPUT.to_vec();
+//   z0_primary.push(0);
+//   z0_primary.extend(ROM.iter());
+
+//   // Check that it verifies
+//   let res = compressed_verifier.proof.verify(
+//     &compressed_verifier.public_params,
+//     &compressed_verifier.verifier_key,
+//     z0_primary.into_iter().map(F::<G1>::from).collect::<Vec<_>>().as_slice(),
+//     [0].into_iter().map(F::<G2>::from).collect::<Vec<_>>().as_slice(),
+//   );
+//   assert!(res.is_ok());
+//   // program::run(&program_data);
+//   //   match result {
+//   //     Ok(program_data) => {
+//   //       let program_output = program::run(&program_data);
+//   //       let compressed_verifier = CompressedVerifier::from(program_output);
+//   //       let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
+//   //       // std::ffi::CString::new(serialized_compressed_verifier.proof.0).unwrap().into_raw()
+//   //     },
+//   //     Err(err) => {
+//   //       let backtrace = std::backtrace::Backtrace::capture();
+
+//   //       let out = if let Some(e) = err.downcast_ref::<&str>() {
+//   //         format!("Captured Panic\nError: {}\n\nStack:\n{}", e, backtrace)
+//   //       } else {
+//   //         format!("Captured Panic\n{:#?}\n\nStack:\n{}", err, backtrace)
+//   //       };
+
+//   //       let out_json = serde_json::to_string_pretty(&out).unwrap(); // should never panic
+//   //                                                                   //
+//   // std::ffi::CString::new(out_json).unwrap().into_raw() // should never panic     },
+//   //   }
+// }

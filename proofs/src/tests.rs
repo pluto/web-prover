@@ -6,18 +6,19 @@ use program::ProgramOutput;
 
 use super::*;
 
-const ROM: &[u64] = &[0, 1, 2, 0, 1, 2];
+pub const ROM: &[u64] = &[0, 1, 2, 0, 1, 2];
 
-const ADD_INTO_ZEROTH_R1CS: &str = "examples/circuit_data/addIntoZeroth.r1cs";
-const ADD_INTO_ZEROTH_GRAPH: &[u8] = include_bytes!("../examples/circuit_data/addIntoZeroth.bin");
+pub const ADD_INTO_ZEROTH_R1CS: &str = "examples/circuit_data/addIntoZeroth.r1cs";
+pub const ADD_INTO_ZEROTH_GRAPH: &[u8] =
+  include_bytes!("../examples/circuit_data/addIntoZeroth.bin");
 
-const SQUARE_ZEROTH_R1CS: &str = "examples/circuit_data/squareZeroth.r1cs";
-const SQUARE_ZEROTH_GRAPH: &[u8] = include_bytes!("../examples/circuit_data/squareZeroth.bin");
+pub const SQUARE_ZEROTH_R1CS: &str = "examples/circuit_data/squareZeroth.r1cs";
+pub const SQUARE_ZEROTH_GRAPH: &[u8] = include_bytes!("../examples/circuit_data/squareZeroth.bin");
 
-const SWAP_MEMORY_R1CS: &str = "examples/circuit_data/swapMemory.r1cs";
-const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../examples/circuit_data/swapMemory.bin");
+pub const SWAP_MEMORY_R1CS: &str = "examples/circuit_data/swapMemory.r1cs";
+pub const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../examples/circuit_data/swapMemory.bin");
 
-const INIT_PUBLIC_INPUT: [u64; 2] = [1, 2];
+pub const INIT_PUBLIC_INPUT: [u64; 2] = [1, 2];
 
 fn run_entry() -> ProgramOutput {
   let program_data = ProgramData {
