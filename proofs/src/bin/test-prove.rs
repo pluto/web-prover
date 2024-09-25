@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use proofs::{program, ProgramData};
+// use proofs::{program, ProgramData};
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
@@ -17,9 +17,9 @@ pub struct Args {
   verbose: u8,
 }
 
-// Note:
-// Run with `cargo run --release -i setup/test.json`
-// from the `./proofs/` dir.
+// // Note:
+// // Run with `cargo run --release -i setup/test.json`
+// // from the `./proofs/` dir.
 fn main() {
   let args = Args::parse();
 
@@ -32,12 +32,15 @@ fn main() {
     _ => Level::TRACE,
   };
   let subscriber = FmtSubscriber::builder().with_max_level(log_level).finish();
-  tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+  tracing::subscriber::set_global_default(subscriber).expect(
+    "setting default subscriber
+failed",
+  );
 
   // Read in the supernova program data
   let file = args.input_file;
-  info!("Using file: {:?}", file);
-  let read = std::fs::read(file).unwrap();
-  let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
-  program::run(&program_data);
+  // info!("Using file: {:?}", file);
+  // let read = std::fs::read(file).unwrap();
+  // let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
+  // program::run(&program_data);
 }
