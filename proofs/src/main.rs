@@ -1,6 +1,7 @@
 #![feature(internal_output_capture)]
 
 pub mod circom;
+pub mod compress;
 pub mod program;
 #[cfg(test)] pub mod tests;
 use std::{collections::HashMap, path::PathBuf};

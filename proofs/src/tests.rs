@@ -81,12 +81,12 @@ fn test_run_verify() {
 
   // Serialize and compress the proof
   let bincode = bincode::serialize(&compressed_snark).unwrap();
-  assert_eq!(bincode.len(), 11176);
+  assert_eq!(bincode.len(), 12200);
 
   let mut encoder = ZlibEncoder::new(Vec::new(), Compression::best());
   encoder.write_all(&bincode).unwrap();
   let compressed = encoder.finish().unwrap();
-  assert_eq!(compressed.len(), 10144);
+  assert_eq!(compressed.len(), 11145);
 
   // Decompress and Deserialize the proof
   let mut decoder = ZlibDecoder::new(&compressed[..]);

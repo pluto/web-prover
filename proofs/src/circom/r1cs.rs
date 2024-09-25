@@ -18,65 +18,6 @@ pub struct R1CS {
   pub constraints:        Vec<Constraint>,
 }
 
-impl From<&[u8]> for R1CS {
-  fn from(value: &[u8]) -> Self {
-    let mut cursor = Cursor::new(value);
-
-    let mut magic = [0u8; 4];
-    cursor.read_exact(&mut magic).unwrap();
-    assert_eq!(magic, [0x72, 0x31, 0x63, 0x73]);
-
-    let version = cursor.read_u32::<LittleEndian>().unwrap();
-    assert_eq!(version, 1);
-
-    let num_sections = cursor.read_u32::<LittleEndian>().unwrap();
-
-    let mut section_offsets = HashMap::<u32, u64>::new();
-    let mut section_sizes = HashMap::<u32, u64>::new();
-
-    for _ in 0..num_sections {
-      let section_type = cursor.read_u32::<LittleEndian>().unwrap();
-      let section_size = cursor.read_u64::<LittleEndian>().unwrap();
-      let offset = cursor.position();
-      section_offsets.insert(section_type, offset);
-      section_sizes.insert(section_type, section_size);
-      cursor.seek(SeekFrom::Current(section_size as i64)).unwrap();
-    }
-
-    let header_type = 1;
-    let constraint_type = 2;
-    let wire2label_type = 3;
-
-    cursor.seek(SeekFrom::Start(*section_offsets.get(&header_type).unwrap())).unwrap();
-    let header = read_header(&mut cursor, *section_sizes.get(&header_type).unwrap());
-    assert_eq!(header.field_size, 32);
-
-    cursor.seek(SeekFrom::Start(*section_offsets.get(&constraint_type).unwrap())).unwrap();
-    let constraints = read_constraints(&mut cursor, &header);
-
-    cursor.seek(SeekFrom::Start(*section_offsets.get(&wire2label_type).unwrap())).unwrap();
-    // TODO: not using wiremapping is cursed fs
-    let _wire_mapping =
-      read_map(&mut cursor, *section_sizes.get(&wire2label_type).unwrap(), &header);
-
-    let num_public_inputs = header.n_pub_in as usize;
-    let num_private_inputs = header.n_prv_in as usize;
-    let num_public_outputs = header.n_pub_out as usize;
-    let num_variables = header.n_wires as usize;
-    let num_inputs = (1 + header.n_pub_in + header.n_pub_out) as usize; // TODO: This seems... odd...
-    let num_aux = num_variables - num_inputs;
-    R1CS {
-      num_private_inputs,
-      num_public_inputs,
-      num_public_outputs,
-      num_inputs,
-      num_aux,
-      num_variables,
-      constraints,
-    }
-  }
-}
-
 // R1CSFile's header
 #[derive(Debug, Default)]
 pub struct Header {
@@ -90,40 +31,79 @@ pub struct Header {
   pub n_constraints: u32,
 }
 
-// R1CSFile parse result
-#[derive(Debug, Default)]
-pub struct R1CSFile {
-  pub version:      u32,
-  pub header:       Header,
-  pub constraints:  Vec<Constraint>,
-  pub wire_mapping: Vec<u64>,
+impl From<&[u8]> for R1CS {
+  fn from(value: &[u8]) -> Self {
+    let cursor = BufReader::new(Cursor::new(value));
+    from_reader(cursor)
+  }
 }
 
-// TODO: Can simplify
-/// load r1cs from bin by a reader
-pub fn load_r1cs_from_file(filename: &PathBuf) -> R1CS {
-  let reader =
-    BufReader::new(OpenOptions::new().read(true).open(filename).expect("unable to open."));
+impl From<&PathBuf> for R1CS {
+  fn from(filename: &PathBuf) -> R1CS {
+    let reader =
+      BufReader::new(OpenOptions::new().read(true).open(filename).expect("unable to open."));
+    from_reader(reader)
+  }
+}
 
-  let file = from_reader(reader);
-  let num_public_inputs = file.header.n_pub_in as usize;
-  let num_private_inputs = file.header.n_prv_in as usize;
-  let num_public_outputs = file.header.n_pub_out as usize;
-  let num_variables = file.header.n_wires as usize;
-  let num_inputs = (1 + file.header.n_pub_in + file.header.n_pub_out) as usize;
+fn from_reader<R: Read + Seek>(mut reader: R) -> R1CS {
+  let mut magic = [0u8; 4];
+  reader.read_exact(&mut magic).unwrap();
+  assert_eq!(magic, [0x72, 0x31, 0x63, 0x73]);
+
+  let version = reader.read_u32::<LittleEndian>().unwrap();
+  assert_eq!(version, 1);
+
+  let num_sections = reader.read_u32::<LittleEndian>().unwrap();
+
+  // section type -> file offset
+  let mut section_offsets = HashMap::<u32, u64>::new();
+  let mut section_sizes = HashMap::<u32, u64>::new();
+
+  // get file offset of each section
+  for _ in 0..num_sections {
+    let section_type = reader.read_u32::<LittleEndian>().unwrap();
+    let section_size = reader.read_u64::<LittleEndian>().unwrap();
+    let offset = reader.stream_position().unwrap();
+    section_offsets.insert(section_type, offset);
+    section_sizes.insert(section_type, section_size);
+    reader.seek(SeekFrom::Current(section_size as i64)).unwrap();
+  }
+
+  let header_type = 1;
+  let constraint_type = 2;
+  let wire2label_type = 3;
+
+  reader.seek(SeekFrom::Start(*section_offsets.get(&header_type).unwrap())).unwrap();
+  let header = read_header(&mut reader, *section_sizes.get(&header_type).unwrap());
+  assert_eq!(header.field_size, 32);
+
+  reader.seek(SeekFrom::Start(*section_offsets.get(&constraint_type).unwrap())).unwrap();
+  let constraints = read_constraints(&mut reader, &header);
+
+  reader.seek(SeekFrom::Start(*section_offsets.get(&wire2label_type).unwrap())).unwrap();
+  // TODO: Idk if this needs used at all
+  // let wire_mapping = read_map(&mut reader, *section_sizes.get(&wire2label_type).unwrap(),
+  // &header);
+
+  let num_public_inputs = header.n_pub_in as usize;
+  let num_private_inputs = header.n_prv_in as usize;
+  let num_public_outputs = header.n_pub_out as usize;
+  let num_variables = header.n_wires as usize;
+  let num_inputs = (1 + header.n_pub_in + header.n_pub_out) as usize; // TODO: This seems... odd...
   let num_aux = num_variables - num_inputs;
   R1CS {
     num_private_inputs,
     num_public_inputs,
     num_public_outputs,
-    num_variables,
     num_inputs,
     num_aux,
-    constraints: file.constraints,
+    num_variables,
+    constraints,
   }
 }
 
-pub(crate) fn read_field<R: Read>(mut reader: R) -> F<G1> {
+fn read_field<R: Read>(mut reader: R) -> F<G1> {
   let mut repr = F::<G1>::ZERO.to_repr();
   for digit in repr.as_mut().iter_mut() {
     *digit = reader.read_u8().unwrap();
@@ -173,59 +153,16 @@ fn read_constraints<R: Read>(mut reader: R, header: &Header) -> Vec<Constraint> 
   }
   vec
 }
-
-fn read_map<R: Read>(mut reader: R, size: u64, header: &Header) -> Vec<u64> {
-  assert_eq!(size, header.n_wires as u64 * 8);
-  let mut vec = Vec::with_capacity(header.n_wires as usize);
-  for _ in 0..header.n_wires {
-    vec.push(reader.read_u64::<LittleEndian>().unwrap());
-  }
-  assert_eq!(vec[0], 0);
-  vec
-}
-
-// TODO: Can remove this
-pub fn from_reader<R: Read + Seek>(mut reader: R) -> R1CSFile
-where {
-  let mut magic = [0u8; 4];
-  reader.read_exact(&mut magic).unwrap();
-  assert_eq!(magic, [0x72, 0x31, 0x63, 0x73]);
-
-  let version = reader.read_u32::<LittleEndian>().unwrap();
-  assert_eq!(version, 1);
-
-  let num_sections = reader.read_u32::<LittleEndian>().unwrap();
-
-  // section type -> file offset
-  let mut section_offsets = HashMap::<u32, u64>::new();
-  let mut section_sizes = HashMap::<u32, u64>::new();
-
-  // get file offset of each section
-  for _ in 0..num_sections {
-    let section_type = reader.read_u32::<LittleEndian>().unwrap();
-    let section_size = reader.read_u64::<LittleEndian>().unwrap();
-    let offset = reader.stream_position().unwrap();
-    section_offsets.insert(section_type, offset);
-    section_sizes.insert(section_type, section_size);
-    reader.seek(SeekFrom::Current(section_size as i64)).unwrap();
-  }
-
-  let header_type = 1;
-  let constraint_type = 2;
-  let wire2label_type = 3;
-
-  reader.seek(SeekFrom::Start(*section_offsets.get(&header_type).unwrap())).unwrap();
-  let header = read_header(&mut reader, *section_sizes.get(&header_type).unwrap());
-  assert_eq!(header.field_size, 32);
-
-  reader.seek(SeekFrom::Start(*section_offsets.get(&constraint_type).unwrap())).unwrap();
-  let constraints = read_constraints(&mut reader, &header);
-
-  reader.seek(SeekFrom::Start(*section_offsets.get(&wire2label_type).unwrap())).unwrap();
-  let wire_mapping = read_map(&mut reader, *section_sizes.get(&wire2label_type).unwrap(), &header);
-
-  R1CSFile { version, header, constraints, wire_mapping }
-}
+// TODO: This is only used for the wiremap which we don't currently use
+// fn read_map<R: Read>(mut reader: R, size: u64, header: &Header) -> Vec<u64> {
+//   assert_eq!(size, header.n_wires as u64 * 8);
+//   let mut vec = Vec::with_capacity(header.n_wires as usize);
+//   for _ in 0..header.n_wires {
+//     vec.push(reader.read_u64::<LittleEndian>().unwrap());
+//   }
+//   assert_eq!(vec[0], 0);
+//   vec
+// }
 
 #[cfg(test)]
 mod tests {
