@@ -35,3 +35,6 @@ anyhow = "1.0" # TODO: This should only ever be a dev-dep in my mind
 
 [dev-dependencies]
 tracing-test = "0.2.5"
+
+[features]
+verify-steps = []

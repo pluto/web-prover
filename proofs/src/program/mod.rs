@@ -1,10 +1,7 @@
 use std::time::Instant;
 
 use arecibo::{
-  supernova::{
-    snark::{CompressedSNARK, ProverKey, VerifierKey},
-    PublicParams, RecursiveSNARK, TrivialTestCircuit,
-  },
+  supernova::{PublicParams, RecursiveSNARK, TrivialTestCircuit},
   traits::{circuit::StepCircuit, snark::default_ck_hint},
 };
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
@@ -30,6 +27,11 @@ pub struct RomCircuit {
   pub curr_public_input:      Option<Vec<F<G1>>>,
   pub curr_private_input:     Option<HashMap<String, Value>>,
   pub witness_generator_type: WitnessGeneratorType,
+}
+
+pub struct ProgramOutput {
+  pub recursive_snark: RecursiveSNARK<E1>,
+  pub public_params:   PublicParams<E1>,
 }
 
 impl NonUniformCircuit<E1> for Memory {
@@ -92,7 +94,7 @@ impl SNStepCircuit<F<G1>> for RomCircuit {
   }
 }
 
-pub fn run(program_data: &ProgramData) -> (PublicParams<E1>, RecursiveSNARK<E1>) {
+pub fn run(program_data: &ProgramData) -> ProgramOutput {
   info!("Starting SuperNova program...");
 
   // Get the public inputs needed for circuits
@@ -175,15 +177,5 @@ pub fn run(program_data: &ProgramData) -> (PublicParams<E1>, RecursiveSNARK<E1>)
 
     recursive_snark_option = Some(recursive_snark);
   }
-  (public_params, recursive_snark_option.unwrap())
-}
-
-#[allow(clippy::type_complexity)]
-pub fn compress(
-  public_params: &PublicParams<E1>,
-  recursive_snark: &RecursiveSNARK<E1>,
-) -> (ProverKey<E1, S1, S2>, VerifierKey<E1, S1, S2>, CompressedSNARK<E1, S1, S2>) {
-  let (pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(public_params).unwrap();
-  let proof = CompressedSNARK::<E1, S1, S2>::prove(public_params, &pk, recursive_snark).unwrap();
-  (pk, vk, proof)
+  ProgramOutput { public_params, recursive_snark: recursive_snark_option.unwrap() }
 }

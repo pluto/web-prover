@@ -1,7 +1,8 @@
 //! This test module is effectively testing a static (comptime) circuit dispatch supernova program
 
 use arecibo::supernova::{PublicParams, RecursiveSNARK};
-use compress::{decompress_and_deserialize, serialize_and_compress};
+use compress::CompressedVerifier;
+use program::ProgramOutput;
 
 use super::*;
 
@@ -18,7 +19,7 @@ const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../examples/circuit_data/swapMe
 
 const INIT_PUBLIC_INPUT: [u64; 2] = [1, 2];
 
-fn run_entry() -> (PublicParams<E1>, RecursiveSNARK<E1>) {
+fn run_entry() -> ProgramOutput {
   let program_data = ProgramData {
     r1cs_paths:              vec![
       PathBuf::from(ADD_INTO_ZEROTH_R1CS),
@@ -41,7 +42,7 @@ fn run_entry() -> (PublicParams<E1>, RecursiveSNARK<E1>) {
 #[test]
 #[tracing_test::traced_test]
 fn test_run() {
-  let (_, recursive_snark) = run_entry();
+  let ProgramOutput { recursive_snark, .. } = run_entry();
   let final_mem = [
     F::<G1>::from(0),
     F::<G1>::from(81),
@@ -59,17 +60,16 @@ fn test_run() {
 #[test]
 #[tracing_test::traced_test]
 fn test_run_verify() {
-  let (public_params, recursive_snark) = run_entry();
+  let program_output = run_entry();
 
   // Get the CompressedSNARK
-  let (_prover_key, verifier_key, compressed_snark) =
-    program::compress(&public_params, &recursive_snark);
+  let compressed_verifier = CompressedVerifier::from(program_output);
 
   // Serialize and compress further
-  let compressed_proof = serialize_and_compress(&compressed_snark);
+  let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
 
   // Decompress and deserialize
-  let compressed_snark = decompress_and_deserialize(&compressed_proof);
+  let compressed_verifier = serialized_compressed_verifier.decompress_and_serialize();
 
   // Extend the initial state input with the ROM (happens internally inside of `program::run`, so we
   // do it out here)
@@ -78,9 +78,9 @@ fn test_run_verify() {
   z0_primary.extend(ROM.iter());
 
   // Check that it verifies
-  let res = compressed_snark.verify(
-    &public_params,
-    &verifier_key,
+  let res = compressed_verifier.proof.verify(
+    &compressed_verifier.public_params,
+    &compressed_verifier.verifier_key,
     z0_primary.into_iter().map(F::<G1>::from).collect::<Vec<_>>().as_slice(),
     [0].into_iter().map(F::<G2>::from).collect::<Vec<_>>().as_slice(),
   );
@@ -93,7 +93,7 @@ fn test_parse_batch_wc() {
   let read = std::fs::read("examples/parse_batch_wc.json").unwrap();
   let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
 
-  let (_pp, recursive_snark) = program::run(&program_data);
+  let ProgramOutput { recursive_snark, .. } = program::run(&program_data);
 
   let final_mem = [
     F::<G1>::from(0),
@@ -117,7 +117,7 @@ fn test_parse_batch_wasm() {
   let read = std::fs::read("examples/parse_batch_wasm.json").unwrap();
   let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
 
-  let (_pp, recursive_snark) = program::run(&program_data);
+  let ProgramOutput { recursive_snark, .. } = program::run(&program_data);
 
   let final_mem = [
     F::<G1>::from(0),

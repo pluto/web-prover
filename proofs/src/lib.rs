@@ -12,6 +12,7 @@ use arecibo::{
   traits::{circuit::TrivialCircuit, Engine, Group},
 };
 use circom::CircomCircuit;
+use compress::CompressedVerifier;
 use ff::Field;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -49,4 +50,57 @@ pub enum WitnessGeneratorType {
   CircomWitnesscalc { path: String },
   #[serde(skip)]
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
+}
+
+#[cfg(not(target_os = "ios"))]
+pub fn run_program(program_data: ProgramData) -> Vec<u8> {
+  let program_output = program::run(&program_data);
+  let compressed_verifier = CompressedVerifier::from(program_output);
+  let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
+  serialized_compressed_verifier.proof.0
+}
+
+#[no_mangle]
+#[allow(clippy::missing_safety_doc)]
+#[cfg(target_os = "ios")]
+pub unsafe extern "C" fn setup_tracing() {
+  let collector =
+    tracing_subscriber::fmt().with_ansi(false).with_max_level(tracing::Level::TRACE).finish();
+  tracing::subscriber::set_global_default(collector).map_err(|e| panic!("{e:?}")).unwrap();
+}
+
+#[no_mangle]
+#[allow(clippy::missing_safety_doc)]
+#[cfg(target_os = "ios")]
+use std::ffi::c_char;
+#[cfg(target_os = "ios")]
+pub unsafe extern "C" fn run_program(program_data_json: *const c_char) -> *const c_char {
+  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    let program_data_str = unsafe {
+      assert!(!program_data_json.is_null());
+      std::ffi::CStr::from_ptr(program_data_json).to_str().unwrap()
+    };
+    serde_json::from_str::<ProgramData>(program_data_str).unwrap()
+  }));
+
+  match result {
+    Ok(program_data) => {
+      let program_output = program::run(&program_data);
+      let compressed_verifier = CompressedVerifier::from(program_output);
+      let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
+      std::ffi::CString::new(serialized_compressed_verifier.proof.0).unwrap().into_raw()
+    },
+    Err(err) => {
+      let backtrace = std::backtrace::Backtrace::capture();
+
+      let out = if let Some(e) = err.downcast_ref::<&str>() {
+        format!("Captured Panic\nError: {}\n\nStack:\n{}", e, backtrace)
+      } else {
+        format!("Captured Panic\n{:#?}\n\nStack:\n{}", err, backtrace)
+      };
+
+      let out_json = serde_json::to_string_pretty(&out).unwrap(); // should never panic
+      std::ffi::CString::new(out_json).unwrap().into_raw() // should never panic
+    },
+  }
 }
