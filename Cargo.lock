@@ -1345,6 +1345,7 @@ name = "client_ios"
 version = "0.1.0"
 dependencies = [
  "client",
+ "proofs",
  "serde",
  "serde_json",
  "tokio",
