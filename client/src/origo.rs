@@ -3,8 +3,13 @@
 use serde::Serialize;
 use tls_proxy2::WitnessData;
 use tracing::debug;
+use proofs::{ProgramData, program, WitnessGeneratorType};
+use std::path::PathBuf;
+use std::collections::HashMap;
 
 use crate::errors;
+
+const AES_GCM_FOLD_R1CS: &str = "examples/circuit_data/aes-gcm-fold.r1cs"; 
 
 #[derive(Serialize)]
 pub struct SignBody {
@@ -49,7 +54,23 @@ pub async fn sign(
 }
 
 pub async fn generate_proof(witness: WitnessData) -> Result<(), errors::ClientErrors> {
+
+  let program_data = ProgramData {
+    r1cs_paths: vec![PathBuf::from(AES_GCM_FOLD_R1CS)],
+    witness_generator_types: vec![WitnessGeneratorType::Raw(witness)],
+    rom: vec![], // idk what this needs to be
+    initial_public_input: vec![],
+    private_input: HashMap::new(),
+  };
+
+  program::run(&program_data);
   debug!("data={:?}", witness);
 
   Ok(())
 }
+
+// pub fn witness_to_raw(witness: WitnessData) -> Vec<u8> {
+//   let mut buf = Vec::new();
+//   witness.write(&mut buf).unwrap();
+//   buf
+// }

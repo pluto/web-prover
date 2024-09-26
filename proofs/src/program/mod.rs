@@ -6,6 +6,7 @@ use arecibo::{
 };
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
+// use proofs::WitnessGeneratorType;
 use utils::{into_input_json, map_private_inputs};
 
 use super::*;
@@ -110,7 +111,7 @@ pub fn run(program_data: &ProgramData) -> ProgramOutput {
   for (circuit_index, (r1cs_path, witness_generator_type)) in
     program_data.r1cs_types.iter().zip(program_data.witness_generator_types.iter()).enumerate()
   {
-    let circuit = CircomCircuit { r1cs: R1CS::from(r1cs_path), witness: None };
+    let circuit = circom::CircomCircuit { r1cs: R1CS::from(r1cs_path), witness: None };
     let rom_circuit = RomCircuit {
       circuit,
       circuit_index,

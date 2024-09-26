@@ -1,16 +1,21 @@
 #![feature(internal_output_capture)]
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::{collections::HashMap, path::PathBuf};
+use tracing::{trace, info, debug};
+use ff::Field;
+
+use arecibo::{
+    provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
+    spartan::batched::BatchedRelaxedR1CSSNARK,
+    traits::{circuit::TrivialCircuit, Engine, Group},
+  };
 
 pub mod circom;
 pub mod compress;
 pub mod program;
-pub mod tests;
-use std::{collections::HashMap, path::PathBuf};
+#[cfg(test)] pub mod tests;
 
-use arecibo::{
-  provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
-  spartan::batched::BatchedRelaxedR1CSSNARK,
-  traits::{circuit::TrivialCircuit, Engine, Group},
-};
 use circom::CircomCircuit;
 use compress::CompressedVerifier;
 use ff::Field;
@@ -76,6 +81,7 @@ pub fn get_compressed_proof(program_data: ProgramData) -> Vec<u8> {
   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
   serialized_compressed_verifier.proof.0
 }
+
 #[cfg(target_os = "ios")] use std::ffi::c_char;
 #[cfg(target_os = "ios")]
 #[no_mangle]
