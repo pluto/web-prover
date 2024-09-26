@@ -11,6 +11,9 @@ use crate::errors;
 
 const AES_GCM_FOLD_R1CS: &str = "examples/circuit_data/aes-gcm-fold.r1cs"; 
 
+const AES_GCM_FOLD_WASM: &str = "examples/circuit_data/aes-gcm-fold_js/aes-gcm-fold.wasm";
+const AES_GCM_FOLD_WTNS: &str = "witness.wtns";
+
 #[derive(Serialize)]
 pub struct SignBody {
   pub hs_server_aes_iv:  String,
@@ -55,13 +58,24 @@ pub async fn sign(
 
 pub async fn generate_proof(witness: WitnessData) -> Result<(), errors::ClientErrors> {
 
+  // let thing = witness.request;
+  // let thing2 = witness.response;
+
+  let mut private_input = HashMap::new();
+  private_input.insert("key".to_string(), serde_json::Value::String(witness.request.aes_key.clone()));
+  private_input.insert("iv".to_string(), serde_json::Value::String(witness.request.aes_iv.clone()));
+  // private_input.insert("aad".to_string(), witness.request.aad.clone());
+  // TODO(WJ 2024-09-26): to get the aad i need to grab it from the origo connection struct.
+
   let program_data = ProgramData {
     r1cs_paths: vec![PathBuf::from(AES_GCM_FOLD_R1CS)],
-    witness_generator_types: vec![WitnessGeneratorType::Raw(witness)],
-    rom: vec![], // idk what this needs to be
-    initial_public_input: vec![],
-    private_input: HashMap::new(),
+    witness_generator_types: vec![WitnessGeneratorType::Wasm{path: AES_GCM_FOLD_WASM.to_string(), wtns_path: AES_GCM_FOLD_WTNS.to_string()}],
+    rom: vec![0; 64],
+    initial_public_input: vec![0; 64],
+    private_input,
   };
+  // private input is the key and iv, and the fold input: plaintext, and aad.
+  // initial public inpute in the example file is a vec of 64 0s.
 
   program::run(&program_data);
   debug!("data={:?}", witness);
