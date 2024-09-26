@@ -25,7 +25,7 @@ use super::*;
 pub mod r1cs;
 pub mod witness;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CircomInput {
   pub step_in: Vec<String>,
 

@@ -6,7 +6,7 @@ pub fn generate_witness_from_generator_type(
   witness_generator_type: &WitnessGeneratorType,
 ) -> Vec<F<G1>> {
   match witness_generator_type {
-    WitnessGeneratorType::Wasm { path, wtns_path } =>
+    WitnessGeneratorType::Wasm { path, wtns_path } => 
       generate_witness_from_wasm_file(input_json, &PathBuf::from(path), &PathBuf::from(wtns_path)),
     WitnessGeneratorType::CircomWitnesscalc { path } =>
       generate_witness_from_witnesscalc_file(input_json, &PathBuf::from(path)),
