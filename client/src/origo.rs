@@ -8,12 +8,14 @@ use std::path::PathBuf;
 use std::collections::HashMap;
 use tls_client2::{Decrypter2, ProtocolVersion, CipherSuite};
 use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
+use arecibo::supernova::RecursiveSNARK;
+use arecibo::provider::Bn256EngineKZG;
 
 use crate::errors;
 
-const AES_GCM_FOLD_R1CS: &str = "examples/circuit_data/aes-gcm-fold.r1cs"; 
+const AES_GCM_FOLD_R1CS: &str = "proofs/examples/circuit_data/aes-gcm-fold.r1cs"; 
 
-const AES_GCM_FOLD_WASM: &str = "examples/circuit_data/aes-gcm-fold_js/aes-gcm-fold.wasm";
+const AES_GCM_FOLD_WASM: &str = "proofs/examples/circuit_data/aes-gcm-fold_js/aes-gcm-fold.wasm";
 const AES_GCM_FOLD_WTNS: &str = "witness.wtns";
 
 #[derive(Serialize)]
@@ -55,36 +57,41 @@ pub async fn sign(
 
   let r = generate_proof(witness).await.unwrap();
 
-  Ok(crate::Proof::Origo(crate::OrigoProof {})) // TODO
+  Ok(crate::Proof::Origo()) // TODO
 }
 
 pub async fn generate_proof(witness: WitnessData) -> Result<(), errors::ClientErrors> {
 
-  // let thing = witness.request;
-  // let thing2 = witness.response;
+  debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
+  debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
+
+  // let mut private_input: HashMap<_, _> = HashMap::new();
+  let key: &[u8] = &witness.request.aes_key;
+  let iv: &[u8] = &witness.request.aes_iv;
 
   let mut private_input = HashMap::new();
-  let key: [u8; 16] = serde_json::from_str(&witness.request.aes_key).unwrap();
-  let iv: [u8; 12] = serde_json::from_str(&witness.request.aes_iv).unwrap();
-  let ct: [u8; 16] = serde_json::from_str(&witness.request.ciphertext).unwrap();
-  private_input.insert("key".to_string(), serde_json::Value::String(witness.request.aes_key.clone()));
-  private_input.insert("iv".to_string(), serde_json::Value::String(witness.request.aes_iv.clone()));
-  // TODO(WJ 2024-09-26): to get the aad i need to grab it from the origo connection struct
-  // need to think about how to get plaintext
 
-  let dec = Decrypter2::new(key, iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
+  // can be any length
+  let ct: &[u8] = witness.request.ciphertext.as_bytes();
+
+  let sized_key: [u8; 16] = key[..16].try_into().unwrap();
+  let sized_iv: [u8; 12] = iv[..12].try_into().unwrap();
+
+  /// okay i need to turn this into an array of "numbers"
+  private_input.insert("key".to_string(), serde_json::to_value(&sized_key).unwrap());
+  private_input.insert("iv".to_string(), serde_json::to_value(&sized_iv).unwrap());
+
+  let dec = Decrypter2::new(sized_key, sized_iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
   let (plaintext, meta) = dec.decrypt_tls13_aes(&OpaqueMessage{
       typ: ContentType::ApplicationData,
-      version: ProtocolVersion::TLSv1_2,
-      payload:  Payload::new(ct)
-  }, 0).unwrap();
+      version: ProtocolVersion::TLSv1_3,
+      payload:  Payload::new(hex::decode(ct).unwrap())
+  }, 0).unwrap(); // sequence is wrong here
   let pt = plaintext.payload.0.to_vec();
-  let pt_as_values: Vec<serde_json::Value> = pt.into_iter().map(serde_json::Value::from).collect();
-
   let aad = meta.additional_data.as_str().to_owned();
 
-  private_input.insert("plaintext".to_string(), serde_json::Value::Array(pt_as_values.clone()));
-  private_input.insert("aad".to_string(), serde_json::Value::String(aad.clone()));
+  private_input.insert("plainText".to_string(), serde_json::to_value(&pt).unwrap());
+  private_input.insert("aad".to_string(), serde_json::to_value(&aad).unwrap());
 
   let program_data = ProgramData {
     r1cs_paths: vec![PathBuf::from(AES_GCM_FOLD_R1CS)],
@@ -97,14 +104,28 @@ pub async fn generate_proof(witness: WitnessData) -> Result<(), errors::ClientEr
   // private input is the key and iv, and the fold input: plaintext, and aad.
   // initial public inpute in the example file is a vec of 64 0s.
 
-  program::run(&program_data);
-  debug!("data={:?}", witness);
+  let (params, proof) = program::run(&program_data);
+  debug!("data={:?}", proof);
 
   Ok(())
 }
 
-// pub fn witness_to_raw(witness: WitnessData) -> Vec<u8> {
-//   let mut buf = Vec::new();
-//   witness.write(&mut buf).unwrap();
-//   buf
-// }
+fn string_to_fixed_bytes<const N: usize>(s: &str) -> Result<[u8; N], &'static str> {
+  let bytes = s.as_bytes();
+  if bytes.len() != N {
+      return Err("String must be exactly 16 bytes long");
+  }
+  
+  let mut array = [0u8; N];
+  array.copy_from_slice(bytes);
+  Ok(array)
+}
+fn bytes_to_fixed_array<const N: usize>(bytes: &[u8]) -> Result<[u8; N], &'static str> {
+  if bytes.len() != N {
+      return Err("Byte slice length does not match the required size");
+  }
+  
+  let mut array = [0u8; N];
+  array.copy_from_slice(bytes);
+  Ok(array)
+}

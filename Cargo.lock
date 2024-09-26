@@ -1286,6 +1286,7 @@ name = "client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arecibo",
  "async-tungstenite 0.25.1",
  "base64 0.22.1",
  "cfg-if",

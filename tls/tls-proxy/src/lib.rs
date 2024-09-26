@@ -12,8 +12,8 @@ use indexmap::IndexMap;
 
 #[derive(Debug, Clone)]
 pub struct DecryptTarget {
-  pub aes_iv: String,
-  pub aes_key: String,
+  pub aes_iv: Vec<u8>,
+  pub aes_key: Vec<u8>,
   pub ciphertext: String,
 }
 #[derive(Debug, Clone)]
@@ -126,13 +126,13 @@ impl OrigoConnection {
 
         return WitnessData {
             request: DecryptTarget {
-                aes_iv: hex_bytes_to_string(self.secret_map.get("Application:client_aes_iv").unwrap().to_vec()),
-                aes_key: hex_bytes_to_string(self.secret_map.get("Application:client_aes_key").unwrap().to_vec()),
+                aes_iv: self.secret_map.get("Application:client_aes_iv").unwrap().to_vec(),
+                aes_key: self.secret_map.get("Application:client_aes_key").unwrap().to_vec(),
                 ciphertext: self.record_map.get(&req_key).unwrap().ciphertext.clone()
             },
             response: DecryptTarget {
-                aes_iv: hex_bytes_to_string(self.secret_map.get("Application:server_aes_iv").unwrap().to_vec()),
-                aes_key: hex_bytes_to_string(self.secret_map.get("Application:server_aes_key").unwrap().to_vec()),
+                aes_iv: self.secret_map.get("Application:server_aes_iv").unwrap().to_vec(),
+                aes_key: self.secret_map.get("Application:server_aes_key").unwrap().to_vec(),
                 ciphertext: self.record_map.get(&resp_key).unwrap().ciphertext.clone()
             }
         }

@@ -775,7 +775,7 @@ impl Decrypter {
     let nonce = GenericArray::from_slice(&init_nonce);
     let mut plaintext = cipher
       .decrypt(nonce, aes_payload)
-      .map_err(|e| BackendError::DecryptionError(e.to_string()))?;
+      .map_err(|e| BackendError::DecryptionError(e.to_string()))?; // error in invalid here
 
     let typ = unpad_tls13(&mut plaintext);
     if typ == ContentType::Unknown(0) {
