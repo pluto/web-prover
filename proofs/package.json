@@ -4,7 +4,7 @@
   "description": "ZK Circuits for WebProofs",
   "dependencies": {
     "circomlib": "^2.0.5",
-    "parser-attestor": "github:pluto/parser-attestor#dfd7e62",
+    "parser-attestor": "github:pluto/parser-attestor#7fa287defa581af4e86fe1c074673a70460a163a",
     "aes-proof": "github:pluto/aes-proof#06152be2d7875f92352da446cb87f20d38d16f34",
     "@zk-email/circuits": "^6.1.1"
   }

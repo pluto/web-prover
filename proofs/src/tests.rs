@@ -134,3 +134,12 @@ fn test_parse_batch_wasm() {
   ];
   assert_eq!(&final_mem.to_vec(), recursive_snark.zi_primary());
 }
+
+pub const HTTP_LOCK_R1CS: &[u8] = include_bytes!("../examples/circuit_data/swapMemory.r1cs");
+pub const HTTP_LOCK_GRAPH: &[u8] = include_bytes!("../examples/circuit_data/swapMemory.bin");
+
+pub const HTTP_INPUT: [u64; 2] = [1, 2];
+
+#[test]
+#[tracing_test::traced_test]
+fn test_end_to_end_proofs() {}
