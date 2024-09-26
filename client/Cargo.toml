@@ -20,6 +20,7 @@ tls-client2={ path="../tls/tls-client", package="tls-client" }
 tls-client-async2={ path="../tls/tls-client-async", package="tls-client-async", features=[
   "tracing",
 ] }
+tls-core={ path="../tls/tls-core", package="tls-core" }
 tls-proxy2={ path="../tls/tls-proxy", package="tls-proxy" }
 proofs={ path="../proofs", package="proofs" }
 
