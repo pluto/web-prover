@@ -22,8 +22,7 @@ type OrigoProof<Bn256EngineKZG> = RecursiveSNARK<Bn256EngineKZG>;
 #[derive(Debug, Serialize)]
 pub enum Proof {
   TLSN(TlsProof),
-  Origo(),
-  // Origo(OrigoProof<Bn256EngineKZG>),
+  Origo(OrigoProof<Bn256EngineKZG>),
 }
 
 pub async fn prover_inner(config: config::Config) -> Result<Proof, errors::ClientErrors> {
