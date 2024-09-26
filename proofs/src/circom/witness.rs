@@ -1,7 +1,5 @@
 use fs::OpenOptions;
 
-rust_witness::witness!(parsefoldbatch);
-
 use super::*;
 pub fn generate_witness_from_generator_type(
   input_json: &str,
@@ -13,10 +11,7 @@ pub fn generate_witness_from_generator_type(
     WitnessGeneratorType::CircomWitnesscalc { path } =>
       generate_witness_from_witnesscalc_file(input_json, &PathBuf::from(path)),
     WitnessGeneratorType::Raw(graph_data) => generate_witness_from_graph(input_json, graph_data),
-    WitnessGeneratorType::RustWitness => parsefoldbatch_witness(serde_json::from_str(input_json))
-      .into_iter()
-      .map(|bigint| F::<G1>::from_str_vartime(&bigint.to_string()).unwrap())
-      .collect(),
+    WitnessGeneratorType::RustWitness(f) => f(input_json),
   }
 }
 

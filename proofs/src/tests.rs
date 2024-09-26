@@ -1,5 +1,6 @@
 //! This test module is effectively testing a static (comptime) circuit dispatch supernova program
 
+use ff::PrimeField;
 use program::ProgramOutput;
 
 use super::*;
@@ -116,6 +117,47 @@ fn test_parse_batch_wc() {
 fn test_parse_batch_wasm() {
   let read = std::fs::read("examples/parse_batch_wasm.json").unwrap();
   let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
+
+  let ProgramOutput { recursive_snark, .. } = program::run(&program_data);
+
+  let final_mem = [
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(4),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+    F::<G1>::from(0),
+  ];
+  assert_eq!(&final_mem.to_vec(), recursive_snark.zi_primary());
+}
+
+rust_witness::witness!(parsefoldbatch);
+fn parse_batch_witness(input_json: &str) -> Vec<F<G1>> {
+  parsefoldbatch_witness(serde_json::from_str(input_json))
+    .into_iter()
+    .map(|bigint| F::<G1>::from_str_vartime(&bigint.to_string()).unwrap())
+    .collect()
+}
+
+#[test]
+#[tracing_test::traced_test]
+fn test_parse_batch_rwit() {
+  // let witgen = |input_json: &str|
+  //   parsefoldbatch_witness(serde_json::from_str(input_json))
+  //     .into_iter()
+  //     .map(|bigint| F::<G1>::from_str_vartime(&bigint.to_string()).unwrap())
+  //     .collect::<Vec<F<G1>>()
+  // ;
+
+  let read = std::fs::read("examples/parse_batch_rwit.json").unwrap();
+  let mut program_data: ProgramData = serde_json::from_slice(&read).unwrap();
+  program_data.witness_generator_types =
+    vec![WitnessGeneratorType::RustWitness(parse_batch_witness)];
 
   let ProgramOutput { recursive_snark, .. } = program::run(&program_data);
 

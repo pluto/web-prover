@@ -60,17 +60,13 @@ pub enum R1CSType {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum WitnessGeneratorType {
   #[serde(rename = "wasm")]
-  Wasm {
-    path:      String,
-    wtns_path: String,
-  },
+  Wasm { path: String, wtns_path: String },
   #[serde(rename = "circom-witnesscalc")]
-  CircomWitnesscalc {
-    path: String,
-  },
+  CircomWitnesscalc { path: String },
   #[serde(skip)]
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
-  RustWitness,
+  #[serde(skip)]
+  RustWitness(fn(&str) -> Vec<F<G1>>),
 }
 
 #[cfg(not(target_os = "ios"))]
