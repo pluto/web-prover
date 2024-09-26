@@ -8,18 +8,18 @@ use std::fmt;
 use strum_macros::Display;
 use indexmap::IndexMap;
 
-// TODO: Remove this crate and integrate into the client crate.
+// TODO: Remove this crate and integrate into the client crate & change to crate visibility.
 
 #[derive(Debug, Clone)]
 pub struct DecryptTarget {
-  aes_iv: String,
-  aes_key: String,
-  ciphertext: String,
+  pub aes_iv: String,
+  pub aes_key: String,
+  pub ciphertext: String,
 }
 #[derive(Debug, Clone)]
 pub struct WitnessData {
-  request: DecryptTarget,
-  response: DecryptTarget
+  pub request: DecryptTarget,
+  pub response: DecryptTarget
 }
 
 #[derive(Debug, Clone, Serialize)]
