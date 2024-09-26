@@ -69,8 +69,8 @@ pub struct SignReply {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct SignBody {
-  server_aes_iv:  String,
-  server_aes_key: String,
+  hs_server_aes_iv:  String,
+  hs_server_aes_key: String,
 }
 
 pub async fn sign(
@@ -231,8 +231,8 @@ fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
 }
 
 fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>, ProxyError> {
-  let server_aes_key = BASE64_STANDARD.decode(payload.server_aes_key)?;
-  let server_aes_iv = BASE64_STANDARD.decode(payload.server_aes_iv)?;
+  let server_aes_key = hex::decode(payload.hs_server_aes_key).unwrap();
+  let server_aes_iv = hex::decode(payload.hs_server_aes_iv).unwrap();
 
   let mut cursor = Cursor::new(bytes);
   let mut messages: Vec<Message> = vec![];
@@ -383,7 +383,6 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
               trace!("Unable to decrypt record. Skipping.");
             },
           }
-
           seq += 1;
         }
 
@@ -503,6 +502,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
       match socket_read.read(&mut buf).await {
         Ok(0) => break,
         Ok(n) => {
+          debug!("sending to server len={:?}, data={:?}", n, hex::encode(&buf[..n]));
           tcp_write.write_all(&buf[..n]).await?;
           let mut buffer = request_buf.lock().unwrap();
           buffer.extend_from_slice(&buf[..n]);
@@ -520,6 +520,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
       match tcp_read.read(&mut buf).await {
         Ok(0) => break,
         Ok(n) => {
+          debug!("sending to client len={:?}, data={:?}", n, hex::encode(&buf[..n]));
           socket_write.write_all(&buf[..n]).await?;
           let mut buffer = request_buf.lock().unwrap();
           buffer.extend_from_slice(&buf[..n]);

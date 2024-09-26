@@ -5,19 +5,20 @@ use hyper::{body::Bytes, Request, StatusCode};
 use serde::Serialize;
 use tls_client2::{ClientConnection, RustCryptoBackend, RustCryptoBackend13, ServerName};
 use tls_client_async2::bind_client;
+use tls_proxy2::WitnessData;
 use url::Url;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
-use crate::{config, errors, OrigoProof, Proof};
+use crate::{config, errors, origo::SignBody, OrigoProof, Proof};
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
-  let (server_aes_key, server_aes_iv) = proxy(config.clone(), session_id.clone()).await;
-  crate::origo::sign(config.clone(), session_id.clone(), server_aes_key, server_aes_iv).await
+  let (sb, witness) = proxy(config.clone(), session_id.clone()).await;
+  crate::origo::sign(config.clone(), session_id.clone(), sb, witness).await
 }
 
-async fn proxy(config: config::Config, session_id: String) -> (Vec<u8>, Vec<u8>) {
+async fn proxy(config: config::Config, session_id: String) -> (SignBody, WitnessData) {
   // TODO build sanitized query
   let wss_url = format!(
     "wss://{}:{}/v1/origo?session_id={}&target_host={}&target_port={}",
@@ -80,7 +81,13 @@ async fn proxy(config: config::Config, session_id: String) -> (Vec<u8>, Vec<u8>)
   let server_aes_key =
     origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_key").unwrap().clone();
 
-  (server_aes_key, server_aes_iv)
+  let witness = origo_conn.lock().unwrap().to_witness_data();
+  let sb = SignBody {
+    hs_server_aes_iv:  hex::encode(server_aes_iv.to_vec()),
+    hs_server_aes_key: hex::encode(server_aes_key.to_vec()),
+  };
+
+  (sb, witness)
 }
 
 use core::slice;
