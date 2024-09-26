@@ -14,16 +14,16 @@ use serde::Serialize;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
 use tracing::info;
+use arecibo::{provider::Bn256EngineKZG, supernova::RecursiveSNARK};
 
-#[derive(Debug, Clone, Copy, Serialize)]
-pub struct OrigoProof {
-  // TODO
-}
+
+type OrigoProof<Bn256EngineKZG> = RecursiveSNARK<Bn256EngineKZG>;
 
 #[derive(Debug, Serialize)]
 pub enum Proof {
   TLSN(TlsProof),
-  Origo(OrigoProof),
+  Origo(),
+  // Origo(OrigoProof<Bn256EngineKZG>),
 }
 
 pub async fn prover_inner(config: config::Config) -> Result<Proof, errors::ClientErrors> {
