@@ -4320,6 +4320,8 @@ dependencies = [
  "itertools 0.13.0",
  "num-bigint 0.4.6",
  "num-traits",
+ "paste",
+ "rust-witness",
  "serde",
  "serde_json",
  "tracing",
@@ -4870,6 +4872,19 @@ checksum = "7e2a3bcec1f113553ef1c88aae6c020a369d03d55b58de9869a0908930385091"
 dependencies = [
  "cfg-if",
  "ordered-multimap",
+]
+
+[[package]]
+name = "rust-witness"
+version = "0.1.0"
+source = "git+https://github.com/chancehudson/rust-witness#d1112024889abcb09267eac9d4b302304caea0b8"
+dependencies = [
+ "cc",
+ "fnv",
+ "num-bigint 0.4.6",
+ "num-traits",
+ "paste",
+ "walkdir",
 ]
 
 [[package]]
