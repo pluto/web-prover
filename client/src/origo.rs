@@ -17,11 +17,6 @@ pub async fn sign(
   sb: SignBody,
   witness: WitnessData,
 ) -> Result<crate::Proof, crate::errors::ClientErrors> {
-  // let sb = SignBody {
-  //   server_aes_iv:  String::from_utf8(server_aes_iv.to_vec()).unwrap(),
-  //   server_aes_key: String::from_utf8(server_aes_key.to_vec()).unwrap(),
-  // };
-
   let url = format!(
     "https://{}:{}/v1/origo/sign?session_id={}",
     config.notary_host.clone(),
