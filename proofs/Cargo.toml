@@ -3,6 +3,8 @@ name = "proofs"
 version = "0.1.0"
 edition = "2021"
 
+bin = "src/bin/main.rs"
+
 [dependencies]
 serde = "1.0"
 serde_json = "1.0"

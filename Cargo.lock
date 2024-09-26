@@ -1304,6 +1304,7 @@ dependencies = [
  "p256",
  "parking_lot",
  "pin-project-lite",
+ "proofs",
  "rayon",
  "reqwest",
  "ring 0.17.8",
