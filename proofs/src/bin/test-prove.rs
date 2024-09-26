@@ -1,6 +1,10 @@
 use std::path::PathBuf;
 
 use clap::Parser;
+use proofs::{
+  program::{self},
+  ProgramData,
+};
 // use proofs::{program, ProgramData};
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -39,8 +43,8 @@ failed",
 
   // Read in the supernova program data
   let file = args.input_file;
-  // info!("Using file: {:?}", file);
-  // let read = std::fs::read(file).unwrap();
-  // let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
-  // program::run(&program_data);
+  info!("Using file: {:?}", file);
+  let read = std::fs::read(file).unwrap();
+  let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
+  program::run(&program_data);
 }
