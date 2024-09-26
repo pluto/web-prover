@@ -6,6 +6,8 @@ use tracing::debug;
 use proofs::{ProgramData, program, WitnessGeneratorType};
 use std::path::PathBuf;
 use std::collections::HashMap;
+use tls_client2::{Decrypter2, ProtocolVersion, CipherSuite};
+use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
 
 use crate::errors;
 
@@ -62,10 +64,27 @@ pub async fn generate_proof(witness: WitnessData) -> Result<(), errors::ClientEr
   // let thing2 = witness.response;
 
   let mut private_input = HashMap::new();
+  let key: [u8; 16] = serde_json::from_str(&witness.request.aes_key).unwrap();
+  let iv: [u8; 12] = serde_json::from_str(&witness.request.aes_iv).unwrap();
+  let ct: [u8; 16] = serde_json::from_str(&witness.request.ciphertext).unwrap();
   private_input.insert("key".to_string(), serde_json::Value::String(witness.request.aes_key.clone()));
   private_input.insert("iv".to_string(), serde_json::Value::String(witness.request.aes_iv.clone()));
-  // private_input.insert("aad".to_string(), witness.request.aad.clone());
-  // TODO(WJ 2024-09-26): to get the aad i need to grab it from the origo connection struct.
+  // TODO(WJ 2024-09-26): to get the aad i need to grab it from the origo connection struct
+  // need to think about how to get plaintext
+
+  let dec = Decrypter2::new(key, iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
+  let (plaintext, meta) = dec.decrypt_tls13_aes(&OpaqueMessage{
+      typ: ContentType::ApplicationData,
+      version: ProtocolVersion::TLSv1_2,
+      payload:  Payload::new(ct)
+  }, 0).unwrap();
+  let pt = plaintext.payload.0.to_vec();
+  let pt_as_values: Vec<serde_json::Value> = pt.into_iter().map(serde_json::Value::from).collect();
+
+  let aad = meta.additional_data.as_str().to_owned();
+
+  private_input.insert("plaintext".to_string(), serde_json::Value::Array(pt_as_values.clone()));
+  private_input.insert("aad".to_string(), serde_json::Value::String(aad.clone()));
 
   let program_data = ProgramData {
     r1cs_paths: vec![PathBuf::from(AES_GCM_FOLD_R1CS)],
@@ -74,6 +93,7 @@ pub async fn generate_proof(witness: WitnessData) -> Result<(), errors::ClientEr
     initial_public_input: vec![0; 64],
     private_input,
   };
+
   // private input is the key and iv, and the fold input: plaintext, and aad.
   // initial public inpute in the example file is a vec of 64 0s.
 
