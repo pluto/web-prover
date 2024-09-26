@@ -86,6 +86,7 @@ pub async fn generate_proof(witness: WitnessData) -> Result<RecursiveSNARK<Bn256
   let pt = plaintext.payload.0.to_vec();
   let aad = meta.additional_data.as_str().to_owned();
 
+  // this somehow needs to be nested in this hashmap of values to be under another key called "fold_input"
   private_input.insert("plainText".to_string(), serde_json::to_value(&pt).unwrap());
   private_input.insert("aad".to_string(), serde_json::to_value(&aad).unwrap());
 
