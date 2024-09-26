@@ -1,8 +1,9 @@
 // logic common to wasm32 and native
 
-use tls_proxy2::WitnessData;
 use serde::Serialize;
+use tls_proxy2::WitnessData;
 use tracing::debug;
+
 use crate::errors;
 
 #[derive(Serialize)]
@@ -43,7 +44,7 @@ pub async fn sign(
   println!("\n{}\n\n", String::from_utf8(response.bytes().await.unwrap().to_vec()).unwrap());
 
   let r = generate_proof(witness).await.unwrap();
-  
+
   Ok(crate::Proof::Origo(crate::OrigoProof {})) // TODO
 }
 

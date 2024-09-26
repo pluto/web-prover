@@ -3,12 +3,11 @@ use std::sync::Arc;
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
+use tls_proxy2::WitnessData;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
-use tls_proxy2::WitnessData;
 
-use crate::{config, errors, Proof};
-use crate::origo::SignBody;
+use crate::{config, errors, origo::SignBody, Proof};
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
@@ -128,7 +127,10 @@ async fn proxy(config: config::Config, session_id: String) -> (SignBody, Witness
     origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_key").unwrap().clone();
 
   let witness = origo_conn.lock().unwrap().to_witness_data();
-  let sb = SignBody { hs_server_aes_iv: hex::encode(server_aes_iv.to_vec()), hs_server_aes_key: hex::encode(server_aes_key.to_vec()) };
+  let sb = SignBody {
+    hs_server_aes_iv:  hex::encode(server_aes_iv.to_vec()),
+    hs_server_aes_key: hex::encode(server_aes_key.to_vec()),
+  };
 
   (sb, witness)
 }
