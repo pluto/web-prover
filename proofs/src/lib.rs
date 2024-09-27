@@ -1,27 +1,22 @@
 #![feature(internal_output_capture)]
+use arecibo::{
+  provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
+  spartan::batched::BatchedRelaxedR1CSSNARK,
+  traits::{circuit::TrivialCircuit, Engine, Group},
+};
+use std::{collections::HashMap, path::PathBuf};
+use ff::Field;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::HashMap, path::PathBuf};
-use tracing::{trace, info, debug};
-use ff::Field;
+use tracing::{debug, info, error, trace};
 
-use arecibo::{
-    provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
-    spartan::batched::BatchedRelaxedR1CSSNARK,
-    traits::{circuit::TrivialCircuit, Engine, Group},
-  };
+use circom::CircomCircuit;
+use compress::CompressedVerifier;
 
 pub mod circom;
 pub mod compress;
 pub mod program;
-#[cfg(test)] pub mod tests;
-
-use circom::CircomCircuit;
-use compress::CompressedVerifier;
-use ff::Field;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use tracing::{debug, error, info, trace};
+pub mod tests;
 
 use crate::tests::{
   ADD_INTO_ZEROTH_GRAPH, ADD_INTO_ZEROTH_R1CS, INIT_PUBLIC_INPUT, ROM, SQUARE_ZEROTH_GRAPH,
