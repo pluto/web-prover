@@ -1321,7 +1321,6 @@ dependencies = [
  "tls-client",
  "tls-client-async",
  "tls-core",
- "tls-proxy",
  "tlsn-core",
  "tlsn-prover",
  "tlsn-tls-client",
@@ -5753,6 +5752,7 @@ dependencies = [
  "futures",
  "hex",
  "hmac",
+ "indexmap 1.9.3",
  "log",
  "p256",
  "rand 0.8.5",
@@ -5761,10 +5761,13 @@ dependencies = [
  "rustls-pemfile 1.0.4",
  "rustversion",
  "sct",
+ "serde",
+ "serde_json",
  "sha2",
+ "strum_macros",
  "tls-backend",
  "tls-core",
- "tls-proxy",
+ "tls-parser",
  "tokio",
  "web-time 0.2.4",
  "webpki",
@@ -5819,19 +5822,6 @@ dependencies = [
  "phf",
  "phf_codegen",
  "rusticata-macros",
-]
-
-[[package]]
-name = "tls-proxy"
-version = "1.0.1"
-dependencies = [
- "hex",
- "indexmap 1.9.3",
- "serde",
- "serde_json",
- "strum_macros",
- "tls-core",
- "tls-parser",
 ]
 
 [[package]]
@@ -6958,9 +6948,7 @@ dependencies = [
 name = "webprover"
 version = "0.0.0"
 dependencies = [
- "form_urlencoded",
  "futures-util",
- "hex",
  "http-body-util",
  "hyper 1.4.1",
  "hyper-util",
@@ -6969,7 +6957,6 @@ dependencies = [
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.26.0",
- "tokio-tungstenite",
 ]
 
 [[package]]

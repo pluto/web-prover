@@ -32,6 +32,6 @@ async fn main() -> Result<()> {
   let config: Config = serde_json::from_str(&config_json)?;
 
   let proof = client::prover_inner(config).await.unwrap();
-  let proof_json = serde_json::to_string_pretty(&proof)?;
+  let _proof_json = serde_json::to_string_pretty(&proof)?;
   Ok(())
 }

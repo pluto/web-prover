@@ -1,3 +1,4 @@
+
 use std::collections::HashMap;
 use serde::Serialize;
 // Use tls_parser types for convenient display methods
@@ -45,13 +46,13 @@ impl RecordMeta {
   }
 }
 
-#[derive(Display, Clone, PartialEq, Eq)]
+#[derive(Display, Clone, PartialEq, Eq, Debug)]
 pub enum Direction {
     Sent,
     Received
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct RecordKey {
     direction: Direction,
     content_type: TlsRecordType,

@@ -1,14 +1,10 @@
 // logic common to wasm32 and native
-
-use std::{collections::HashMap, path::PathBuf};
-
 use arecibo::{provider::Bn256EngineKZG, supernova::RecursiveSNARK};
-use proofs::{program, ProgramData, WitnessGeneratorType};
+use proofs::program;
 use serde::Serialize;
 use serde_json::json;
-use tls_client2::{CipherSuite, Decrypter2, ProtocolVersion};
-use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
-use tls_proxy2::WitnessData;
+use tls_client2::{origo::WitnessData, CipherSuite, Decrypter2, ProtocolVersion};
+use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
 use tracing::debug;
 
 use crate::errors;
@@ -35,8 +31,6 @@ pub async fn sign(
     config.notary_port.clone(),
     session_id.clone(),
   );
-
-  let client = reqwest::ClientBuilder::new().build().unwrap();
 
   #[cfg(feature = "notary_ca_cert")]
   // TODO: recheck use of rustls backend
@@ -102,7 +96,7 @@ pub async fn generate_proof(
       {
           "wasm": {
               "path": AES_GCM_FOLD_WASM,
-              "wtns_path": "witness.wtns"
+              "wtns_path": AES_GCM_FOLD_WTNS
           }
       }
     ],
@@ -111,6 +105,6 @@ pub async fn generate_proof(
   });
 
   let program_data = serde_json::from_value(private_input).unwrap();
-  let (params, proof) = program::run(&program_data);
+  let (_params, proof) = program::run(&program_data);
   Ok(proof)
 }

@@ -3,10 +3,11 @@ use std::sync::Arc;
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
-use tls_proxy2::WitnessData;
+use tls_client2::origo::{OrigoConnection, WitnessData};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
+// {OrigoConnection, WitnessData};
 use crate::{config, errors, origo::SignBody, Proof};
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
@@ -23,7 +24,7 @@ async fn proxy(config: config::Config, session_id: String) -> (SignBody, Witness
     .with_root_certificates(root_store)
     .with_no_client_auth();
 
-  let origo_conn = Arc::new(std::sync::Mutex::new(tls_proxy2::OrigoConnection::new()));
+  let origo_conn = Arc::new(std::sync::Mutex::new(OrigoConnection::new()));
   let client = tls_client2::ClientConnection::new(
     Arc::new(client_config),
     Box::new(tls_client2::RustCryptoBackend13::new(origo_conn.clone())),
@@ -86,7 +87,7 @@ async fn proxy(config: config::Config, session_id: String) -> (SignBody, Witness
     tls_client_async2::bind_client(notary_tls_socket.compat(), client);
 
   // TODO: What do with tls_fut? what do with tls_receiver?
-  let (tls_sender, tls_receiver) = oneshot::channel();
+  let (tls_sender, _tls_receiver) = oneshot::channel();
   let handled_tls_fut = async {
     let result = tls_fut.await;
     // Triggered when the server shuts the connection.

@@ -1,4 +1,4 @@
-use super::{Backend, BackendError};
+use super::{origo::OrigoConnection, Backend, BackendError};
 use crate::{DecryptMode, EncryptMode, Error};
 use aes_gcm::{
     aead::{generic_array::GenericArray, Aead, NewAead, Payload},
@@ -23,8 +23,6 @@ use tls_core::{
     prf::prf,
     suites::{self, SupportedCipherSuite},
 };
-
-use tls_proxy::{self, OrigoConnection};
 
 /// Implementation of TLS backend using RustCrypto primitives
 pub struct RustCryptoBackend {
