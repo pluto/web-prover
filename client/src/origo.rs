@@ -92,21 +92,28 @@ pub async fn generate_proof(witness: WitnessData) -> Result<RecursiveSNARK<Bn256
   private_input.insert("aad".to_string(), serde_json::to_value(&aad).unwrap());
 
   let private_input = json!({
+    "private_input": {
       "key": sized_key,
       "iv": sized_iv,
       "fold_input": {
         "plainText": pt,
       },
       "aad": aad
+    },
+    "r1cs_paths": [AES_GCM_FOLD_R1CS],
+    "witness_generator_types": [
+      {
+          "wasm": {
+              "path": AES_GCM_FOLD_WASM,
+              "wtns_path": "witness.wtns"
+          }
+      }
+    ],
+    "rom": vec![0; 64],
+    "initial_public_input": vec![0; 64],
   });
 
-  let program_data = ProgramData {
-    r1cs_paths: vec![PathBuf::from(AES_GCM_FOLD_R1CS)],
-    witness_generator_types: vec![WitnessGeneratorType::Wasm{path: AES_GCM_FOLD_WASM.to_string(), wtns_path: AES_GCM_FOLD_WTNS.to_string()}],
-    rom: vec![0; 64],
-    initial_public_input: vec![0; 64],
-    private_input: serde_json::from_value(private_input).unwrap()
-  };
+  let program_data = serde_json::from_value(private_input).unwrap();
 
   let (params, proof) = program::run(&program_data);
   debug!("data={:?}", proof);
