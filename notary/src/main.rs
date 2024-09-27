@@ -49,8 +49,8 @@ struct SharedState {
 
 #[derive(Debug, Clone)]
 struct OrigoSession {
-  request:   Vec<u8>,
-  timestamp: SystemTime,
+  request:    Vec<u8>,
+  _timestamp: SystemTime,
 }
 
 #[tokio::main]
