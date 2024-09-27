@@ -1,22 +1,20 @@
 #![feature(internal_output_capture)]
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use tracing::{trace, info, debug};
-use ff::Field;
+use std::{collections::HashMap, path::PathBuf};
 
 use arecibo::{
-    provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
-    spartan::batched::BatchedRelaxedR1CSSNARK,
-    traits::{circuit::TrivialCircuit, Engine, Group},
-  };
+  provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
+  spartan::batched::BatchedRelaxedR1CSSNARK,
+  traits::{circuit::TrivialCircuit, Engine, Group},
+};
+use ff::Field;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use tracing::{debug, info, trace};
 
 pub mod circom;
 pub mod compress;
 pub mod program;
 #[cfg(test)] pub mod tests;
-
 
 pub type E1 = Bn256EngineKZG;
 pub type E2 = GrumpkinEngine;
@@ -31,8 +29,6 @@ pub type F<G> = <G as Group>::Scalar;
 
 pub type C1 = circom::CircomCircuit;
 pub type C2 = TrivialCircuit<F<G2>>;
-
-
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum WitnessGeneratorType {

@@ -164,12 +164,6 @@ pub fn run(program_data: &ProgramData) -> (PublicParams<E1>, RecursiveSNARK<E1>)
     recursive_snark.prove_step(&public_params, &circuit_primary, &circuit_secondary).unwrap();
     info!("Single step proof took: {:?}", start.elapsed());
 
-    // TODO: I don't think we really need to do this, we can just verify compressed proof
-    info!("Verifying single step...");
-    let start = Instant::now();
-    recursive_snark.verify(&public_params, &z0_primary, &z0_secondary).unwrap();
-    info!("Single step verification took: {:?}", start.elapsed());
-
     // Update everything now for next step
     next_public_input = recursive_snark.zi_primary().clone();
     next_public_input.truncate(circuit_primary.arity());

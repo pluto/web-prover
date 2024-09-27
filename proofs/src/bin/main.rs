@@ -1,11 +1,9 @@
+use std::path::PathBuf;
 
 use clap::Parser;
 use proofs::{program, ProgramData};
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
-use std::path::PathBuf;
-
-
 
 #[derive(Parser, Debug)]
 #[command(name = "prove")]

@@ -1,21 +1,19 @@
 // logic common to wasm32 and native
 
+use std::{collections::HashMap, path::PathBuf};
+
+use arecibo::{provider::Bn256EngineKZG, supernova::RecursiveSNARK};
+use proofs::{program, ProgramData, WitnessGeneratorType};
 use serde::Serialize;
 use serde_json::json;
+use tls_client2::{CipherSuite, Decrypter2, ProtocolVersion};
+use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
 use tls_proxy2::WitnessData;
 use tracing::debug;
-use proofs::{ProgramData, program, WitnessGeneratorType};
-use std::path::PathBuf;
-use std::collections::HashMap;
-use tls_client2::{Decrypter2, ProtocolVersion, CipherSuite};
-use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
-use arecibo::supernova::RecursiveSNARK;
-use arecibo::provider::Bn256EngineKZG;
 
 use crate::errors;
 
-const AES_GCM_FOLD_R1CS: &str = "proofs/examples/circuit_data/aes-gcm-fold.r1cs"; 
-
+const AES_GCM_FOLD_R1CS: &str = "proofs/examples/circuit_data/aes-gcm-fold.r1cs";
 const AES_GCM_FOLD_WASM: &str = "proofs/examples/circuit_data/aes-gcm-fold_js/aes-gcm-fold.wasm";
 const AES_GCM_FOLD_WTNS: &str = "witness.wtns";
 
@@ -61,8 +59,9 @@ pub async fn sign(
   Ok(crate::Proof::Origo(r))
 }
 
-pub async fn generate_proof(witness: WitnessData) -> Result<RecursiveSNARK<Bn256EngineKZG>, errors::ClientErrors> {
-
+pub async fn generate_proof(
+  witness: WitnessData,
+) -> Result<RecursiveSNARK<Bn256EngineKZG>, errors::ClientErrors> {
   debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
   debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
 
@@ -74,11 +73,16 @@ pub async fn generate_proof(witness: WitnessData) -> Result<RecursiveSNARK<Bn256
   let sized_iv: [u8; 12] = iv[..12].try_into().unwrap();
 
   let dec = Decrypter2::new(sized_key, sized_iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
-  let (plaintext, meta) = dec.decrypt_tls13_aes(&OpaqueMessage{
-      typ: ContentType::ApplicationData,
-      version: ProtocolVersion::TLSv1_3,
-      payload:  Payload::new(hex::decode(ct).unwrap())
-  }, 0).unwrap();
+  let (plaintext, meta) = dec
+    .decrypt_tls13_aes(
+      &OpaqueMessage {
+        typ:     ContentType::ApplicationData,
+        version: ProtocolVersion::TLSv1_3,
+        payload: Payload::new(hex::decode(ct).unwrap()),
+      },
+      0,
+    )
+    .unwrap();
   let pt = plaintext.payload.0.to_vec();
   let mut aad = hex::decode(meta.additional_data).unwrap();
   aad.resize(16, 0);
