@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use hex;
 use serde::Serialize;
 // Use tls_parser types for convenient display methods
 use tls_parser::{TlsRecordType, TlsHandshakeType};
@@ -68,7 +67,7 @@ impl RecordKey {
             None
         };
         
-        return RecordKey {
+        RecordKey {
             direction: d,
             content_type: TlsRecordType(ct.get_u8()),
             handshake_type: hst,
@@ -88,26 +87,16 @@ impl fmt::Display for RecordKey {
     }
 }
 
-pub fn hex_bytes_to_string(bytes: Vec<u8>) -> String {
-    bytes.iter()
-          .map(|b| format!("{:02x}", b))
-          .collect()
-}
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct OrigoConnection {
     pub secret_map: HashMap<String, Vec<u8>>,
     pub record_map: IndexMap<String, RecordMeta>,
 }
 
 impl OrigoConnection {
-    pub fn new() -> OrigoConnection {
-        return {
-            OrigoConnection {
-                secret_map: HashMap::new(),
-                record_map: IndexMap::default(),
-            }
-        };
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn insert_record(&mut self, record_key: RecordKey, record_meta: RecordMeta) {
@@ -124,7 +113,7 @@ impl OrigoConnection {
         let req_key = RecordKey::new(Direction::Sent, ContentType::ApplicationData, 0, 0u8).to_string();
         let resp_key = RecordKey::new(Direction::Received, ContentType::ApplicationData, 1, 0u8).to_string();
 
-        return WitnessData {
+        WitnessData {
             request: DecryptTarget {
                 aes_iv: self.secret_map.get("Application:client_aes_iv").unwrap().to_vec(),
                 aes_key: self.secret_map.get("Application:client_aes_key").unwrap().to_vec(),
