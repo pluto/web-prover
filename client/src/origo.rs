@@ -69,14 +69,9 @@ pub async fn generate_proof(witness: WitnessData) -> Result<RecursiveSNARK<Bn256
   let key: &[u8] = &witness.request.aes_key;
   let iv: &[u8] = &witness.request.aes_iv;
 
-  let mut private_input = HashMap::new();
-
   let ct: &[u8] = witness.request.ciphertext.as_bytes();
   let sized_key: [u8; 16] = key[..16].try_into().unwrap();
   let sized_iv: [u8; 12] = iv[..12].try_into().unwrap();
-
-  private_input.insert("key".to_string(), serde_json::to_value(&sized_key).unwrap());
-  private_input.insert("iv".to_string(), serde_json::to_value(&sized_iv).unwrap());
 
   let dec = Decrypter2::new(sized_key, sized_iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
   let (plaintext, meta) = dec.decrypt_tls13_aes(&OpaqueMessage{
@@ -85,11 +80,9 @@ pub async fn generate_proof(witness: WitnessData) -> Result<RecursiveSNARK<Bn256
       payload:  Payload::new(hex::decode(ct).unwrap())
   }, 0).unwrap();
   let pt = plaintext.payload.0.to_vec();
-  let aad = meta.additional_data.as_str().to_owned();
-
-  // this somehow needs to be nested in this hashmap of values to be under another key called "fold_input"
-  private_input.insert("plainText".to_string(), serde_json::to_value(&pt).unwrap());
-  private_input.insert("aad".to_string(), serde_json::to_value(&aad).unwrap());
+  let mut aad = hex::decode(meta.additional_data).unwrap();
+  aad.resize(16, 0);
+  let rom_len = pt.len() / 16;
 
   let private_input = json!({
     "private_input": {
@@ -109,14 +102,11 @@ pub async fn generate_proof(witness: WitnessData) -> Result<RecursiveSNARK<Bn256
           }
       }
     ],
-    "rom": vec![0; 64],
-    "initial_public_input": vec![0; 64],
+    "rom": vec![0; rom_len],
+    "initial_public_input": vec![0; 48],
   });
 
   let program_data = serde_json::from_value(private_input).unwrap();
-
   let (params, proof) = program::run(&program_data);
-  debug!("data={:?}", proof);
-
   Ok(proof)
 }
