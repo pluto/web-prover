@@ -32,6 +32,8 @@ pub async fn sign(
     session_id.clone(),
   );
 
+  let client = reqwest::ClientBuilder::new().build().unwrap();
+
   #[cfg(feature = "notary_ca_cert")]
   // TODO: recheck use of rustls backend
   let client = reqwest::ClientBuilder::new()
