@@ -14,14 +14,20 @@ pub enum ProxyError {
   #[error(transparent)]
   TlsBackend(#[from] tls_backend::BackendError),
 
+  #[error(transparent)]
+  InvalidDnsName(#[from] rustls::pki_types::InvalidDnsNameError),
+
+  #[error(transparent)]
+  RustTls(#[from] rustls::Error),
+
   #[error("unable to parse record! position={position:?}, remaining={remaining:?}, e={e:?}")]
   TlsParser { position: u64, remaining: usize, e: String },
 
   #[error("{0}")]
   TlsHandshakeExtract(String),
 
-  #[error("Error occurred during Sign: {0}")]
-  Sign(Box<dyn std::error::Error + Send + 'static>),
+  #[error("Error occurred during sign: {0}")]
+  Sign(String),
 }
 
 impl IntoResponse for ProxyError {

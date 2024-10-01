@@ -10,12 +10,16 @@ use axum::{
   response::Response,
   Json,
 };
-use base64::{prelude::BASE64_STANDARD, Engine};
 use hex;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use nom::{bytes::streaming::take, IResult};
 use rs_merkle::{Hasher, MerkleTree};
+use rustls::{
+  client::verify_server_name,
+  pki_types::{CertificateDer, DnsName, ServerName},
+  server::ParsedCertificate,
+};
 use serde::{Deserialize, Serialize};
 use tls_client2::{
   hash_hs::HandshakeHashBuffer,
@@ -27,7 +31,7 @@ use tls_client2::{
       enums::Compression,
       handshake::{
         ClientExtension, ClientHelloPayload, HandshakeMessagePayload, HandshakePayload, Random,
-        ServerExtension, ServerHelloPayload, SessionID,
+        ServerExtension, ServerHelloPayload, ServerNamePayload, SessionID,
       },
       message::{Message, MessagePayload, OpaqueMessage},
     },
@@ -86,11 +90,29 @@ pub async fn sign(
     handshake_hash_buffer.start_hash(&tls_client2::tls_core::suites::HashAlgorithm::SHA256);
   let mut server_certificate: Certificate = Certificate(vec![]);
 
+  let mut sni_dns_name = Vec::new();
+
   for msg in messages {
     match msg.payload {
       MessagePayload::Handshake(ref handshake) => match handshake.payload {
-        HandshakePayload::ClientHello(_) => {
+        HandshakePayload::ClientHello(ref client_hello_payload) => {
           debug!("ClientHello");
+
+          // get ClientHello server name from SNI extension
+          for extension in &client_hello_payload.extensions {
+            match extension {
+              ClientExtension::ServerName(server_name) => {
+                let dns_name = match &server_name[0].payload {
+                  ServerNamePayload::HostName((_, dns_name)) => dns_name,
+                  _ =>
+                    return Err(ProxyError::Sign("unknown client hello SNI extension".to_string())),
+                };
+                sni_dns_name = dns_name.as_ref().as_ref().to_vec();
+              },
+              _ => {},
+            }
+          }
+
           transcript.add_message(&msg);
         },
         HandshakePayload::ServerHello(_) => {
@@ -116,7 +138,7 @@ pub async fn sign(
             &digitally_signed_struct,
           ) {
             Ok(_) => (),
-            Err(e) => return Err(ProxyError::Sign(Box::new(e))),
+            Err(e) => return Err(ProxyError::Sign(e.to_string())),
           };
         },
         HandshakePayload::EncryptedExtensions(_) => {
@@ -163,7 +185,21 @@ pub async fn sign(
   }
 
   // TODO check OSCP and CT (maybe)
-  // TODO check target_name matches SNI and/or cert name (let's discuss)
+
+  // verify SNI name matches target host
+  if *state.target_host.lock().unwrap().as_bytes() != sni_dns_name {
+    return Err(ProxyError::Sign(String::from("ClientHello SNI does not match target host")));
+  }
+
+  // verify certificate name matches target host
+  let cert = CertificateDer::from_slice(&server_certificate.0);
+  let parsed_certificate = ParsedCertificate::try_from(&cert)?;
+  let dns_name = DnsName::try_from(state.target_host.lock().unwrap().clone())?;
+  let server_name = ServerName::DnsName(dns_name);
+
+  // TODO: this only verifies the name and should be used in conjunction with more verification
+  // like [verify_server_cert_signed_by_trust_anchor]
+  verify_server_name(&parsed_certificate, &server_name)?;
 
   let leaves: Vec<String> = vec!["request".to_string(), "response".to_string()]; // TODO
 
@@ -422,6 +458,9 @@ pub async fn proxy(
   let session_id = query.session_id.clone();
 
   info!("Starting notarize with ID: {}", session_id);
+
+  // add target host to shared state
+  *state.target_host.lock().unwrap() = query.target_host.clone();
 
   match protocol_upgrade {
     ProtocolUpgrade::Ws(ws) => ws.on_upgrade(move |socket| {

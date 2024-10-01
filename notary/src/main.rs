@@ -45,6 +45,7 @@ struct SharedState {
   tlsn_max_sent_data: usize,
   tlsn_max_recv_data: usize,
   origo_sessions:     Arc<Mutex<HashMap<String, OrigoSession>>>,
+  target_host:        Arc<Mutex<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -73,6 +74,7 @@ async fn main() {
     tlsn_max_sent_data: c.tlsn_max_sent_data,
     tlsn_max_recv_data: c.tlsn_max_recv_data,
     origo_sessions:     Default::default(),
+    target_host:        Default::default(),
   });
 
   let router = Router::new()
