@@ -8,9 +8,9 @@ use hyper_util::{
 };
 use pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::ServerConfig;
+use serde_json::json;
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
-use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -67,7 +67,8 @@ async fn response(
       Response::builder()
         .status(200)
         .header("Content-Type", "application/json")
-        .body(Full::new(Bytes::from(data.to_string()))).unwrap()
+        .body(Full::new(Bytes::from(data.to_string())))
+        .unwrap(),
     ),
     "/bin/128B" => Ok(Response::new(Full::new(Bytes::from(vec![0; 128])))),
     "/bin/1KB" => Ok(Response::new(Full::new(Bytes::from(vec![0; 1024])))),

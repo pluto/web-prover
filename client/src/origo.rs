@@ -50,6 +50,6 @@ pub async fn sign(
   // TODO: Actually use this input in the proofs. 
   let sign_response = response.bytes().await.unwrap().to_vec();
   println!("\n{}\n\n", String::from_utf8(sign_response.clone()).unwrap());
-  
+
   Ok(sign_response)
 }

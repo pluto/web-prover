@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+
 use base64::prelude::*;
 use http_body_util::Full;
 use hyper::{body::Bytes, Request};
@@ -14,13 +15,13 @@ pub enum NotaryMode {
 #[derive(Deserialize, Clone, Debug)]
 pub struct Witness {
   #[serde(with = "serde_bytes")]
-  pub val: Vec<u8>
+  pub val: Vec<u8>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct ProvingData {
   #[serde(with = "serde_bytes")]
-  pub r1cs: Vec<u8>,
+  pub r1cs:      Vec<u8>,
   pub witnesses: Vec<Witness>,
 }
 #[derive(Deserialize, Clone, Debug)]

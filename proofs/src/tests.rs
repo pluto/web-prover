@@ -20,12 +20,12 @@ const INIT_PUBLIC_INPUT: [u64; 2] = [1, 2];
 
 fn run_entry() -> (PublicParams<E1>, RecursiveSNARK<E1>) {
   let program_data = ProgramData {
-    r1cs_paths: Some(vec![
+    r1cs_paths:              Some(vec![
       PathBuf::from(ADD_INTO_ZEROTH_R1CS),
       PathBuf::from(SQUARE_ZEROTH_R1CS),
       PathBuf::from(SWAP_MEMORY_R1CS),
     ]),
-    r1cs_data: None,
+    r1cs_data:               None,
     witness_generator_types: vec![
       WitnessGeneratorType::Raw(ADD_INTO_ZEROTH_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(SQUARE_ZEROTH_GRAPH.to_vec()),

@@ -1,32 +1,35 @@
-use std::sync::Arc;
+use std::{
+  collections::HashMap,
+  io::{BufReader, Cursor},
+  path::PathBuf,
+  sync::Arc,
+};
 
+use arecibo::{provider::Bn256EngineKZG, supernova::RecursiveSNARK};
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::{body::Bytes, Request, StatusCode};
+use proofs::{
+  circom::witness::load_witness_from_bin_reader, program, ProgramData, WitnessGeneratorType,
+};
 use serde::Serialize;
-use tls_client2::{ClientConnection, RustCryptoBackend, RustCryptoBackend13, ServerName, origo::WitnessData};
+use serde_json::json;
+use tls_client2::{
+  CipherSuite, ClientConnection, Decrypter2, ProtocolVersion, RustCryptoBackend,
+  RustCryptoBackend13, ServerName, origo::WitnessData
+};
 use tls_client_async2::bind_client;
+use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
+use tracing::debug;
 use url::Url;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
-use tracing::debug;
-use tls_client2::{Decrypter2, ProtocolVersion, CipherSuite};
-use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
-use arecibo::supernova::{RecursiveSNARK};
-use std::io::{Cursor, BufReader};
-use proofs::circom::witness::load_witness_from_bin_reader;
-use arecibo::provider::Bn256EngineKZG;
-use proofs::{ProgramData, program, WitnessGeneratorType};
-use std::path::PathBuf;
-use std::collections::HashMap;
-use crate::config::ProvingData;
-use serde_json::json;
 
-use crate::{config, errors, origo::SignBody, OrigoProof, Proof};
+use crate::{config, config::ProvingData, errors, origo::SignBody, OrigoProof, Proof};
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
   let (sb, witness) = proxy(config.clone(), session_id.clone()).await;
-  
+
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
   let program_data = generate_program_data(&witness, config.proving).await;
 
@@ -54,19 +57,25 @@ async fn generate_program_data(witness: &WitnessData, proving: ProvingData) -> P
   private_input.insert("iv".to_string(), serde_json::to_value(&sized_iv).unwrap());
 
   let dec = Decrypter2::new(sized_key, sized_iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
-  let (plaintext, meta) = dec.decrypt_tls13_aes(&OpaqueMessage{
-      typ: ContentType::ApplicationData,
-      version: ProtocolVersion::TLSv1_3,
-      payload:  Payload::new(hex::decode(ct).unwrap())
-  }, 0).unwrap();
+  let (plaintext, meta) = dec
+    .decrypt_tls13_aes(
+      &OpaqueMessage {
+        typ:     ContentType::ApplicationData,
+        version: ProtocolVersion::TLSv1_3,
+        payload: Payload::new(hex::decode(ct).unwrap()),
+      },
+      0,
+    )
+    .unwrap();
   let pt = plaintext.payload.0.to_vec();
   let aad = hex::decode(meta.additional_data.to_owned()).unwrap();
-  let mut padded_aad = vec![0; 16-aad.len()];
+  let mut padded_aad = vec![0; 16 - aad.len()];
   padded_aad.extend(aad);
 
-  // this somehow needs to be nested in this hashmap of values to be under another key called "fold_input"
-  // private_input.insert("plainText".to_string(), serde_json::to_value(&pt).unwrap());
-  // private_input.insert("aad".to_string(), serde_json::to_value(&aad).unwrap());
+  // this somehow needs to be nested in this hashmap of values to be under another key called
+  // "fold_input" private_input.insert("plainText".to_string(),
+  // serde_json::to_value(&pt).unwrap()); private_input.insert("aad".to_string(),
+  // serde_json::to_value(&aad).unwrap());
 
   // TODO: Is padding the approach we want or change to support variable length?
   let janky_padding = pt.len() % 16;
@@ -79,7 +88,7 @@ async fn generate_program_data(witness: &WitnessData, proving: ProvingData) -> P
     witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w.val))));
   }
 
-  let private_input  = json!({
+  let private_input = json!({
     "private_input": {
       "key": sized_key,
       "iv": sized_iv,
@@ -94,7 +103,7 @@ async fn generate_program_data(witness: &WitnessData, proving: ProvingData) -> P
     "initial_public_input": vec![0; 48], // TODO: Feed in correct data.
     "witnesses": witnesses,
   });
-  
+
   serde_json::from_value(private_input).unwrap()
 }
 

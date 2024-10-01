@@ -9,12 +9,12 @@ pub fn generate_witness_from_generator_type(
   match witness_generator_type {
     WitnessGeneratorType::Browser => {
       panic!("browser type witness generation cannot be generated in process")
-    }
+    },
     WitnessGeneratorType::Wasm { path, wtns_path } =>
       generate_witness_from_wasm_file(input_json, &PathBuf::from(path), &PathBuf::from(wtns_path)),
     WitnessGeneratorType::CircomWitnesscalc { path } =>
       generate_witness_from_witnesscalc_file(input_json, &PathBuf::from(path)),
-    
+
     WitnessGeneratorType::Raw(graph_data) => generate_witness_from_graph(input_json, graph_data),
   }
 }
@@ -23,13 +23,14 @@ pub fn generate_witness_from_graph(
   input_json: &str,
   graph_data: &[u8],
 ) -> Vec<<G1 as Group>::Scalar> {
-  #[cfg(not(target_arch = "wasm32"))] {
+  #[cfg(not(target_arch = "wasm32"))]
+  {
     let witness = circom_witnesscalc::calc_witness(input_json, graph_data).unwrap();
 
     return witness
       .iter()
       .map(|elem| <F<G1> as PrimeField>::from_str_vartime(elem.to_string().as_str()).unwrap())
-      .collect()
+      .collect();
   }
 
   todo!("circom_witnesscalc not supported in wasm");
@@ -39,20 +40,20 @@ pub fn generate_witness_from_witnesscalc_file(
   witness_input_json: &str,
   graph_path: &PathBuf,
 ) -> Vec<F<G1>> {
-  #[cfg(not(target_arch = "wasm32"))] {
+  #[cfg(not(target_arch = "wasm32"))]
+  {
     let mut file = std::fs::File::open(graph_path).unwrap();
     let mut graph_data = Vec::new();
     file.read_to_end(&mut graph_data).unwrap();
-    
+
     let witness = circom_witnesscalc::calc_witness(witness_input_json, &graph_data).unwrap();
     return witness
       .iter()
       .map(|elem| <F<G1> as PrimeField>::from_str_vartime(elem.to_string().as_str()).unwrap())
-      .collect()
+      .collect();
   }
 
   todo!("circom_witnesscalc not supported in wasm");
-  
 }
 
 pub fn generate_witness_from_wasm_file(
