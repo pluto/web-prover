@@ -1,0 +1,14 @@
+[package]
+name   ="nw_connection"
+version="0.1.0"
+edition="2021"
+
+[dependencies]
+cidre={ git="https://github.com/yury/cidre", rev="6c65bb624c7e13c9116279a82de4a3cd56afd163", default-features=false, features=[
+	"nw",
+	"blocks",
+	"ios_18_0",
+] } # looks like we don't actually need ios_18_0 feature?!
+
+tokio={ version="1.40.0", features=["full"] }
+bytes="1.7.2"

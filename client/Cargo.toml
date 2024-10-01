@@ -11,6 +11,9 @@ websocket=[]
 # used for local development
 notary_ca_cert=[]
 
+# build with iOS App Clip Network support
+ios_app_clip=[]
+
 # Shared dependencies for all targets
 [dependencies]
 
@@ -29,7 +32,7 @@ cfg-if      ="1.0.0"
 serde.workspace     =true
 serde_json.workspace=true
 # Web
-hex = "0.4"
+hex           ="0.4"
 url           ="2.5"
 hyper         ={ version="1.4", features=["client", "http1"] }
 http-body-util="0.1"
@@ -72,6 +75,7 @@ ws_stream_tungstenite={ version="0.13.0", features=["tokio_io"] }
 clap                 ={ version="4.5.13", features=["derive"] }
 anyhow               ="1.0.86"
 reqwest              ={ version="0.12", features=["json", "rustls-tls"] }
+nw_connection        ={ path="../nw_connection", optional=true }
 
 #- Wasm target configuration ----------------------------------------------------------------------#
 [target.'cfg(target_arch = "wasm32")'.dependencies]

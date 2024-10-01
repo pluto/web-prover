@@ -1173,6 +1173,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cidre"
+version = "0.4.0"
+source = "git+https://github.com/yury/cidre?rev=6c65bb624c7e13c9116279a82de4a3cd56afd163#6c65bb624c7e13c9116279a82de4a3cd56afd163"
+dependencies = [
+ "cidre-macros",
+]
+
+[[package]]
+name = "cidre-macros"
+version = "0.1.0"
+source = "git+https://github.com/yury/cidre?rev=6c65bb624c7e13c9116279a82de4a3cd56afd163#6c65bb624c7e13c9116279a82de4a3cd56afd163"
+
+[[package]]
 name = "cipher"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1301,6 +1314,7 @@ dependencies = [
  "hyper 1.4.1",
  "hyper-util",
  "js-sys",
+ "nw_connection",
  "p256",
  "parking_lot",
  "pin-project-lite",
@@ -3762,6 +3776,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c7398b9c8b70908f6371f47ed36737907c87c52af34c268fed0bf0ceb92ead9"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "nw_connection"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "cidre",
+ "tokio",
 ]
 
 [[package]]
