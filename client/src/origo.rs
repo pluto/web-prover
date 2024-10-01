@@ -47,7 +47,7 @@ pub async fn sign(
   let response = client.post(url).json(&sb).send().await.unwrap();
   assert!(response.status() == hyper::StatusCode::OK);
 
-  // TODO: Actually use this input in the proofs. 
+  // TODO: Actually use this input in the proofs.
   let sign_response = response.bytes().await.unwrap().to_vec();
   println!("\n{}\n\n", String::from_utf8(sign_response.clone()).unwrap());
 

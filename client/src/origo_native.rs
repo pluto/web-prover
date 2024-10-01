@@ -13,10 +13,14 @@ use proofs::{
   circom::witness::load_witness_from_bin_reader, program, ProgramData, WitnessGeneratorType, F, G1,
 };
 use serde_json::json;
-use tls_client2::{CipherSuite, Decrypter2, ProtocolVersion, origo::{OrigoConnection, WitnessData}};
+use tls_client2::{
+  origo::{OrigoConnection, WitnessData},
+  CipherSuite, Decrypter2, ProtocolVersion,
+};
 use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
+
 use crate::{config, errors, origo::SignBody, Proof};
 
 const AES_GCM_FOLD_R1CS: &str = "proofs/examples/circuit_data/aes-gcm-fold.r1cs";
