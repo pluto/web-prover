@@ -226,5 +226,11 @@ fn test_aes_gcm_fold_rwit() {
   program_data.witness_generator_types =
     vec![WitnessGeneratorType::RustWitness(aes_gcm_fold_witness)];
 
-  let ProgramOutput { recursive_snark, .. } = program::run(&program_data);
+  let program_output = program::run(&program_data);
+
+  let compressed_verifier = CompressedVerifier::from(program_output);
+
+  let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
+
+  assert_eq!(serialized_compressed_verifier.proof.0.len(), 12264);
 }
