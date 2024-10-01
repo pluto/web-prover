@@ -24,6 +24,7 @@ pub const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../examples/circuit_data/sw
 
 pub const INIT_PUBLIC_INPUT: [u64; 2] = [1, 2];
 
+#[allow(unused)]
 fn unfuckulate(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
   let circom_input: CircomInput = serde_json::from_str(input_json).unwrap();
   dbg!(&circom_input);
@@ -45,6 +46,7 @@ fn unfuckulate(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
 }
 
 rust_witness::witness!(addIntoZeroth);
+#[allow(unused)]
 fn add_into_zeroth_witness(input_json: &str) -> Vec<F<G1>> {
   addIntoZeroth_witness(unfuckulate(input_json))
     .into_iter()
