@@ -29,11 +29,12 @@ jobs:
       - run: rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
         if: matrix.os == 'macos-latest'
 
-      - name: Install LLVM and Clang to support 'ring' crate
+      - name: Install LLVM and Clang to support 'ring' crate and protobuf
         if: matrix.os == 'macos-latest'
         run: |
           brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
           echo /usr/local/opt/llvm@18/bin >> $GITHUB_PATH
+          brew install protobuf
 
       - run: |
           RUST_LOG=DEBUG cargo run --release -p notary -- --config ./fixture/notary-config.toml &
