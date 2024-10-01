@@ -30,7 +30,7 @@ struct ReadResult {
 
 struct WriteResult {}
 
-struct NWConnection {
+pub struct NWConnection {
   queue:            Retained<Queue>,
   connection:       Retained<Connection>,
   write_waker:      Arc<Mutex<Option<Waker>>>,
@@ -40,7 +40,7 @@ struct NWConnection {
 }
 
 impl NWConnection {
-  fn connect(host: &str, port: u16) -> Self {
+  pub fn connect(host: &str, port: u16) -> Self {
     let hostname = CString::new(host).unwrap();
     let port = CString::new(port.to_string()).unwrap();
     let endpoint = Endpoint::with_host(hostname.as_c_str(), port.as_c_str()).unwrap();
