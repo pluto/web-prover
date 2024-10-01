@@ -25,7 +25,7 @@ pub const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../examples/circuit_data/sw
 pub const INIT_PUBLIC_INPUT: [u64; 2] = [1, 2];
 
 #[allow(unused)]
-fn unfuckulate(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
+fn remap_inputs(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
   let circom_input: CircomInput = serde_json::from_str(input_json).unwrap();
   dbg!(&circom_input);
   let mut unfuckulated = vec![];
@@ -48,7 +48,7 @@ fn unfuckulate(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
 rust_witness::witness!(addIntoZeroth);
 #[allow(unused)]
 fn add_into_zeroth_witness(input_json: &str) -> Vec<F<G1>> {
-  addIntoZeroth_witness(unfuckulate(input_json))
+  addIntoZeroth_witness(remap_inputs(input_json))
     .into_iter()
     .map(|bigint| F::<G1>::from_str_vartime(&bigint.to_string()).unwrap())
     .collect()
@@ -56,7 +56,7 @@ fn add_into_zeroth_witness(input_json: &str) -> Vec<F<G1>> {
 
 rust_witness::witness!(squareZeroth);
 fn square_zeroth_witness(input_json: &str) -> Vec<F<G1>> {
-  squareZeroth_witness(unfuckulate(input_json))
+  squareZeroth_witness(remap_inputs(input_json))
     .into_iter()
     .map(|bigint| F::<G1>::from_str_vartime(&bigint.to_string()).unwrap())
     .collect()
@@ -64,7 +64,7 @@ fn square_zeroth_witness(input_json: &str) -> Vec<F<G1>> {
 
 rust_witness::witness!(swapMemory);
 fn swap_memory_witness(input_json: &str) -> Vec<F<G1>> {
-  swapMemory_witness(unfuckulate(input_json))
+  swapMemory_witness(remap_inputs(input_json))
     .into_iter()
     .map(|bigint| F::<G1>::from_str_vartime(&bigint.to_string()).unwrap())
     .collect()
@@ -193,7 +193,7 @@ fn test_parse_batch_wasm() {
 
 rust_witness::witness!(parsefoldbatch);
 fn parse_batch_witness(input_json: &str) -> Vec<F<G1>> {
-  parsefoldbatch_witness(unfuckulate(input_json))
+  parsefoldbatch_witness(remap_inputs(input_json))
     .into_iter()
     .map(|bigint| F::<G1>::from_str_vartime(&bigint.to_string()).unwrap())
     .collect()
@@ -212,7 +212,7 @@ fn test_parse_batch_rwit() {
 
 rust_witness::witness!(aesgcmfold);
 fn aes_gcm_fold_witness(input_json: &str) -> Vec<F<G1>> {
-  aesgcmfold_witness(unfuckulate(input_json))
+  aesgcmfold_witness(remap_inputs(input_json))
     .into_iter()
     .map(|bigint| F::<G1>::from_str_vartime(&bigint.to_string()).unwrap())
     .collect()
