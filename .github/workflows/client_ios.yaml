@@ -24,10 +24,11 @@ jobs:
       - run: rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
 
       # TODO: do we need llvm for this?
-      - name: Install LLVM and Clang to support 'ring' crate
+      - name: Install LLVM and Clang to support 'ring' crate and protobuf for witnesscalc
         run: |
           brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
           echo /usr/local/opt/llvm@18/bin >> $GITHUB_PATH
+          brew install protobuf
 
       - uses: Swatinem/rust-cache@v2
 
