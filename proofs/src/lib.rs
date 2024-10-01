@@ -36,16 +36,20 @@ pub enum WitnessGeneratorType {
   Wasm { path: String, wtns_path: String },
   #[serde(rename = "circom-witnesscalc")]
   CircomWitnesscalc { path: String },
+  #[serde(rename = "browser")]
+  Browser,
   #[serde(skip)]
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ProgramData {
-  pub r1cs_paths:              Vec<PathBuf>,
+  pub r1cs_paths:              Option<Vec<PathBuf>>,
+  pub r1cs_data:               Option<Vec<Vec<u8>>>,
   pub witness_generator_types: Vec<WitnessGeneratorType>,
   pub rom:                     Vec<u64>,
   pub initial_public_input:    Vec<u64>,
+  pub witnesses:               Vec<Vec<F<G1>>>,
   pub private_input:           HashMap<String, Value>, /* TODO: We should probably just make
                                                         * this a vec here */
 }

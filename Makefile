@@ -1,9 +1,19 @@
 wasm:
 	@# TODO: -C lto fails with `lto can only be run for executables, cdylibs and static library outputs`
 	-cargo install wasm-pack
+	-ln -s ./proofs/examples/circuit_data/ ./client_wasm/demo/static/build
 	cd client_wasm && \
-	  PATH="/opt/homebrew/opt/llvm/bin:$$PATH" RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C opt-level=z" \
+	  PATH="/opt/homebrew/opt/llvm/bin:$$PATH" RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C opt-level=z -C link-arg=--max-memory=3221225472" \
 	  rustup run nightly ~/.cargo/bin/wasm-pack build --release --target web ./ -- \
+	    -Z build-std=panic_abort,std
+
+wasm-debug:
+	@# TODO: -C lto fails with `lto can only be run for executables, cdylibs and static library outputs`
+	-cargo install wasm-pack
+	-ln -s ./proofs/examples/circuit_data/ ./client_wasm/demo/static/build
+	cd client_wasm && \
+	  PATH="/opt/homebrew/opt/llvm/bin:$$PATH" RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C opt-level=z -C link-arg=--max-memory=3221225472" \
+	  rustup run nightly ~/.cargo/bin/wasm-pack build --debug --target web ./ -- \
 	    -Z build-std=panic_abort,std
 
 ios:

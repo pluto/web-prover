@@ -10,6 +10,7 @@ use pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::ServerConfig;
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
+use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -56,8 +57,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 async fn response(
   req: Request<hyper::body::Incoming>,
 ) -> Result<Response<Full<Bytes>>, Infallible> {
+  let data = json!({
+    "hello": "world"
+  });
+
   match req.uri().path() {
     "/health" => Ok(Response::default()),
+    "/test" => Ok(
+      Response::builder()
+        .status(200)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(data.to_string()))).unwrap()
+    ),
+    "/bin/128B" => Ok(Response::new(Full::new(Bytes::from(vec![0; 128])))),
     "/bin/1KB" => Ok(Response::new(Full::new(Bytes::from(vec![0; 1024])))),
     "/bin/2KB" => Ok(Response::new(Full::new(Bytes::from(vec![0; 2048])))),
     "/bin/4KB" => Ok(Response::new(Full::new(Bytes::from(vec![0; 4096])))),

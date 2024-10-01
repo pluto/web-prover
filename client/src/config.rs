@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-
 use base64::prelude::*;
 use http_body_util::Full;
 use hyper::{body::Bytes, Request};
@@ -12,6 +11,18 @@ pub enum NotaryMode {
   TLSN,
 }
 
+#[derive(Deserialize, Clone, Debug)]
+pub struct Witness {
+  #[serde(with = "serde_bytes")]
+  pub val: Vec<u8>
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct ProvingData {
+  #[serde(with = "serde_bytes")]
+  pub r1cs: Vec<u8>,
+  pub witnesses: Vec<Witness>,
+}
 #[derive(Deserialize, Clone, Debug)]
 pub struct Config {
   pub mode:                NotaryMode,
@@ -27,6 +38,8 @@ pub struct Config {
   pub max_sent_data: Option<usize>,
   /// Maximum data that can be received by the prover
   pub max_recv_data: Option<usize>,
+
+  pub proving: ProvingData,
 
   #[serde(skip)]
   session_id: String,

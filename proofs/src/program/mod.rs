@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use arecibo::{
   supernova::{
     snark::{CompressedSNARK, ProverKey, VerifierKey},
@@ -9,7 +7,6 @@ use arecibo::{
 };
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
-// use proofs::WitnessGeneratorType;
 use utils::{into_input_json, map_private_inputs};
 
 use super::*;
@@ -59,18 +56,10 @@ impl SNStepCircuit<F<G1>> for RomCircuit {
     pc: Option<&AllocatedNum<F<G1>>>, // TODO: idk how to use the program counter lol
     z: &[AllocatedNum<F<G1>>],
   ) -> Result<(Option<AllocatedNum<F<G1>>>, Vec<AllocatedNum<F<G1>>>), SynthesisError> {
+    // TODO: Clean this up.
     let circuit = if let Some(allocated_num) = pc {
       if allocated_num.get_value().is_some() {
-        let mut circuit = self.circuit.clone();
-        let witness = generate_witness_from_generator_type(
-          &into_input_json(
-            &self.curr_public_input.as_ref().unwrap()[..circuit.arity()],
-            self.curr_private_input.as_ref().unwrap(),
-          ),
-          &self.witness_generator_type,
-        );
-        circuit.witness = Some(witness);
-        circuit
+        self.circuit.clone()
       } else {
         self.circuit.clone()
       }
@@ -93,6 +82,33 @@ impl SNStepCircuit<F<G1>> for RomCircuit {
   }
 }
 
+fn create_rom_circuit(
+    circuit_index: usize,
+    r1cs_path: Option<&PathBuf>,
+    r1cs_data: Option<&Vec<u8>>,
+    program_data: &ProgramData,
+    generator_type: &WitnessGeneratorType,
+    z0_primary: &[F<G1>],
+    private_inputs: &[HashMap<String, Value>]
+) -> RomCircuit {
+    RomCircuit {
+        circuit: circom::CircomCircuit {
+            r1cs: match (r1cs_data, r1cs_path) {
+              (Some(d), None) => R1CS::from(d.as_slice()),
+              (None, Some(p)) => R1CS::from(p),
+              (Some(_), Some(_)) => panic!("cannot mix r1cs path and data"),
+              (None, None) => panic!("missing r1cs path or data")
+            },
+            witness: None,
+        },
+        circuit_index,
+        rom_size: program_data.rom.len(),
+        curr_public_input: (program_data.rom[0] as usize == circuit_index).then(|| z0_primary.to_vec()),
+        curr_private_input: (program_data.rom[0] as usize == circuit_index).then(|| private_inputs[0].clone()),
+        witness_generator_type: generator_type.clone(),
+    }
+}
+
 pub fn run(program_data: &ProgramData) -> (PublicParams<E1>, RecursiveSNARK<E1>) {
   info!("Starting SuperNova program...");
 
@@ -105,32 +121,28 @@ pub fn run(program_data: &ProgramData) -> (PublicParams<E1>, RecursiveSNARK<E1>)
   // Get the private inputs needed for circuits
   let private_inputs = map_private_inputs(program_data);
 
-  let mut circuits = vec![];
-  for (circuit_index, (r1cs_path, witness_generator_type)) in
-    program_data.r1cs_paths.iter().zip(program_data.witness_generator_types.iter()).enumerate()
-  {
-    let circuit = circom::CircomCircuit { r1cs: R1CS::from(r1cs_path), witness: None };
-    let rom_circuit = RomCircuit {
-      circuit,
-      circuit_index,
-      rom_size: program_data.rom.len(),
-      curr_public_input: if program_data.rom[0] as usize == circuit_index {
-        Some(z0_primary.clone())
-      } else {
-        None
-      },
-      curr_private_input: if program_data.rom[0] as usize == circuit_index {
-        Some(private_inputs[0].clone())
-      } else {
-        None
-      },
-      witness_generator_type: witness_generator_type.clone(),
-    };
-    circuits.push(rom_circuit);
-  }
+  let mut circuits = Vec::new();
+  for generator_type in &program_data.witness_generator_types {
+      let rom_circuits: Vec<RomCircuit> = match (&program_data.r1cs_data, &program_data.r1cs_paths) {
+          (Some(r1cs_data), _) => r1cs_data
+              .iter().enumerate()
+              .map(|(circuit_index, d)| create_rom_circuit(circuit_index, None, Some(d), program_data, generator_type, &z0_primary, &private_inputs))
+              .collect(),
+          (None, Some(r1cs_paths)) => r1cs_paths
+              .iter().enumerate()
+              .map(|(circuit_index, p)| create_rom_circuit(circuit_index, Some(p), None, program_data, generator_type, &z0_primary, &private_inputs))
+              .collect(),
+          (None, None) => panic!("missing r1cs_data or r1cs_paths"),
+      };
+
+      circuits.extend(rom_circuits);
+  }  
+
+  debug!("Initialized RomCircuits: len={:?}", circuits.len());
 
   let mut memory = Memory { rom: program_data.rom.clone(), circuits };
 
+  // NOTE: This needs move to a preprocessing step.
   let public_params = PublicParams::setup(&memory, &*default_ck_hint(), &*default_ck_hint());
 
   let z0_secondary = vec![F::<G2>::ZERO];
@@ -141,9 +153,32 @@ pub fn run(program_data: &ProgramData) -> (PublicParams<E1>, RecursiveSNARK<E1>)
   for (idx, &op_code) in program_data.rom.iter().enumerate() {
     info!("Step {} of ROM", idx);
     debug!("Opcode = {}", op_code);
+
     memory.circuits[op_code as usize].curr_private_input = Some(private_inputs[idx].clone());
     memory.circuits[op_code as usize].curr_public_input = Some(next_public_input);
 
+    let wit_type = memory.circuits[op_code as usize].witness_generator_type.clone();
+    let is_browser = match wit_type {
+      WitnessGeneratorType::Browser => true,
+      _ => false
+    };
+
+    memory.circuits[op_code as usize].circuit.witness = if is_browser  {
+      // When running in browser, the witness is passed as input.
+      Some(program_data.witnesses[op_code as usize].clone())
+    } else {
+      let arity = memory.circuits[op_code as usize].circuit.arity().clone();
+      let in_json = into_input_json(
+        &memory.circuits[op_code as usize].curr_public_input.as_ref().unwrap()[..arity],
+        memory.circuits[op_code as usize].curr_private_input.as_ref().unwrap(),
+      );
+      let witness = generate_witness_from_generator_type(
+        &in_json,
+        &wit_type,
+      );
+      Some(witness)
+    };
+    
     let circuit_primary = memory.primary_circuit(op_code as usize);
     let circuit_secondary = memory.secondary_circuit();
 
@@ -160,9 +195,15 @@ pub fn run(program_data: &ProgramData) -> (PublicParams<E1>, RecursiveSNARK<E1>)
     });
 
     info!("Proving single step...");
-    let start = Instant::now();
     recursive_snark.prove_step(&public_params, &circuit_primary, &circuit_secondary).unwrap();
-    info!("Single step proof took: {:?}", start.elapsed());
+    info!("Done proving single step...");
+
+    // TODO: We don't really need to do this, we can just verify compressed proof
+    // 
+    // info!("Verifying single step...");
+    // let start = Instant::now();
+    // recursive_snark.verify(&public_params, &z0_primary, &z0_secondary).unwrap();
+    // info!("Single step verification took: {:?}", start.elapsed());
 
     // Update everything now for next step
     next_public_input = recursive_snark.zi_primary().clone();
