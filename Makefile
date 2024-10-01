@@ -35,4 +35,4 @@ wasm-demo/node_modules:
 wasm-demo: wasm-demo/node_modules
 	cd client_wasm/demo && npm run start
 
-.PHONY: wasm wasm-demo ios
+.PHONY: wasm wasm-debug wasm-demo ios
