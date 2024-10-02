@@ -29,6 +29,9 @@ jobs:
       - run: rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
         if: matrix.os == 'macos-latest'
 
+      - run: apt install -y protobuf-compiler
+        if: matrix.os == 'ubuntu-latest'
+
       - name: Install LLVM and Clang to support 'ring' crate and protobuf
         if: matrix.os == 'macos-latest'
         run: |
