@@ -33,7 +33,7 @@ fn run_entry() -> ProgramOutput {
     ],
     rom:                     ROM.to_vec(),
     initial_public_input:    INIT_PUBLIC_INPUT.to_vec(),
-    private_input:           HashMap::new(),
+    private_input:           vec![HashMap::new(), HashMap::new(), HashMap::new()],
   };
 
   program::run(&program_data)
@@ -135,11 +135,21 @@ fn test_parse_batch_wasm() {
   assert_eq!(&final_mem.to_vec(), recursive_snark.zi_primary());
 }
 
-pub const HTTP_LOCK_R1CS: &[u8] = include_bytes!("../examples/circuit_data/swapMemory.r1cs");
-pub const HTTP_LOCK_GRAPH: &[u8] = include_bytes!("../examples/circuit_data/swapMemory.bin");
+pub const HTTP_LOCK_R1CS: &[u8] =
+  include_bytes!("../examples/circuit_data/http_get_response.circom");
+pub const HTTP_LOCK_GRAPH: &[u8] = include_bytes!("../examples/circuit_data/http_get_response.bin");
+pub const JSON_PARSE_R1CS: &[u8] = include_bytes!("../examples/circuit_data/json_parse.circom");
+pub const JSON_PARSE_GRAPH: &[u8] = include_bytes!("../examples/circuit_data/json_parse.bin");
+pub const JSON_EXTRACT_R1CS: &[u8] = include_bytes!("../examples/circuit_data/json_extract.circom");
+pub const JSON_EXTRACT_GRPAH: &[u8] = include_bytes!("../examples/circuit_data/json_extract.bin");
 
-pub const HTTP_INPUT: [u64; 2] = [1, 2];
+// pub const HTTP_INPUT: [u64; 2] = [1, 2];
 
 #[test]
 #[tracing_test::traced_test]
-fn test_end_to_end_proofs() {}
+fn test_end_to_end_proofs() {
+  let read = std::fs::read("examples/http_parse_extract.json").unwrap();
+  let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
+
+  // let ProgramOutput { recursive_snark, .. } = program::run(&program_data);
+}

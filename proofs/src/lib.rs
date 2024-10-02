@@ -45,8 +45,8 @@ pub struct ProgramData {
   pub witness_generator_types: Vec<WitnessGeneratorType>,
   pub rom:                     Vec<u64>,
   pub initial_public_input:    Vec<u64>,
-  pub private_input:           HashMap<String, Value>, /* TODO: We should probably just make
-                                                        * this a vec here */
+  // TODO: We should probably just make this a vec here
+  pub private_input:           Vec<HashMap<String, Value>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

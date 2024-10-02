@@ -1,3 +1,5 @@
+use std::{collections::BTreeMap, iter::Map};
+
 use bellpepper_core::{
   boolean::{AllocatedBit, Boolean},
   LinearCombination,
@@ -114,24 +116,44 @@ pub fn get_selector_vec_from_index<CS: ConstraintSystem<F<G1>>>(
 // This function NEEDS reworked, but we should just rethink how we prep inputs for this stuff
 // anyway, so I'm leaving this as tech debt, sorry.
 pub fn map_private_inputs(program_data: &ProgramData) -> Vec<HashMap<String, Value>> {
-  let mut private_inputs: Vec<HashMap<String, Value>> = Vec::new();
-  match program_data.private_input.get("fold_input") {
-    None =>
-    // TODO: This is dumb and really only makes the `tests::test_run` pass. This is inadvisable to
-    // actually use!
-      for _ in 0..program_data.rom.len() {
-        private_inputs.push(program_data.private_input.clone());
-      },
+  // should have private input for each unique ROM opcode
+  let mut opcode_frequency = BTreeMap::<u64, usize>::new();
+  for opcode in program_data.rom.iter() {
+    if let Some(freq) = opcode_frequency.get_mut(opcode) {
+      *freq = *freq + 1;
+    } else {
+      opcode_frequency.insert(*opcode, 1);
+    }
+  }
+  let (last_key, _) = opcode_frequency.iter().next_back().unwrap();
+  assert_eq!(program_data.private_input.len() as u64 - 1, *last_key);
 
-    Some(fold_input) =>
-      for i in 0..program_data.rom.len() {
-        let mut map = program_data.private_input.clone();
+  let mut private_inputs: Vec<HashMap<String, Value>> = Vec::new();
+  // tracks iteration of opcodes in ROM
+  let mut curr_opcode_frequency = HashMap::<u64, usize>::new();
+
+  for opcode in program_data.rom.iter() {
+    let curr_private_input = program_data.private_input[*opcode as usize].clone();
+
+    match curr_private_input.get("fold_input") {
+      None =>
+      // TODO: This is dumb and really only makes the `tests::test_run` pass. This is inadvisable to
+      // actually use!
+        for _ in 0..program_data.rom.len() {
+          private_inputs.push(curr_private_input.clone());
+        },
+
+      Some(fold_input) => {
+        let mut map = curr_private_input.clone();
         map.remove("fold_input");
 
+        let opcode_freq = opcode_frequency.get(opcode).unwrap();
+        let i = curr_opcode_frequency.get(opcode).unwrap_or(&0);
+
         for (key, values) in fold_input.as_object().unwrap() {
-          let batch_size = values.as_array().unwrap().len() / program_data.rom.len();
+          let batch_size = values.as_array().unwrap().len() / opcode_freq;
           info!("key: {}, batch size: {}", key, batch_size);
-          for val in values.as_array().unwrap().chunks(batch_size).skip(i).take(1) {
+          for val in values.as_array().unwrap().chunks(batch_size).skip(*i).take(1) {
             let mut data: Vec<Value> = Vec::new();
             for individual in val {
               data.push(individual.clone());
@@ -141,7 +163,14 @@ pub fn map_private_inputs(program_data: &ProgramData) -> Vec<HashMap<String, Val
         }
         private_inputs.push(map);
       },
+    }
+    if let Some(freq) = curr_opcode_frequency.get_mut(opcode) {
+      *freq = *freq + 1;
+    } else {
+      curr_opcode_frequency.insert(*opcode, 1);
+    }
   }
+
   private_inputs
 }
 

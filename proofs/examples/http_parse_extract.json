@@ -1,0 +1,199 @@
+{
+    "private_input": [
+        {
+            "version": [
+                72,
+                84,
+                84,
+                80,
+                47,
+                49,
+                46,
+                49
+            ],
+            "status": [
+                50,
+                48,
+                48
+            ],
+            "message": [
+                79,
+                75
+            ],
+            "header1": [
+                67,
+                111,
+                110,
+                116,
+                101,
+                110,
+                116,
+                45,
+                84,
+                121,
+                112,
+                101
+            ],
+            "value1": [
+                97,
+                112,
+                112,
+                108,
+                105,
+                99,
+                97,
+                116,
+                105,
+                111,
+                110,
+                47,
+                106,
+                115,
+                111,
+                110
+            ]
+        },
+        {},
+        {
+            "key1": [
+                115,
+                117,
+                99,
+                99,
+                101,
+                115,
+                115
+            ]
+        }
+    ],
+    "r1cs_types": [
+        {
+            "file": {
+                "path": "examples/circuit_data/http_get_response.r1cs"
+            }
+        },
+        {
+            "file": {
+                "path": "examples/circuit_data/json_parse.r1cs"
+            }
+        },
+        {
+            "file": {
+                "path": "examples/circuit_data/json_extract.r1cs"
+            }
+        }
+    ],
+    "witness_generator_types": [
+        {
+            "circom-witnesscalc": {
+                "path": "examples/circuit_data/http_get_response.bin"
+            }
+        },
+        {
+            "circom-witnesscalc": {
+                "path": "examples/circuit_data/json_parse.bin"
+            }
+        },
+        {
+            "circom-witnesscalc": {
+                "path": "examples/circuit_data/json_extract.bin"
+            }
+        }
+    ],
+    "rom": [
+        0,
+        1,
+        2
+    ],
+    "initial_public_input": [
+        72,
+        84,
+        84,
+        80,
+        47,
+        49,
+        46,
+        49,
+        32,
+        50,
+        48,
+        48,
+        32,
+        79,
+        75,
+        13,
+        10,
+        67,
+        111,
+        110,
+        116,
+        101,
+        110,
+        116,
+        45,
+        84,
+        121,
+        112,
+        101,
+        58,
+        32,
+        97,
+        112,
+        112,
+        108,
+        105,
+        99,
+        97,
+        116,
+        105,
+        111,
+        110,
+        47,
+        106,
+        115,
+        111,
+        110,
+        13,
+        10,
+        67,
+        111,
+        110,
+        116,
+        101,
+        110,
+        116,
+        45,
+        76,
+        101,
+        110,
+        103,
+        116,
+        104,
+        58,
+        32,
+        49,
+        57,
+        13,
+        10,
+        13,
+        10,
+        123,
+        34,
+        115,
+        117,
+        99,
+        99,
+        101,
+        115,
+        115,
+        34,
+        58,
+        34,
+        116,
+        114,
+        117,
+        101,
+        34,
+        125
+    ]
+}
