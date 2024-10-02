@@ -47,13 +47,14 @@ pub struct ProgramData {
   pub initial_public_input:    Vec<u64>,
   pub private_input:           HashMap<String, Value>, /* TODO: We should probably just make
                                                         * this a vec here */
+  pub witnesses:               Vec<Vec<F<G1>>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum R1CSType {
   #[serde(rename = "file")]
   File { path: PathBuf },
-  #[serde(skip)]
+  #[serde(rename = "raw")]
   Raw(Vec<u8>),
 }
 
@@ -63,6 +64,8 @@ pub enum WitnessGeneratorType {
   Wasm { path: String, wtns_path: String },
   #[serde(rename = "circom-witnesscalc")]
   CircomWitnesscalc { path: String },
+  #[serde(rename = "browser")]  // TODO: Can we merge this with Raw? 
+  Browser, 
   #[serde(skip)]
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
   #[serde(skip)]

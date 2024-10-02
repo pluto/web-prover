@@ -90,6 +90,7 @@ fn run_entry() -> ProgramOutput {
     rom:                     ROM.to_vec(),
     initial_public_input:    INIT_PUBLIC_INPUT.to_vec(),
     private_input:           HashMap::new(),
+    witnesses: vec![vec![]],
   };
 
   program::run(&program_data)

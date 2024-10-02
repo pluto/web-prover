@@ -28,20 +28,75 @@ function end() {
   console.log(seconds + " seconds");
 }
 
+const getConstraints = async function(circuit) {
+  const r1csUrl = new URL(`${circuit}.r1cs`, `https://localhost:8090/build/${circuit}`).toString();
+  const r1cs = await fetch(r1csUrl).then((r) => r.arrayBuffer());
+  return r1cs;
+}
+
+const getWitnessGenerator = async function(circuit) {
+  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/${circuit}_js/`).toString();
+  const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
+  return wasm;
+}
+
+const generateWitnessBytes = async function(inputs) {
+  const _snarkjs = import("snarkjs");
+  const snarkjs = await _snarkjs;
+  const wasm = await getWitnessGenerator(circuit);
+
+  let witnesses = [];
+  for(var i =0; i<2; i++) { 
+    const witStart = +Date.now();
+    let wtns = {type:"mem"};
+    await snarkjs.wtns.calculate(inputs[0], new Uint8Array(wasm), wtns);
+    const witEnd = +Date.now();
+    console.log("witgen time:", witEnd-witStart);
+    console.log("witness", wtns);
+    witnesses.push({
+      val: wtns.data
+    });
+  };
+
+  return witnesses;
+};
+
+// TODO: Migrate this from hardcoded to generated in WASM. 
+var inputs = [{
+    "key": [49,49,49,49,49,49,49,49,49,49,49,49,49,49,49,49], 
+    "iv": [49,49,49,49,49,49,49,49,49,49,49,49], 
+    "plainText": [116,101,115,116,104,101,108,108,111,48,48,48,48,48,48,48],
+    "aad": [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    "step_in": [
+      [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+      [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+      [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0]
+    ]
+}];
+
+// TODO: Configurable identifiers
+var circuit = "aes-gcm-fold";
+var r1cs = await getConstraints(circuit);
+var witnesses = await generateWitnessBytes(inputs);
+
 start();
 
+// TODO: Call this in a web worker so the main thread doesn't hang. 
 // Config for local development
 const proof = await prover({
   mode: "Origo",
   notary_host: "localhost",
   notary_port: 7443,
   target_method: "GET",
-  target_url:
-    "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json", // "https://localhost:8085/health",
+  target_url: "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json",
   target_headers: {},
   target_body: "",
   max_sent_data: 10000,
   max_recv_data: 10000,
+  proving: {
+    r1cs: r1cs,
+    witnesses: witnesses,
+  }
 });
 
 // const proof = await prover({
@@ -73,10 +128,9 @@ const proof = await prover({
 // });
 
 end();
-
 console.log(proof);
 
-// ./fixture/certs/notary.pub
+// ./fixture/cets/notary.pub
 const pubkey =
   "-----BEGIN PUBLIC KEY-----\n" +
   "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEBv36FI4ZFszJa0DQFJ3wWCXvVLFr\n" +
