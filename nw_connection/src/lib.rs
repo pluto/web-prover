@@ -88,15 +88,14 @@ impl AsyncRead for NWConnection {
       };
 
       *reading_finished.lock().unwrap() = Some(ReadResult { data: data.into(), error });
-
       waker.lock().unwrap().take().unwrap().wake();
     };
 
-    self.connection.recv(1, 8192, completion_callback);
-
     let mut_self = self.get_mut();
     *mut_self.read_waker.lock().unwrap() = Some(cx.waker().clone());
-    *mut_self.reading_finished.lock().unwrap() = None;
+    // *mut_self.reading_finished.lock().unwrap() = None; // TODO we don't need this
+
+    mut_self.connection.recv(1, 8192, completion_callback);
 
     Poll::Pending
   }
@@ -133,15 +132,15 @@ impl AsyncWrite for NWConnection {
       waker.lock().unwrap().take().unwrap().wake();
     };
 
-    let content = Data::copy_from_slice(buf);
-
-    let context = ContentCtx::default_msg();
-    let is_complete = true; // TODO
-    self.connection.send(Some(&content), context, is_complete, completion_callback);
-
     let mut_self = self.get_mut();
     *mut_self.write_waker.lock().unwrap() = Some(cx.waker().clone());
-    *mut_self.sending_finished.lock().unwrap() = None;
+    // *mut_self.sending_finished.lock().unwrap() = None; // TODO we should not need this
+
+    let content = Data::copy_from_slice(buf);
+    let context = ContentCtx::default_msg();
+    let is_complete = true; // TODO
+    mut_self.connection.send(Some(&content), context, is_complete, completion_callback);
+
     return Poll::Pending;
   }
 
