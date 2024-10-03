@@ -39,10 +39,14 @@ async fn proxy(config: config::Config, session_id: String) -> (SignBody, Witness
   let notary_connector =
     tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));
 
-  let notary_socket =
-    tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port.clone()))
-      .await
-      .unwrap();
+  // let notary_socket =
+  //   tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port.clone()))
+  //     .await
+  //     .unwrap();
+
+  // #[cfg(feature = "ios_app_clip")]
+  use nw_connection;
+  let notary_socket = nw_connection::NWConnection::connect(&config.notary_host.clone(), config.notary_port.clone());
 
   let notary_tls_socket = notary_connector
     .connect(rustls::ServerName::try_from(config.notary_host.as_str()).unwrap(), notary_socket)
