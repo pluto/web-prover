@@ -10,8 +10,8 @@ use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
-  circom::witness::load_witness_from_bin_reader, program, ProgramData, WitnessGeneratorType, F, G1,
-  compress::CompressedVerifier
+  circom::witness::load_witness_from_bin_reader, compress::CompressedVerifier, program,
+  ProgramData, WitnessGeneratorType, F, G1,
 };
 use serde_json::json;
 use tls_client2::{
@@ -32,12 +32,12 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
   let (sb, witness) = proxy(config.clone(), session_id.clone()).await;
 
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
-  
+
   let program_data = generate_program_data(&witness).await;
   let program_output = program::run(&program_data);
   let compressed_verifier = CompressedVerifier::from(program_output);
   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
-  
+
   Ok(crate::Proof::Origo(serialized_compressed_verifier.proof.0))
 }
 

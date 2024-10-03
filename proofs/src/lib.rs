@@ -1,17 +1,17 @@
 #![feature(internal_output_capture)]
+use std::{collections::HashMap, path::PathBuf};
+
 use arecibo::{
   provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
   spartan::batched::BatchedRelaxedR1CSSNARK,
   traits::{circuit::TrivialCircuit, Engine, Group},
 };
-use std::{collections::HashMap, path::PathBuf};
+use circom::CircomCircuit;
+use compress::CompressedVerifier;
 use ff::Field;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tracing::{debug, info, error, trace};
-
-use circom::CircomCircuit;
-use compress::CompressedVerifier;
+use tracing::{debug, error, info, trace};
 
 pub mod circom;
 pub mod compress;
@@ -64,8 +64,8 @@ pub enum WitnessGeneratorType {
   Wasm { path: String, wtns_path: String },
   #[serde(rename = "circom-witnesscalc")]
   CircomWitnesscalc { path: String },
-  #[serde(rename = "browser")]  // TODO: Can we merge this with Raw? 
-  Browser, 
+  #[serde(rename = "browser")] // TODO: Can we merge this with Raw?
+  Browser,
   #[serde(skip)]
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
   #[serde(skip)]

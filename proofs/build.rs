@@ -1,5 +1,6 @@
-use rust_witness::transpile::transpile_wasm;
 use std::env;
+
+use rust_witness::transpile::transpile_wasm;
 
 fn main() {
   let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();

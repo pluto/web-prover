@@ -9,8 +9,8 @@ use arecibo::{provider::Bn256EngineKZG, supernova::RecursiveSNARK};
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
-  circom::witness::load_witness_from_bin_reader, program, ProgramData, WitnessGeneratorType,
-  compress::CompressedVerifier
+  circom::witness::load_witness_from_bin_reader, compress::CompressedVerifier, program,
+  ProgramData, WitnessGeneratorType,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -37,7 +37,7 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
   let program_output = program::run(&program_data);
   let compressed_verifier = CompressedVerifier::from(program_output);
   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
-  
+
   Ok(crate::Proof::Origo(serialized_compressed_verifier.proof.0))
 }
 
