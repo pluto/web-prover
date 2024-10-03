@@ -1,4 +1,0 @@
-module Rust {
-  header "libproofs.h"
-  export *
-}
