@@ -1,9 +1,4 @@
 #![feature(internal_output_capture)]
-
-pub mod circom;
-pub mod compress;
-pub mod program;
-pub mod tests;
 use std::{collections::HashMap, path::PathBuf};
 
 use arecibo::{
@@ -17,6 +12,11 @@ use ff::Field;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, error, info, trace};
+
+pub mod circom;
+pub mod compress;
+pub mod program;
+pub mod tests;
 
 use crate::tests::{
   ADD_INTO_ZEROTH_GRAPH, ADD_INTO_ZEROTH_R1CS, INIT_PUBLIC_INPUT, ROM, SQUARE_ZEROTH_GRAPH,
@@ -47,13 +47,14 @@ pub struct ProgramData {
   pub initial_public_input:    Vec<u64>,
   pub private_input:           HashMap<String, Value>, /* TODO: We should probably just make
                                                         * this a vec here */
+  pub witnesses:               Vec<Vec<F<G1>>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum R1CSType {
   #[serde(rename = "file")]
   File { path: PathBuf },
-  #[serde(skip)]
+  #[serde(rename = "raw")]
   Raw(Vec<u8>),
 }
 
@@ -63,6 +64,8 @@ pub enum WitnessGeneratorType {
   Wasm { path: String, wtns_path: String },
   #[serde(rename = "circom-witnesscalc")]
   CircomWitnesscalc { path: String },
+  #[serde(rename = "browser")] // TODO: Can we merge this with Raw?
+  Browser,
   #[serde(skip)]
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
   #[serde(skip)]
@@ -76,6 +79,7 @@ pub fn get_compressed_proof(program_data: ProgramData) -> Vec<u8> {
   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
   serialized_compressed_verifier.proof.0
 }
+
 #[cfg(target_os = "ios")] use std::ffi::c_char;
 #[cfg(target_os = "ios")]
 #[no_mangle]

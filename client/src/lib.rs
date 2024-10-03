@@ -10,20 +10,16 @@ pub mod config;
 pub mod errors;
 mod tls;
 
+use arecibo::{provider::Bn256EngineKZG, supernova::RecursiveSNARK};
 use serde::Serialize;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
 use tracing::info;
 
-#[derive(Debug, Clone, Copy, Serialize)]
-pub struct OrigoProof {
-  // TODO
-}
-
 #[derive(Debug, Serialize)]
 pub enum Proof {
   TLSN(TlsProof),
-  Origo(OrigoProof),
+  Origo(Vec<u8>),
 }
 
 pub async fn prover_inner(config: config::Config) -> Result<Proof, errors::ClientErrors> {

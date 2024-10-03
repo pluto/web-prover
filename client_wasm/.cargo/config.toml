@@ -1,0 +1,9 @@
+# NOTE: These configuration flags are stored in this file because they're crate specific
+# when building the wasm binary, they are required. However the wasmpack toolchain builds
+# several other tools while running `wasm-pack build`. If these are set as "RUSTFLAGS"
+# they will be ingested by the build for the tools, causing those tools to fail to build.
+# 
+# See https://github.com/pluto/web-prover/pull/201#issuecomment-2392115215
+#
+[build]
+rustflags=["-C", "target-feature=+atomics,+bulk-memory,+mutable-globals", "-C", "opt-level=z", "-C", "link-arg=--max-memory=3221225472"]

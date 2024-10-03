@@ -20,7 +20,11 @@ tls-client2={ path="../tls/tls-client", package="tls-client" }
 tls-client-async2={ path="../tls/tls-client-async", package="tls-client-async", features=[
   "tracing",
 ] }
-tls-proxy2={ path="../tls/tls-proxy", package="tls-proxy" }
+tls-core={ path="../tls/tls-core", package="tls-core" }
+proofs={ path="../proofs", package="proofs" }
+arecibo = { git = "https://github.com/argumentcomputer/arecibo", default-features = false, features = [
+    "portable",
+] }
 
 webpki-roots="0.26.1"
 pki-types   ={ package="rustls-pki-types", version="1.7" }
@@ -28,6 +32,7 @@ cfg-if      ="1.0.0"
 # Serde
 serde.workspace     =true
 serde_json.workspace=true
+serde_bytes = "0.11"
 # Web
 hex = "0.4"
 url           ="2.5"
