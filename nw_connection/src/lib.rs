@@ -20,15 +20,16 @@ use tokio::{
   net::ToSocketAddrs,
   sync::oneshot,
 };
-
-struct CustomError {}
+struct CustomError(String); // TODO can we use cidre::Error instead?
 
 struct ReadResult {
   data:  Vec<u8>,
   error: Option<CustomError>,
 }
 
-struct WriteResult {}
+struct WriteResult {
+  error: Option<CustomError>,
+}
 
 pub struct NWConnection {
   queue:            Retained<Queue>,
@@ -66,7 +67,14 @@ impl AsyncRead for NWConnection {
     cx: &mut std::task::Context<'_>,
     buf: &mut tokio::io::ReadBuf<'_>,
   ) -> std::task::Poll<std::io::Result<()>> {
+    if self.read_waker.lock().unwrap().is_some() {
+      return Poll::Pending;
+    }
+
     if let Some(result) = self.reading_finished.lock().unwrap().take() {
+      if let Some(error) = result.error {
+        return Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Other, error.0)));
+      }
       buf.put_slice(result.data.as_slice());
       return Poll::Ready(Ok(()));
     }
@@ -76,24 +84,23 @@ impl AsyncRead for NWConnection {
 
     let completion_callback = move |content: Option<&dispatch::Data>,
                                     context: Option<&nw::ContentCtx>,
-                                    is_complete: bool,
+                                    _is_complete: bool,
                                     error: Option<&Error>| {
-      let data = content.unwrap().as_ns().as_slice();
-      // println!("{}", String::from_utf8_lossy(data));
+      // is_complete is always false?
 
-      let error = if error.is_none() {
-        None
-      } else {
-        Some(CustomError {}) // TODO
-      };
+      let data: &[u8] = content.as_ref().map_or(&[], |c| c.as_ns().as_slice());
+      let error = error.map(|e| CustomError(format!("{:?}", e)));
 
       *reading_finished.lock().unwrap() = Some(ReadResult { data: data.into(), error });
-      waker.lock().unwrap().take().unwrap().wake();
+
+      if let Some(waker) = waker.lock().unwrap().take() {
+        waker.wake();
+      }
     };
 
     let mut_self = self.get_mut();
     *mut_self.read_waker.lock().unwrap() = Some(cx.waker().clone());
-    // *mut_self.reading_finished.lock().unwrap() = None; // TODO we don't need this
+    *mut_self.reading_finished.lock().unwrap() = None;
 
     mut_self.connection.recv(1, 8192, completion_callback);
 
@@ -107,7 +114,14 @@ impl AsyncWrite for NWConnection {
     cx: &mut std::task::Context<'_>,
     buf: &[u8],
   ) -> std::task::Poll<Result<usize, std::io::Error>> {
+    if self.write_waker.lock().unwrap().is_some() {
+      return Poll::Pending;
+    }
+
     if let Some(result) = self.sending_finished.lock().unwrap().take() {
+      if let Some(error) = result.error {
+        return Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Other, error.0)));
+      }
       return Poll::Ready(Ok(buf.len()));
     }
 
@@ -119,26 +133,20 @@ impl AsyncWrite for NWConnection {
     let sending_finished = self.sending_finished.clone();
 
     let completion_callback = move |error: Option<&Error>| {
-      match error {
-        Some(err) => {
-          println!("Error occurred2: {:?}", err);
-        },
-        None => {
-          println!("Operation completed successfully2.");
-        },
+      let error = error.map(|e| CustomError(format!("{:?}", e)));
+      *sending_finished.lock().unwrap() = Some(WriteResult { error });
+      if let Some(waker) = waker.lock().unwrap().take() {
+        waker.wake();
       }
-
-      *sending_finished.lock().unwrap() = Some(WriteResult {});
-      waker.lock().unwrap().take().unwrap().wake();
     };
 
     let mut_self = self.get_mut();
     *mut_self.write_waker.lock().unwrap() = Some(cx.waker().clone());
-    // *mut_self.sending_finished.lock().unwrap() = None; // TODO we should not need this
+    *mut_self.sending_finished.lock().unwrap() = None;
 
     let content = Data::copy_from_slice(buf);
     let context = ContentCtx::default_msg();
-    let is_complete = true; // TODO
+    let is_complete = true; // TODO true or false?!
     mut_self.connection.send(Some(&content), context, is_complete, completion_callback);
 
     return Poll::Pending;
