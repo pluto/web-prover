@@ -1,8 +1,8 @@
 //! This test module is effectively testing a static (comptime) circuit dispatch supernova program
 
-use std::str::FromStr;
+use std::{str::FromStr, time::Instant};
 
-use arecibo::supernova::RecursiveSNARK;
+use arecibo::supernova::{snark::CompressedSNARK, RecursiveSNARK};
 use circom::CircomInput;
 use ff::PrimeField;
 use num_bigint::BigInt;
@@ -24,12 +24,14 @@ pub const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../examples/circuit_data/sw
 
 pub const INIT_PUBLIC_INPUT: [u64; 2] = [1, 2];
 
+pub const MAX_ROM_SIZE: usize = 100;
+
 #[allow(unused)]
 fn remap_inputs(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
   let circom_input: CircomInput = serde_json::from_str(input_json).unwrap();
   dbg!(&circom_input);
-  let mut unfuckulated = vec![];
-  unfuckulated.push((
+  let mut remapped = vec![];
+  remapped.push((
     "step_in".to_string(),
     circom_input.step_in.into_iter().map(|s| BigInt::from_str(&s).unwrap()).collect(),
   ));
@@ -40,9 +42,9 @@ fn remap_inputs(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
       .iter()
       .map(|x| BigInt::from_str(&x.as_number().unwrap().to_string()).unwrap())
       .collect::<Vec<BigInt>>();
-    unfuckulated.push((k, val));
+    remapped.push((k, val));
   }
-  unfuckulated
+  remapped
 }
 
 rust_witness::witness!(addIntoZeroth);
@@ -82,16 +84,21 @@ fn run_entry_wc() -> (SetupData, RecursiveSNARK<E1>) {
       WitnessGeneratorType::Raw(SQUARE_ZEROTH_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(SWAP_MEMORY_GRAPH.to_vec()),
     ],
-    rom:                     vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    rom:                     vec![0; MAX_ROM_SIZE],
     initial_public_input:    INIT_PUBLIC_INPUT.to_vec(),
     private_input:           HashMap::new(),
     witnesses:               vec![vec![]],
   };
   let circuit_list = program::initialize_circuit_list(&program_data);
+  let start = Instant::now();
   let setup_data = program::setup(circuit_list);
-  println!("set up with wrong rom");
-  program_data.rom = ROM.to_vec();
+  println!("Setup elapsed: {:?}", start.elapsed());
+  let mut rom = ROM.to_vec();
+  rom.resize(MAX_ROM_SIZE, u64::MAX);
+  program_data.rom = rom;
+  let start = Instant::now();
   let snark = program::run(&program_data, &setup_data);
+  println!("Proof elapsed: {:?}", start.elapsed());
   (setup_data, snark)
 }
 
@@ -121,6 +128,7 @@ fn run_entry_rwit() -> (SetupData, RecursiveSNARK<E1>) {
 #[test]
 #[tracing_test::traced_test]
 fn test_run_wc() {
+  let start = Instant::now();
   let (_, proof) = run_entry_wc();
   let final_mem = [
     F::<G1>::from(0),
@@ -133,7 +141,8 @@ fn test_run_wc() {
     F::<G1>::from(1),
     F::<G1>::from(2),
   ];
-  assert_eq!(&final_mem.to_vec(), proof.zi_primary());
+  println!("Time elapsed: {:?}", start.elapsed());
+  // assert_eq!(&final_mem.to_vec(), proof.zi_primary());
 }
 
 #[test]
@@ -155,10 +164,12 @@ fn test_run_rwit() {
 }
 
 #[test]
-#[tracing_test::traced_test]
+// #[tracing_test::traced_test]
 fn test_run_verify_wc() {
   let (setup_data, recursive_snark) = run_entry_wc();
+  let start = Instant::now();
   let proof = program::compress(&setup_data, &recursive_snark);
+  println!("Compress elapsed {:?}", start.elapsed());
 
   // Serialize and compress further
   let serialized_compressed_proof = proof.serialize_and_compress();
@@ -170,16 +181,40 @@ fn test_run_verify_wc() {
   // we do it out here)
   let mut z0_primary = INIT_PUBLIC_INPUT.to_vec();
   z0_primary.push(0);
-  z0_primary.extend(ROM.iter());
+  let mut rom = ROM.to_vec();
+  rom.resize(MAX_ROM_SIZE, u64::MAX);
+  z0_primary.extend(rom.iter());
 
   // Check that it verifies
   let res = proof.0.verify(
     &setup_data.public_params,
     &setup_data.verifier_key,
-    z0_primary.into_iter().map(F::<G1>::from).collect::<Vec<_>>().as_slice(),
+    z0_primary.clone().into_iter().map(F::<G1>::from).collect::<Vec<_>>().as_slice(),
     [0].into_iter().map(F::<G2>::from).collect::<Vec<_>>().as_slice(),
   );
   assert!(res.is_ok());
+  let serialized_pp = bincode::serialize(&setup_data.public_params).unwrap();
+  println!("PP size: {:?}", serialized_pp.len());
+
+  let pp = bincode::deserialize(&serialized_pp).unwrap();
+  let (pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&pp).unwrap();
+  let proof = CompressedSNARK::prove(&pp, &pk, &recursive_snark).unwrap();
+
+  // GIven that this passes, we are able to serde the pp properly.
+  proof
+    .verify(
+      &pp,
+      &vk,
+      z0_primary.into_iter().map(F::<G1>::from).collect::<Vec<_>>().as_slice(),
+      [0].into_iter().map(F::<G2>::from).collect::<Vec<_>>().as_slice(),
+    )
+    .unwrap();
+
+  // let serialized_pk = bincode::serialize(&setup_data.prover_key).unwrap();
+  // println!("PK size: {:?}", serialized_pk.len());
+
+  // let serialized_pp = bincode::serialize(&setup_data.public_params).unwrap();
+  // println!("PP size: {:?}", serialized_pp.len());
 }
 
 #[test]

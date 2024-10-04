@@ -125,40 +125,34 @@ pub fn run(program_data: &ProgramData, setup_data: &SetupData) -> RecursiveSNARK
   let mut recursive_snark_option = None;
   let mut next_public_input = z0_primary.clone();
 
-  for (idx, &op_code) in program_data.rom.iter().enumerate() {
+  let circuits = initialize_circuit_list(program_data);
+  let mut memory = Memory { rom: program_data.rom.clone(), circuits };
+
+  for (idx, &op_code) in
+    program_data.rom.iter().enumerate().take_while(|&(_, &op_code)| op_code != u64::MAX)
+  {
     info!("Step {} of ROM", idx);
     debug!("Opcode = {}", op_code);
-    // TODO: This is highly awkward. We don't need to recreate the memory each time
-    let circuits = initialize_circuit_list(&program_data);
-    debug!("Got circuits."); // TODO: remove
-    let mut memory = Memory { rom: program_data.rom.clone(), circuits };
     memory.circuits[op_code as usize].curr_private_input = Some(private_inputs[idx].clone());
     memory.circuits[op_code as usize].curr_public_input = Some(next_public_input);
 
-    debug!("set inputs");
     let wit_type = memory.circuits[op_code as usize].witness_generator_type.clone();
-    let is_browser = match wit_type {
-      WitnessGeneratorType::Browser => true,
-      _ => false,
-    };
 
-    debug!("before browser match");
-    memory.circuits[op_code as usize].circuit.witness = if is_browser {
-      // When running in browser, the witness is passed as input.
-      Some(program_data.witnesses[op_code as usize].clone())
-    } else {
-      let arity = memory.circuits[op_code as usize].circuit.arity();
-      let in_json = into_input_json(
-        &memory.circuits[op_code as usize].curr_public_input.as_ref().unwrap()[..arity],
-        memory.circuits[op_code as usize].curr_private_input.as_ref().unwrap(),
-      );
-      debug!("got in_json");
-      let witness = generate_witness_from_generator_type(&in_json, &wit_type);
-      println!("computed witnesss");
-      Some(witness)
-    };
+    memory.circuits[op_code as usize].circuit.witness =
+      if matches!(wit_type, WitnessGeneratorType::Browser) {
+        // When running in browser, the witness is passed as input.
+        Some(program_data.witnesses[op_code as usize].clone())
+      } else {
+        let arity = memory.circuits[op_code as usize].circuit.arity();
+        let in_json = into_input_json(
+          &memory.circuits[op_code as usize].curr_public_input.as_ref().unwrap()[..arity],
+          memory.circuits[op_code as usize].curr_private_input.as_ref().unwrap(),
+        );
 
-    debug!("prepping snark."); // TODO: remove
+        let witness = generate_witness_from_generator_type(&in_json, &wit_type);
+        Some(witness)
+      };
+
     let circuit_primary = memory.primary_circuit(op_code as usize);
     let circuit_secondary = memory.secondary_circuit();
 

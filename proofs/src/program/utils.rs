@@ -55,7 +55,8 @@ pub fn next_rom_index_and_pc<CS: ConstraintSystem<F<G1>>>(
     allocated_rom
       .get(next_rom_index)
       .and_then(|v| v.get_value())
-      .unwrap_or(allocated_rom.get(current_rom_index).unwrap().get_value().unwrap())
+      .and_then(|value| if value == F::<G1>::from(u64::MAX) { None } else { Some(value) })
+      .unwrap_or_else(|| allocated_rom.get(current_rom_index).unwrap().get_value().unwrap())
   });
 
   Ok((rom_index_next, pc_next))
