@@ -19,7 +19,6 @@ use tls_client2::{
   CipherSuite, Decrypter2, ProtocolVersion,
 };
 use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
-use tls_proxy2::WitnessData;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 

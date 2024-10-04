@@ -36,9 +36,6 @@ itertools ="0.13"
 bincode="1.3"
 flate2 ="1.0"
 
-bincode="1.3"
-flate2 ="1.0"
-
 anyhow="1.0" # TODO: This should only ever be a dev-dep in my mind
 
 [dev-dependencies]

@@ -31,7 +31,6 @@ use tls_core::{
 
 use super::{Backend, BackendError, origo::{OrigoConnection, RecordMeta, RecordKey, Direction}};
 use crate::{backend::tls13::AeadKey, DecryptMode, EncryptMode, Error};
-use tls_proxy::{self, OrigoConnection, RecordMeta, RecordKey, Direction};
 
 /// Implementation of TLS 1.3 backend using RustCrypto primitives
 pub struct RustCryptoBackend13 {

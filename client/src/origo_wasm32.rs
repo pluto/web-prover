@@ -20,7 +20,6 @@ use tls_client2::{
 };
 use tls_client_async2::bind_client;
 use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
-use tls_proxy2::WitnessData;
 use tracing::debug;
 use url::Url;
 use wasm_bindgen_futures::spawn_local;

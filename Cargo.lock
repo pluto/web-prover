@@ -1280,6 +1280,7 @@ name = "client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arecibo",
  "async-tungstenite 0.25.1",
  "base64 0.22.1",
  "cfg-if",
@@ -1298,6 +1299,7 @@ dependencies = [
  "p256",
  "parking_lot",
  "pin-project-lite",
+ "proofs",
  "rayon",
  "reqwest",
  "ring 0.17.8",
@@ -1305,6 +1307,7 @@ dependencies = [
  "rustls-pki-types",
  "serde",
  "serde-wasm-bindgen",
+ "serde_bytes",
  "serde_json",
  "strum",
  "strum_macros",
@@ -1312,7 +1315,7 @@ dependencies = [
  "time",
  "tls-client",
  "tls-client-async",
- "tls-proxy",
+ "tls-core",
  "tlsn-core",
  "tlsn-prover",
  "tlsn-tls-client",
@@ -4337,7 +4340,6 @@ dependencies = [
  "bincode",
  "byteorder",
  "circom_witnesscalc",
- "clap",
  "ff",
  "flate2",
  "halo2curves",
@@ -4348,8 +4350,6 @@ dependencies = [
  "rust-witness",
  "serde",
  "serde_json",
- "tracing",
- "tracing-subscriber",
  "tracing-test",
 ]
 
@@ -5259,6 +5259,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_bytes"
+version = "0.11.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "387cc504cb06bb40a96c8e04e951fe01854cf6bc921053c954e4a606d9675c6a"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde_derive"
 version = "1.0.210"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5771,6 +5780,7 @@ dependencies = [
  "futures",
  "hex",
  "hmac",
+ "indexmap 1.9.3",
  "log",
  "p256",
  "rand 0.8.5",
@@ -5779,10 +5789,13 @@ dependencies = [
  "rustls-pemfile 1.0.4",
  "rustversion",
  "sct",
+ "serde",
+ "serde_json",
  "sha2",
+ "strum_macros",
  "tls-backend",
  "tls-core",
- "tls-proxy",
+ "tls-parser",
  "tokio",
  "web-time 0.2.4",
  "webpki",
@@ -5837,19 +5850,6 @@ dependencies = [
  "phf",
  "phf_codegen",
  "rusticata-macros",
-]
-
-[[package]]
-name = "tls-proxy"
-version = "1.0.1"
-dependencies = [
- "hex",
- "indexmap 1.9.3",
- "serde",
- "serde_json",
- "strum_macros",
- "tls-core",
- "tls-parser",
 ]
 
 [[package]]
@@ -7008,13 +7008,14 @@ version = "0.0.0"
 dependencies = [
  "form_urlencoded",
  "futures-util",
- "hex",
  "http-body-util",
  "hyper 1.4.1",
  "hyper-util",
  "rustls 0.23.13",
  "rustls-pemfile 2.2.0",
  "rustls-pki-types",
+ "serde",
+ "serde_json",
  "tokio",
  "tokio-rustls 0.26.0",
  "tokio-tungstenite 0.23.1",

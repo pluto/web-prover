@@ -4,7 +4,6 @@ use serde::Serialize;
 use serde_json::json;
 use tls_client2::{origo::WitnessData, CipherSuite, Decrypter2, ProtocolVersion};
 use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
-use tls_proxy2::WitnessData;
 use tracing::debug;
 
 use crate::errors;
@@ -52,10 +51,4 @@ pub async fn sign(
   println!("\n{}\n\n", String::from_utf8(sign_response.clone()).unwrap());
 
   Ok(sign_response)
-}
-
-pub async fn generate_proof(witness: WitnessData) -> Result<(), errors::ClientErrors> {
-  debug!("data={:?}", witness);
-
-  Ok(())
 }
