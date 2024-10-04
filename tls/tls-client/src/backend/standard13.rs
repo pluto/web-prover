@@ -10,7 +10,7 @@ use aes_gcm::{
 };
 use async_trait::async_trait;
 use base64::{prelude::BASE64_STANDARD, Engine};
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, kv::ToValue, trace, warn, Record};
 use p256::{ecdh::EphemeralSecret, EncodedPoint, PublicKey as ECDHPublicKey};
 use rand::{rngs::OsRng, thread_rng, Rng};
 use ring::hkdf::Okm;
@@ -21,7 +21,7 @@ use tls_core::{
   key::{Certificate, PublicKey},
   msgs::{
     base::Payload as TLSPayload,
-    enums::{CipherSuite, ContentType, NamedGroup, ProtocolVersion},
+    enums::{CipherSuite, ContentType, HandshakeType, NamedGroup, ProtocolVersion},
     handshake::Random,
     message::{OpaqueMessage, PlainMessage},
   },
@@ -31,6 +31,7 @@ use tls_core::{
 
 use super::{Backend, BackendError};
 use crate::{backend::tls13::AeadKey, DecryptMode, EncryptMode, Error};
+use tls_proxy::{self, OrigoConnection, RecordMeta, RecordKey, Direction};
 
 /// Implementation of TLS 1.3 backend using RustCrypto primitives
 pub struct RustCryptoBackend13 {
@@ -144,8 +145,6 @@ pub struct TlsKeys {
   server_iv:  AeadKey,
 }
 
-use tls_proxy::{self, OrigoConnection};
-
 // === Helpers
 // TODO: Move into different lib.
 use super::tls13::{expand, HkdfExpander, OkmBlock};
@@ -235,8 +234,9 @@ impl RustCryptoBackend13 {
   }
 
   /// tk: add a field to the witness record map
-  pub fn insert_record(&mut self, record_meta: RecordMeta) {
-    self.record_map.insert(record_meta.nonce.clone(), record_meta);
+  pub fn insert_record(&mut self, d: Direction, seq: u64, ct: ContentType, first_byte: u8, record_meta: RecordMeta) {
+    self.record_map.insert(record_meta.nonce.clone(), record_meta.clone());
+    self.logger.lock().unwrap().insert_record(RecordKey::new(d, ct, seq, first_byte), record_meta);
   }
 
   /// consume the witness data generated for writing `session_params_13.json`
@@ -341,42 +341,42 @@ impl RustCryptoBackend13 {
 
     trace!(
       "client_aes_iv={:?}, iv_len={:?}",
-      BASE64_STANDARD.encode(client_aes_iv.buf),
+      hex::encode(client_aes_iv.buf),
       client_aes_iv.buf.len()
     );
     self.logger.lock().unwrap().set_secret(
       format!("{:?}:client_aes_iv", self.encrypt_mode).to_string(),
-      BASE64_STANDARD.encode(client_aes_iv.buf).into(),
+      client_aes_iv.buf.into(),
     );
 
     trace!(
       "client_aes_key={:?}, iv_len={:?}",
-      BASE64_STANDARD.encode(client_aes_key.buf),
+      hex::encode(client_aes_key.buf),
       client_aes_iv.buf.len()
     );
     self.logger.lock().unwrap().set_secret(
       format!("{:?}:client_aes_key", self.encrypt_mode).to_string(),
-      BASE64_STANDARD.encode(client_aes_key.buf).into(),
+      client_aes_key.buf.into(),
     );
 
     trace!(
       "server_aes_iv={:?}, iv_len={:?}",
-      BASE64_STANDARD.encode(server_aes_iv.buf),
+      hex::encode(server_aes_iv.buf),
       server_aes_iv.buf.len()
     );
     self.logger.lock().unwrap().set_secret(
       format!("{:?}:server_aes_iv", self.encrypt_mode).to_string(),
-      BASE64_STANDARD.encode(server_aes_iv.buf).into(),
+      server_aes_iv.buf.into(),
     );
 
     trace!(
       "server_aes_key={:?}, iv_len={:?}",
-      BASE64_STANDARD.encode(server_aes_key.buf),
+      hex::encode(server_aes_key.buf),
       server_aes_key.buf.len()
     );
     self.logger.lock().unwrap().set_secret(
       format!("{:?}:server_aes_key", self.encrypt_mode).to_string(),
-      BASE64_STANDARD.encode(server_aes_key.buf).into(),
+      server_aes_key.buf.into(),
     );
 
     TlsKeys {
@@ -479,7 +479,7 @@ impl Backend for RustCryptoBackend13 {
     // Start with diffie hellman dto produce the shared pre_master_secret
     let mut pms = [0u8; 32]; // NOTE: 32 bytes in both impls
     let secret = *sk.diffie_hellman(&server_pk).raw_secret_bytes();
-    pms.copy_from_slice(&secret);
+    pms.copy_from_slice(&secret.as_slice());
     self.pre_master_secret = Some(pms);
     trace!("pre_master_secret={:?}", BASE64_STANDARD.encode(pms));
 
@@ -517,9 +517,10 @@ impl Backend for RustCryptoBackend13 {
       CipherSuite::TLS13_AES_128_GCM_SHA256 => match msg.version {
         // TODO: Do we need both on the encrypt side?
         ProtocolVersion::TLSv1_3 | ProtocolVersion::TLSv1_2 => {
-          let cipher_msg = enc.encrypt_tls13_aes(&msg, seq);
-          trace!("[SUCCESS] Encrypted message: {:?}", cipher_msg);
-          return cipher_msg;
+          let (cipher_msg, meta) = enc.encrypt_tls13_aes(&msg, seq)?;
+
+          self.insert_record(Direction::Sent, seq, msg.typ, msg.payload.0[0], meta);
+          return Ok(cipher_msg);
         },
         version => {
           return Err(BackendError::UnsupportedProtocolVersion(version));
@@ -542,10 +543,7 @@ impl Backend for RustCryptoBackend13 {
         // NOTE: Must support both because cipher messages are labeled 1.2
         ProtocolVersion::TLSv1_3 | ProtocolVersion::TLSv1_2 => {
           let (plain_message, record_meta) = dec.decrypt_tls13_aes(&msg, seq)?;
-          if let Some(meta) = record_meta {
-            self.insert_record(meta);
-          }
-          debug!("[SUCCESS] Decrypted message: {:?}", plain_message);
+          self.insert_record(Direction::Received, seq, plain_message.typ, plain_message.payload.0[0], record_meta);
           return Ok(plain_message);
         },
         version => {
@@ -711,27 +709,10 @@ impl Encrypter {
     Self { write_key, write_iv, cipher_suite }
   }
 
-  fn encrypt_tls13_aes(&self, m: &PlainMessage, seq: u64) -> Result<OpaqueMessage, BackendError> {
+  fn encrypt_tls13_aes(&self, m: &PlainMessage, seq: u64) -> Result<(OpaqueMessage, RecordMeta), BackendError> {
     let total_len = m.payload.0.len() + 1 + 16;
     let aad = make_tls13_aad(total_len);
-    let nonce = make_nonce(self.write_iv, seq);
-
-    debug!(
-      "ENC: msg={:?}, msg_len={:?}, seq={:?}",
-      hex::encode(m.payload.0.clone()),
-      m.payload.0.len(),
-      seq
-    );
-    debug!(
-      "ENC: iv={:?}, dec_key={:?}",
-      hex::encode(self.write_iv),
-      hex::encode(self.write_key)
-    );
-    debug!(
-      "ENC: nonce={:?}, aad={:?}",
-      hex::encode(nonce.as_ref()),
-      hex::encode(aad.as_ref())
-    );
+    let init_nonce = make_nonce(self.write_iv, seq);
 
     let mut payload = Vec::with_capacity(total_len);
     payload.extend_from_slice(&m.payload.0);
@@ -740,23 +721,32 @@ impl Encrypter {
     let aes_payload = Payload { msg: &payload, aad: &aad };
 
     let cipher = Aes128Gcm::new_from_slice(&self.write_key).unwrap();
-    let nonce = GenericArray::from_slice(&nonce);
+    let nonce = GenericArray::from_slice(&init_nonce);
     let ciphertext = cipher
       .encrypt(nonce, aes_payload)
       .map_err(|e| BackendError::EncryptionError(e.to_string()))?;
 
-        debug!(
-            "ENC: cipher_text={:?}, cipher_len={:?}",
-            hex::encode(ciphertext.clone()),
-            ciphertext.len()
-        );
-        let om = OpaqueMessage {
-            typ: ContentType::ApplicationData, // Always send Application Data label
-            version: ProtocolVersion::TLSv1_2, // Opaque Messages lie.
-            payload: TLSPayload::new(ciphertext),
-        };
+    trace!("ENC: cipher={:?}", hex::encode(ciphertext.clone()));
+    trace!("ENC: plain_text={:?}", hex::encode(m.payload.0.clone()));
+    debug!(
+      "ENC: cipher_len={:?}, plain_len={:?}, seq={:?}, iv={:?}, dec_key={:?}, nonce={:?}, aad={:?}",
+      ciphertext.len(),
+      m.payload.0.len(),
+      seq, 
+      hex::encode(self.write_iv),
+      hex::encode(self.write_key),
+      hex::encode(init_nonce.as_ref()),
+      hex::encode(aad.as_ref()),
+    );
 
-    Ok(om)
+    Ok((
+      OpaqueMessage {
+        typ: ContentType::ApplicationData, // Always send Application Data label
+        version: ProtocolVersion::TLSv1_2, // Opaque Messages lie.
+        payload: TLSPayload::new(ciphertext.clone()),
+      }, 
+      RecordMeta::new(&aad, &m.payload.0, &ciphertext, &nonce.to_vec())
+    ))
   }
 }
 
@@ -764,33 +754,6 @@ pub struct Decrypter {
   write_key:    [u8; 16],
   write_iv:     [u8; 12],
   cipher_suite: CipherSuite,
-}
-
-#[derive(Debug, Clone)]
-pub struct RecordMeta {
-  additional_data: String,
-  typ:             String,
-  payload:         String,
-  ciphertext:      String,
-  nonce:           String,
-}
-
-impl RecordMeta {
-  pub fn new(
-    additional_data: &[u8],
-    typ: &str,
-    payload: &[u8],
-    ciphertext: &[u8],
-    nonce: &[u8],
-  ) -> Self {
-    Self {
-      additional_data: BASE64_STANDARD.encode(additional_data),
-      typ:             typ.to_string(),
-      payload:         BASE64_STANDARD.encode(payload),
-      ciphertext:      BASE64_STANDARD.encode(ciphertext),
-      nonce:           BASE64_STANDARD.encode(nonce),
-    }
-  }
 }
 
 impl Decrypter {
@@ -802,32 +765,14 @@ impl Decrypter {
     &self,
     m: &OpaqueMessage,
     seq: u64,
-  ) -> Result<(PlainMessage, Option<RecordMeta>), BackendError> {
+  ) -> Result<(PlainMessage, RecordMeta), BackendError> {
     let aad = make_tls13_aad(m.payload.0.len());
-    let nonce = make_nonce(self.write_iv, seq);
-
-    use hex;
-    debug!(
-      "DEC: msg={:?}, msg_len={:?}, seq={:?}",
-      hex::encode(m.payload.0.clone()),
-      m.payload.0.len(),
-      seq
-    );
-    debug!(
-      "DEC: iv={:?}, dec_key={:?}",
-      hex::encode(self.write_iv),
-      hex::encode(self.write_key)
-    );
-    debug!(
-      "DEC: nonce={:?}, aad={:?}",
-      hex::encode(nonce.as_ref()),
-      hex::encode(aad.as_ref())
-    );
+    let init_nonce = make_nonce(self.write_iv, seq);
 
     let aes_payload = Payload { msg: &m.payload.0, aad: &aad };
 
     let cipher = Aes128Gcm::new_from_slice(&self.write_key).unwrap();
-    let nonce = GenericArray::from_slice(&nonce);
+    let nonce = GenericArray::from_slice(&init_nonce);
     let mut plaintext = cipher
       .decrypt(nonce, aes_payload)
       .map_err(|e| BackendError::DecryptionError(e.to_string()))?;
@@ -837,37 +782,22 @@ impl Decrypter {
       return Err(BackendError::InternalError("peer sent bad TLSInnerPlaintext".to_string()));
     }
 
-    let meta = match typ {
-      ContentType::Handshake => {
-        // tk: not sure why this value is 20
-        // but there are 3 other handshake messages with an initial value of 4
-        // ref: jens/jan
-        if plaintext[0] == 20u8 {
-          // hc.setRecordMeta(additionalData, hc.trafficSecret, ciphertextCopy, tmp_nonce, "SF")
-          let meta = RecordMeta::new(&aad, "SF", &plaintext, &m.payload.0, &nonce.to_vec());
-        //   debug!("record_meta={:?}", meta);
-          Some(meta)
-        } else {
-          None
-        }
-      },
-      ContentType::ApplicationData => {
-        // hc.setRecordMeta(additionalData, plaintext, ciphertextCopy, tmp_nonce, "SR")
-        let meta = RecordMeta::new(&aad, "SR", &plaintext, &m.payload.0, &nonce.to_vec());
-        // debug!("record_meta={:?}", meta);
-        Some(meta)
-      },
-      _ => None,
-    };
-
+    trace!("DEC: cipher={:?}", hex::encode(m.payload.0.clone()));
+    trace!("DEC: plain_text={:?}", hex::encode(plaintext.clone()));
     debug!(
-      "DEC: plain_text={:?}, plain_len={:?}",
-      hex::encode(plaintext.clone()),
-      plaintext.len()
+      "DEC: cipher_len={:?}, plain_len={:?}, seq={:?}, iv={:?}, dec_key={:?}, nonce={:?}, aad={:?}",
+      m.payload.0.len(),
+      plaintext.len(),
+      seq,
+      hex::encode(self.write_iv),
+      hex::encode(self.write_key),
+      hex::encode(init_nonce.as_ref()),
+      hex::encode(aad.as_ref())
     );
+
     Ok((
-      PlainMessage { typ, version: ProtocolVersion::TLSv1_3, payload: TLSPayload(plaintext) },
-      meta,
+      PlainMessage { typ, version: ProtocolVersion::TLSv1_3, payload: TLSPayload(plaintext.clone()) },
+      RecordMeta::new(&aad, &plaintext, &m.payload.0, &nonce.to_vec()),
     ))
   }
 }

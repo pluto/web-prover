@@ -2,8 +2,8 @@ pragma circom 2.1.9;
 
 include "parser-attestor/circuits/json/parser/parser.circom";
 
-template ParseFold(DATA_BYTES, MAX_STACK_HEIGHT) {
-    signal input step_in[DATA_BYTES];
+template ParseFold(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT) {
+    signal input step_in[TOTAL_BYTES];
 
     component State[DATA_BYTES];
     State[0]        = StateUpdate(MAX_STACK_HEIGHT);
@@ -23,7 +23,7 @@ template ParseFold(DATA_BYTES, MAX_STACK_HEIGHT) {
     }
 
     var perIterationDataLength = MAX_STACK_HEIGHT*2 + 2;
-    signal output step_out[DATA_BYTES + DATA_BYTES * perIterationDataLength];
+    signal output step_out[TOTAL_BYTES];
     for (var i = 0 ; i < DATA_BYTES ; i++) {
         step_out[i] <== step_in[i];
     }
@@ -39,4 +39,4 @@ template ParseFold(DATA_BYTES, MAX_STACK_HEIGHT) {
 }
 
 
-component main { public [step_in] } = ParseFold(18, 1);
+component main { public [step_in] } = ParseFold(500, 90, 1);

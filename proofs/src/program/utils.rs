@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, iter::Map};
+use std::collections::BTreeMap;
 
 use bellpepper_core::{
   boolean::{AllocatedBit, Boolean},
@@ -139,9 +139,7 @@ pub fn map_private_inputs(program_data: &ProgramData) -> Vec<HashMap<String, Val
       None =>
       // TODO: This is dumb and really only makes the `tests::test_run` pass. This is inadvisable to
       // actually use!
-        for _ in 0..program_data.rom.len() {
-          private_inputs.push(curr_private_input.clone());
-        },
+        private_inputs.push(curr_private_input.clone()),
 
       Some(fold_input) => {
         let mut map = curr_private_input.clone();
@@ -152,7 +150,7 @@ pub fn map_private_inputs(program_data: &ProgramData) -> Vec<HashMap<String, Val
 
         for (key, values) in fold_input.as_object().unwrap() {
           let batch_size = values.as_array().unwrap().len() / opcode_freq;
-          info!("key: {}, batch size: {}", key, batch_size);
+          info!("key: {}, batch size: {}, opcode_freq: {}", key, batch_size, opcode_freq);
           for val in values.as_array().unwrap().chunks(batch_size).skip(*i).take(1) {
             let mut data: Vec<Value> = Vec::new();
             for individual in val {
@@ -197,5 +195,15 @@ mod tests {
     let inputs = map_private_inputs(&circuit_data);
     assert_eq!(inputs.len(), 4);
     assert_eq!(inputs[0].get("data").unwrap().as_array().unwrap().len(), 40);
+  }
+
+  #[test]
+  #[tracing_test::traced_test]
+  fn test_map_private_inputs_complex() {
+    let read = std::fs::read("examples/aes_200.json").unwrap();
+    let circuit_data: ProgramData = serde_json::from_slice(&read).unwrap();
+
+    let inputs = map_private_inputs(&circuit_data);
+    assert_eq!(inputs.len(), 13);
   }
 }

@@ -65,6 +65,8 @@ pub enum WitnessGeneratorType {
   CircomWitnesscalc { path: String },
   #[serde(skip)]
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
+  #[serde(skip)]
+  RustWitness(fn(&str) -> Vec<F<G1>>),
 }
 
 #[cfg(not(target_os = "ios"))]

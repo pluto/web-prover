@@ -3,18 +3,19 @@ use std::sync::Arc;
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
+use tls_proxy2::WitnessData;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
-use crate::{config, errors, Proof};
+use crate::{config, errors, origo::SignBody, Proof};
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
-  let (server_aes_key, server_aes_iv) = proxy(config.clone(), session_id.clone()).await;
-  crate::origo::sign(config.clone(), session_id.clone(), server_aes_key, server_aes_iv).await
+  let (sb, witness) = proxy(config.clone(), session_id.clone()).await;
+  crate::origo::sign(config.clone(), session_id.clone(), sb, witness).await
 }
 
-async fn proxy(config: config::Config, session_id: String) -> (Vec<u8>, Vec<u8>) {
+async fn proxy(config: config::Config, session_id: String) -> (SignBody, WitnessData) {
   let root_store = crate::tls::tls_client2_default_root_store();
 
   let client_config = tls_client2::ClientConfig::builder()
@@ -125,5 +126,11 @@ async fn proxy(config: config::Config, session_id: String) -> (Vec<u8>, Vec<u8>)
   let server_aes_key =
     origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_key").unwrap().clone();
 
-  (server_aes_key, server_aes_iv)
+  let witness = origo_conn.lock().unwrap().to_witness_data();
+  let sb = SignBody {
+    hs_server_aes_iv:  hex::encode(server_aes_iv.to_vec()),
+    hs_server_aes_key: hex::encode(server_aes_key.to_vec()),
+  };
+
+  (sb, witness)
 }

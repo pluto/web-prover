@@ -25,11 +25,11 @@ template ExtractValue(DATA_BYTES, MAX_STACK_HEIGHT, keyLen1, depth1, maxValueLen
     signal parsingData[DATA_BYTES][2];
     for (var i = 0 ; i < DATA_BYTES ; i++) {
         for (var j = 0 ; j < MAX_STACK_HEIGHT ; j++) {
-            stack[i][j][0] <== step_in[DATA_BYTES + i*j];
-            stack[i][j][1] <== step_in[DATA_BYTES + i*j + 1];
+            stack[i][j][0] <== step_in[DATA_BYTES + i*perIterationDataLength + j*2];
+            stack[i][j][1] <== step_in[DATA_BYTES + i*perIterationDataLength + j*2 + 1];
         }
-        parsingData[i][0] <== step_in[DATA_BYTES + i*MAX_STACK_HEIGHT];
-        parsingData[i][1] <== step_in[DATA_BYTES + i*MAX_STACK_HEIGHT + 1];
+        parsingData[i][0] <== step_in[DATA_BYTES + i*perIterationDataLength + MAX_STACK_HEIGHT*2];
+        parsingData[i][1] <== step_in[DATA_BYTES + i*perIterationDataLength + MAX_STACK_HEIGHT*2 + 1];
     }
 
     signal input key1[keyLen1];
@@ -118,23 +118,35 @@ template ExtractValue(DATA_BYTES, MAX_STACK_HEIGHT, keyLen1, depth1, maxValueLen
         value_starting_index[i] <== value_starting_index[i-1] + i * (1-is_zero_mask[i]) * is_prev_starting_index[i];
     }
 }
-template ExtractStringValue(DATA_BYTES, MAX_STACK_HEIGHT, keyLen1, depth1, maxValueLen) {
+template ExtractStringValue(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, keyLen1, depth1, maxValueLen) {
     var perIterationDataLength = MAX_STACK_HEIGHT*2 + 2;
-    signal input step_in[DATA_BYTES + DATA_BYTES * perIterationDataLength];
-
+    signal input step_in[TOTAL_BYTES];
     signal input key1[keyLen1];
 
-    signal output step_out[maxValueLen];
+    signal output step_out[TOTAL_BYTES];
 
-    signal value_starting_index[DATA_BYTES];
-    value_starting_index <== ExtractValue(DATA_BYTES, MAX_STACK_HEIGHT, keyLen1, depth1, maxValueLen)(step_in, key1);
-
-    signal data[DATA_BYTES];
-    for (var i = 0 ; i < DATA_BYTES ; i++) {
+    signal data[DATA_BYTES + DATA_BYTES * perIterationDataLength];
+    for (var i = 0 ; i < DATA_BYTES + DATA_BYTES * perIterationDataLength ; i++) {
         data[i] <== step_in[i];
     }
 
-    step_out <== SelectSubArray(DATA_BYTES, maxValueLen)(data, value_starting_index[DATA_BYTES-1]+1, maxValueLen);
+    signal value_starting_index[DATA_BYTES];
+    value_starting_index <== ExtractValue(DATA_BYTES, MAX_STACK_HEIGHT, keyLen1, depth1, maxValueLen)(data, key1);
+
+    signal input_data[DATA_BYTES];
+    for (var i = 0 ; i < DATA_BYTES ; i++) {
+        input_data[i] <== step_in[i];
+        log("input", i, input_data[i]);
+    }
+    log("value_starting_index", value_starting_index[DATA_BYTES-1]+1);
+
+    signal value[maxValueLen];
+    value <== SelectSubArray(DATA_BYTES, maxValueLen)(input_data, value_starting_index[DATA_BYTES-1]+1, maxValueLen);
+
+    for (var i = 0 ; i < maxValueLen ; i++) {
+        step_out[i] <== value[i];
+        log("Extract", step_out[i]);
+    }
 }
 
-component main { public [step_in] } = ExtractStringValue(18, 1, 7, 0, 4);
+component main { public [step_in] } = ExtractStringValue(500, 90, 1, 4, 0, 12);

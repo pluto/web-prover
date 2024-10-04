@@ -1,6 +1,6 @@
 ios:
 	-rm -rf target
-	-rm -rf Rust.xcframework 
+	-rm -rf Rust.xcframework
 	-cargo install cbindgen
 	rustup target add aarch64-apple-ios
 	# rustup target add aarch64-apple-ios-sim
@@ -12,3 +12,10 @@ ios:
 		-library ../target/aarch64-apple-ios/release/libproofs.a \
 		-headers ./headers/ \
 		-output Rust.xcframework
+
+proof:
+	circom examples/circuit_data/aes_gcm_fold.circom --r1cs --wasm -o examples/circuit_data/ -l node_modules
+	circom examples/circuit_data/http_get_response.circom --r1cs --wasm -o examples/circuit_data/ -l node_modules
+	circom examples/circuit_data/json_parse.circom --r1cs --wasm -o examples/circuit_data/ -l node_modules
+	circom examples/circuit_data/json_extract.circom --r1cs --wasm -o examples/circuit_data/ -l node_modules
+	cargo test test_end_to_end_proofs -- --exact

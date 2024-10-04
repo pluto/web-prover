@@ -106,6 +106,8 @@ pub fn run(program_data: &ProgramData) -> ProgramOutput {
   // Get the private inputs needed for circuits
   let private_inputs = map_private_inputs(program_data);
 
+  debug!("{:?}", private_inputs);
+
   let mut circuits = vec![];
   for (circuit_index, (r1cs_path, witness_generator_type)) in
     program_data.r1cs_types.iter().zip(program_data.witness_generator_types.iter()).enumerate()
