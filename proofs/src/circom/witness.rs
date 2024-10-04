@@ -25,8 +25,9 @@ pub fn generate_witness_from_graph(
 ) -> Vec<<G1 as Group>::Scalar> {
   #[cfg(not(target_arch = "wasm32"))]
   {
-    let witness =
-      capture_and_log(|| circom_witnesscalc::calc_witness(input_json, graph_data).unwrap());
+    let witness = circom_witnesscalc::calc_witness(input_json, graph_data).unwrap();
+    // let witness =
+    //   capture_and_log(|| circom_witnesscalc::calc_witness(input_json, graph_data).unwrap());
 
     return witness
       .iter()

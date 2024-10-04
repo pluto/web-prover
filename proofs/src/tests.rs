@@ -71,7 +71,7 @@ fn swap_memory_witness(input_json: &str) -> Vec<F<G1>> {
 }
 
 fn run_entry_wc() -> (SetupData, RecursiveSNARK<E1>) {
-  let program_data = ProgramData {
+  let mut program_data = ProgramData {
     r1cs_types:              vec![
       R1CSType::Raw(ADD_INTO_ZEROTH_R1CS.to_vec()),
       R1CSType::Raw(SQUARE_ZEROTH_R1CS.to_vec()),
@@ -82,19 +82,20 @@ fn run_entry_wc() -> (SetupData, RecursiveSNARK<E1>) {
       WitnessGeneratorType::Raw(SQUARE_ZEROTH_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(SWAP_MEMORY_GRAPH.to_vec()),
     ],
-    rom:                     ROM.to_vec(),
+    rom:                     vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     initial_public_input:    INIT_PUBLIC_INPUT.to_vec(),
     private_input:           HashMap::new(),
     witnesses:               vec![vec![]],
   };
   let circuit_list = program::initialize_circuit_list(&program_data);
   let setup_data = program::setup(circuit_list);
-  println!("here");
+  println!("set up with wrong rom");
+  program_data.rom = ROM.to_vec();
   let snark = program::run(&program_data, &setup_data);
   (setup_data, snark)
 }
 
-fn run_entry_rwit() -> RecursiveSNARK<E1> {
+fn run_entry_rwit() -> (SetupData, RecursiveSNARK<E1>) {
   let program_data = ProgramData {
     r1cs_types:              vec![
       R1CSType::Raw(ADD_INTO_ZEROTH_R1CS.to_vec()),
@@ -113,13 +114,32 @@ fn run_entry_rwit() -> RecursiveSNARK<E1> {
   };
   let circuit_list = program::initialize_circuit_list(&program_data);
   let setup_data = program::setup(circuit_list);
-  program::run(&program_data, &setup_data)
+  let snark = program::run(&program_data, &setup_data);
+  (setup_data, snark)
 }
 
 #[test]
 #[tracing_test::traced_test]
 fn test_run_wc() {
   let (_, proof) = run_entry_wc();
+  let final_mem = [
+    F::<G1>::from(0),
+    F::<G1>::from(81),
+    F::<G1>::from(6),
+    F::<G1>::from(0),
+    F::<G1>::from(1),
+    F::<G1>::from(2),
+    F::<G1>::from(0),
+    F::<G1>::from(1),
+    F::<G1>::from(2),
+  ];
+  assert_eq!(&final_mem.to_vec(), proof.zi_primary());
+}
+
+#[test]
+#[tracing_test::traced_test]
+fn test_run_rwit() {
+  let (_, proof) = run_entry_rwit();
   let final_mem = [
     F::<G1>::from(0),
     F::<G1>::from(81),
