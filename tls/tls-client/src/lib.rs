@@ -443,3 +443,7 @@ pub type ClientSession = ClientConnection;
 /* Apologies: would make a trait alias here, but those remain unstable.
 pub trait Session = Connection;
 */
+
+pub mod origo {
+    pub use crate::backend::origo::{OrigoConnection, WitnessData};
+}

@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "proxy/",
     "server/",
     "client/",
     "client-rs/",

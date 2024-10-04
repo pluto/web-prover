@@ -60,3 +60,4 @@ proofs/ir_log/*
 proofs/*.bin
 proofs/log_input_signals.txt
 proofs/*.wtns
+client/.rustc_info.json

@@ -1,10 +1,17 @@
 // logic common to wasm32 and native
-
+use arecibo::{provider::Bn256EngineKZG, supernova::RecursiveSNARK};
 use serde::Serialize;
+use serde_json::json;
+use tls_client2::{origo::WitnessData, CipherSuite, Decrypter2, ProtocolVersion};
+use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
 use tls_proxy2::WitnessData;
 use tracing::debug;
 
 use crate::errors;
+
+const AES_GCM_FOLD_R1CS: &str = "proofs/examples/circuit_data/aes-gcm-fold.r1cs";
+const AES_GCM_FOLD_WASM: &str = "proofs/examples/circuit_data/aes-gcm-fold_js/aes-gcm-fold.wasm";
+const AES_GCM_FOLD_WTNS: &str = "witness.wtns";
 
 #[derive(Serialize)]
 pub struct SignBody {
@@ -16,8 +23,8 @@ pub async fn sign(
   config: crate::config::Config,
   session_id: String,
   sb: SignBody,
-  witness: WitnessData,
-) -> Result<crate::Proof, crate::errors::ClientErrors> {
+  witness: &WitnessData,
+) -> Result<Vec<u8>, crate::errors::ClientErrors> {
   let url = format!(
     "https://{}:{}/v1/origo/sign?session_id={}",
     config.notary_host.clone(),
@@ -40,12 +47,11 @@ pub async fn sign(
   let response = client.post(url).json(&sb).send().await.unwrap();
   assert!(response.status() == hyper::StatusCode::OK);
 
-  // TODO remove debug log line
-  println!("\n{}\n\n", String::from_utf8(response.bytes().await.unwrap().to_vec()).unwrap());
+  // TODO: Actually use this input in the proofs.
+  let sign_response = response.bytes().await.unwrap().to_vec();
+  println!("\n{}\n\n", String::from_utf8(sign_response.clone()).unwrap());
 
-  let r = generate_proof(witness).await.unwrap();
-
-  Ok(crate::Proof::Origo(crate::OrigoProof {})) // TODO
+  Ok(sign_response)
 }
 
 pub async fn generate_proof(witness: WitnessData) -> Result<(), errors::ClientErrors> {

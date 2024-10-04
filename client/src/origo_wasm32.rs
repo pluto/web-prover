@@ -1,21 +1,114 @@
-use std::sync::Arc;
+use std::{
+  collections::HashMap,
+  io::{BufReader, Cursor},
+  path::PathBuf,
+  sync::Arc,
+};
 
+use arecibo::{provider::Bn256EngineKZG, supernova::RecursiveSNARK};
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::{body::Bytes, Request, StatusCode};
+use proofs::{
+  circom::witness::load_witness_from_bin_reader, compress::CompressedVerifier, program,
+  ProgramData, WitnessGeneratorType,
+};
 use serde::Serialize;
-use tls_client2::{ClientConnection, RustCryptoBackend, RustCryptoBackend13, ServerName};
+use serde_json::json;
+use tls_client2::{
+  origo::WitnessData, CipherSuite, ClientConnection, Decrypter2, ProtocolVersion,
+  RustCryptoBackend, RustCryptoBackend13, ServerName,
+};
 use tls_client_async2::bind_client;
+use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
 use tls_proxy2::WitnessData;
+use tracing::debug;
 use url::Url;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
-use crate::{config, errors, origo::SignBody, OrigoProof, Proof};
+use crate::{config, config::ProvingData, errors, origo::SignBody, Proof};
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
   let (sb, witness) = proxy(config.clone(), session_id.clone()).await;
-  crate::origo::sign(config.clone(), session_id.clone(), sb, witness).await
+
+  let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
+
+  let program_data = generate_program_data(&witness, config.proving).await;
+  let program_output = program::run(&program_data);
+  let compressed_verifier = CompressedVerifier::from(program_output);
+  let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
+
+  Ok(crate::Proof::Origo(serialized_compressed_verifier.proof.0))
+}
+
+async fn generate_program_data(witness: &WitnessData, proving: ProvingData) -> ProgramData {
+  debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
+  debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
+
+  let key: &[u8] = &witness.request.aes_key;
+  let iv: &[u8] = &witness.request.aes_iv;
+
+  let mut private_input = HashMap::new();
+
+  let ct: &[u8] = witness.request.ciphertext.as_bytes();
+  let sized_key: [u8; 16] = key[..16].try_into().unwrap();
+  let sized_iv: [u8; 12] = iv[..12].try_into().unwrap();
+
+  private_input.insert("key".to_string(), serde_json::to_value(&sized_key).unwrap());
+  private_input.insert("iv".to_string(), serde_json::to_value(&sized_iv).unwrap());
+
+  let dec = Decrypter2::new(sized_key, sized_iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
+  let (plaintext, meta) = dec
+    .decrypt_tls13_aes(
+      &OpaqueMessage {
+        typ:     ContentType::ApplicationData,
+        version: ProtocolVersion::TLSv1_3,
+        payload: Payload::new(hex::decode(ct).unwrap()),
+      },
+      0,
+    )
+    .unwrap();
+  let pt = plaintext.payload.0.to_vec();
+  let aad = hex::decode(meta.additional_data.to_owned()).unwrap();
+  let mut padded_aad = vec![0; 16 - aad.len()];
+  padded_aad.extend(aad);
+
+  // this somehow needs to be nested in this hashmap of values to be under another key called
+  // "fold_input" private_input.insert("plainText".to_string(),
+  // serde_json::to_value(&pt).unwrap()); private_input.insert("aad".to_string(),
+  // serde_json::to_value(&aad).unwrap());
+
+  // TODO: Is padding the approach we want or change to support variable length?
+  let janky_padding = pt.len() % 16;
+  let mut janky_plaintext_padding = vec![0; janky_padding];
+  let rom_len = (pt.len() + janky_padding) / 16;
+  janky_plaintext_padding.extend(pt);
+
+  let mut witnesses = Vec::new();
+  for w in proving.witnesses {
+    witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w.val))));
+  }
+
+  let private_input = json!({
+    "private_input": {
+      "key": sized_key,
+      "iv": sized_iv,
+      "fold_input": {
+        "plainText": janky_plaintext_padding,
+      },
+      "aad": padded_aad,
+    },
+    "r1cs_types": [{
+      "raw": proving.r1cs
+    }],
+    "witness_generator_types": [{"browser": ()}],
+    "rom": vec![0; rom_len],
+    "initial_public_input": vec![0; 48], // TODO: Feed in correct data.
+    "witnesses": witnesses,
+  });
+
+  serde_json::from_value(private_input).unwrap()
 }
 
 async fn proxy(config: config::Config, session_id: String) -> (SignBody, WitnessData) {
@@ -36,7 +129,7 @@ async fn proxy(config: config::Config, session_id: String) -> (SignBody, Witness
     .with_root_certificates(root_store)
     .with_no_client_auth();
 
-  let origo_conn = Arc::new(std::sync::Mutex::new(tls_proxy2::OrigoConnection::new()));
+  let origo_conn = Arc::new(std::sync::Mutex::new(tls_client2::origo::OrigoConnection::new()));
   let client = tls_client2::ClientConnection::new(
     Arc::new(client_config),
     Box::new(tls_client2::RustCryptoBackend13::new(origo_conn.clone())),

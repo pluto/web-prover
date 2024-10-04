@@ -33,6 +33,6 @@ async fn main() -> Result<()> {
 
   let proof = client::prover_inner(config).await.unwrap();
   let proof_json = serde_json::to_string_pretty(&proof)?;
-  println!("{}", proof_json);
+  println!("Proving Successful: proof_len={:?}", proof_json.len());
   Ok(())
 }

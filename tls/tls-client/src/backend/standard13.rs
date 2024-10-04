@@ -29,7 +29,7 @@ use tls_core::{
   suites::{self, SupportedCipherSuite},
 };
 
-use super::{Backend, BackendError};
+use super::{Backend, BackendError, origo::{OrigoConnection, RecordMeta, RecordKey, Direction}};
 use crate::{backend::tls13::AeadKey, DecryptMode, EncryptMode, Error};
 use tls_proxy::{self, OrigoConnection, RecordMeta, RecordKey, Direction};
 
@@ -640,7 +640,6 @@ impl Backend for RustCryptoBackend13 {
 }
 
 fn tk_dbg_with_context(witness: &Witness) {
-  return;
   let expected = [
     ("DHE", "vC4GIYWwM1k4WJnIuW29+OpFLGJdzIJeuWnkE93wYQM="),
     ("ES", "M60KHGB+wDsJ5s2Yk2gM4hCt8wCqHyZg4bIuEPFw+So="),
@@ -775,7 +774,7 @@ impl Decrypter {
     let nonce = GenericArray::from_slice(&init_nonce);
     let mut plaintext = cipher
       .decrypt(nonce, aes_payload)
-      .map_err(|e| BackendError::DecryptionError(e.to_string()))?;
+      .map_err(|e| BackendError::DecryptionError(e.to_string()))?; // error in invalid here
 
     let typ = unpad_tls13(&mut plaintext);
     if typ == ContentType::Unknown(0) {

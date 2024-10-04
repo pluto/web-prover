@@ -1,9 +1,4 @@
 #![feature(internal_output_capture)]
-
-pub mod circom;
-pub mod compress;
-pub mod program;
-pub mod tests;
 use std::{collections::HashMap, path::PathBuf};
 
 use arecibo::{
@@ -17,6 +12,11 @@ use ff::Field;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, error, info, trace};
+
+pub mod circom;
+pub mod compress;
+pub mod program;
+pub mod tests;
 
 use crate::tests::{
   ADD_INTO_ZEROTH_GRAPH, ADD_INTO_ZEROTH_R1CS, INIT_PUBLIC_INPUT, ROM, SQUARE_ZEROTH_GRAPH,
@@ -45,15 +45,16 @@ pub struct ProgramData {
   pub witness_generator_types: Vec<WitnessGeneratorType>,
   pub rom:                     Vec<u64>,
   pub initial_public_input:    Vec<u64>,
-  // TODO: We should probably just make this a vec here
-  pub private_input:           Vec<HashMap<String, Value>>,
+  pub private_input:           HashMap<String, Value>, /* TODO: We should probably just make
+                                                        * this a vec here */
+  pub witnesses:               Vec<Vec<F<G1>>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum R1CSType {
   #[serde(rename = "file")]
   File { path: PathBuf },
-  #[serde(skip)]
+  #[serde(rename = "raw")]
   Raw(Vec<u8>),
 }
 
@@ -63,6 +64,8 @@ pub enum WitnessGeneratorType {
   Wasm { path: String, wtns_path: String },
   #[serde(rename = "circom-witnesscalc")]
   CircomWitnesscalc { path: String },
+  #[serde(rename = "browser")] // TODO: Can we merge this with Raw?
+  Browser,
   #[serde(skip)]
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
   #[serde(skip)]

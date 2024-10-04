@@ -1,9 +1,18 @@
 wasm:
-	@# TODO: -C lto fails with `lto can only be run for executables, cdylibs and static library outputs`
+	@# NOTE: This build depends on RUSTFLAGS in the client_wasm/.cargo/config.toml
 	-cargo install wasm-pack
+	-cd client_wasm/demo/static && ln -s ../../../proofs/examples/circuit_data build && cd ../../..
 	cd client_wasm && \
-	  PATH="/opt/homebrew/opt/llvm/bin:$$PATH" RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C opt-level=z" \
+	  PATH="/opt/homebrew/opt/llvm/bin:$$PATH" \
 	  rustup run nightly ~/.cargo/bin/wasm-pack build --release --target web ./ -- \
+	    -Z build-std=panic_abort,std
+
+wasm-debug:
+	-cargo install wasm-pack
+	-cd client_wasm/demo/static && ln -s ../../../proofs/examples/circuit_data build && cd ../../..
+	cd client_wasm && \
+	  PATH="/opt/homebrew/opt/llvm/bin:$$PATH" \
+	  rustup run nightly ~/.cargo/bin/wasm-pack build --debug --target web ./ -- \
 	    -Z build-std=panic_abort,std
 
 ios:
@@ -25,4 +34,4 @@ wasm-demo/node_modules:
 wasm-demo: wasm-demo/node_modules
 	cd client_wasm/demo && npm run start
 
-.PHONY: wasm wasm-demo ios
+.PHONY: wasm wasm-debug wasm-demo ios
