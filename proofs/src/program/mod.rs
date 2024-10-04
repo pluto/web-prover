@@ -1,16 +1,17 @@
-use std::time::Instant;
-
+use arecibo::{
+  supernova::{snark::CompressedSNARK, PublicParams, RecursiveSNARK, TrivialTestCircuit},
+  traits::{circuit::StepCircuit, snark::default_ck_hint},
+};
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
-use proving_ground::{
-  supernova::{NonUniformCircuit, PublicParams, RecursiveSNARK, StepCircuit},
-  traits::snark::default_ck_hint,
-};
+use proof::Proof;
 use utils::{into_input_json, map_private_inputs};
 
 use super::*;
 
 pub mod utils;
+
+use arecibo::supernova::{NonUniformCircuit, StepCircuit as SNStepCircuit};
 
 pub struct Memory {
   pub rom:      Vec<u64>,
@@ -27,14 +28,9 @@ pub struct RomCircuit {
   pub witness_generator_type: WitnessGeneratorType,
 }
 
-pub struct ProgramOutput {
-  pub recursive_snark: RecursiveSNARK<E1>,
-  pub public_params:   PublicParams<E1>,
-}
-
 impl NonUniformCircuit<E1> for Memory {
   type C1 = RomCircuit;
-  type C2 = TrivialCircuit<F<G2>>;
+  type C2 = TrivialTestCircuit<F<G2>>;
 
   fn num_circuits(&self) -> usize { self.circuits.len() }
 
@@ -47,7 +43,7 @@ impl NonUniformCircuit<E1> for Memory {
   fn initial_circuit_index(&self) -> usize { self.rom[0] as usize }
 }
 
-impl StepCircuit<F<G1>> for RomCircuit {
+impl SNStepCircuit<F<G1>> for RomCircuit {
   fn arity(&self) -> usize { self.circuit.arity() + 1 + self.rom_size }
 
   fn circuit_index(&self) -> usize { self.circuit_index }
@@ -55,7 +51,7 @@ impl StepCircuit<F<G1>> for RomCircuit {
   fn synthesize<CS: ConstraintSystem<F<G1>>>(
     &self,
     cs: &mut CS,
-    pc: Option<&AllocatedNum<F<G1>>>,
+    pc: Option<&AllocatedNum<F<G1>>>, // TODO: idk how to use the program counter lol
     z: &[AllocatedNum<F<G1>>],
   ) -> Result<(Option<AllocatedNum<F<G1>>>, Vec<AllocatedNum<F<G1>>>), SynthesisError> {
     // TODO: Clean this up.
@@ -84,7 +80,35 @@ impl StepCircuit<F<G1>> for RomCircuit {
   }
 }
 
-pub fn run(program_data: &ProgramData) -> ProgramOutput {
+pub fn initialize_circuit_list(program_data: &ProgramData) -> Vec<RomCircuit> {
+  let mut circuits = vec![];
+  for (circuit_index, (r1cs_path, witness_generator_type)) in
+    program_data.r1cs_types.iter().zip(program_data.witness_generator_types.iter()).enumerate()
+  {
+    let circuit = circom::CircomCircuit { r1cs: R1CS::from(r1cs_path), witness: None };
+    let rom_circuit = RomCircuit {
+      circuit,
+      circuit_index,
+      rom_size: program_data.rom.len(),
+      curr_public_input: None,
+      curr_private_input: None,
+
+      witness_generator_type: witness_generator_type.clone(),
+    };
+
+    circuits.push(rom_circuit);
+  }
+  circuits
+}
+
+pub fn setup(ordered_circuit_list: Vec<RomCircuit>) -> SetupData {
+  let memory = Memory { circuits: ordered_circuit_list, rom: vec![] }; // Note, `rom` here is not used in setup, only `circuits`
+  let public_params = PublicParams::setup(&memory, &*default_ck_hint(), &*default_ck_hint());
+  let (prover_key, verifier_key) = CompressedSNARK::setup(&public_params).unwrap();
+  SetupData { prover_key, verifier_key, public_params }
+}
+
+pub fn run(program_data: &ProgramData, setup_data: &SetupData) -> RecursiveSNARK<E1> {
   info!("Starting SuperNova program...");
 
   // Get the public inputs needed for circuits
@@ -96,48 +120,17 @@ pub fn run(program_data: &ProgramData) -> ProgramOutput {
   // Get the private inputs needed for circuits
   let private_inputs = map_private_inputs(program_data);
 
-  let mut circuits = vec![];
-  for (circuit_index, (r1cs_path, witness_generator_type)) in
-    program_data.r1cs_types.iter().zip(program_data.witness_generator_types.iter()).enumerate()
-  {
-    let circuit = circom::CircomCircuit { r1cs: R1CS::from(r1cs_path), witness: None };
-    let rom_circuit = RomCircuit {
-      circuit,
-      circuit_index,
-      rom_size: program_data.rom.len(),
-      curr_public_input: if program_data.rom[0] as usize == circuit_index {
-        Some(z0_primary.clone())
-      } else {
-        None
-      },
-      curr_private_input: if program_data.rom[0] as usize == circuit_index {
-        Some(private_inputs[0].clone())
-      } else {
-        None
-      },
-      witness_generator_type: witness_generator_type.clone(),
-    };
-
-    circuits.push(rom_circuit);
-  }
-
-  debug!("Initialized RomCircuits: len={:?}", circuits.len());
-
-  let mut memory = Memory { rom: program_data.rom.clone(), circuits };
-
-  // NOTE: This needs move to a preprocessing step.
-  let public_params = PublicParams::setup(&memory, &*default_ck_hint(), &*default_ck_hint());
-
   let z0_secondary = vec![F::<G2>::ZERO];
 
   let mut recursive_snark_option = None;
   let mut next_public_input = z0_primary.clone();
 
-  let outer_start = Instant::now();
   for (idx, &op_code) in program_data.rom.iter().enumerate() {
     info!("Step {} of ROM", idx);
     debug!("Opcode = {}", op_code);
-
+    // TODO: This is highly awkward.
+    let circuits = initialize_circuit_list(&program_data);
+    let mut memory = Memory { rom: program_data.rom.clone(), circuits };
     memory.circuits[op_code as usize].curr_private_input = Some(private_inputs[idx].clone());
     memory.circuits[op_code as usize].curr_public_input = Some(next_public_input);
 
@@ -151,7 +144,7 @@ pub fn run(program_data: &ProgramData) -> ProgramOutput {
       // When running in browser, the witness is passed as input.
       Some(program_data.witnesses[op_code as usize].clone())
     } else {
-      let arity = memory.circuits[op_code as usize].circuit.arity().clone();
+      let arity = memory.circuits[op_code as usize].circuit.arity();
       let in_json = into_input_json(
         &memory.circuits[op_code as usize].curr_public_input.as_ref().unwrap()[..arity],
         memory.circuits[op_code as usize].curr_private_input.as_ref().unwrap(),
@@ -165,7 +158,7 @@ pub fn run(program_data: &ProgramData) -> ProgramOutput {
 
     let mut recursive_snark = recursive_snark_option.unwrap_or_else(|| {
       RecursiveSNARK::new(
-        &public_params,
+        &setup_data.public_params,
         &memory,
         &circuit_primary,
         &circuit_secondary,
@@ -176,13 +169,15 @@ pub fn run(program_data: &ProgramData) -> ProgramOutput {
     });
 
     info!("Proving single step...");
-    recursive_snark.prove_step(&public_params, &circuit_primary, &circuit_secondary).unwrap();
+    recursive_snark
+      .prove_step(&setup_data.public_params, &circuit_primary, &circuit_secondary)
+      .unwrap();
     info!("Done proving single step...");
 
     #[cfg(feature = "verify-steps")]
     {
       info!("Verifying single step...");
-      recursive_snark.verify(&public_params, &z0_primary, &z0_secondary).unwrap();
+      recursive_snark.verify(&setup_data.public_params, &z0_primary, &z0_secondary).unwrap();
       info!("Single step verification done");
     }
 
@@ -192,6 +187,20 @@ pub fn run(program_data: &ProgramData) -> ProgramOutput {
 
     recursive_snark_option = Some(recursive_snark);
   }
-  println!("Outer elapsed: {:?}", outer_start.elapsed());
-  ProgramOutput { public_params, recursive_snark: recursive_snark_option.unwrap() }
+  // Note, this unwrap cannot fail
+  recursive_snark_option.unwrap()
+}
+
+pub fn compress(
+  setup_data: &SetupData,
+  recursive_snark: &RecursiveSNARK<E1>,
+) -> Proof<CompressedSNARK<E1, S1, S2>> {
+  Proof(
+    CompressedSNARK::<E1, S1, S2>::prove(
+      &setup_data.public_params,
+      &setup_data.prover_key,
+      recursive_snark,
+    )
+    .unwrap(),
+  )
 }

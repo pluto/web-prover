@@ -2,10 +2,10 @@
 
 use std::str::FromStr;
 
+use arecibo::supernova::RecursiveSNARK;
 use circom::CircomInput;
 use ff::PrimeField;
 use num_bigint::BigInt;
-use program::ProgramOutput;
 
 use super::*;
 
@@ -70,7 +70,31 @@ fn swap_memory_witness(input_json: &str) -> Vec<F<G1>> {
     .collect()
 }
 
-fn run_entry() -> ProgramOutput {
+fn run_entry_wc() -> (SetupData, RecursiveSNARK<E1>) {
+  let program_data = ProgramData {
+    r1cs_types:              vec![
+      R1CSType::Raw(ADD_INTO_ZEROTH_R1CS.to_vec()),
+      R1CSType::Raw(SQUARE_ZEROTH_R1CS.to_vec()),
+      R1CSType::Raw(SWAP_MEMORY_R1CS.to_vec()),
+    ],
+    witness_generator_types: vec![
+      WitnessGeneratorType::Raw(ADD_INTO_ZEROTH_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(SQUARE_ZEROTH_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(SWAP_MEMORY_GRAPH.to_vec()),
+    ],
+    rom:                     ROM.to_vec(),
+    initial_public_input:    INIT_PUBLIC_INPUT.to_vec(),
+    private_input:           HashMap::new(),
+    witnesses:               vec![vec![]],
+  };
+  let circuit_list = program::initialize_circuit_list(&program_data);
+  let setup_data = program::setup(circuit_list);
+  println!("here");
+  let snark = program::run(&program_data, &setup_data);
+  (setup_data, snark)
+}
+
+fn run_entry_rwit() -> RecursiveSNARK<E1> {
   let program_data = ProgramData {
     r1cs_types:              vec![
       R1CSType::Raw(ADD_INTO_ZEROTH_R1CS.to_vec()),
@@ -82,24 +106,20 @@ fn run_entry() -> ProgramOutput {
       WitnessGeneratorType::RustWitness(square_zeroth_witness),
       WitnessGeneratorType::RustWitness(swap_memory_witness),
     ],
-    // witness_generator_types: vec![
-    //   WitnessGeneratorType::Raw(ADD_INTO_ZEROTH_GRAPH.to_vec()),
-    //   WitnessGeneratorType::Raw(SQUARE_ZEROTH_GRAPH.to_vec()),
-    //   WitnessGeneratorType::Raw(SWAP_MEMORY_GRAPH.to_vec()),
-    // ],
     rom:                     ROM.to_vec(),
     initial_public_input:    INIT_PUBLIC_INPUT.to_vec(),
     private_input:           HashMap::new(),
     witnesses:               vec![vec![]],
   };
-
-  program::run(&program_data)
+  let circuit_list = program::initialize_circuit_list(&program_data);
+  let setup_data = program::setup(circuit_list);
+  program::run(&program_data, &setup_data)
 }
 
 #[test]
 #[tracing_test::traced_test]
-fn test_run() {
-  let ProgramOutput { recursive_snark, .. } = run_entry();
+fn test_run_wc() {
+  let (_, proof) = run_entry_wc();
   let final_mem = [
     F::<G1>::from(0),
     F::<G1>::from(81),
@@ -111,22 +131,20 @@ fn test_run() {
     F::<G1>::from(1),
     F::<G1>::from(2),
   ];
-  assert_eq!(&final_mem.to_vec(), recursive_snark.zi_primary());
+  assert_eq!(&final_mem.to_vec(), proof.zi_primary());
 }
 
 #[test]
 #[tracing_test::traced_test]
-fn test_run_verify() {
-  let program_output = run_entry();
-
-  // Get the CompressedSNARK
-  let compressed_verifier = CompressedVerifier::from(program_output);
+fn test_run_verify_wc() {
+  let (setup_data, recursive_snark) = run_entry_wc();
+  let proof = program::compress(&setup_data, &recursive_snark);
 
   // Serialize and compress further
-  let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
+  let serialized_compressed_proof = proof.serialize_and_compress();
 
   // Decompress and deserialize
-  let compressed_verifier = serialized_compressed_verifier.decompress_and_serialize();
+  let proof = serialized_compressed_proof.decompress_and_serialize();
 
   // Extend the initial state input with the ROM (happens internally inside of `program::run`, so
   // we do it out here)
@@ -135,9 +153,9 @@ fn test_run_verify() {
   z0_primary.extend(ROM.iter());
 
   // Check that it verifies
-  let res = compressed_verifier.proof.verify(
-    &compressed_verifier.public_params,
-    &compressed_verifier.verifier_key,
+  let res = proof.0.verify(
+    &setup_data.public_params,
+    &setup_data.verifier_key,
     z0_primary.into_iter().map(F::<G1>::from).collect::<Vec<_>>().as_slice(),
     [0].into_iter().map(F::<G2>::from).collect::<Vec<_>>().as_slice(),
   );
@@ -149,8 +167,10 @@ fn test_run_verify() {
 fn test_parse_batch_wc() {
   let read = std::fs::read("examples/parse_batch_wc.json").unwrap();
   let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
+  let circuit_list = program::initialize_circuit_list(&program_data);
+  let setup_data = program::setup(circuit_list);
 
-  let ProgramOutput { recursive_snark, .. } = program::run(&program_data);
+  let recursive_snark = program::run(&program_data, &setup_data);
 
   let final_mem = [
     F::<G1>::from(0),
@@ -174,8 +194,10 @@ fn test_parse_batch_wasm() {
   let read = std::fs::read("examples/parse_batch_wasm.json").unwrap();
   let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
 
-  let ProgramOutput { recursive_snark, .. } = program::run(&program_data);
+  let circuit_list = program::initialize_circuit_list(&program_data);
+  let setup_data = program::setup(circuit_list);
 
+  let recursive_snark = program::run(&program_data, &setup_data);
   let final_mem = [
     F::<G1>::from(0),
     F::<G1>::from(0),
@@ -207,8 +229,10 @@ fn test_parse_batch_rwit() {
   let mut program_data: ProgramData = serde_json::from_slice(&read).unwrap();
   program_data.witness_generator_types =
     vec![WitnessGeneratorType::RustWitness(parse_batch_witness)];
+  let circuit_list = program::initialize_circuit_list(&program_data);
+  let setup_data = program::setup(circuit_list);
 
-  let ProgramOutput { recursive_snark: _, .. } = program::run(&program_data);
+  program::run(&program_data, &setup_data);
 }
 
 rust_witness::witness!(aesgcmfold);
@@ -226,6 +250,8 @@ fn test_aes_gcm_fold_rwit() {
   let mut program_data: ProgramData = serde_json::from_slice(&read).unwrap();
   program_data.witness_generator_types =
     vec![WitnessGeneratorType::RustWitness(aes_gcm_fold_witness)];
+  let circuit_list = program::initialize_circuit_list(&program_data);
+  let setup_data = program::setup(circuit_list);
 
-  let ProgramOutput { recursive_snark, .. } = program::run(&program_data);
+  program::run(&program_data, &setup_data);
 }
