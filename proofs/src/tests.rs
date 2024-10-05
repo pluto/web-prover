@@ -197,7 +197,9 @@ fn test_run_verify_wc() {
   println!("PP size: {:?}", serialized_pp.len());
 
   let pp = bincode::deserialize(&serialized_pp).unwrap();
+  let start = Instant::now();
   let (pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&pp).unwrap();
+  println!("CSNARK setup elapsed: {:?}", start.elapsed());
   let proof = CompressedSNARK::prove(&pp, &pk, &recursive_snark).unwrap();
 
   // GIven that this passes, we are able to serde the pp properly.
@@ -210,8 +212,8 @@ fn test_run_verify_wc() {
     )
     .unwrap();
 
-  // let serialized_pk = bincode::serialize(&setup_data.prover_key).unwrap();
-  // println!("PK size: {:?}", serialized_pk.len());
+  let serialized_vk = bincode::serialize(&setup_data.verifier_key).unwrap();
+  println!("VK size: {:?}", serialized_vk.len());
 
   // let serialized_pp = bincode::serialize(&setup_data.public_params).unwrap();
   // println!("PP size: {:?}", serialized_pp.len());
