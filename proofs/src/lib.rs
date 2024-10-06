@@ -7,7 +7,7 @@ use ff::Field;
 use proving_ground::{
   provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
   spartan::batched::BatchedRelaxedR1CSSNARK,
-  supernova::TrivialSecondaryCircuit,
+  supernova::TrivialCircuit,
   traits::{Engine, Group},
 };
 use serde::{Deserialize, Serialize};
@@ -36,7 +36,7 @@ pub type S2 = BatchedRelaxedR1CSSNARK<E2, EE2>;
 pub type F<G> = <G as Group>::Scalar;
 
 pub type C1 = CircomCircuit;
-pub type C2 = TrivialSecondaryCircuit<F<G2>>;
+pub type C2 = TrivialCircuit<F<G2>>;
 
 const TEST_JSON: &str = include_str!("../examples/aes_fold.json");
 

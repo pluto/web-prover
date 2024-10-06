@@ -3,9 +3,7 @@ use std::time::Instant;
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
 use proving_ground::{
-  supernova::{
-    NonUniformCircuit, PublicParams, RecursiveSNARK, StepCircuit, TrivialSecondaryCircuit,
-  },
+  supernova::{NonUniformCircuit, PublicParams, RecursiveSNARK, StepCircuit},
   traits::snark::default_ck_hint,
 };
 use utils::{into_input_json, map_private_inputs};
@@ -36,7 +34,7 @@ pub struct ProgramOutput {
 
 impl NonUniformCircuit<E1> for Memory {
   type C1 = RomCircuit;
-  type C2 = TrivialSecondaryCircuit<F<G2>>;
+  type C2 = TrivialCircuit<F<G2>>;
 
   fn num_circuits(&self) -> usize { self.circuits.len() }
 
