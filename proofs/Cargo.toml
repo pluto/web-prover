@@ -10,8 +10,6 @@ build = "build.rs"
 [[bin]]
 name = "test-prove"
 
-bin = "src/bin/main.rs"
-
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 circom_witnesscalc = { git = "https://github.com/pluto/circom-witnesscalc" }
 
