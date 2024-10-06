@@ -4329,7 +4329,6 @@ name = "proofs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "arecibo",
  "bellpepper-core",
  "bincode",
  "byteorder",
@@ -4342,6 +4341,7 @@ dependencies = [
  "num-bigint 0.4.6",
  "num-traits",
  "paste",
+ "proving_ground",
  "rust-witness",
  "serde",
  "serde_json",
@@ -4444,6 +4444,48 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4759aa0d3a6232fb8dbdb97b61de2c20047c68aca932c7ed76da9d788508d670"
 dependencies = [
  "prost 0.13.3",
+]
+
+[[package]]
+name = "proving_ground"
+version = "0.1.0"
+dependencies = [
+ "bellpepper 0.4.1 (git+https://github.com/argumentcomputer/bellpepper?branch=dev)",
+ "bellpepper-core",
+ "bincode",
+ "bitvec",
+ "byteorder",
+ "cfg-if",
+ "derive_more 0.99.18",
+ "digest 0.10.7",
+ "ff",
+ "generic-array 1.1.0",
+ "getrandom 0.2.15",
+ "group",
+ "grumpkin-msm",
+ "halo2curves",
+ "itertools 0.13.0",
+ "neptune",
+ "num-bigint 0.4.6",
+ "num-integer",
+ "num-traits",
+ "once_cell",
+ "pairing",
+ "pasta_curves",
+ "proptest",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "rand_core 0.6.4",
+ "rayon",
+ "rayon-scan",
+ "ref-cast",
+ "serde",
+ "sha3",
+ "static_assertions",
+ "subtle",
+ "thiserror",
+ "tracing",
+ "vergen",
 ]
 
 [[package]]

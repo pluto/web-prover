@@ -1,16 +1,18 @@
-use arecibo::{
-  supernova::{PublicParams, RecursiveSNARK, TrivialTestCircuit},
-  traits::{circuit::StepCircuit, snark::default_ck_hint},
-};
+use std::time::Instant;
+
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
+use proving_ground::{
+  supernova::{
+    NonUniformCircuit, PublicParams, RecursiveSNARK, StepCircuit, TrivialSecondaryCircuit,
+  },
+  traits::snark::default_ck_hint,
+};
 use utils::{into_input_json, map_private_inputs};
 
 use super::*;
 
 pub mod utils;
-
-use arecibo::supernova::{NonUniformCircuit, StepCircuit as SNStepCircuit};
 
 pub struct Memory {
   pub rom:      Vec<u64>,
@@ -34,7 +36,7 @@ pub struct ProgramOutput {
 
 impl NonUniformCircuit<E1> for Memory {
   type C1 = RomCircuit;
-  type C2 = TrivialTestCircuit<F<G2>>;
+  type C2 = TrivialSecondaryCircuit<F<G2>>;
 
   fn num_circuits(&self) -> usize { self.circuits.len() }
 
@@ -47,7 +49,7 @@ impl NonUniformCircuit<E1> for Memory {
   fn initial_circuit_index(&self) -> usize { self.rom[0] as usize }
 }
 
-impl SNStepCircuit<F<G1>> for RomCircuit {
+impl StepCircuit<F<G1>> for RomCircuit {
   fn arity(&self) -> usize { self.circuit.arity() + 1 + self.rom_size }
 
   fn circuit_index(&self) -> usize { self.circuit_index }
@@ -55,7 +57,7 @@ impl SNStepCircuit<F<G1>> for RomCircuit {
   fn synthesize<CS: ConstraintSystem<F<G1>>>(
     &self,
     cs: &mut CS,
-    pc: Option<&AllocatedNum<F<G1>>>, // TODO: idk how to use the program counter lol
+    pc: Option<&AllocatedNum<F<G1>>>,
     z: &[AllocatedNum<F<G1>>],
   ) -> Result<(Option<AllocatedNum<F<G1>>>, Vec<AllocatedNum<F<G1>>>), SynthesisError> {
     // TODO: Clean this up.
@@ -133,6 +135,7 @@ pub fn run(program_data: &ProgramData) -> ProgramOutput {
   let mut recursive_snark_option = None;
   let mut next_public_input = z0_primary.clone();
 
+  let outer_start = Instant::now();
   for (idx, &op_code) in program_data.rom.iter().enumerate() {
     info!("Step {} of ROM", idx);
     debug!("Opcode = {}", op_code);
@@ -191,5 +194,6 @@ pub fn run(program_data: &ProgramData) -> ProgramOutput {
 
     recursive_snark_option = Some(recursive_snark);
   }
+  println!("Outer elapsed: {:?}", outer_start.elapsed());
   ProgramOutput { public_params, recursive_snark: recursive_snark_option.unwrap() }
 }

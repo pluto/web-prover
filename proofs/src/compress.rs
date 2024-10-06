@@ -1,11 +1,11 @@
 use std::io::{Read, Write};
 
-use arecibo::supernova::{
+use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
+use program::ProgramOutput;
+use proving_ground::supernova::{
   snark::{CompressedSNARK, ProverKey, VerifierKey},
   PublicParams,
 };
-use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
-use program::ProgramOutput;
 
 use super::*;
 

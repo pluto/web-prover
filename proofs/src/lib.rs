@@ -1,14 +1,15 @@
 #![feature(internal_output_capture)]
 use std::{collections::HashMap, path::PathBuf};
 
-use arecibo::{
-  provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
-  spartan::batched::BatchedRelaxedR1CSSNARK,
-  traits::{circuit::TrivialCircuit, Engine, Group},
-};
 use circom::CircomCircuit;
 use compress::CompressedVerifier;
 use ff::Field;
+use proving_ground::{
+  provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
+  spartan::batched::BatchedRelaxedR1CSSNARK,
+  supernova::TrivialSecondaryCircuit,
+  traits::{Engine, Group},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, error, info, trace};
@@ -28,14 +29,14 @@ pub type E2 = GrumpkinEngine;
 pub type G1 = <E1 as Engine>::GE;
 pub type G2 = <E2 as Engine>::GE;
 pub type EE1 = EvaluationEngine<halo2curves::bn256::Bn256, E1>;
-pub type EE2 = arecibo::provider::ipa_pc::EvaluationEngine<E2>;
+pub type EE2 = proving_ground::provider::ipa_pc::EvaluationEngine<E2>;
 pub type S1 = BatchedRelaxedR1CSSNARK<E1, EE1>;
 pub type S2 = BatchedRelaxedR1CSSNARK<E2, EE2>;
 
 pub type F<G> = <G as Group>::Scalar;
 
 pub type C1 = CircomCircuit;
-pub type C2 = TrivialCircuit<F<G2>>;
+pub type C2 = TrivialSecondaryCircuit<F<G2>>;
 
 const TEST_JSON: &str = include_str!("../examples/aes_fold.json");
 

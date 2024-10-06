@@ -22,9 +22,10 @@ serde_json = "1.0"
 rust-witness = { git = "https://github.com/chancehudson/rust-witness" }
 paste = "1.0"
 
-arecibo = { git = "https://github.com/argumentcomputer/arecibo", default-features = false, features = [
-    # "portable",
-] }
+# arecibo = { git = "https://github.com/argumentcomputer/arecibo", default-features = false, features = [
+#     "portable",
+# ] }
+proving_ground = { path = "../../pluto/proving_ground" }
 ff = { version = "0.13", default-features = false, features = ["derive"] }
 bellpepper-core = "0.4"
 halo2curves = "0.6.1"
