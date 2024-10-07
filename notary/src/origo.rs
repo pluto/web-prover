@@ -77,6 +77,13 @@ pub struct SignBody {
   hs_server_aes_key: String,
 }
 
+/// Proxy signature on TLS contents between server and client. Performs following functions:
+/// - extracts TLS messages
+/// - verifies server certificate signature
+/// - verifies client hello SNI matches target host in proxy's [`SharedState`]
+///   - verifies server replied back with [`ServerExtension::ServerNameAck`]
+/// - verifies server cert name matches target host in proxy's [`SharedState`]
+/// - create a signature for TLS messages using merkle tree root
 pub async fn sign(
   query: Query<SignQuery>,
   State(state): State<Arc<SharedState>>,
@@ -115,8 +122,24 @@ pub async fn sign(
 
           transcript.add_message(&msg);
         },
-        HandshakePayload::ServerHello(_) => {
+        HandshakePayload::ServerHello(ref server_hello_payload) => {
           debug!("ServerHello");
+
+          // check server_hello_payload and check it contains ServerNameAck extension
+          let mut server_name_ack_flag = false;
+          for extension in &server_hello_payload.extensions {
+            match extension {
+              ServerExtension::ServerNameAck => server_name_ack_flag = true,
+              _ => {},
+            }
+          }
+          if !server_name_ack_flag {
+            debug!("server name ack flag not recieved: {:?}", server_hello_payload.extensions);
+            return Err(ProxyError::Sign(String::from(
+              "ServerNameAck not present in ServerHelloPayload",
+            )));
+          }
+
           transcript.add_message(&msg);
         },
         HandshakePayload::Certificate(_) => {
