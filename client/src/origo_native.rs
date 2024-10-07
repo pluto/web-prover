@@ -86,14 +86,14 @@ async fn generate_program_data(witness: &WitnessData) -> ProgramData {
   janky_plaintext_padding.extend(pt);
 
   let private_input = json!({
-    "private_input": {
+    "private_input": [{
       "key": sized_key,
       "iv": sized_iv,
       "fold_input": {
         "plainText": janky_plaintext_padding,
       },
       "aad": padded_aad,
-    },
+    }],
     "r1cs_types": [{
       "file": {
           "path": AES_GCM_FOLD_R1CS

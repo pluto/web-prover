@@ -200,10 +200,10 @@ mod tests {
   #[test]
   #[tracing_test::traced_test]
   fn test_map_private_inputs_complex() {
-    let read = std::fs::read("examples/aes_200.json").unwrap();
+    let read = std::fs::read("examples/aes_http_json_extract.json").unwrap();
     let circuit_data: ProgramData = serde_json::from_slice(&read).unwrap();
 
     let inputs = map_private_inputs(&circuit_data);
-    assert_eq!(inputs.len(), 13);
+    assert_eq!(inputs.len(), 16);
   }
 }
