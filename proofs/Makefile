@@ -18,4 +18,4 @@ proof:
 	circom examples/circuit_data/http_get_response.circom --r1cs --wasm -o examples/circuit_data/ -l node_modules
 	circom examples/circuit_data/json_parse.circom --r1cs --wasm -o examples/circuit_data/ -l node_modules
 	circom examples/circuit_data/json_extract.circom --r1cs --wasm -o examples/circuit_data/ -l node_modules
-	cargo test tests::test_end_to_end_proofs -- --exact
+	cargo test -- tests::test_end_to_end_proofs --exact --ignored
