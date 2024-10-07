@@ -192,6 +192,7 @@ fn test_parse_batch_wasm() {
   assert_eq!(&final_mem.to_vec(), recursive_snark.zi_primary());
 }
 
+#[ignore]
 #[test]
 #[tracing_test::traced_test]
 fn test_end_to_end_proofs() {

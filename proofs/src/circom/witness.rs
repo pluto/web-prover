@@ -83,10 +83,7 @@ pub fn generate_witness_from_wasm_file(
     error!("{}", std::str::from_utf8(&output.stderr).unwrap());
   }
   fs::remove_file(witness_generator_input).unwrap();
-  let reader = OpenOptions::new()
-    .read(true)
-    .open(wtns_path)
-    .expect(&format!("unable to open {}", wtns_path.display()));
+  let reader = OpenOptions::new().read(true).open(wtns_path).expect("unable to open.");
   let witness = load_witness_from_bin_reader(BufReader::new(reader));
   fs::remove_file(wtns_path).unwrap();
   witness

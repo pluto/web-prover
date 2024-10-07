@@ -555,7 +555,7 @@
     "r1cs_types": [
         {
             "file": {
-                "path": "examples/circuit_data/aes_gcm_fold.r1cs"
+                "path": "examples/circuit_data/aes_gcm_folds.r1cs"
             }
         },
         {
@@ -577,8 +577,8 @@
     "witness_generator_types": [
         {
             "wasm": {
-                "path": "examples/circuit_data/aes_gcm_fold_js/aes_gcm_fold.wasm",
-                "wtns_path": "aes_gcm_fold.wtns"
+                "path": "examples/circuit_data/aes_gcm_folds_js/aes_gcm_folds.wasm",
+                "wtns_path": "aes_gcm_folds.wtns"
             }
         },
         {
@@ -1119,5 +1119,6 @@
         0,
         0,
         0
-    ]
+    ],
+    "witnesses": []
 }
