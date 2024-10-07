@@ -1079,8 +1079,12 @@
             0
         ]
     },
-    "r1cs_paths": [
-        "examples/circuit_data/aes-gcm-fold.r1cs"
+    "r1cs_types": [
+        {
+            "file": {
+                "path": "examples/circuit_data/aes-gcm-fold.r1cs"
+            }
+        }
     ],
     "witness_generator_types": [
         {
@@ -1205,5 +1209,6 @@
         0,
         0,
         0
-    ]
+    ], 
+    "witnesses":[]
 }

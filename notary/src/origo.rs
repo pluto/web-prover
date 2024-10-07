@@ -577,8 +577,8 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
 
   state.origo_sessions.lock().unwrap().insert(session_id.to_string(), OrigoSession {
     // TODO currently request is both, request and response. will this become a problem?
-    request:   request_buf.lock().unwrap().to_vec(),
-    timestamp: SystemTime::now(),
+    request:    request_buf.lock().unwrap().to_vec(),
+    _timestamp: SystemTime::now(),
   });
 
   Ok(())

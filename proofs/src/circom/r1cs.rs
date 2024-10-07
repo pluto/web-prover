@@ -31,6 +31,15 @@ pub struct Header {
   pub n_constraints: u32,
 }
 
+impl From<&R1CSType> for R1CS {
+  fn from(value: &R1CSType) -> Self {
+    match value {
+      R1CSType::File { path } => R1CS::from(path),
+      R1CSType::Raw(bytes) => R1CS::from(&bytes[..]),
+    }
+  }
+}
+
 impl From<&[u8]> for R1CS {
   fn from(value: &[u8]) -> Self {
     let cursor = BufReader::new(Cursor::new(value));

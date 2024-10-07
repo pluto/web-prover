@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use tlsn_core::proof::SessionProof;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::{state::Closed, Prover};
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::errors;
 

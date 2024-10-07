@@ -5,13 +5,17 @@ pub fn generate_witness_from_generator_type(
   input_json: &str,
   witness_generator_type: &WitnessGeneratorType,
 ) -> Vec<F<G1>> {
-  dbg!(input_json);
   match witness_generator_type {
+    WitnessGeneratorType::Browser => {
+      panic!("browser type witness generation cannot be generated in process")
+    },
     WitnessGeneratorType::Wasm { path, wtns_path } =>
       generate_witness_from_wasm_file(input_json, &PathBuf::from(path), &PathBuf::from(wtns_path)),
     WitnessGeneratorType::CircomWitnesscalc { path } =>
       generate_witness_from_witnesscalc_file(input_json, &PathBuf::from(path)),
+
     WitnessGeneratorType::Raw(graph_data) => generate_witness_from_graph(input_json, graph_data),
+    WitnessGeneratorType::RustWitness(f) => f(input_json),
   }
 }
 
@@ -19,27 +23,41 @@ pub fn generate_witness_from_graph(
   input_json: &str,
   graph_data: &[u8],
 ) -> Vec<<G1 as Group>::Scalar> {
-  let witness = circom_witnesscalc::calc_witness(input_json, graph_data).unwrap();
+  #[cfg(not(target_arch = "wasm32"))]
+  {
+    let witness =
+      capture_and_log(|| circom_witnesscalc::calc_witness(input_json, graph_data).unwrap());
 
-  witness
-    .iter()
-    .map(|elem| <F<G1> as PrimeField>::from_str_vartime(elem.to_string().as_str()).unwrap())
-    .collect()
+    return witness
+      .iter()
+      .map(|elem| <F<G1> as PrimeField>::from_str_vartime(elem.to_string().as_str()).unwrap())
+      .collect();
+  }
+
+  todo!("circom_witnesscalc not supported in wasm");
 }
 
 pub fn generate_witness_from_witnesscalc_file(
   witness_input_json: &str,
   graph_path: &PathBuf,
 ) -> Vec<F<G1>> {
-  let mut file = std::fs::File::open(graph_path).unwrap();
-  let mut graph_data = Vec::new();
-  file.read_to_end(&mut graph_data).unwrap();
+  #[cfg(not(target_arch = "wasm32"))]
+  {
+    let mut file = std::fs::File::open(graph_path).unwrap();
+    let mut graph_data = Vec::new();
+    file.read_to_end(&mut graph_data).unwrap();
 
-  let witness = circom_witnesscalc::calc_witness(witness_input_json, &graph_data).unwrap();
-  witness
-    .iter()
-    .map(|elem| <F<G1> as PrimeField>::from_str_vartime(elem.to_string().as_str()).unwrap())
-    .collect()
+    let witness = capture_and_log(|| {
+      circom_witnesscalc::calc_witness(witness_input_json, &graph_data).unwrap()
+    });
+    let r = witness
+      .iter()
+      .map(|elem| <F<G1> as PrimeField>::from_str_vartime(elem.to_string().as_str()).unwrap())
+      .collect();
+    return r;
+  }
+
+  todo!("circom_witnesscalc not supported in wasm");
 }
 
 pub fn generate_witness_from_wasm_file(
@@ -61,8 +79,8 @@ pub fn generate_witness_from_wasm_file(
     .output()
     .expect("failed to execute process");
   if !output.stdout.is_empty() || !output.stderr.is_empty() {
-    print!("stdout: {}", std::str::from_utf8(&output.stdout).unwrap());
-    print!("stderr: {}", std::str::from_utf8(&output.stderr).unwrap());
+    debug!("{}", std::str::from_utf8(&output.stdout).unwrap());
+    error!("{}", std::str::from_utf8(&output.stderr).unwrap());
   }
   fs::remove_file(witness_generator_input).unwrap();
   let reader = OpenOptions::new().read(true).open(wtns_path).expect("unable to open.");
@@ -71,7 +89,7 @@ pub fn generate_witness_from_wasm_file(
   witness
 }
 
-pub(crate) fn load_witness_from_bin_reader<R: Read>(mut reader: R) -> Vec<F<G1>> {
+pub fn load_witness_from_bin_reader<R: Read>(mut reader: R) -> Vec<F<G1>> {
   let mut wtns_header = [0u8; 4];
   reader.read_exact(&mut wtns_header).unwrap();
   assert_eq!(wtns_header, [119, 116, 110, 115]);
@@ -120,7 +138,7 @@ pub(crate) fn read_field<R: Read>(mut reader: R) -> Result<F<G1>> {
   Ok(fr)
 }
 
-fn _capture_and_log<F, T>(f: F) -> T
+fn capture_and_log<F, T>(f: F) -> T
 where F: FnOnce() -> T {
   // Create a buffer to capture stdout
   let output_buffer = Arc::new(Mutex::new(Vec::new()));

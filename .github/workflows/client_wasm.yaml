@@ -47,7 +47,10 @@ jobs:
       #      wasm-pack test --firefox
       #      docs: https://rustwasm.github.io/docs/wasm-pack/tutorials/npm-browser-packages/testing-your-project.html
 
-      - run: make wasm
+      - run: |
+          echo "$PATH"
+          echo "$GITHUB_PATH"
+          make wasm
 
       - run: "tar czf pkg.tar.gz ./pkg/*"
         if: matrix.os == 'ubuntu-latest'
