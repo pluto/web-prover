@@ -4,7 +4,6 @@ use proof::Proof;
 use proving_ground::{
   supernova::{
     snark::CompressedSNARK, NonUniformCircuit, PublicParams, RecursiveSNARK, StepCircuit,
-    TrivialCircuit,
   },
   traits::snark::default_ck_hint,
 };
@@ -52,7 +51,7 @@ impl StepCircuit<F<G1>> for RomCircuit {
   fn synthesize<CS: ConstraintSystem<F<G1>>>(
     &self,
     cs: &mut CS,
-    pc: Option<&AllocatedNum<F<G1>>>, // TODO: idk how to use the program counter lol
+    pc: Option<&AllocatedNum<F<G1>>>,
     z: &[AllocatedNum<F<G1>>],
   ) -> Result<(Option<AllocatedNum<F<G1>>>, Vec<AllocatedNum<F<G1>>>), SynthesisError> {
     let rom_index = &z[self.circuit.arity()]; // jump to where we pushed pc data into CS
@@ -91,14 +90,21 @@ pub fn initialize_circuit_list(program_data: &ProgramData) -> Vec<RomCircuit> {
   circuits
 }
 
-pub fn setup(ordered_circuit_list: Vec<RomCircuit>) -> SetupData {
+pub fn setup(ordered_circuit_list: Vec<RomCircuit>) -> PublicParams<E1> {
+  // Optionally time the setup stage for the program
+  #[cfg(feature = "timing")]
+  let time = std::time::Instant::now();
+
   let memory = Memory { circuits: ordered_circuit_list, rom: vec![] }; // Note, `rom` here is not used in setup, only `circuits`
   let public_params = PublicParams::setup(&memory, &*default_ck_hint(), &*default_ck_hint());
-  let (prover_key, verifier_key) = CompressedSNARK::setup(&public_params).unwrap();
-  SetupData { prover_key, verifier_key, public_params }
+
+  #[cfg(feature = "timing")]
+  trace!("`PublicParams::setup()` elapsed: {:?}", time.elapsed());
+
+  public_params
 }
 
-pub fn run(program_data: &ProgramData, setup_data: &SetupData) -> RecursiveSNARK<E1> {
+pub fn run(program_data: &ProgramData, public_params: &PublicParams<E1>) -> RecursiveSNARK<E1> {
   info!("Starting SuperNova program...");
 
   // Get the public inputs needed for circuits
@@ -118,6 +124,8 @@ pub fn run(program_data: &ProgramData, setup_data: &SetupData) -> RecursiveSNARK
   let circuits = initialize_circuit_list(program_data);
   let mut memory = Memory { rom: program_data.rom.clone(), circuits };
 
+  #[cfg(feature = "timing")]
+  let time = std::time::Instant::now();
   for (idx, &op_code) in
     program_data.rom.iter().enumerate().take_while(|&(_, &op_code)| op_code != u64::MAX)
   {
@@ -148,7 +156,7 @@ pub fn run(program_data: &ProgramData, setup_data: &SetupData) -> RecursiveSNARK
 
     let mut recursive_snark = recursive_snark_option.unwrap_or_else(|| {
       RecursiveSNARK::new(
-        &setup_data.public_params,
+        public_params,
         &memory,
         &circuit_primary,
         &circuit_secondary,
@@ -159,15 +167,13 @@ pub fn run(program_data: &ProgramData, setup_data: &SetupData) -> RecursiveSNARK
     });
 
     info!("Proving single step...");
-    recursive_snark
-      .prove_step(&setup_data.public_params, &circuit_primary, &circuit_secondary)
-      .unwrap();
+    recursive_snark.prove_step(public_params, &circuit_primary, &circuit_secondary).unwrap();
     info!("Done proving single step...");
 
     #[cfg(feature = "verify-steps")]
     {
       info!("Verifying single step...");
-      recursive_snark.verify(&setup_data.public_params, &z0_primary, &z0_secondary).unwrap();
+      recursive_snark.verify(public_params, &z0_primary, &z0_secondary).unwrap();
       info!("Single step verification done");
     }
 
@@ -178,19 +184,28 @@ pub fn run(program_data: &ProgramData, setup_data: &SetupData) -> RecursiveSNARK
     recursive_snark_option = Some(recursive_snark);
   }
   // Note, this unwrap cannot fail
-  recursive_snark_option.unwrap()
+  let recursive_snark = recursive_snark_option.unwrap();
+  #[cfg(feature = "timing")]
+  trace!("Recursive loop of `program::run()` elapsed: {:?}", time.elapsed());
+
+  recursive_snark
 }
 
-pub fn compress(
-  setup_data: &SetupData,
+pub fn compress_proof(
   recursive_snark: &RecursiveSNARK<E1>,
+  public_params: &PublicParams<E1>,
 ) -> Proof<CompressedSNARK<E1, S1, S2>> {
-  Proof(
-    CompressedSNARK::<E1, S1, S2>::prove(
-      &setup_data.public_params,
-      &setup_data.prover_key,
-      recursive_snark,
-    )
-    .unwrap(),
-  )
+  let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(public_params).unwrap();
+
+  // Optionally time the `CompressedSNARK` creation
+  #[cfg(feature = "timing")]
+  let time = std::time::Instant::now();
+
+  let proof =
+    Proof(CompressedSNARK::<E1, S1, S2>::prove(public_params, &pk, recursive_snark).unwrap());
+
+  #[cfg(feature = "timing")]
+  trace!("`CompressedSNARK::prove` of `program::run()` elapsed: {:?}", time.elapsed());
+
+  proof
 }

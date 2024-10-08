@@ -1,7 +1,6 @@
 use std::io::{Read, Write};
 
 use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
-use proving_ground::supernova::snark::{CompressedSNARK, ProverKey, VerifierKey};
 
 use super::*;
 
@@ -26,13 +25,3 @@ impl Proof<Vec<u8>> {
     Proof(bincode::deserialize(&decompressed).unwrap())
   }
 }
-
-// #[derive(Serialize)]
-// pub struct VerifierKeyWrapper(VerifierKey<E1, S1, S2>);
-
-// impl Serialize for VerifierKeyWrapper {
-//   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//   where S: serde::Serializer {
-//     todo!()
-//   }
-// }

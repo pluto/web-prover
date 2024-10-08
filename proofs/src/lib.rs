@@ -6,10 +6,7 @@ use ff::Field;
 use proving_ground::{
   provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
   spartan::batched::BatchedRelaxedR1CSSNARK,
-  supernova::{
-    snark::{ProverKey, VerifierKey},
-    PublicParams, TrivialCircuit,
-  },
+  supernova::{snark::CompressedSNARK, TrivialCircuit},
   traits::{Engine, Group},
 };
 use serde::{Deserialize, Serialize};
@@ -19,12 +16,7 @@ use tracing::{debug, error, info, trace};
 pub mod circom;
 pub mod program;
 pub mod proof;
-pub mod tests;
-
-use crate::tests::{
-  ADD_INTO_ZEROTH_GRAPH, ADD_INTO_ZEROTH_R1CS, INIT_PUBLIC_INPUT, ROM, SQUARE_ZEROTH_GRAPH,
-  SQUARE_ZEROTH_R1CS, SWAP_MEMORY_GRAPH, SWAP_MEMORY_R1CS,
-};
+#[cfg(test)] mod tests;
 
 pub type E1 = Bn256EngineKZG;
 pub type E2 = GrumpkinEngine;
@@ -39,14 +31,6 @@ pub type F<G> = <G as Group>::Scalar;
 
 pub type C1 = CircomCircuit;
 pub type C2 = TrivialCircuit<F<G2>>;
-
-const TEST_JSON: &str = include_str!("../examples/aes_fold.json");
-
-pub struct SetupData {
-  public_params: PublicParams<E1>,
-  prover_key:    ProverKey<E1, S1, S2>,
-  verifier_key:  VerifierKey<E1, S1, S2>,
-}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ProgramData {

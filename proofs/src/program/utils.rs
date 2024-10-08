@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use bellpepper_core::{
   boolean::{AllocatedBit, Boolean},
   LinearCombination,
@@ -154,6 +156,26 @@ pub fn into_input_json(public_input: &[F<G1>], private_input: &HashMap<String, V
 
   let input = CircomInput { step_in: decimal_stringified_input, extra: private_input.clone() };
   serde_json::to_string(&input).unwrap()
+}
+
+pub fn remap_inputs(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
+  let circom_input: CircomInput = serde_json::from_str(input_json).unwrap();
+  dbg!(&circom_input);
+  let mut remapped = vec![];
+  remapped.push((
+    "step_in".to_string(),
+    circom_input.step_in.into_iter().map(|s| BigInt::from_str(&s).unwrap()).collect(),
+  ));
+  for (k, v) in circom_input.extra {
+    let val = v
+      .as_array()
+      .unwrap()
+      .iter()
+      .map(|x| BigInt::from_str(&x.as_number().unwrap().to_string()).unwrap())
+      .collect::<Vec<BigInt>>();
+    remapped.push((k, val));
+  }
+  remapped
 }
 
 #[cfg(test)]

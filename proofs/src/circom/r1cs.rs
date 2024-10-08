@@ -1,4 +1,3 @@
-use ff::PrimeField;
 use fs::OpenOptions;
 
 use super::*;
