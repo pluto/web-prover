@@ -126,6 +126,35 @@ fn run_entry_rwit() -> (SetupData, RecursiveSNARK<E1>) {
 }
 
 #[test]
+fn time_setup_components() {
+  let program_data = ProgramData {
+    r1cs_types:              vec![
+      R1CSType::Raw(ADD_INTO_ZEROTH_R1CS.to_vec()),
+      R1CSType::Raw(SQUARE_ZEROTH_R1CS.to_vec()),
+      R1CSType::Raw(SWAP_MEMORY_R1CS.to_vec()),
+    ],
+    witness_generator_types: vec![
+      WitnessGeneratorType::Raw(ADD_INTO_ZEROTH_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(SQUARE_ZEROTH_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(SWAP_MEMORY_GRAPH.to_vec()),
+    ],
+    rom:                     ROM.to_vec(),
+    initial_public_input:    INIT_PUBLIC_INPUT.to_vec(),
+    private_input:           HashMap::new(),
+    witnesses:               vec![vec![]],
+  };
+  let circuit_list = program::initialize_circuit_list(&program_data);
+
+  let time = Instant::now();
+  let setup_data = program::setup(circuit_list);
+  println!("program setup elapsed: {:?}", time.elapsed());
+
+  let time = Instant::now();
+  let (pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&setup_data.public_params).unwrap();
+  println!("pk/vk from pp elapsed: {:?}", time.elapsed());
+}
+
+#[test]
 #[tracing_test::traced_test]
 fn test_run_wc() {
   let start = Instant::now();
