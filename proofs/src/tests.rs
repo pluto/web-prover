@@ -2,7 +2,7 @@
 
 use ff::PrimeField;
 use program::utils::remap_inputs;
-use proving_ground::supernova::{PublicParams, RecursiveSNARK};
+use proving_ground::supernova::RecursiveSNARK;
 
 use super::*;
 

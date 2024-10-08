@@ -2,9 +2,7 @@ use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
 use proof::Proof;
 use proving_ground::{
-  supernova::{
-    snark::CompressedSNARK, NonUniformCircuit, PublicParams, RecursiveSNARK, StepCircuit,
-  },
+  supernova::{NonUniformCircuit, RecursiveSNARK, StepCircuit},
   traits::snark::default_ck_hint,
 };
 use utils::{into_input_json, map_private_inputs};
