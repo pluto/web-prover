@@ -2,10 +2,10 @@
 
 use std::{str::FromStr, time::Instant};
 
-use arecibo::supernova::{snark::CompressedSNARK, RecursiveSNARK};
 use circom::CircomInput;
 use ff::PrimeField;
 use num_bigint::BigInt;
+use proving_ground::supernova::{snark::CompressedSNARK, RecursiveSNARK};
 
 use super::*;
 

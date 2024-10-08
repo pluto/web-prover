@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 
-use arecibo::supernova::snark::{CompressedSNARK, ProverKey, VerifierKey};
 use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
+use proving_ground::supernova::snark::{CompressedSNARK, ProverKey, VerifierKey};
 
 use super::*;
 

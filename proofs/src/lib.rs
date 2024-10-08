@@ -2,12 +2,14 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use circom::CircomCircuit;
-use compress::CompressedVerifier;
 use ff::Field;
 use proving_ground::{
   provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
   spartan::batched::BatchedRelaxedR1CSSNARK,
-  supernova::TrivialCircuit,
+  supernova::{
+    snark::{ProverKey, VerifierKey},
+    PublicParams, TrivialCircuit,
+  },
   traits::{Engine, Group},
 };
 use serde::{Deserialize, Serialize};
@@ -15,8 +17,8 @@ use serde_json::Value;
 use tracing::{debug, error, info, trace};
 
 pub mod circom;
-pub mod compress;
 pub mod program;
+pub mod proof;
 pub mod tests;
 
 use crate::tests::{
@@ -39,6 +41,12 @@ pub type C1 = CircomCircuit;
 pub type C2 = TrivialCircuit<F<G2>>;
 
 const TEST_JSON: &str = include_str!("../examples/aes_fold.json");
+
+pub struct SetupData {
+  public_params: PublicParams<E1>,
+  prover_key:    ProverKey<E1, S1, S2>,
+  verifier_key:  VerifierKey<E1, S1, S2>,
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ProgramData {
@@ -73,45 +81,47 @@ pub enum WitnessGeneratorType {
   RustWitness(fn(&str) -> Vec<F<G1>>),
 }
 
-#[cfg(not(target_os = "ios"))]
-pub fn get_compressed_proof(program_data: ProgramData) -> Vec<u8> {
-  let program_output = program::run(&program_data);
-  let compressed_verifier = CompressedVerifier::from(program_output);
-  let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
-  serialized_compressed_verifier.proof.0
-}
+// TODO: Redo these
 
-#[cfg(target_os = "ios")] use std::ffi::c_char;
-#[cfg(target_os = "ios")]
-#[no_mangle]
-#[allow(clippy::missing_safety_doc)]
-pub unsafe extern "C" fn get_compressed_proof(program_data_json: *const c_char) -> *const c_char {
-  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-    let program_data_str = unsafe {
-      assert!(!program_data_json.is_null());
-      std::ffi::CStr::from_ptr(program_data_json).to_str().unwrap()
-    };
-    serde_json::from_str::<ProgramData>(program_data_str).unwrap()
-  }));
+// #[cfg(not(target_os = "ios"))]
+// pub fn get_compressed_proof(program_data: ProgramData) -> Vec<u8> {
+//   let program_output = program::run(&program_data);
+//   let compressed_verifier = CompressedVerifier::from(program_output);
+//   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
+//   serialized_compressed_verifier.proof.0
+// }
 
-  match result {
-    Ok(program_data) => {
-      let program_output = program::run(&program_data);
-      let compressed_verifier = CompressedVerifier::from(program_output);
-      let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
-      std::ffi::CString::new(serialized_compressed_verifier.proof.0).unwrap().into_raw()
-    },
-    Err(err) => {
-      let backtrace = std::backtrace::Backtrace::capture();
+// #[cfg(target_os = "ios")] use std::ffi::c_char;
+// #[cfg(target_os = "ios")]
+// #[no_mangle]
+// #[allow(clippy::missing_safety_doc)]
+// pub unsafe extern "C" fn get_compressed_proof(program_data_json: *const c_char) -> *const c_char
+// {   let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+//     let program_data_str = unsafe {
+//       assert!(!program_data_json.is_null());
+//       std::ffi::CStr::from_ptr(program_data_json).to_str().unwrap()
+//     };
+//     serde_json::from_str::<ProgramData>(program_data_str).unwrap()
+//   }));
 
-      let out = if let Some(e) = err.downcast_ref::<&str>() {
-        format!("Captured Panic\nError: {}\n\nStack:\n{}", e, backtrace)
-      } else {
-        format!("Captured Panic\n{:#?}\n\nStack:\n{}", err, backtrace)
-      };
+//   match result {
+//     Ok(program_data) => {
+//       let program_output = program::run(&program_data);
+//       let compressed_verifier = CompressedVerifier::from(program_output);
+//       let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
+//       std::ffi::CString::new(serialized_compressed_verifier.proof.0).unwrap().into_raw()
+//     },
+//     Err(err) => {
+//       let backtrace = std::backtrace::Backtrace::capture();
 
-      let out_json = serde_json::to_string_pretty(&out).unwrap(); // should never panic
-      std::ffi::CString::new(out_json).unwrap().into_raw() // should never panic
-    },
-  }
-}
+//       let out = if let Some(e) = err.downcast_ref::<&str>() {
+//         format!("Captured Panic\nError: {}\n\nStack:\n{}", e, backtrace)
+//       } else {
+//         format!("Captured Panic\n{:#?}\n\nStack:\n{}", err, backtrace)
+//       };
+
+//       let out_json = serde_json::to_string_pretty(&out).unwrap(); // should never panic
+//       std::ffi::CString::new(out_json).unwrap().into_raw() // should never panic
+//     },
+//   }
+// }

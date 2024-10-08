@@ -1,17 +1,18 @@
-use arecibo::{
-  supernova::{snark::CompressedSNARK, PublicParams, RecursiveSNARK, TrivialTestCircuit},
-  traits::{circuit::StepCircuit, snark::default_ck_hint},
-};
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
 use proof::Proof;
+use proving_ground::{
+  supernova::{
+    snark::CompressedSNARK, NonUniformCircuit, PublicParams, RecursiveSNARK, StepCircuit,
+    TrivialCircuit,
+  },
+  traits::snark::default_ck_hint,
+};
 use utils::{into_input_json, map_private_inputs};
 
 use super::*;
 
 pub mod utils;
-
-use arecibo::supernova::{NonUniformCircuit, StepCircuit as SNStepCircuit};
 
 pub struct Memory {
   pub rom:      Vec<u64>,
@@ -30,7 +31,7 @@ pub struct RomCircuit {
 
 impl NonUniformCircuit<E1> for Memory {
   type C1 = RomCircuit;
-  type C2 = TrivialTestCircuit<F<G2>>;
+  type C2 = TrivialCircuit<F<G2>>;
 
   fn num_circuits(&self) -> usize { self.circuits.len() }
 
@@ -43,7 +44,7 @@ impl NonUniformCircuit<E1> for Memory {
   fn initial_circuit_index(&self) -> usize { self.rom[0] as usize }
 }
 
-impl SNStepCircuit<F<G1>> for RomCircuit {
+impl StepCircuit<F<G1>> for RomCircuit {
   fn arity(&self) -> usize { self.circuit.arity() + 1 + self.rom_size }
 
   fn circuit_index(&self) -> usize { self.circuit_index }
