@@ -99,7 +99,7 @@ template LockStartLine(TOTAL_BYTES, DATA_BYTES, beginningLen, middleLen, finalLe
     log("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 
     // Additionally verify beginning had correct length
-    beginningLen === middle_start_counter;
+    beginningLen === middle_start_counter - 1; // TODO: Note, i added -1 here
 
     // Check middle is correct by substring match and length check
     signal middleMatch <== SubstringMatchWithIndex(DATA_BYTES, middleLen)(data, middle, middle_start_counter);

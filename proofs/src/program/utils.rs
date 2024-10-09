@@ -116,7 +116,7 @@ pub fn get_selector_vec_from_index<CS: ConstraintSystem<F<G1>>>(
 // This function NEEDS reworked, but we should just rethink how we prep inputs for this stuff
 // anyway, so I'm leaving this as tech debt, sorry.
 pub fn map_private_inputs(program_data: &ProgramData) -> Vec<HashMap<String, Value>> {
-  // should have private input for each unique ROM opcode
+  // TODO: should have private input for each unique ROM opcode -- agreed
   let mut opcode_frequency = BTreeMap::<u64, usize>::new();
   for opcode in program_data.rom.iter() {
     if let Some(freq) = opcode_frequency.get_mut(opcode) {

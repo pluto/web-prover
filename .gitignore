@@ -57,7 +57,10 @@ proofs/ptau/*
 proofs/circuits/test/*.circom
 proofs/circuits/main/*
 proofs/ir_log/*
-proofs/*.bin
+proofs/**/*.bin
 proofs/log_input_signals.txt
-proofs/*.wtns
+proofs/**/*.wtns
+proofs/web_proof_circuits/*.r1cs
+proofs/web_proof_circuits/*_js/*
 client/.rustc_info.json
+

@@ -52,8 +52,6 @@ template LockHTTPResponse(TOTAL_BYTES, DATA_BYTES, maxContentLength, versionLen,
     var status_start_counter = 0;
     var status_end_counter   = 0;
     var message_end_counter  = 0;
-    signal headerNameValueMatch1[DATA_BYTES];
-    var hasMatchedHeaderValue1 = 0;
 
     component State[DATA_BYTES];
     State[0]                       = HttpStateUpdate();
@@ -77,8 +75,8 @@ template LockHTTPResponse(TOTAL_BYTES, DATA_BYTES, maxContentLength, versionLen,
     // Get the message bytes
     status_end_counter          += startLineMask[0] - messageMask[0];
     message_end_counter         += startLineMask[0];
-    headerNameValueMatch1[0]    <== HeaderFieldNameValueMatch(DATA_BYTES, headerNameLen1, headerValueLen1)(data, header1, value1, 0);
-    hasMatchedHeaderValue1      += headerNameValueMatch1[0];
+    // headerNameValueMatch1[0]    <== HeaderFieldNameValueMatch(DATA_BYTES, headerNameLen1, headerValueLen1)(data, header1, value1, 0);
+    // hasMatchedHeaderValue1      += headerNameValueMatch1[0];
 
     for(var data_idx = 1; data_idx < DATA_BYTES; data_idx++) {
         State[data_idx]                       = HttpStateUpdate();
@@ -109,9 +107,26 @@ template LockHTTPResponse(TOTAL_BYTES, DATA_BYTES, maxContentLength, versionLen,
         // Get the message bytes
         status_end_counter          += startLineMask[data_idx] - messageMask[data_idx];
         message_end_counter         += startLineMask[data_idx];
-        headerNameValueMatch1[data_idx] <== HeaderFieldNameValueMatch(DATA_BYTES, headerNameLen1, headerValueLen1)(data, header1, value1, data_idx);
-        hasMatchedHeaderValue1 += headerNameValueMatch1[data_idx];
+        // headerNameValueMatch1[data_idx] <== HeaderFieldNameValueMatch(DATA_BYTES, headerNameLen1, headerValueLen1)(data, header1, value1, data_idx);
+        // hasMatchedHeaderValue1 += headerNameValueMatch1[data_idx];
     }
+
+    component headerNameLocation = SubstringMatch(DATA_BYTES, headerNameLen1);
+    headerNameLocation.data      <== data;
+    headerNameLocation.key       <== header1;
+
+    component headerFieldNameValueMatch;
+
+    headerFieldNameValueMatch             =  HeaderFieldNameValueMatch(DATA_BYTES, headerNameLen1, headerValueLen1);
+    headerFieldNameValueMatch.data        <== data;
+    headerFieldNameValueMatch.headerName  <== header1;
+    headerFieldNameValueMatch.headerValue <== value1;
+    headerFieldNameValueMatch.index       <== headerNameLocation.position;
+
+    // TODO: Make this assert we are parsing header
+    // using IndexSelector likely
+    // This is the assertion that we have locked down the correct header
+    headerFieldNameValueMatch.out === 1;
 
     _ <== State[DATA_BYTES-1].next_line_status;
     _ <== State[DATA_BYTES-1].next_parsing_start;
@@ -153,7 +168,6 @@ template LockHTTPResponse(TOTAL_BYTES, DATA_BYTES, maxContentLength, versionLen,
     messageMatch        === 1;
     // -2 here for the CRLF
     messageLen          === message_end_counter - status_end_counter - 2;
-    hasMatchedHeaderValue1 === 1;
 
     for (var i = 0 ; i < maxContentLength ; i++) {
         log(i, step_out[i]);

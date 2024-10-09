@@ -14,9 +14,10 @@ ios:
 		-output Rust.xcframework
 
 proof:
-	circom examples/circuit_data/aes_gcm_folds.circom --r1cs --wasm -o examples/circuit_data/ -l node_modules
-	circom examples/circuit_data/http_get_response.circom --r1cs --wasm -o examples/circuit_data/ -l node_modules
-	circom examples/circuit_data/json_parse.circom --r1cs --wasm -o examples/circuit_data/ -l node_modules
-	circom examples/circuit_data/json_universal_array.circom -l node_modules --r1cs --wasm -o examples/circuit_data
-	circom examples/circuit_data/json_universal_object.circom -l node_modules --r1cs --wasm -o examples/circuit_data
+	circom web_proof_circuits/aes_gcm_chunk.circom --r1cs --wasm -o web_proof_circuits/ -l node_modules
+	circom web_proof_circuits/http_parse_and_lock_start_line.circom --r1cs --wasm -o web_proof_circuits/ -l node_modules
+	circom web_proof_circuits/http_lock_header.circom --r1cs --wasm -o web_proof_circuits/ -l node_modules
+	circom web_proof_circuits/json_parse.circom --r1cs --wasm -o web_proof_circuits/ -l node_modules
+	circom web_proof_circuits/json_universal_array.circom -l node_modules --r1cs --wasm -o web_proof_circuits
+	circom web_proof_circuits/json_universal_object.circom -l node_modules --r1cs --wasm -o web_proof_circuits
 	cargo test --release -- tests::test_end_to_end_proofs --exact --ignored
