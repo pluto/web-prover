@@ -16,12 +16,7 @@ use tracing::{debug, error, info, trace};
 pub mod circom;
 pub mod compress;
 pub mod program;
-pub mod tests;
-
-use crate::tests::{
-  ADD_INTO_ZEROTH_GRAPH, ADD_INTO_ZEROTH_R1CS, INIT_PUBLIC_INPUT, ROM, SQUARE_ZEROTH_GRAPH,
-  SQUARE_ZEROTH_R1CS, SWAP_MEMORY_GRAPH, SWAP_MEMORY_R1CS,
-};
+#[cfg(test)] mod tests;
 
 pub type E1 = Bn256EngineKZG;
 pub type E2 = GrumpkinEngine;
@@ -37,17 +32,13 @@ pub type F<G> = <G as Group>::Scalar;
 pub type C1 = CircomCircuit;
 pub type C2 = TrivialCircuit<F<G2>>;
 
-const TEST_JSON: &str = include_str!("../examples/aes_fold.json");
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ProgramData {
   pub r1cs_types:              Vec<R1CSType>,
   pub witness_generator_types: Vec<WitnessGeneratorType>,
   pub rom:                     Vec<u64>,
   pub initial_public_input:    Vec<u64>,
-  pub private_input:           Vec<HashMap<String, Value>>, /* TODO: We should probably just
-                                                             * make
-                                                             * this a vec here */
+  pub private_input:           Vec<HashMap<String, Value>>,
   pub witnesses:               Vec<Vec<F<G1>>>,
 }
 

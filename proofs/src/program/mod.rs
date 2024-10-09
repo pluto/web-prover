@@ -58,28 +58,17 @@ impl SNStepCircuit<F<G1>> for RomCircuit {
     pc: Option<&AllocatedNum<F<G1>>>, // TODO: idk how to use the program counter lol
     z: &[AllocatedNum<F<G1>>],
   ) -> Result<(Option<AllocatedNum<F<G1>>>, Vec<AllocatedNum<F<G1>>>), SynthesisError> {
-    // TODO: Clean this up.
-    let circuit = if let Some(allocated_num) = pc {
-      if allocated_num.get_value().is_some() {
-        self.circuit.clone()
-      } else {
-        self.circuit.clone()
-      }
-    } else {
-      panic!("allocated num was none?")
-    };
-
-    let rom_index = &z[circuit.arity()]; // jump to where we pushed pc data into CS
-    let allocated_rom = &z[circuit.arity() + 1..]; // jump to where we pushed rom data into C
+    let rom_index = &z[self.circuit.arity()]; // jump to where we pushed pc data into CS
+    let allocated_rom = &z[self.circuit.arity() + 1..]; // jump to where we pushed rom data into C
     let (rom_index_next, pc_next) = utils::next_rom_index_and_pc(
       &mut cs.namespace(|| "next and rom_index and pc"),
       rom_index,
       allocated_rom,
       pc.ok_or(SynthesisError::AssignmentMissing)?,
     )?;
-    let mut circuit_constraints = circuit.vanilla_synthesize(cs, z)?;
+    let mut circuit_constraints = self.circuit.vanilla_synthesize(cs, z)?;
     circuit_constraints.push(rom_index_next);
-    circuit_constraints.extend(z[circuit.arity() + 1..].iter().cloned());
+    circuit_constraints.extend(z[self.circuit.arity() + 1..].iter().cloned());
     Ok((Some(pc_next), circuit_constraints))
   }
 }
@@ -150,7 +139,7 @@ pub fn run(program_data: &ProgramData) -> ProgramOutput {
       // When running in browser, the witness is passed as input.
       Some(program_data.witnesses[op_code as usize].clone())
     } else {
-      let arity = memory.circuits[op_code as usize].circuit.arity().clone();
+      let arity = memory.circuits[op_code as usize].circuit.arity();
       let in_json = into_input_json(
         &memory.circuits[op_code as usize].curr_public_input.as_ref().unwrap()[..arity],
         memory.circuits[op_code as usize].curr_private_input.as_ref().unwrap(),

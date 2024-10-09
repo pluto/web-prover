@@ -836,91 +836,91 @@
     "r1cs_types": [
         {
             "file": {
-                "path": "examples/circuit_data/aes_gcm_folds.r1cs"
+                "path": "web_proof_circuits/aes_gcm_chunk.r1cs"
             }
         },
         {
             "file": {
-                "path": "examples/circuit_data/http_get_response.r1cs"
+                "path": "web_proof_circuits/http_get_response.r1cs"
             }
         },
         {
             "file": {
-                "path": "examples/circuit_data/json_parse.r1cs"
+                "path": "web_proof_circuits/json_parse.r1cs"
             }
         },
         {
             "file": {
-                "path": "examples/circuit_data/json_universal_object.r1cs"
+                "path": "web_proof_circuits/json_universal_object.r1cs"
             }
         },
         {
             "file": {
-                "path": "examples/circuit_data/json_universal_object.r1cs"
+                "path": "web_proof_circuits/json_universal_object.r1cs"
             }
         },
         {
             "file": {
-                "path": "examples/circuit_data/json_universal_array.r1cs"
+                "path": "web_proof_circuits/json_universal_array.r1cs"
             }
         },
         {
             "file": {
-                "path": "examples/circuit_data/json_universal_object.r1cs"
+                "path": "web_proof_circuits/json_universal_object.r1cs"
             }
         },
         {
             "file": {
-                "path": "examples/circuit_data/json_universal_object.r1cs"
+                "path": "web_proof_circuits/json_universal_object.r1cs"
             }
         }
     ],
     "witness_generator_types": [
         {
             "wasm": {
-                "path": "examples/circuit_data/aes_gcm_folds_js/aes_gcm_folds.wasm",
-                "wtns_path": "aes_gcm_folds.wtns"
+                "path": "web_proof_circuits/aes_gcm_chunk_js/aes_gcm_chunk.wasm",
+                "wtns_path": "aes_gcm_chunk.wtns"
             }
         },
         {
             "wasm": {
-                "path": "examples/circuit_data/http_get_response_js/http_get_response.wasm",
+                "path": "web_proof_circuits/http_get_response_js/http_get_response.wasm",
                 "wtns_path": "http_get_response.wtns"
             }
         },
         {
             "wasm": {
-                "path": "examples/circuit_data/json_parse_js/json_parse.wasm",
+                "path": "web_proof_circuits/json_parse_js/json_parse.wasm",
                 "wtns_path": "json_parse.wtns"
             }
         },
         {
             "wasm": {
-                "path": "examples/circuit_data/json_universal_object_js/json_universal_object.wasm",
+                "path": "web_proof_circuits/json_universal_object_js/json_universal_object.wasm",
                 "wtns_path": "json_universal_object.wtns"
             }
         },
         {
             "wasm": {
-                "path": "examples/circuit_data/json_universal_object_js/json_universal_object.wasm",
+                "path": "web_proof_circuits/json_universal_object_js/json_universal_object.wasm",
                 "wtns_path": "json_universal_object.wtns"
             }
         },
         {
             "wasm": {
-                "path": "examples/circuit_data/json_universal_array_js/json_universal_array.wasm",
+                "path": "web_proof_circuits/json_universal_array_js/json_universal_array.wasm",
                 "wtns_path": "json_universal_array.wtns"
             }
         },
         {
             "wasm": {
-                "path": "examples/circuit_data/json_universal_object_js/json_universal_object.wasm",
+                "path": "web_proof_circuits/json_universal_object_js/json_universal_object.wasm",
                 "wtns_path": "json_universal_object.wtns"
             }
         },
         {
             "wasm": {
-                "path": "examples/circuit_data/json_universal_object_js/json_universal_object.wasm",
+                "path": "web_proof_circuits/json_universal_object_js/json_universal_object.wasm",
                 "wtns_path": "json_universal_object.wtns"
             }
         }
