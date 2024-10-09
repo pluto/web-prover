@@ -15,8 +15,7 @@ ios:
 
 proof:
 	circom web_proof_circuits/aes_gcm_chunk.circom --r1cs --wasm -o web_proof_circuits/ -l node_modules
-	circom web_proof_circuits/http_parse_and_lock_start_line.circom --r1cs --wasm -o web_proof_circuits/ -l node_modules
-	circom web_proof_circuits/http_lock_header.circom --r1cs --wasm -o web_proof_circuits/ -l node_modules
+	circom web_proof_circuits/http_get_response.circom --r1cs --wasm -o web_proof_circuits/ -l node_modules
 	circom web_proof_circuits/json_parse.circom --r1cs --wasm -o web_proof_circuits/ -l node_modules
 	circom web_proof_circuits/json_universal_array.circom -l node_modules --r1cs --wasm -o web_proof_circuits
 	circom web_proof_circuits/json_universal_object.circom -l node_modules --r1cs --wasm -o web_proof_circuits
