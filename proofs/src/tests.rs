@@ -202,18 +202,25 @@ fn test_end_to_end_proofs() {
   // Transfer-Encoding: chunked
   //
   // {
-  // "data":"item",
-  // "profile":"Artist",
-  // "a":"b",
-  // "name":"Taylor Swift"
+  //    "data": {
+  //        "items": [
+  //            {
+  //                "data": "Artist",
+  //                "profile": {
+  //                    "name": "Taylor Swift"
+  //                }
+  //            }
+  //        ]
+  //    }
   // }
 
-  let read = std::fs::read("examples/aes_http_json_extract.json").unwrap();
+  // let read = std::fs::read("examples/aes_http_json_extract.json").unwrap();
+  let read = std::fs::read("examples/universal.json").unwrap();
   let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
 
   let ProgramOutput { recursive_snark, .. } = program::run(&program_data);
 
-  let res = "Taylor Swift";
+  let res = "\"Taylor Swift\"";
   let final_mem =
     res.as_bytes().into_iter().map(|val| F::<G1>::from(*val as u64)).collect::<Vec<F<G1>>>();
 

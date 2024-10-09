@@ -39,4 +39,4 @@ template ParseFold(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT) {
 }
 
 
-component main { public [step_in] } = ParseFold(500, 90, 1);
+component main { public [step_in] } = ParseFold(4000, 250, 5);

@@ -79,4 +79,4 @@ template AESGCMFOLD(bytesPerFold, totalBytes, inputBytes) {
     // signal output authTag[16] <== aes.authTag;
 }
 
-component main { public [step_in] } = AESGCMFOLD(16, 208, 500);
+component main { public [step_in] } = AESGCMFOLD(16, 320, 4000);

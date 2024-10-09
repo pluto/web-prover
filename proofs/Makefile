@@ -17,5 +17,6 @@ proof:
 	circom examples/circuit_data/aes_gcm_folds.circom --r1cs --wasm -o examples/circuit_data/ -l node_modules
 	circom examples/circuit_data/http_get_response.circom --r1cs --wasm -o examples/circuit_data/ -l node_modules
 	circom examples/circuit_data/json_parse.circom --r1cs --wasm -o examples/circuit_data/ -l node_modules
-	circom examples/circuit_data/json_extract.circom --r1cs --wasm -o examples/circuit_data/ -l node_modules
-	cargo test -- tests::test_end_to_end_proofs --exact --ignored
+	circom examples/circuit_data/json_universal_array.circom -l node_modules --r1cs --wasm -o examples/circuit_data
+	circom examples/circuit_data/json_universal_object.circom -l node_modules --r1cs --wasm -o examples/circuit_data
+	cargo test --release -- tests::test_end_to_end_proofs --exact --ignored

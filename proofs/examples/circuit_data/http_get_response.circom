@@ -159,4 +159,4 @@ template LockHTTPResponse(TOTAL_BYTES, DATA_BYTES, maxContentLength, versionLen,
         log(i, step_out[i]);
     }
 }
-component main { public [step_in] } = LockHTTPResponse(500,208,90,8,3,2,12,31);
+component main { public [step_in] } = LockHTTPResponse(4000,320,250,8,3,2,12,31);
