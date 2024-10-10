@@ -2,29 +2,6 @@ pragma circom 2.1.9;
 
 include "parser-attestor/circuits/json/interpreter.circom";
 
-template IsEqualArrayPaddedLHS(n) {
-    signal input in[2][n];
-    signal output out;
-
-    var accum = 0;
-    component equalComponent[n];
-    component isPaddedElement[n];
-
-    for(var i = 0; i < n; i++) {
-        isPaddedElement[i] = IsZero();
-        isPaddedElement[i].in <== in[0][i];
-        equalComponent[i] = IsEqual();
-        equalComponent[i].in[0] <== in[0][i];
-        equalComponent[i].in[1] <== in[1][i] * (1-isPaddedElement[i].out);
-        accum += equalComponent[i].out;
-    }
-
-    component totalEqual = IsEqual();
-    totalEqual.in[0] <== n;
-    totalEqual.in[1] <== accum;
-    out <== totalEqual.out;
-}
-
 template ObjectExtractor(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValueLen) {
     assert(MAX_STACK_HEIGHT >= 2);
 
@@ -65,7 +42,7 @@ template ObjectExtractor(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, m
     signal parsing_key[DATA_BYTES - maxKeyLen];
     signal parsing_value[DATA_BYTES - maxKeyLen];
     signal parsing_object_value[DATA_BYTES - maxKeyLen];
-    component is_key_match[DATA_BYTES - maxKeyLen];
+    signal is_key_match[DATA_BYTES - maxKeyLen];
     signal is_key_match_for_value[DATA_BYTES+1 - maxKeyLen];
     is_key_match_for_value[0] <== 0;
     signal is_next_pair_at_depth[DATA_BYTES - maxKeyLen];
@@ -74,17 +51,14 @@ template ObjectExtractor(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, m
     // initialise first iteration
 
     // check inside key or value
-    parsing_key[0] <== InsideKey(MAX_STACK_HEIGHT)(stack[0], parsingData[0][0], parsingData[0][1]);
+    parsing_key[0] <== InsideKey()(stack[0][0], parsingData[0][0], parsingData[0][1]);
     parsing_value[0] <== InsideValueObject()(stack[0][0], stack[0][1], parsingData[0][0], parsingData[0][1]);
 
-    // is_key_match[0] <== KeyMatchAtDepthWithIndex(DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, 0)(data, key, keyLen, 0, parsing_key[0], stack[0]);
-    is_key_match[0]       = IsEqualArrayPaddedLHS(maxKeyLen); // TODO: Finish this
-    is_key_match[0].in[0] <== key;
-    for(var matcher_idx = 0; matcher_idx < maxKeyLen; matcher_idx++) {
-        is_key_match[0].in[1][matcher_idx] <== data[matcher_idx];
-    }
+    // start of JSON can never match a key
+    is_key_match[0] <== 0;
+
     is_next_pair_at_depth[0] <== NextKVPairAtDepth(MAX_STACK_HEIGHT, 0)(stack[0], data[0]);
-    is_key_match_for_value[1] <== Mux1()([is_key_match_for_value[0] * (1-is_next_pair_at_depth[0]), is_key_match[0].out * (1-is_next_pair_at_depth[0])], is_key_match[0].out);
+    is_key_match_for_value[1] <== Mux1()([is_key_match_for_value[0] * (1-is_next_pair_at_depth[0]), is_key_match[0] * (1-is_next_pair_at_depth[0])], is_key_match[0]);
     is_value_match[0] <== parsing_value[0] * is_key_match_for_value[1];
 
     mask[0] <== data[0] * is_value_match[0];
@@ -99,7 +73,7 @@ template ObjectExtractor(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, m
         // - mask
 
         // check if inside key or not
-        parsing_key[data_idx] <== InsideKey(MAX_STACK_HEIGHT)(stack[data_idx], parsingData[data_idx][0], parsingData[data_idx][1]);
+        parsing_key[data_idx] <== InsideKey()(stack[data_idx][0], parsingData[data_idx][0], parsingData[data_idx][1]);
         // check if inside value
         parsing_value[data_idx] <== InsideValueObject()(stack[data_idx][0], stack[data_idx][1], parsingData[data_idx][0], parsingData[data_idx][1]);
 
@@ -107,17 +81,9 @@ template ObjectExtractor(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, m
         // - key matches at current index and depth of key is as specified
         // - whether next KV pair starts
         // - whether key matched for a value (propogate key match until new KV pair of lower depth starts)
-        // is_key_match[data_idx] <== KeyMatchAtDepthWithIndex(DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, 0)(data, key, keyLen, data_idx, parsing_key[data_idx], stack[data_idx]);
-        
-        is_key_match[data_idx]       = IsEqualArrayPaddedLHS(maxKeyLen);
-        is_key_match[data_idx].in[0] <== key;
-        for(var matcher_idx = 0; matcher_idx < maxKeyLen; matcher_idx++) {
-            is_key_match[data_idx].in[1][matcher_idx] <== data[data_idx + matcher_idx];
-        }
-        
-
+        is_key_match[data_idx] <== KeyMatchAtIndex(DATA_BYTES, maxKeyLen, data_idx)(data, key, keyLen, parsing_key[data_idx]);
         is_next_pair_at_depth[data_idx] <== NextKVPairAtDepth(MAX_STACK_HEIGHT, 0)(stack[data_idx], data[data_idx]);
-        is_key_match_for_value[data_idx+1] <== Mux1()([is_key_match_for_value[data_idx] * (1-is_next_pair_at_depth[data_idx]), is_key_match[data_idx].out * (1-is_next_pair_at_depth[data_idx])], is_key_match[data_idx].out);
+        is_key_match_for_value[data_idx+1] <== Mux1()([is_key_match_for_value[data_idx] * (1-is_next_pair_at_depth[data_idx]), is_key_match[data_idx] * (1-is_next_pair_at_depth[data_idx])], is_key_match[data_idx]);
         is_value_match[data_idx] <== is_key_match_for_value[data_idx+1] * parsing_value[data_idx];
 
        or[data_idx] <== OR()(is_value_match[data_idx], is_value_match[data_idx - 1]);
@@ -177,15 +143,6 @@ template ArrayIndexExtractor(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxValue
     // final mask
     signal mask[DATA_BYTES];
 
-    // component State[DATA_BYTES];
-    // State[0] = StateUpdate(MAX_STACK_HEIGHT);
-    // State[0].byte           <== data[0];
-    // for(var i = 0; i < MAX_STACK_HEIGHT; i++) {
-    //     State[0].stack[i]   <== [0,0];
-    // }
-    // State[0].parsing_string <== 0;
-    // State[0].parsing_number <== 0;
-
     signal parsing_array[DATA_BYTES];
     signal or[DATA_BYTES];
 
@@ -193,12 +150,6 @@ template ArrayIndexExtractor(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxValue
     mask[0] <== data[0] * parsing_array[0];
 
     for(var data_idx = 1; data_idx < DATA_BYTES; data_idx++) {
-        // State[data_idx]                  = StateUpdate(MAX_STACK_HEIGHT);
-        // State[data_idx].byte           <== data[data_idx];
-        // State[data_idx].stack          <== State[data_idx - 1].next_stack;
-        // State[data_idx].parsing_string <== State[data_idx - 1][0];
-        // State[data_idx].parsing_number <== State[data_idx - 1][1];
-
         parsing_array[data_idx] <== InsideArrayIndexObject()(stack[data_idx][0], stack[data_idx][1], parsingData[data_idx][0], parsingData[data_idx][1], index);
 
         or[data_idx] <== OR()(parsing_array[data_idx], parsing_array[data_idx - 1]);
