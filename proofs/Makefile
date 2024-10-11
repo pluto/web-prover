@@ -19,18 +19,24 @@ ios:
 proof:
 	circom web_proof_circuits/aes_gcm_chunk.circom --r1cs --wasm -o web_proof_circuits/ -l node_modules
 
-	circom web_proof_circuits/http_get_response.circom --r1cs --wasm -o web_proof_circuits/ -l node_modules # NEEDS FIXED
+	# HTTP parse and lock start line
+	circom web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.circom \
+		--r1cs -o web_proof_circuits/http_parse_and_lock_start_line -l node_modules
+	build-circuit web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.circom \
+		web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.bin -l node_modules
 
 	# - These work ----------------------------------------------------------------------------------------------------------- #
-	# JSON Parse
+	
+
+	# JSON parse
 	circom web_proof_circuits/json_parse/json_parse.circom --r1cs -o web_proof_circuits/json_parse -l node_modules
 	build-circuit web_proof_circuits/json_parse/json_parse.circom web_proof_circuits/json_parse/json_parse.bin -l node_modules
 
-	# JSON Mask Object 
+	# JSON mask object 
 	circom web_proof_circuits/json_mask_object/json_mask_object.circom --r1cs -o web_proof_circuits/json_mask_object -l node_modules
 	build-circuit web_proof_circuits/json_mask_object/json_mask_object.circom web_proof_circuits/json_mask_object/json_mask_object.bin -l node_modules
 
-	# JSON Mask Array Index
+	# JSON mask array index
 	circom web_proof_circuits/json_mask_array_index/json_mask_array_index.circom --r1cs -o web_proof_circuits/json_mask_array_index -l node_modules
 	build-circuit web_proof_circuits/json_mask_array_index/json_mask_array_index.circom web_proof_circuits/json_mask_array_index/json_mask_array_index.bin -l node_modules
 	# ------------------------------------------------------------------------------------------------------------------------ #

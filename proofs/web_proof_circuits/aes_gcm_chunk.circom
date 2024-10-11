@@ -75,8 +75,6 @@ template AESGCMFOLD(bytesPerFold, totalBytes, inputBytes) {
     for(var i = 50 ; i < inputBytes ; i++) {
         step_out[i] <== step_in[i];
     }
-
-    // signal output authTag[16] <== aes.authTag;
 }
 
 component main { public [step_in] } = AESGCMFOLD(16, 320, 4000);

@@ -8,7 +8,7 @@ template JsonMaskObjectNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValueLen
     // Total number of variables in the parser for each byte of data
     assert(MAX_STACK_HEIGHT >= 2);
     var PER_ITERATION_DATA_LENGTH = MAX_STACK_HEIGHT * 2 + 2;
-    var TOTAL_BYTES               = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1);
+    var TOTAL_BYTES               = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1); // data + parser vars
     // ------------------------------------------------------------------------------------------------------------------ //
     
     // ------------------------------------------------------------------------------------------------------------------ //
@@ -144,14 +144,13 @@ template JsonMaskArrayIndexNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxValueLen) {
 
     // value starting index in `data`
     signal value_starting_index[DATA_BYTES];
-    // final mask
     signal mask[DATA_BYTES];
 
     signal parsing_array[DATA_BYTES];
     signal or[DATA_BYTES];
 
     parsing_array[0] <== InsideArrayIndexObject()(stack[0][0], stack[0][1], parsingData[0][0], parsingData[0][1], index);
-    mask[0] <== data[0] * parsing_array[0];
+    mask[0]          <== data[0] * parsing_array[0];
 
     for(var data_idx = 1; data_idx < DATA_BYTES; data_idx++) {
         parsing_array[data_idx] <== InsideArrayIndexObject()(stack[data_idx][0], stack[data_idx][1], parsingData[data_idx][0], parsingData[data_idx][1], index);
