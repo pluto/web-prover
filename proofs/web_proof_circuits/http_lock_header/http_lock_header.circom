@@ -35,8 +35,7 @@ template LockHeader(DATA_BYTES, headerNameLen, headerValueLen) {
     headerFieldNameValueMatch.headerValue <== value;
     headerFieldNameValueMatch.index       <== headerNameLocation.position;
 
-    // TODO: Make this assert we are parsing header
-    // using IndexSelector likely
+    // TODO: Make this assert we are parsing header!!!
     // This is the assertion that we have locked down the correct header
     headerFieldNameValueMatch.out === 1;
 

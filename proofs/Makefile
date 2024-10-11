@@ -32,6 +32,12 @@ proof:
 	build-circuit web_proof_circuits/http_lock_header/http_lock_header.circom \
 		web_proof_circuits/http_lock_header/http_lock_header.bin -l node_modules
 
+	# HTTP body mask
+	circom web_proof_circuits/http_body_mask/http_body_mask.circom \
+		--r1cs -o web_proof_circuits/http_body_mask -l node_modules
+	build-circuit web_proof_circuits/http_body_mask/http_body_mask.circom \
+		web_proof_circuits/http_body_mask/http_body_mask.bin -l node_modules
+
 	# JSON parse
 	circom web_proof_circuits/json_parse/json_parse.circom --r1cs -o web_proof_circuits/json_parse -l node_modules
 	build-circuit web_proof_circuits/json_parse/json_parse.circom web_proof_circuits/json_parse/json_parse.bin -l node_modules
