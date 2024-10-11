@@ -13,10 +13,26 @@ ios:
 		-headers ./headers/ \
 		-output Rust.xcframework
 
+# First generate the R1CS files using Circom
+# Second generate the graph bin files using circom-witnesscalc
+# Finally run test using these files
 proof:
 	circom web_proof_circuits/aes_gcm_chunk.circom --r1cs --wasm -o web_proof_circuits/ -l node_modules
-	circom web_proof_circuits/http_get_response.circom --r1cs --wasm -o web_proof_circuits/ -l node_modules
-	circom web_proof_circuits/json_parse.circom --r1cs --wasm -o web_proof_circuits/ -l node_modules
-	circom web_proof_circuits/json_universal_array.circom -l node_modules --r1cs --wasm -o web_proof_circuits
-	circom web_proof_circuits/json_universal_object.circom -l node_modules --r1cs --wasm -o web_proof_circuits
+
+	circom web_proof_circuits/http_get_response.circom --r1cs --wasm -o web_proof_circuits/ -l node_modules # NEEDS FIXED
+
+	# - These work ------------------------------------------------------------------------------------------------------ #
+	circom web_proof_circuits/json_parse.circom --r1cs -o web_proof_circuits/ -l node_modules
+	build-circuit web_proof_circuits/json_parse.circom web_proof_circuits/json_parse.bin -l node_modules 
+	# ------------------------------------------------------------------------------------------------------------------- #
+
+	circom web_proof_circuits/json_object_extract.circom -l node_modules --r1cs -o web_proof_circuits
+
+
+
+
+
+
+
+	circom web_proof_circuits/json_array.circom -l node_modules --r1cs --wasm -o web_proof_circuits
 	cargo test --release -- tests::test_end_to_end_proofs --exact --ignored
