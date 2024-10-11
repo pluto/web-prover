@@ -36,8 +36,8 @@ template JsonObjectExtractNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValue
     signal input key[maxKeyLen];
     signal input keyLen;
 
-    // The value that will be extracted
-    signal value[maxValueLen];
+    // // The value that will be extracted
+    // signal value[maxValueLen];
     
     
     // flag determining whether this byte is matched value
@@ -46,15 +46,15 @@ template JsonObjectExtractNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValue
     signal mask[DATA_BYTES - maxKeyLen];
 
 
-    signal parsing_object_value[DATA_BYTES - maxKeyLen];
+    // signal parsing_object_value[DATA_BYTES - maxKeyLen];
     signal is_key_match[DATA_BYTES - maxKeyLen];
     signal is_key_match_for_value[DATA_BYTES+1 - maxKeyLen];
     is_key_match_for_value[0] <== 0;
     signal is_next_pair_at_depth[DATA_BYTES - maxKeyLen];
     signal or[DATA_BYTES - maxKeyLen];
 
-// Index we know the value starts at
-    signal value_starting_index[DATA_BYTES - maxKeyLen];
+// // Index we know the value starts at
+//     signal value_starting_index[DATA_BYTES - maxKeyLen];
 
     // initialise first iteration
 
@@ -97,29 +97,22 @@ template JsonObjectExtractNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValue
         is_key_match_for_value[data_idx+1] <== Mux1()([is_key_match_for_value[data_idx] * (1-is_next_pair_at_depth[data_idx]), is_key_match[data_idx] * (1-is_next_pair_at_depth[data_idx])], is_key_match[data_idx]);
         is_value_match[data_idx] <== is_key_match_for_value[data_idx+1] * parsing_value[data_idx];
 
-       or[data_idx] <== OR()(is_value_match[data_idx], is_value_match[data_idx - 1]);
+        or[data_idx] <== OR()(is_value_match[data_idx], is_value_match[data_idx - 1]);
 
         // mask = currently parsing value and all subsequent keys matched
         mask[data_idx] <== data[data_idx] * or[data_idx];
     }
 
-    // find starting index of value in data by matching mask
-    signal is_zero_mask[DATA_BYTES - maxKeyLen];
-    signal is_prev_starting_index[DATA_BYTES - maxKeyLen];
-    value_starting_index[0] <== 0;
-    is_prev_starting_index[0] <== 0;
-    is_zero_mask[0] <== IsZero()(mask[0]);
-    for (var i=1 ; i<DATA_BYTES - maxKeyLen ; i++) {
-        is_zero_mask[i] <== IsZero()(mask[i]);
-        is_prev_starting_index[i] <== IsZero()(value_starting_index[i-1]);
-        value_starting_index[i] <== value_starting_index[i-1] + i * (1-is_zero_mask[i]) * is_prev_starting_index[i];
-    }
-
+    // Write the `step_out` with masked data
     signal output step_out[TOTAL_BYTES];
-    // value <== SelectSubArray(DATA_BYTES - maxKeyLen, maxValueLen)(mask, value_starting_index[DATA_BYTES-1 - maxKeyLen], maxValueLen);
-    for (var i = 0 ; i < maxValueLen ; i++) {
-        // log(i, value[i]);
-        // step_out[i] <== value[i];
-        step_out[i] <== 0;
+    for (var i = 0 ; i < DATA_BYTES - maxKeyLen ; i++) {
+        step_out[i] <== mask[i];
+    }
+    for (var i = 0 ; i < maxKeyLen ; i++) {
+        step_out[DATA_BYTES - maxKeyLen + i] <== 0;
+    }
+    // Append the parser state back on `step_out`
+    for (var i = DATA_BYTES ; i < TOTAL_BYTES ; i++) {
+        step_out[i] <== step_in[i];
     }
 }
