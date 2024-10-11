@@ -19,14 +19,18 @@ ios:
 proof:
 	circom web_proof_circuits/aes_gcm_chunk.circom --r1cs --wasm -o web_proof_circuits/ -l node_modules
 
+	# - These work ----------------------------------------------------------------------------------------------------------- #
 	# HTTP parse and lock start line
 	circom web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.circom \
 		--r1cs -o web_proof_circuits/http_parse_and_lock_start_line -l node_modules
 	build-circuit web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.circom \
 		web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.bin -l node_modules
 
-	# - These work ----------------------------------------------------------------------------------------------------------- #
-	
+	# HTTP lock header
+	circom web_proof_circuits/http_lock_header/http_lock_header.circom \
+		--r1cs -o web_proof_circuits/http_lock_header -l node_modules
+	build-circuit web_proof_circuits/http_lock_header/http_lock_header.circom \
+		web_proof_circuits/http_lock_header/http_lock_header.bin -l node_modules
 
 	# JSON parse
 	circom web_proof_circuits/json_parse/json_parse.circom --r1cs -o web_proof_circuits/json_parse -l node_modules
@@ -41,13 +45,4 @@ proof:
 	build-circuit web_proof_circuits/json_mask_array_index/json_mask_array_index.circom web_proof_circuits/json_mask_array_index/json_mask_array_index.bin -l node_modules
 	# ------------------------------------------------------------------------------------------------------------------------ #
 
-	circom web_proof_circuits/json_object_extract.circom -l node_modules --r1cs -o web_proof_circuits
-
-
-
-
-
-
-
-	circom web_proof_circuits/json_array.circom -l node_modules --r1cs --wasm -o web_proof_circuits
 	cargo test --release -- tests::test_end_to_end_proofs --exact --ignored
