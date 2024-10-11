@@ -2,7 +2,7 @@ pragma circom 2.1.9;
 
 include "parser-attestor/circuits/json/interpreter.circom";
 
-template JsonObjectMaskNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValueLen) {
+template JsonMaskObjectNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValueLen) {
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~~ Set sizes at compile time ~~    
     // Total number of variables in the parser for each byte of data
@@ -105,31 +105,42 @@ template JsonObjectMaskNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValueLen
     }
 }
 
-template ArrayIndexMask(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxValueLen) {
+template JsonMaskArrayIndexNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxValueLen) {
+    // ------------------------------------------------------------------------------------------------------------------ //
+    // ~~ Set sizes at compile time ~~    
+    // Total number of variables in the parser for each byte of data
     assert(MAX_STACK_HEIGHT >= 2);
+    var PER_ITERATION_DATA_LENGTH = MAX_STACK_HEIGHT * 2 + 2;
+    var TOTAL_BYTES               = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1);
+    // ------------------------------------------------------------------------------------------------------------------ //
 
-    var perIterationDataLength = MAX_STACK_HEIGHT*2 + 2;
+    // ------------------------------------------------------------------------------------------------------------------ //
+    // ~ Unravel from previous NIVC step ~
+    // Read in from previous NIVC step (JsonParseNIVC)
     signal input step_in[TOTAL_BYTES];
 
+    // Grab the raw data bytes from the `step_in` variable
     signal data[DATA_BYTES];
     for (var i = 0 ; i < DATA_BYTES ; i++) {
         data[i] <== step_in[i];
     }
-    signal input index;
 
-    signal output step_out[TOTAL_BYTES];
-    signal value[maxValueLen];
-
+    // Decode the encoded data in `step_in` back into parser variables
     signal stack[DATA_BYTES][MAX_STACK_HEIGHT][2];
     signal parsingData[DATA_BYTES][2];
     for (var i = 0 ; i < DATA_BYTES ; i++) {
         for (var j = 0 ; j < MAX_STACK_HEIGHT ; j++) {
-            stack[i][j][0] <== step_in[DATA_BYTES + i*perIterationDataLength + j*2];
-            stack[i][j][1] <== step_in[DATA_BYTES + i*perIterationDataLength + j*2 + 1];
+            stack[i][j][0] <== step_in[DATA_BYTES + i * PER_ITERATION_DATA_LENGTH + j * 2];
+            stack[i][j][1] <== step_in[DATA_BYTES + i * PER_ITERATION_DATA_LENGTH + j * 2 + 1];
         }
-        parsingData[i][0] <== step_in[DATA_BYTES + i*perIterationDataLength + MAX_STACK_HEIGHT*2];
-        parsingData[i][1] <== step_in[DATA_BYTES + i*perIterationDataLength + MAX_STACK_HEIGHT*2 + 1];
+        parsingData[i][0] <== step_in[DATA_BYTES + i * PER_ITERATION_DATA_LENGTH + MAX_STACK_HEIGHT * 2];
+        parsingData[i][1] <== step_in[DATA_BYTES + i * PER_ITERATION_DATA_LENGTH + MAX_STACK_HEIGHT * 2 + 1];
     }
+    // ------------------------------------------------------------------------------------------------------------------ //
+
+    // ------------------------------------------------------------------------------------------------------------------ //
+    // ~ Array index masking ~
+    signal input index;
 
     // value starting index in `data`
     signal value_starting_index[DATA_BYTES];
@@ -149,22 +160,13 @@ template ArrayIndexMask(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxValueLen) 
         mask[data_idx] <== data[data_idx] * or[data_idx];
     }
 
-    signal is_zero_mask[DATA_BYTES];
-    signal is_prev_starting_index[DATA_BYTES];
-    value_starting_index[0] <== 0;
-    is_prev_starting_index[0] <== 0;
-    is_zero_mask[0] <== IsZero()(mask[0]);
-    for (var i=1 ; i<DATA_BYTES ; i++) {
-        is_zero_mask[i] <== IsZero()(mask[i]);
-        is_prev_starting_index[i] <== IsZero()(value_starting_index[i-1]);
-        value_starting_index[i] <== value_starting_index[i-1] + i * (1-is_zero_mask[i]) * is_prev_starting_index[i];
+    // Write the `step_out` with masked data
+    signal output step_out[TOTAL_BYTES];
+    for (var i = 0 ; i < DATA_BYTES ; i++) {
+        step_out[i] <== mask[i];
     }
-
-    log("value starting index", value_starting_index[DATA_BYTES-1]);
-    value <== SelectSubArray(DATA_BYTES, maxValueLen)(mask, value_starting_index[DATA_BYTES-1], maxValueLen);
-    for (var i = 0 ; i < maxValueLen ; i++) {
-        log(i, value[i]);
-        step_out[i] <== value[i];
+    // Append the parser state back on `step_out`
+    for (var i = DATA_BYTES ; i < TOTAL_BYTES ; i++) {
+        step_out[i] <== step_in[i];
     }
 }
-
