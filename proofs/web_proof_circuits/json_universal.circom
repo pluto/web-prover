@@ -2,16 +2,18 @@ pragma circom 2.1.9;
 
 include "parser-attestor/circuits/json/interpreter.circom";
 
-template JsonObjectExtractNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValueLen) {
-    // -------------------------------------------------------------------------------------------- //
+template JsonObjectMaskNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValueLen) {
+    // ------------------------------------------------------------------------------------------------------------------ //
     // ~~ Set sizes at compile time ~~    
     // Total number of variables in the parser for each byte of data
     assert(MAX_STACK_HEIGHT >= 2);
     var PER_ITERATION_DATA_LENGTH = MAX_STACK_HEIGHT * 2 + 2;
     var TOTAL_BYTES               = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1);
-    // -------------------------------------------------------------------------------------------- //
-
-    // Read in from previous NIVC step (usually JsonParseNIVC)
+    // ------------------------------------------------------------------------------------------------------------------ //
+    
+    // ------------------------------------------------------------------------------------------------------------------ //
+    // ~ Unravel from previous NIVC step ~
+    // Read in from previous NIVC step (JsonParseNIVC)
     signal input step_in[TOTAL_BYTES];
 
     // Grab the raw data bytes from the `step_in` variable
@@ -31,14 +33,13 @@ template JsonObjectExtractNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValue
         parsingData[i][0] <== step_in[DATA_BYTES + i * PER_ITERATION_DATA_LENGTH + MAX_STACK_HEIGHT * 2];
         parsingData[i][1] <== step_in[DATA_BYTES + i * PER_ITERATION_DATA_LENGTH + MAX_STACK_HEIGHT * 2 + 1];
     }
+    // ------------------------------------------------------------------------------------------------------------------ //
 
+    // ------------------------------------------------------------------------------------------------------------------ //
+    // ~ Object masking ~
     // Key data to use to point to which object to extract
     signal input key[maxKeyLen];
     signal input keyLen;
-
-    // // The value that will be extracted
-    // signal value[maxValueLen];
-    
     
     // flag determining whether this byte is matched value
     signal is_value_match[DATA_BYTES - maxKeyLen];
@@ -48,44 +49,31 @@ template JsonObjectExtractNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValue
 
     // signal parsing_object_value[DATA_BYTES - maxKeyLen];
     signal is_key_match[DATA_BYTES - maxKeyLen];
-    signal is_key_match_for_value[DATA_BYTES+1 - maxKeyLen];
+    signal is_key_match_for_value[DATA_BYTES + 1 - maxKeyLen];
     is_key_match_for_value[0] <== 0;
     signal is_next_pair_at_depth[DATA_BYTES - maxKeyLen];
     signal or[DATA_BYTES - maxKeyLen];
-
-// // Index we know the value starts at
-//     signal value_starting_index[DATA_BYTES - maxKeyLen];
-
-    // initialise first iteration
 
     // Signals to detect if we are parsing a key or value with initial setup
     signal parsing_key[DATA_BYTES - maxKeyLen];
     signal parsing_value[DATA_BYTES - maxKeyLen];
     // TODO: Can't these just be 0 since the start of object can't be either of these?
-    parsing_key[0] <== InsideKey()(stack[0][0], parsingData[0][0], parsingData[0][1]);
-    parsing_value[0] <== InsideValueObject()(stack[0][0], stack[0][1], parsingData[0][0], parsingData[0][1]);
+    // parsing_key[0] <== InsideKey()(stack[0][0], parsingData[0][0], parsingData[0][1]);
+    // parsing_value[0] <== InsideValueObject()(stack[0][0], stack[0][1], parsingData[0][0], parsingData[0][1]);
 
-    // start of object can never match a key
-    is_key_match[0] <== 0;
+    // Initialize values knowing 0th bit of data will never be a key/value 
+    parsing_key[0]   <== 0;
+    parsing_value[0] <== 0;
+    is_key_match[0]  <== 0;
 
-    is_next_pair_at_depth[0] <== NextKVPairAtDepth(MAX_STACK_HEIGHT, 0)(stack[0], data[0]);
+    is_next_pair_at_depth[0]  <== NextKVPairAtDepth(MAX_STACK_HEIGHT, 0)(stack[0], data[0]);
     is_key_match_for_value[1] <== Mux1()([is_key_match_for_value[0] * (1-is_next_pair_at_depth[0]), is_key_match[0] * (1-is_next_pair_at_depth[0])], is_key_match[0]);
-    is_value_match[0] <== parsing_value[0] * is_key_match_for_value[1];
+    is_value_match[0]         <== parsing_value[0] * is_key_match_for_value[1];
 
     mask[0] <== data[0] * is_value_match[0];
 
     for(var data_idx = 1; data_idx < DATA_BYTES - maxKeyLen; data_idx++) {
-        // - parsing key
-        // - parsing value (different for string/numbers and array)
-        // - key match (key 1, key 2)
-        // - is next pair
-        // - is key match for value
-        // - value_mask
-        // - mask
-
-        // check if inside key or not
         parsing_key[data_idx] <== InsideKey()(stack[data_idx][0], parsingData[data_idx][0], parsingData[data_idx][1]);
-        // check if inside value
         parsing_value[data_idx] <== InsideValueObject()(stack[data_idx][0], stack[data_idx][1], parsingData[data_idx][0], parsingData[data_idx][1]);
 
         // to get correct value, check:
@@ -116,3 +104,67 @@ template JsonObjectExtractNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValue
         step_out[i] <== step_in[i];
     }
 }
+
+template ArrayIndexMask(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxValueLen) {
+    assert(MAX_STACK_HEIGHT >= 2);
+
+    var perIterationDataLength = MAX_STACK_HEIGHT*2 + 2;
+    signal input step_in[TOTAL_BYTES];
+
+    signal data[DATA_BYTES];
+    for (var i = 0 ; i < DATA_BYTES ; i++) {
+        data[i] <== step_in[i];
+    }
+    signal input index;
+
+    signal output step_out[TOTAL_BYTES];
+    signal value[maxValueLen];
+
+    signal stack[DATA_BYTES][MAX_STACK_HEIGHT][2];
+    signal parsingData[DATA_BYTES][2];
+    for (var i = 0 ; i < DATA_BYTES ; i++) {
+        for (var j = 0 ; j < MAX_STACK_HEIGHT ; j++) {
+            stack[i][j][0] <== step_in[DATA_BYTES + i*perIterationDataLength + j*2];
+            stack[i][j][1] <== step_in[DATA_BYTES + i*perIterationDataLength + j*2 + 1];
+        }
+        parsingData[i][0] <== step_in[DATA_BYTES + i*perIterationDataLength + MAX_STACK_HEIGHT*2];
+        parsingData[i][1] <== step_in[DATA_BYTES + i*perIterationDataLength + MAX_STACK_HEIGHT*2 + 1];
+    }
+
+    // value starting index in `data`
+    signal value_starting_index[DATA_BYTES];
+    // final mask
+    signal mask[DATA_BYTES];
+
+    signal parsing_array[DATA_BYTES];
+    signal or[DATA_BYTES];
+
+    parsing_array[0] <== InsideArrayIndexObject()(stack[0][0], stack[0][1], parsingData[0][0], parsingData[0][1], index);
+    mask[0] <== data[0] * parsing_array[0];
+
+    for(var data_idx = 1; data_idx < DATA_BYTES; data_idx++) {
+        parsing_array[data_idx] <== InsideArrayIndexObject()(stack[data_idx][0], stack[data_idx][1], parsingData[data_idx][0], parsingData[data_idx][1], index);
+
+        or[data_idx] <== OR()(parsing_array[data_idx], parsing_array[data_idx - 1]);
+        mask[data_idx] <== data[data_idx] * or[data_idx];
+    }
+
+    signal is_zero_mask[DATA_BYTES];
+    signal is_prev_starting_index[DATA_BYTES];
+    value_starting_index[0] <== 0;
+    is_prev_starting_index[0] <== 0;
+    is_zero_mask[0] <== IsZero()(mask[0]);
+    for (var i=1 ; i<DATA_BYTES ; i++) {
+        is_zero_mask[i] <== IsZero()(mask[i]);
+        is_prev_starting_index[i] <== IsZero()(value_starting_index[i-1]);
+        value_starting_index[i] <== value_starting_index[i-1] + i * (1-is_zero_mask[i]) * is_prev_starting_index[i];
+    }
+
+    log("value starting index", value_starting_index[DATA_BYTES-1]);
+    value <== SelectSubArray(DATA_BYTES, maxValueLen)(mask, value_starting_index[DATA_BYTES-1], maxValueLen);
+    for (var i = 0 ; i < maxValueLen ; i++) {
+        log(i, value[i]);
+        step_out[i] <== value[i];
+    }
+}
+

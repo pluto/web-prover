@@ -2,17 +2,19 @@ pragma circom 2.1.9;
 
 include "parser-attestor/circuits/json/parser/parser.circom";
 
-template JSONParseNIVC(DATA_BYTES, MAX_STACK_HEIGHT) {
-    // -------------------------------------------------------------------------------------------- //
+template JsonParseNIVC(DATA_BYTES, MAX_STACK_HEIGHT) {
+    // ------------------------------------------------------------------------------------------------------------------ //
     // ~~ Set sizes at compile time ~~    
     // Total number of variables in the parser for each byte of data
     var PER_ITERATION_DATA_LENGTH = MAX_STACK_HEIGHT * 2 + 2;
     var TOTAL_BYTES               = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1);
-    // -------------------------------------------------------------------------------------------- //
+    // ------------------------------------------------------------------------------------------------------------------ //
 
-    // Read in from previous NIVC step (usually AES)
+    // Read in from previous NIVC step (AESNIVC)
     signal input step_in[TOTAL_BYTES];
 
+    // ------------------------------------------------------------------------------------------------------------------ //
+    // ~ Parse JSON ~
     // Initialize the parser
     component State[DATA_BYTES];
     State[0] = StateUpdate(MAX_STACK_HEIGHT);
@@ -31,7 +33,10 @@ template JSONParseNIVC(DATA_BYTES, MAX_STACK_HEIGHT) {
         State[i].parsing_string <== State[i - 1].next_parsing_string;
         State[i].parsing_number <== State[i - 1].next_parsing_number;
     }
+    // ------------------------------------------------------------------------------------------------------------------ //
 
+    // ------------------------------------------------------------------------------------------------------------------ //
+    // ~ Write to `step_out` for next NIVC step
     // Pass the data bytes back out in the first `step_out` signals
     signal output step_out[TOTAL_BYTES];
     for (var i = 0 ; i < DATA_BYTES ; i++) {
@@ -47,6 +52,7 @@ template JSONParseNIVC(DATA_BYTES, MAX_STACK_HEIGHT) {
         step_out[DATA_BYTES + i * PER_ITERATION_DATA_LENGTH + MAX_STACK_HEIGHT * 2]     <== State[i].next_parsing_string;
         step_out[DATA_BYTES + i * PER_ITERATION_DATA_LENGTH + MAX_STACK_HEIGHT * 2 + 1] <== State[i].next_parsing_number;
     }
+    // ------------------------------------------------------------------------------------------------------------------ //
 }
 
 component main { public [step_in] } = JsonParseNIVC(250, 5);
