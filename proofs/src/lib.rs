@@ -12,6 +12,11 @@ use ff::Field;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, error, info, trace};
+use circom::CircomInput;
+use ff::PrimeField;
+use num_bigint::BigInt;
+use program::ProgramOutput;
+use std::str::FromStr;
 
 pub mod circom;
 pub mod compress;
@@ -66,6 +71,8 @@ pub enum WitnessGeneratorType {
   CircomWitnesscalc { path: String },
   #[serde(rename = "browser")] // TODO: Can we merge this with Raw?
   Browser,
+  #[serde(rename = "mobile")]
+  Mobile{ circuit: String },
   #[serde(skip)]
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
   #[serde(skip)]
@@ -78,6 +85,35 @@ pub fn get_compressed_proof(program_data: ProgramData) -> Vec<u8> {
   let compressed_verifier = CompressedVerifier::from(program_output);
   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
   serialized_compressed_verifier.proof.0
+}
+
+#[cfg(target_arch = "aarch64")]
+rust_witness::witness!(aesgcmfold);
+#[cfg(target_arch = "aarch64")]
+fn remap_inputs(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
+  let circom_input: CircomInput = serde_json::from_str(input_json).unwrap();
+  let mut unfuckulated = vec![];
+  unfuckulated.push((
+    "step_in".to_string(),
+    circom_input.step_in.into_iter().map(|s| BigInt::from_str(&s).unwrap()).collect(),
+  ));
+  for (k, v) in circom_input.extra {
+    let val = v
+      .as_array()
+      .unwrap()
+      .iter()
+      .map(|x| BigInt::from_str(&x.as_number().unwrap().to_string()).unwrap())
+      .collect::<Vec<BigInt>>();
+    unfuckulated.push((k, val));
+  }
+  unfuckulated
+}
+#[cfg(target_arch = "aarch64")]
+fn aes_gcm_fold_Wrapper(input_json: &str) -> Vec<F<G1>> {
+  aesgcmfold_witness(remap_inputs(input_json))
+    .into_iter()
+    .map(|bigint| F::<G1>::from_str_vartime(&bigint.to_string()).unwrap())
+    .collect()
 }
 
 #[cfg(target_os = "ios")] use std::ffi::c_char;

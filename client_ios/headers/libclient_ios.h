@@ -5,4 +5,4 @@
 
 void setup_tracing(void);
 
-void run_program_ios_void_void(void);
+const char *prover(const char *config_json);

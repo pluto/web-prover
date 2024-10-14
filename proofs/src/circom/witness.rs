@@ -1,6 +1,7 @@
 use fs::OpenOptions;
 
 use super::*;
+
 pub fn generate_witness_from_generator_type(
   input_json: &str,
   witness_generator_type: &WitnessGeneratorType,
@@ -8,6 +9,9 @@ pub fn generate_witness_from_generator_type(
   match witness_generator_type {
     WitnessGeneratorType::Browser => {
       panic!("browser type witness generation cannot be generated in process")
+    },
+    WitnessGeneratorType::Mobile { circuit } => {
+      panic!("mobile type witgen not supported")
     },
     WitnessGeneratorType::Wasm { path, wtns_path } =>
       generate_witness_from_wasm_file(input_json, &PathBuf::from(path), &PathBuf::from(wtns_path)),
