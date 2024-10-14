@@ -21,6 +21,7 @@ pub struct Args {
   verbose: u8,
 }
 
+// TODO: This should be given a setup interface too.
 // // Note:
 // // Run with `cargo run --release -i setup/test.json`
 // // from the `./proofs/` dir.
@@ -41,12 +42,12 @@ fn main() {
 failed",
   );
 
-  // Read in the supernova program data
-  let file = args.input_file;
-  info!("Using file: {:?}", file);
-  let read = std::fs::read(file).unwrap();
-  let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
-  let circuit_list = program::initialize_circuit_list(&program_data);
-  let setup_data = program::setup(circuit_list);
-  program::run(&program_data, &setup_data);
+  // // Read in the supernova program data
+  // let file = args.input_file;
+  // info!("Using file: {:?}", file);
+  // let read = std::fs::read(file).unwrap();
+  // let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
+  // let circuit_list = program::initialize_circuit_list(&program_data);
+  // let setup_data = program::setup(circuit_list);
+  // program::run(&program_data);
 }

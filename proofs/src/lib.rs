@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, io::Write, path::PathBuf};
 
 use circom::CircomCircuit;
 use ff::Field;
@@ -28,17 +28,63 @@ pub type S2 = BatchedRelaxedR1CSSNARK<E2, EE2>;
 
 pub type F<G> = <G as Group>::Scalar;
 
-pub type C1 = CircomCircuit;
-pub type C2 = TrivialCircuit<F<G2>>;
+trait SetupStatus {
+  type PublicParams;
+}
+pub struct Online;
+impl SetupStatus for Online {
+  type PublicParams = PublicParams<E1>;
+}
+pub struct Offline;
+impl SetupStatus for Offline {
+  type PublicParams = PathBuf;
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ProgramData {
+pub struct SetupData {
   pub r1cs_types:              Vec<R1CSType>,
   pub witness_generator_types: Vec<WitnessGeneratorType>,
-  pub rom:                     Vec<u64>,
-  pub initial_public_input:    Vec<u64>,
-  pub private_input:           Vec<HashMap<String, Value>>,
-  pub witnesses:               Vec<Vec<F<G1>>>,
+  pub max_rom_length:          usize,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ProgramData<S: SetupStatus> {
+  pub public_params:        S::PublicParams,
+  pub setup_data:           SetupData,
+  pub rom:                  Vec<u64>, // TODO: Put the inputs in here (use aliases)
+  pub initial_public_input: Vec<u64>,
+  pub private_input:        Vec<HashMap<String, Value>>,
+  pub witnesses:            Vec<Vec<F<G1>>>,
+}
+
+impl ProgramData<Offline> {
+  fn into_online(self) -> ProgramData<Online> {
+    let file = std::fs::read(&self.public_params).unwrap();
+    let public_params = bincode::deserialize(&file).unwrap();
+    let ProgramData { setup_data, rom, initial_public_input, private_input, witnesses, .. } = self;
+    ProgramData { public_params, setup_data, rom, initial_public_input, private_input, witnesses }
+  }
+}
+
+impl ProgramData<Online> {
+  fn into_offline(self, path: PathBuf) -> ProgramData<Offline> {
+    let serialized = bincode::serialize(&self.public_params).unwrap();
+    if let Some(parent) = path.parent() {
+      std::fs::create_dir_all(parent).unwrap();
+    }
+    let mut file = std::fs::File::create(&path).unwrap();
+    file.write_all(&serialized).unwrap();
+
+    let ProgramData { setup_data, rom, initial_public_input, private_input, witnesses, .. } = self;
+    ProgramData {
+      public_params: path,
+      setup_data,
+      rom,
+      initial_public_input,
+      private_input,
+      witnesses,
+    }
+  }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -64,10 +110,10 @@ pub enum WitnessGeneratorType {
 }
 
 #[cfg(not(target_os = "ios"))]
-pub fn compute_web_proof(program_data: &ProgramData, public_params: &PublicParams<E1>) -> Vec<u8> {
-  let recursive_snark = program::run(program_data, public_params);
+pub fn compute_web_proof(program_data: &ProgramData<Online>) -> Vec<u8> {
+  let recursive_snark = program::run(program_data);
   // TODO: Unecessary 2x generation of pk,vk, but it is cheap. Refactor later if need be!
-  let proof = program::compress_proof(&recursive_snark, public_params);
+  let proof = program::compress_proof(&recursive_snark, &program_data.public_params);
   let serialized_proof = proof.serialize_and_compress();
   serialized_proof.0
 }

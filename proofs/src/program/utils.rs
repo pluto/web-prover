@@ -116,7 +116,9 @@ pub fn get_selector_vec_from_index<CS: ConstraintSystem<F<G1>>>(
 // `num_folds` with `rom.len()` as a simple patch
 // This function NEEDS reworked, but we should just rethink how we prep inputs for this stuff
 // anyway, so I'm leaving this as tech debt, sorry.
-pub fn map_private_inputs(program_data: &ProgramData) -> Vec<HashMap<String, Value>> {
+pub fn map_private_inputs<T: SetupStatus>(
+  program_data: &ProgramData<T>,
+) -> Vec<HashMap<String, Value>> {
   // TODO: should have private input for each unique ROM opcode -- agreed
   let mut opcode_frequency = BTreeMap::<u64, usize>::new();
   for opcode in program_data.rom.iter() {
@@ -211,7 +213,7 @@ mod tests {
   #[tracing_test::traced_test]
   fn test_map_private_inputs() {
     let read = std::fs::read("examples/parse_batch_wc.json").unwrap();
-    let circuit_data: ProgramData = serde_json::from_slice(&read).unwrap();
+    let circuit_data: ProgramData<Offline> = serde_json::from_slice(&read).unwrap();
 
     let inputs = map_private_inputs(&circuit_data);
     assert_eq!(inputs.len(), 4);
@@ -222,7 +224,7 @@ mod tests {
   #[tracing_test::traced_test]
   fn test_map_private_inputs_complex() {
     let read = std::fs::read("examples/aes_http_json_extract.json").unwrap();
-    let circuit_data: ProgramData = serde_json::from_slice(&read).unwrap();
+    let circuit_data: ProgramData<Offline> = serde_json::from_slice(&read).unwrap();
 
     let inputs = map_private_inputs(&circuit_data);
     assert_eq!(inputs.len(), 16);
