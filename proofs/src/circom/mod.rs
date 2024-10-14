@@ -9,13 +9,9 @@ use std::{
 };
 
 use anyhow::Result;
-use arecibo::{
-  traits::{circuit::TrivialCircuit, snark::RelaxedR1CSSNARKTrait},
-  PublicParams,
-};
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, LinearCombination, SynthesisError};
 use byteorder::{LittleEndian, ReadBytesExt};
-use ff::{Field, PrimeField};
+use ff::PrimeField;
 use r1cs::R1CS;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -51,6 +47,8 @@ pub struct CircomCircuit {
 }
 
 impl CircomCircuit {
+  pub fn arity(&self) -> usize { self.r1cs.num_public_inputs }
+
   pub fn vanilla_synthesize<CS: ConstraintSystem<F<G1>>>(
     &self,
     cs: &mut CS,
@@ -124,26 +122,4 @@ impl CircomCircuit {
 
     Ok(z_out)
   }
-}
-
-// TODO: We can delete this eventually
-impl arecibo::traits::circuit::StepCircuit<F<G1>> for CircomCircuit {
-  fn arity(&self) -> usize { self.r1cs.num_public_inputs }
-
-  fn synthesize<CS: ConstraintSystem<F<G1>>>(
-    &self,
-    cs: &mut CS,
-    z: &[AllocatedNum<F<G1>>],
-  ) -> Result<Vec<AllocatedNum<F<G1>>>, SynthesisError> {
-    // synthesize the circuit
-    self.vanilla_synthesize(cs, z)
-  }
-}
-
-pub fn create_public_params(r1cs: R1CS) -> PublicParams<E1> {
-  let circuit_primary = CircomCircuit { r1cs, witness: None };
-  let circuit_secondary = TrivialCircuit::<F<G2>>::default();
-
-  PublicParams::setup(&circuit_primary, &circuit_secondary, &*S1::ck_floor(), &*S2::ck_floor())
-    .unwrap() // nova setup
 }

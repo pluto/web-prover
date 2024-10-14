@@ -25,15 +25,17 @@ pub fn generate_witness_from_graph(
 ) -> Vec<<G1 as Group>::Scalar> {
   #[cfg(not(target_arch = "wasm32"))]
   {
+    // let witness = circom_witnesscalc::calc_witness(input_json, graph_data).unwrap();
+    // Note: this captures stdout in this function call into `trace` logs
     let witness =
       capture_and_log(|| circom_witnesscalc::calc_witness(input_json, graph_data).unwrap());
 
-    return witness
+    witness
       .iter()
       .map(|elem| <F<G1> as PrimeField>::from_str_vartime(elem.to_string().as_str()).unwrap())
-      .collect();
+      .collect()
   }
-
+  #[cfg(target_arch = "wasm32")]
   todo!("circom_witnesscalc not supported in wasm");
 }
 
@@ -54,9 +56,9 @@ pub fn generate_witness_from_witnesscalc_file(
       .iter()
       .map(|elem| <F<G1> as PrimeField>::from_str_vartime(elem.to_string().as_str()).unwrap())
       .collect();
-    return r;
+    r
   }
-
+  #[cfg(target_arch = "wasm32")]
   todo!("circom_witnesscalc not supported in wasm");
 }
 
