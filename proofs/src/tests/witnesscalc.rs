@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use serde_json::json;
 
 use super::*;
@@ -5,6 +7,8 @@ use super::*;
 const ADD_EXTERNAL_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/add_external.bin");
 const SQUARE_ZEROTH_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/square_zeroth.bin");
 const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/swap_memory.bin");
+
+const TEST_OFFLINE_PATH: &str = "src/tests/test_run_serialized_verify.bin";
 
 fn get_setup_data() -> SetupData {
   SetupData {
@@ -23,7 +27,7 @@ fn get_setup_data() -> SetupData {
 }
 
 // TODO: This likely won't work until we adaptively resize the ROM given the `SetupData`
-fn run_entry() -> (ProgramData<Online>, RecursiveSNARK<E1>) {
+fn run_entry(setup_data: SetupData) -> (ProgramData<Online>, RecursiveSNARK<E1>) {
   let mut external_input0: HashMap<String, Value> = HashMap::new();
   external_input0.insert("external".to_string(), json!(EXTERNAL_INPUTS[0]));
   let mut external_input1: HashMap<String, Value> = HashMap::new();
@@ -36,7 +40,6 @@ fn run_entry() -> (ProgramData<Online>, RecursiveSNARK<E1>) {
     HashMap::new(),
     HashMap::new(),
   ];
-  let setup_data = get_setup_data();
   let public_params = program::setup(&setup_data);
   let program_data = ProgramData {
     public_params,
@@ -53,7 +56,8 @@ fn run_entry() -> (ProgramData<Online>, RecursiveSNARK<E1>) {
 #[test]
 #[tracing_test::traced_test]
 fn test_run() {
-  let (_, proof) = run_entry();
+  let setup_data = get_setup_data();
+  let (_, proof) = run_entry(setup_data);
   // [1,2] + [5,7]
   // --> [6,9]
   // --> [36,9]
@@ -82,14 +86,15 @@ fn test_run() {
 #[test]
 #[tracing_test::traced_test]
 fn test_run_serialized_verify() {
-  let (public_params, recursive_snark) = run_entry();
+  let setup_data = get_setup_data();
+  let (program_data, recursive_snark) = run_entry(setup_data);
 
   // Pseudo-offline the `PublicParams` and regenerate it
-  let serialized_public_params = bincode::serialize(&public_params).unwrap();
-  let public_params = bincode::deserialize(&serialized_public_params).unwrap();
+  let program_data = program_data.into_offline(PathBuf::from_str(TEST_OFFLINE_PATH).unwrap());
+  let program_data = program_data.into_online();
 
   // Create the compressed proof with the offlined `PublicParams`
-  let proof = program::compress_proof(&recursive_snark, &public_params);
+  let proof = program::compress_proof(&recursive_snark, &program_data.public_params);
 
   // Serialize the proof and zlib compress further
   let serialized_compressed_proof = proof.serialize_and_compress();
@@ -98,7 +103,7 @@ fn test_run_serialized_verify() {
   let proof = serialized_compressed_proof.decompress_and_serialize();
 
   // Extend the initial state input with the ROM (happens internally inside of `program::run`, so
-  // we do it out here)
+  // we do it out here just for the test)
   let mut z0_primary = INIT_PUBLIC_INPUT.to_vec();
   z0_primary.push(0);
   let mut rom = ROM.to_vec();
@@ -106,38 +111,13 @@ fn test_run_serialized_verify() {
   z0_primary.extend(rom.iter());
 
   // Check that it verifies with offlined `PublicParams` regenerated pkey vkey
-  let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
+  let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
   let res = proof.0.verify(
-    &public_params,
+    &program_data.public_params,
     &vk,
     z0_primary.clone().into_iter().map(F::<G1>::from).collect::<Vec<_>>().as_slice(),
     [0].into_iter().map(F::<G2>::from).collect::<Vec<_>>().as_slice(),
   );
   assert!(res.is_ok());
+  std::fs::remove_file(PathBuf::from_str(TEST_OFFLINE_PATH).unwrap()).unwrap();
 }
-
-// TODO: Consider reworking this to at least show an offline example
-// #[test]
-// #[tracing_test::traced_test]
-// fn test_parse_batch() {
-//   let read = std::fs::read("examples/parse_batch_wc.json").unwrap();
-//   let program_data: ProgramData<Offline> = serde_json::from_slice(&read).unwrap();
-//   let setup_data = program::setup(circuit_list);
-
-//   let recursive_snark = program::run(&program_data, &setup_data);
-
-//   let final_mem = [
-//     F::<G1>::from(0),
-//     F::<G1>::from(0),
-//     F::<G1>::from(0),
-//     F::<G1>::from(0),
-//     F::<G1>::from(0),
-//     F::<G1>::from(0),
-//     F::<G1>::from(4),
-//     F::<G1>::from(0),
-//     F::<G1>::from(0),
-//     F::<G1>::from(0),
-//     F::<G1>::from(0),
-//   ];
-//   assert_eq!(&final_mem.to_vec(), recursive_snark.zi_primary());
-// }
