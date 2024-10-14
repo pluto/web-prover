@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{collections::BTreeMap, str::FromStr};
 
 use bellpepper_core::{
   boolean::{AllocatedBit, Boolean},

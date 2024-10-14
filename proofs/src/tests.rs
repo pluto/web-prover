@@ -61,7 +61,7 @@ fn run_entry_wc() -> (PublicParams<E1>, RecursiveSNARK<E1>) {
     ],
     rom:                     vec![0; MAX_ROM_SIZE],
     initial_public_input:    INIT_PUBLIC_INPUT.to_vec(),
-    private_input:           HashMap::new(),
+    private_input:           Vec::new(),
     witnesses:               vec![vec![]],
   };
   let circuit_list = program::initialize_circuit_list(&program_data);
