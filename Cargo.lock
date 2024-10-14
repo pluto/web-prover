@@ -930,16 +930,14 @@ dependencies = [
 
 [[package]]
 name = "bindgen"
-version = "0.69.5"
+version = "0.70.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "271383c67ccabffb7381723dea0672a673f292304fcb45c01cc648c7a8d58088"
+checksum = "f49d8fed880d473ea71efb9bf597651e77201bdd4893efe54c9e5d65ae04ce6f"
 dependencies = [
  "bitflags",
  "cexpr",
  "clang-sys",
- "itertools 0.12.1",
- "lazy_static",
- "lazycell",
+ "itertools 0.10.5",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -948,7 +946,6 @@ dependencies = [
  "rustc-hash 1.1.0",
  "shlex",
  "syn 2.0.79",
- "which",
 ]
 
 [[package]]
@@ -1199,7 +1196,7 @@ dependencies = [
 [[package]]
 name = "circom_witnesscalc"
 version = "0.2.0"
-source = "git+https://github.com/pluto/circom-witnesscalc#2606b41fd6aa4485f2dfda94566ef0f02bf88fee"
+source = "git+https://github.com/iden3/circom-witnesscalc#ad8cbcc10beb3b5f278389db4adc3b88c68b35a9"
 dependencies = [
  "ark-bn254",
  "ark-ff 0.4.2",
@@ -1212,8 +1209,8 @@ dependencies = [
  "hex",
  "lazy_static",
  "libc",
+ "num-bigint 0.4.6",
  "parser",
- "postcard",
  "program_structure",
  "prost 0.13.3",
  "prost-build",
@@ -1401,12 +1398,6 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
 ]
-
-[[package]]
-name = "cobs"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67ba02a97a2bd10f4b59b25c7973101c79642302776489e030cd13cdab09ed15"
 
 [[package]]
 name = "code_producers"
@@ -2091,18 +2082,6 @@ dependencies = [
  "subtle",
  "zeroize",
 ]
-
-[[package]]
-name = "embedded-io"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef1a6892d9eef45c8fa6b9e0086428a2cca8491aca8f787c534a3d6d0bcb3ced"
-
-[[package]]
-name = "embedded-io"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
 
 [[package]]
 name = "ena"
@@ -3142,12 +3121,6 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 dependencies = [
  "spin 0.9.8",
 ]
-
-[[package]]
-name = "lazycell"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
@@ -4208,18 +4181,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "postcard"
-version = "1.0.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f7f0a8d620d71c457dd1d47df76bb18960378da56af4527aaa10f515eee732e"
-dependencies = [
- "cobs",
- "embedded-io 0.4.0",
- "embedded-io 0.6.1",
- "serde",
-]
-
-[[package]]
 name = "powerfmt"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4453,7 +4414,6 @@ dependencies = [
 [[package]]
 name = "proving_ground"
 version = "0.1.0"
-source = "git+https://github.com/pluto/proving_ground?rev=dcdc708#dcdc7083be7241afb62cd6efe894d451b9c474c2"
 dependencies = [
  "bellpepper",
  "bellpepper-core",

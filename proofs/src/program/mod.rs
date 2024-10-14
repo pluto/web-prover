@@ -18,7 +18,7 @@ pub struct Memory {
 
 #[derive(Clone)]
 pub struct RomCircuit {
-  pub circuit:                C1,
+  pub circuit:                CircomCircuit,
   pub circuit_index:          usize,
   pub rom_size:               usize,
   pub curr_public_input:      Option<Vec<F<G1>>>,
@@ -67,33 +67,13 @@ impl StepCircuit<F<G1>> for RomCircuit {
   }
 }
 
-pub fn initialize_circuit_list(program_data: &ProgramData) -> Vec<RomCircuit> {
-  let mut circuits = vec![];
-  for (circuit_index, (r1cs_path, witness_generator_type)) in
-    program_data.r1cs_types.iter().zip(program_data.witness_generator_types.iter()).enumerate()
-  {
-    let circuit = circom::CircomCircuit { r1cs: R1CS::from(r1cs_path), witness: None };
-    let rom_circuit = RomCircuit {
-      circuit,
-      circuit_index,
-      rom_size: program_data.rom.len(),
-      curr_public_input: None,
-      curr_private_input: None,
-
-      witness_generator_type: witness_generator_type.clone(),
-    };
-
-    circuits.push(rom_circuit);
-  }
-  circuits
-}
-
-pub fn setup(ordered_circuit_list: Vec<RomCircuit>) -> PublicParams<E1> {
+pub fn setup(setup_data: &SetupData) -> PublicParams<E1> {
   // Optionally time the setup stage for the program
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
 
-  let memory = Memory { circuits: ordered_circuit_list, rom: vec![] }; // Note, `rom` here is not used in setup, only `circuits`
+  let circuits = initialize_circuit_list(setup_data);
+  let memory = Memory { circuits, rom: vec![] }; // Note, `rom` here is not used in setup, only `circuits`
   let public_params = PublicParams::setup(&memory, &*default_ck_hint(), &*default_ck_hint());
 
   #[cfg(feature = "timing")]
@@ -102,7 +82,7 @@ pub fn setup(ordered_circuit_list: Vec<RomCircuit>) -> PublicParams<E1> {
   public_params
 }
 
-pub fn run(program_data: &ProgramData, public_params: &PublicParams<E1>) -> RecursiveSNARK<E1> {
+pub fn run(program_data: &ProgramData<Online>) -> RecursiveSNARK<E1> {
   info!("Starting SuperNova program...");
 
   // Get the public inputs needed for circuits
@@ -119,7 +99,7 @@ pub fn run(program_data: &ProgramData, public_params: &PublicParams<E1>) -> Recu
   let mut recursive_snark_option = None;
   let mut next_public_input = z0_primary.clone();
 
-  let circuits = initialize_circuit_list(program_data);
+  let circuits = initialize_circuit_list(&program_data.setup_data); // TODO: AwK?
   let mut memory = Memory { rom: program_data.rom.clone(), circuits };
 
   #[cfg(feature = "timing")]
@@ -154,7 +134,7 @@ pub fn run(program_data: &ProgramData, public_params: &PublicParams<E1>) -> Recu
 
     let mut recursive_snark = recursive_snark_option.unwrap_or_else(|| {
       RecursiveSNARK::new(
-        public_params,
+        &program_data.public_params,
         &memory,
         &circuit_primary,
         &circuit_secondary,
@@ -165,13 +145,15 @@ pub fn run(program_data: &ProgramData, public_params: &PublicParams<E1>) -> Recu
     });
 
     info!("Proving single step...");
-    recursive_snark.prove_step(public_params, &circuit_primary, &circuit_secondary).unwrap();
+    recursive_snark
+      .prove_step(&program_data.public_params, &circuit_primary, &circuit_secondary)
+      .unwrap();
     info!("Done proving single step...");
 
     #[cfg(feature = "verify-steps")]
     {
       info!("Verifying single step...");
-      recursive_snark.verify(public_params, &z0_primary, &z0_secondary).unwrap();
+      recursive_snark.verify(&program_data.public_params, &z0_primary, &z0_secondary).unwrap();
       info!("Single step verification done");
     }
 
@@ -206,4 +188,25 @@ pub fn compress_proof(
   trace!("`CompressedSNARK::prove` of `program::run()` elapsed: {:?}", time.elapsed());
 
   proof
+}
+
+fn initialize_circuit_list(setup_data: &SetupData) -> Vec<RomCircuit> {
+  let mut circuits = vec![];
+  for (circuit_index, (r1cs_path, witness_generator_type)) in
+    setup_data.r1cs_types.iter().zip(setup_data.witness_generator_types.iter()).enumerate()
+  {
+    let circuit = circom::CircomCircuit { r1cs: R1CS::from(r1cs_path), witness: None };
+    let rom_circuit = RomCircuit {
+      circuit,
+      circuit_index,
+      rom_size: setup_data.max_rom_length,
+      curr_public_input: None,
+      curr_private_input: None,
+
+      witness_generator_type: witness_generator_type.clone(),
+    };
+
+    circuits.push(rom_circuit);
+  }
+  circuits
 }
