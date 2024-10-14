@@ -29,7 +29,10 @@ use tls_core::{
   suites::{self, SupportedCipherSuite},
 };
 
-use super::{Backend, BackendError, origo::{OrigoConnection, RecordMeta, RecordKey, Direction}};
+use super::{
+  origo::{Direction, OrigoConnection, RecordKey, RecordMeta},
+  Backend, BackendError,
+};
 use crate::{backend::tls13::AeadKey, DecryptMode, EncryptMode, Error};
 
 /// Implementation of TLS 1.3 backend using RustCrypto primitives
@@ -233,7 +236,14 @@ impl RustCryptoBackend13 {
   }
 
   /// tk: add a field to the witness record map
-  pub fn insert_record(&mut self, d: Direction, seq: u64, ct: ContentType, first_byte: u8, record_meta: RecordMeta) {
+  pub fn insert_record(
+    &mut self,
+    d: Direction,
+    seq: u64,
+    ct: ContentType,
+    first_byte: u8,
+    record_meta: RecordMeta,
+  ) {
     self.record_map.insert(record_meta.nonce.clone(), record_meta.clone());
     self.logger.lock().unwrap().insert_record(RecordKey::new(d, ct, seq, first_byte), record_meta);
   }
@@ -478,7 +488,7 @@ impl Backend for RustCryptoBackend13 {
     // Start with diffie hellman dto produce the shared pre_master_secret
     let mut pms = [0u8; 32]; // NOTE: 32 bytes in both impls
     let secret = *sk.diffie_hellman(&server_pk).raw_secret_bytes();
-    pms.copy_from_slice(&secret.as_slice());
+    pms.copy_from_slice(secret.as_slice());
     self.pre_master_secret = Some(pms);
     trace!("pre_master_secret={:?}", BASE64_STANDARD.encode(pms));
 
@@ -542,7 +552,13 @@ impl Backend for RustCryptoBackend13 {
         // NOTE: Must support both because cipher messages are labeled 1.2
         ProtocolVersion::TLSv1_3 | ProtocolVersion::TLSv1_2 => {
           let (plain_message, record_meta) = dec.decrypt_tls13_aes(&msg, seq)?;
-          self.insert_record(Direction::Received, seq, plain_message.typ, plain_message.payload.0[0], record_meta);
+          self.insert_record(
+            Direction::Received,
+            seq,
+            plain_message.typ,
+            plain_message.payload.0[0],
+            record_meta,
+          );
           return Ok(plain_message);
         },
         version => {
@@ -567,7 +583,7 @@ impl Backend for RustCryptoBackend13 {
     }
 
     if matches!(self.encrypt_mode, EncryptMode::Application) {
-    //   tk_dbg_with_context(&self.witness);
+      //   tk_dbg_with_context(&self.witness);
     }
 
     Ok(())
@@ -707,7 +723,11 @@ impl Encrypter {
     Self { write_key, write_iv, cipher_suite }
   }
 
-  fn encrypt_tls13_aes(&self, m: &PlainMessage, seq: u64) -> Result<(OpaqueMessage, RecordMeta), BackendError> {
+  fn encrypt_tls13_aes(
+    &self,
+    m: &PlainMessage,
+    seq: u64,
+  ) -> Result<(OpaqueMessage, RecordMeta), BackendError> {
     let total_len = m.payload.0.len() + 1 + 16;
     let aad = make_tls13_aad(total_len);
     let init_nonce = make_nonce(self.write_iv, seq);
@@ -730,7 +750,7 @@ impl Encrypter {
       "ENC: cipher_len={:?}, plain_len={:?}, seq={:?}, iv={:?}, dec_key={:?}, nonce={:?}, aad={:?}",
       ciphertext.len(),
       m.payload.0.len(),
-      seq, 
+      seq,
       hex::encode(self.write_iv),
       hex::encode(self.write_key),
       hex::encode(init_nonce.as_ref()),
@@ -739,11 +759,11 @@ impl Encrypter {
 
     Ok((
       OpaqueMessage {
-        typ: ContentType::ApplicationData, // Always send Application Data label
-        version: ProtocolVersion::TLSv1_2, // Opaque Messages lie.
+        typ:     ContentType::ApplicationData, // Always send Application Data label
+        version: ProtocolVersion::TLSv1_2,     // Opaque Messages lie.
         payload: TLSPayload::new(ciphertext.clone()),
-      }, 
-      RecordMeta::new(&aad, &m.payload.0, &ciphertext, &nonce.to_vec())
+      },
+      RecordMeta::new(&aad, &m.payload.0, &ciphertext, nonce),
     ))
   }
 }
@@ -794,8 +814,12 @@ impl Decrypter {
     );
 
     Ok((
-      PlainMessage { typ, version: ProtocolVersion::TLSv1_3, payload: TLSPayload(plaintext.clone()) },
-      RecordMeta::new(&aad, &plaintext, &m.payload.0, &nonce.to_vec()),
+      PlainMessage {
+        typ,
+        version: ProtocolVersion::TLSv1_3,
+        payload: TLSPayload(plaintext.clone()),
+      },
+      RecordMeta::new(&aad, &plaintext, &m.payload.0, nonce),
     ))
   }
 }

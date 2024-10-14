@@ -46,5 +46,7 @@ failed",
   info!("Using file: {:?}", file);
   let read = std::fs::read(file).unwrap();
   let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
-  program::run(&program_data);
+  let circuit_list = program::initialize_circuit_list(&program_data);
+  let setup_data = program::setup(circuit_list);
+  program::run(&program_data, &setup_data);
 }
