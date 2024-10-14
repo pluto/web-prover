@@ -1,19 +1,20 @@
+use serde_json::json;
+
 use super::*;
 
-const ADD_INTO_ZEROTH_GRAPH: &[u8] =
-  include_bytes!("../../examples/circuit_data/addIntoZeroth.bin");
-const SQUARE_ZEROTH_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/squareZeroth.bin");
-const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/swapMemory.bin");
+const ADD_EXTERNAL_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/add_external.bin");
+const SQUARE_ZEROTH_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/square_zeroth.bin");
+const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/swap_memory.bin");
 
 fn get_setup_data() -> SetupData {
   SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(ADD_INTO_ZEROTH_R1CS.to_vec()),
+      R1CSType::Raw(ADD_EXTERNAL_R1CS.to_vec()),
       R1CSType::Raw(SQUARE_ZEROTH_R1CS.to_vec()),
       R1CSType::Raw(SWAP_MEMORY_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      WitnessGeneratorType::Raw(ADD_INTO_ZEROTH_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(ADD_EXTERNAL_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(SQUARE_ZEROTH_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(SWAP_MEMORY_GRAPH.to_vec()),
     ],
@@ -23,14 +24,26 @@ fn get_setup_data() -> SetupData {
 
 // TODO: This likely won't work until we adaptively resize the ROM given the `SetupData`
 fn run_entry() -> (ProgramData<Online>, RecursiveSNARK<E1>) {
+  let mut external_input0: HashMap<String, Value> = HashMap::new();
+  external_input0.insert("external".to_string(), json!(EXTERNAL_INPUTS[0]));
+  let mut external_input1: HashMap<String, Value> = HashMap::new();
+  external_input1.insert("external".to_string(), json!(EXTERNAL_INPUTS[1]));
+  let private_inputs = vec![
+    external_input0,
+    HashMap::new(),
+    HashMap::new(),
+    external_input1,
+    HashMap::new(),
+    HashMap::new(),
+  ];
   let setup_data = get_setup_data();
   let public_params = program::setup(&setup_data);
   let program_data = ProgramData {
     public_params,
     setup_data,
     rom: ROM.to_vec(),
-    initial_public_input: INIT_PUBLIC_INPUT.to_vec(),
-    private_input: Vec::new(),
+    initial_nivc_input: INIT_PUBLIC_INPUT.to_vec(),
+    private_inputs,
     witnesses: vec![vec![]],
   };
   let recursive_snark = program::run(&program_data);
@@ -41,9 +54,16 @@ fn run_entry() -> (ProgramData<Online>, RecursiveSNARK<E1>) {
 #[tracing_test::traced_test]
 fn test_run() {
   let (_, proof) = run_entry();
+  // [1,2] + [5,7]
+  // --> [6,9]
+  // --> [36,9]
+  // --> [9,36] + [13,1]
+  // --> [22,37]
+  // --> [484,37]
+  // [37,484]
   let final_mem = [
-    F::<G1>::from(0),
-    F::<G1>::from(81),
+    F::<G1>::from(37),
+    F::<G1>::from(484),
     F::<G1>::from(6),
     F::<G1>::from(0),
     F::<G1>::from(1),

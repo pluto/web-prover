@@ -5,7 +5,6 @@ use std::{
   io::{BufReader, Cursor, Read, Seek, SeekFrom},
   path::PathBuf,
   process::Command,
-  sync::{Arc, Mutex},
 };
 
 use anyhow::Result;
