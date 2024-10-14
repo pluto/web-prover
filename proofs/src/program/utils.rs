@@ -129,14 +129,14 @@ pub fn map_private_inputs<T: SetupStatus>(
     }
   }
   let (last_key, _) = opcode_frequency.iter().next_back().unwrap();
-  assert_eq!(program_data.private_input.len() as u64 - 1, *last_key);
+  assert_eq!(program_data.private_inputs.len() as u64 - 1, *last_key);
 
   let mut private_inputs: Vec<HashMap<String, Value>> = Vec::new();
   // tracks iteration of opcodes in ROM
   let mut curr_opcode_frequency = HashMap::<u64, usize>::new();
 
   for opcode in program_data.rom.iter() {
-    let curr_private_input = program_data.private_input[*opcode as usize].clone();
+    let curr_private_input = program_data.private_inputs[*opcode as usize].clone();
 
     match curr_private_input.get("fold_input") {
       None =>

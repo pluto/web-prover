@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::Write, path::PathBuf};
 
-use circom::CircomCircuit;
+use circom::{r1cs::R1CS, CircomCircuit};
 use ff::Field;
 use proving_ground::{
   provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
@@ -28,16 +28,20 @@ pub type S2 = BatchedRelaxedR1CSSNARK<E2, EE2>;
 
 pub type F<G> = <G as Group>::Scalar;
 
-trait SetupStatus {
+pub trait SetupStatus {
   type PublicParams;
+  // type R1CS: Clone;
 }
+// #[derive(Clone)]
 pub struct Online;
 impl SetupStatus for Online {
   type PublicParams = PublicParams<E1>;
+  // type R1CS = R1CS;
 }
 pub struct Offline;
 impl SetupStatus for Offline {
   type PublicParams = PathBuf;
+  // type R1CS = R1CSType;
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -49,25 +53,39 @@ pub struct SetupData {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ProgramData<S: SetupStatus> {
-  pub public_params:        S::PublicParams,
-  pub setup_data:           SetupData,
-  pub rom:                  Vec<u64>, // TODO: Put the inputs in here (use aliases)
-  pub initial_public_input: Vec<u64>,
-  pub private_input:        Vec<HashMap<String, Value>>,
-  pub witnesses:            Vec<Vec<F<G1>>>,
+  pub public_params:      S::PublicParams,
+  pub setup_data:         SetupData,
+  pub rom:                Vec<u64>, // TODO: Put the inputs in here (use aliases)
+  pub initial_nivc_input: Vec<u64>,
+  pub private_inputs:     Vec<HashMap<String, Value>>,
+  pub witnesses:          Vec<Vec<F<G1>>>,
 }
 
 impl ProgramData<Offline> {
-  fn into_online(self) -> ProgramData<Online> {
+  pub fn into_online(self) -> ProgramData<Online> {
     let file = std::fs::read(&self.public_params).unwrap();
     let public_params = bincode::deserialize(&file).unwrap();
-    let ProgramData { setup_data, rom, initial_public_input, private_input, witnesses, .. } = self;
-    ProgramData { public_params, setup_data, rom, initial_public_input, private_input, witnesses }
+    let Self {
+      setup_data,
+      rom,
+      initial_nivc_input: initial_public_input,
+      private_inputs: private_input,
+      witnesses,
+      ..
+    } = self;
+    ProgramData {
+      public_params,
+      setup_data,
+      rom,
+      initial_nivc_input: initial_public_input,
+      private_inputs: private_input,
+      witnesses,
+    }
   }
 }
 
 impl ProgramData<Online> {
-  fn into_offline(self, path: PathBuf) -> ProgramData<Offline> {
+  pub fn into_offline(self, path: PathBuf) -> ProgramData<Offline> {
     let serialized = bincode::serialize(&self.public_params).unwrap();
     if let Some(parent) = path.parent() {
       std::fs::create_dir_all(parent).unwrap();
@@ -75,13 +93,20 @@ impl ProgramData<Online> {
     let mut file = std::fs::File::create(&path).unwrap();
     file.write_all(&serialized).unwrap();
 
-    let ProgramData { setup_data, rom, initial_public_input, private_input, witnesses, .. } = self;
+    let Self {
+      setup_data,
+      rom,
+      initial_nivc_input: initial_public_input,
+      private_inputs: private_input,
+      witnesses,
+      ..
+    } = self;
     ProgramData {
       public_params: path,
       setup_data,
       rom,
-      initial_public_input,
-      private_input,
+      initial_nivc_input: initial_public_input,
+      private_inputs: private_input,
       witnesses,
     }
   }

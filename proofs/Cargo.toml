@@ -2,13 +2,13 @@
 name = "proofs"
 version = "0.1.0"
 edition = "2021"
-build = "build.rs"
+# build = "build.rs"
 
 [[bin]]
 name = "test-prove"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-circom_witnesscalc = { git = "https://github.com/iden3/circom-witnesscalc" }
+circom_witnesscalc = { git = "https://github.com/pluto/circom-witnesscalc" } # Fork is needed apparently??
 
 [dependencies]
 serde = "1.0"

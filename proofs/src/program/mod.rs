@@ -12,8 +12,12 @@ use super::*;
 pub mod utils;
 
 pub struct Memory {
-  pub rom:      Vec<u64>,
   pub circuits: Vec<RomCircuit>,
+  pub rom:      Vec<u64>,
+}
+
+impl Memory {
+  pub fn populate_witnesses(&mut self, program_data: &ProgramData<Online>) {}
 }
 
 #[derive(Clone)]
@@ -21,8 +25,8 @@ pub struct RomCircuit {
   pub circuit:                CircomCircuit,
   pub circuit_index:          usize,
   pub rom_size:               usize,
-  pub curr_public_input:      Option<Vec<F<G1>>>,
-  pub curr_private_input:     Option<HashMap<String, Value>>,
+  pub nivc_io:                Option<Vec<F<G1>>>,
+  pub private_input:          Option<HashMap<String, Value>>,
   pub witness_generator_type: WitnessGeneratorType,
 }
 
@@ -73,7 +77,7 @@ pub fn setup(setup_data: &SetupData) -> PublicParams<E1> {
   let time = std::time::Instant::now();
 
   let circuits = initialize_circuit_list(setup_data);
-  let memory = Memory { circuits, rom: vec![] }; // Note, `rom` here is not used in setup, only `circuits`
+  let memory = Memory { circuits, rom: vec![0; setup_data.max_rom_length] }; // Note, `rom` here is not used in setup, only `circuits`
   let public_params = PublicParams::setup(&memory, &*default_ck_hint(), &*default_ck_hint());
 
   #[cfg(feature = "timing")]
@@ -85,14 +89,18 @@ pub fn setup(setup_data: &SetupData) -> PublicParams<E1> {
 pub fn run(program_data: &ProgramData<Online>) -> RecursiveSNARK<E1> {
   info!("Starting SuperNova program...");
 
+  // Resize the rom to be the `max_rom_length` committed to in the `SetupData`
+  let mut rom = program_data.rom.clone();
+  rom.resize(program_data.setup_data.max_rom_length, u64::MAX);
+
   // Get the public inputs needed for circuits
   let mut z0_primary: Vec<F<G1>> =
-    program_data.initial_public_input.iter().map(|val| F::<G1>::from(*val)).collect();
+    program_data.initial_nivc_input.iter().map(|val| F::<G1>::from(*val)).collect();
   z0_primary.push(F::<G1>::ZERO); // rom_index = 0
-  z0_primary.extend(program_data.rom.iter().map(|opcode| <E1 as Engine>::Scalar::from(*opcode)));
+  z0_primary.extend(rom.iter().map(|opcode| <E1 as Engine>::Scalar::from(*opcode)));
 
   // Get the private inputs needed for circuits
-  let private_inputs = map_private_inputs(program_data);
+  // let private_inputs = map_private_inputs(program_data);
 
   let z0_secondary = vec![F::<G2>::ZERO];
 
@@ -100,7 +108,7 @@ pub fn run(program_data: &ProgramData<Online>) -> RecursiveSNARK<E1> {
   let mut next_public_input = z0_primary.clone();
 
   let circuits = initialize_circuit_list(&program_data.setup_data); // TODO: AwK?
-  let mut memory = Memory { rom: program_data.rom.clone(), circuits };
+  let mut memory = Memory { rom, circuits };
 
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
@@ -109,8 +117,9 @@ pub fn run(program_data: &ProgramData<Online>) -> RecursiveSNARK<E1> {
   {
     info!("Step {} of ROM", idx);
     debug!("Opcode = {}", op_code);
-    memory.circuits[op_code as usize].curr_private_input = Some(private_inputs[idx].clone());
-    memory.circuits[op_code as usize].curr_public_input = Some(next_public_input);
+    memory.circuits[op_code as usize].private_input =
+      Some(program_data.private_inputs[idx].clone());
+    memory.circuits[op_code as usize].nivc_io = Some(next_public_input);
 
     let wit_type = memory.circuits[op_code as usize].witness_generator_type.clone();
 
@@ -121,8 +130,8 @@ pub fn run(program_data: &ProgramData<Online>) -> RecursiveSNARK<E1> {
       } else {
         let arity = memory.circuits[op_code as usize].circuit.arity();
         let in_json = into_input_json(
-          &memory.circuits[op_code as usize].curr_public_input.as_ref().unwrap()[..arity],
-          memory.circuits[op_code as usize].curr_private_input.as_ref().unwrap(),
+          &memory.circuits[op_code as usize].nivc_io.as_ref().unwrap()[..arity],
+          memory.circuits[op_code as usize].private_input.as_ref().unwrap(),
         );
 
         let witness = generate_witness_from_generator_type(&in_json, &wit_type);
@@ -200,8 +209,8 @@ fn initialize_circuit_list(setup_data: &SetupData) -> Vec<RomCircuit> {
       circuit,
       circuit_index,
       rom_size: setup_data.max_rom_length,
-      curr_public_input: None,
-      curr_private_input: None,
+      nivc_io: None,
+      private_input: None,
 
       witness_generator_type: witness_generator_type.clone(),
     };

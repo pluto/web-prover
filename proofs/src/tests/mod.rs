@@ -11,13 +11,13 @@ mod witnesscalc;
 
 const ROM: &[u64] = &[0, 1, 2, 0, 1, 2];
 
-const ADD_INTO_ZEROTH_R1CS: &[u8] =
-  include_bytes!("../../examples/circuit_data/addIntoZeroth.r1cs");
-const SQUARE_ZEROTH_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/squareZeroth.r1cs");
-const SWAP_MEMORY_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/swapMemory.r1cs");
+const ADD_EXTERNAL_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/add_external.r1cs");
+const SQUARE_ZEROTH_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/square_zeroth.r1cs");
+const SWAP_MEMORY_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/swap_memory.r1cs");
 
 const INIT_PUBLIC_INPUT: [u64; 2] = [1, 2];
-const MAX_ROM_LENGTH: usize = 10;
+const EXTERNAL_INPUTS: [[u64; 2]; 2] = [[5, 7], [13, 1]];
+const MAX_ROM_LENGTH: usize = 10; // TODO: This should be able to be longer
 
 #[ignore]
 #[test]
