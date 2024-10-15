@@ -22,7 +22,7 @@ use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::O
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
-use crate::{config, errors, config::ProvingData, origo::SignBody, Proof};
+use crate::{config, config::ProvingData, errors, origo::SignBody, Proof};
 
 const AES_GCM_FOLD_R1CS: &str = "proofs/examples/circuit_data/aes-gcm-fold.r1cs";
 const AES_GCM_FOLD_WASM: &str = "proofs/examples/circuit_data/aes-gcm-fold_js/aes-gcm-fold.wasm";

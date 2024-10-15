@@ -143,8 +143,8 @@ pub fn run(program_data: &ProgramData) -> ProgramOutput {
     let wit_type = memory.circuits[op_code as usize].witness_generator_type.clone();
     let (is_browser, is_mobile) = match wit_type.clone() {
       WitnessGeneratorType::Browser => (true, false),
-      WitnessGeneratorType::Mobile{ circuit } => (false, true),
-      _ => (false, false)
+      WitnessGeneratorType::Mobile { circuit } => (false, true),
+      _ => (false, false),
     };
 
     memory.circuits[op_code as usize].circuit.witness = if is_browser {
@@ -152,9 +152,9 @@ pub fn run(program_data: &ProgramData) -> ProgramOutput {
       Some(program_data.witnesses[op_code as usize].clone())
     } else if is_mobile {
       // TODO: Obviously this code is horrible. Migration to circom-witnesscalc
-      // will help. In the mean time, do the dirty to benchmark performance. 
+      // will help. In the mean time, do the dirty to benchmark performance.
       match wit_type.clone() {
-        WitnessGeneratorType::Mobile{circuit} => {
+        WitnessGeneratorType::Mobile { circuit } => {
           let r = if circuit == "aes-gcm-fold" {
             let arity = memory.circuits[op_code as usize].circuit.arity().clone();
             let in_json = into_input_json(
@@ -167,8 +167,8 @@ pub fn run(program_data: &ProgramData) -> ProgramOutput {
             panic!("Mobile only supports aes-gcm-fold")
           };
           r
-        }, 
-        _ => panic!("Mobile only supported")
+        },
+        _ => panic!("Mobile only supported"),
       }
     } else {
       let arity = memory.circuits[op_code as usize].circuit.arity().clone();

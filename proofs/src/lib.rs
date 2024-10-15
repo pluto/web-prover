@@ -1,22 +1,19 @@
 #![feature(internal_output_capture)]
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use arecibo::{
   provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
   spartan::batched::BatchedRelaxedR1CSSNARK,
   traits::{circuit::TrivialCircuit, Engine, Group},
 };
-use circom::CircomCircuit;
+use circom::{CircomCircuit, CircomInput};
 use compress::CompressedVerifier;
-use ff::Field;
+use ff::{Field, PrimeField};
+use num_bigint::BigInt;
+use program::ProgramOutput;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, error, info, trace};
-use circom::CircomInput;
-use ff::PrimeField;
-use num_bigint::BigInt;
-use program::ProgramOutput;
-use std::str::FromStr;
 
 pub mod circom;
 pub mod compress;
@@ -72,7 +69,7 @@ pub enum WitnessGeneratorType {
   #[serde(rename = "browser")] // TODO: Can we merge this with Raw?
   Browser,
   #[serde(rename = "mobile")]
-  Mobile{ circuit: String },
+  Mobile { circuit: String },
   #[serde(skip)]
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
   #[serde(skip)]
@@ -116,10 +113,9 @@ fn aes_gcm_fold_wrapper(input_json: &str) -> Vec<F<G1>> {
       .into_iter()
       .map(|bigint| F::<G1>::from_str_vartime(&bigint.to_string()).unwrap())
       .collect();
-    return r
+    return r;
   }
   panic!("rust-witness only supported on arm")
-
 }
 
 #[cfg(target_os = "ios")] use std::ffi::c_char;

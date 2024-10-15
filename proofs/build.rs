@@ -1,4 +1,5 @@
 use std::{env, process::Command};
+
 use rust_witness::transpile::transpile_wasm;
 
 fn main() {

@@ -2,8 +2,8 @@ use std::{
   collections::HashMap,
   ffi::{c_char, CStr, CString},
   path::PathBuf,
+  time::Instant,
 };
-use std::time::Instant;
 
 use client::{config::Config, errors::ClientErrors};
 use proofs::{
@@ -45,7 +45,7 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
     let start = Instant::now();
     debug!("starting proving");
     let proof = rt.block_on(client::prover_inner(config)).unwrap();
-    debug!("done proving: {:?}", Instant::now()-start);
+    debug!("done proving: {:?}", Instant::now() - start);
     serde_json::to_string_pretty(&proof).unwrap()
   }));
 
