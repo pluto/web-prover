@@ -20,5 +20,6 @@ proofs/log_input_signals.txt
 proofs/*.wtns
 client/.rustc_info.json
 
-# exclude ios build files
-headers/libclient_ios.h
+# exclude ios/wasm build files
+client_ios/headers/libclient_ios.h
+client_wasm/demo/static/build
