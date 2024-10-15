@@ -2,7 +2,7 @@
 
 use std::str::FromStr;
 
-use circom::CircomInput;
+use circom::{witness::remap_inputs, CircomInput};
 use ff::PrimeField;
 use num_bigint::BigInt;
 use program::ProgramOutput;
@@ -23,27 +23,6 @@ pub const SWAP_MEMORY_R1CS: &[u8] = include_bytes!("../examples/circuit_data/swa
 pub const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../examples/circuit_data/swapMemory.bin");
 
 pub const INIT_PUBLIC_INPUT: [u64; 2] = [1, 2];
-
-#[allow(unused)]
-fn remap_inputs(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
-  let circom_input: CircomInput = serde_json::from_str(input_json).unwrap();
-  dbg!(&circom_input);
-  let mut unfuckulated = vec![];
-  unfuckulated.push((
-    "step_in".to_string(),
-    circom_input.step_in.into_iter().map(|s| BigInt::from_str(&s).unwrap()).collect(),
-  ));
-  for (k, v) in circom_input.extra {
-    let val = v
-      .as_array()
-      .unwrap()
-      .iter()
-      .map(|x| BigInt::from_str(&x.as_number().unwrap().to_string()).unwrap())
-      .collect::<Vec<BigInt>>();
-    unfuckulated.push((k, val));
-  }
-  unfuckulated
-}
 
 rust_witness::witness!(addIntoZeroth);
 #[allow(unused)]

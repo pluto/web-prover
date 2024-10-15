@@ -76,79 +76,9 @@ pub enum WitnessGeneratorType {
   RustWitness(fn(&str) -> Vec<F<G1>>),
 }
 
-#[cfg(not(target_os = "ios"))]
 pub fn get_compressed_proof(program_data: ProgramData) -> Vec<u8> {
   let program_output = program::run(&program_data);
   let compressed_verifier = CompressedVerifier::from(program_output);
   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
   serialized_compressed_verifier.proof.0
-}
-
-#[cfg(target_arch = "aarch64")]
-rust_witness::witness!(aesgcmfold);
-#[cfg(target_arch = "aarch64")]
-fn remap_inputs(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
-  let circom_input: CircomInput = serde_json::from_str(input_json).unwrap();
-  let mut unfuckulated = vec![];
-  unfuckulated.push((
-    "step_in".to_string(),
-    circom_input.step_in.into_iter().map(|s| BigInt::from_str(&s).unwrap()).collect(),
-  ));
-  for (k, v) in circom_input.extra {
-    let val = v
-      .as_array()
-      .unwrap()
-      .iter()
-      .map(|x| BigInt::from_str(&x.as_number().unwrap().to_string()).unwrap())
-      .collect::<Vec<BigInt>>();
-    unfuckulated.push((k, val));
-  }
-  unfuckulated
-}
-
-fn aes_gcm_fold_wrapper(input_json: &str) -> Vec<F<G1>> {
-  #[cfg(target_arch = "aarch64")]
-  {
-    let r = aesgcmfold_witness(remap_inputs(input_json))
-      .into_iter()
-      .map(|bigint| F::<G1>::from_str_vartime(&bigint.to_string()).unwrap())
-      .collect();
-    return r;
-  }
-  panic!("rust-witness only supported on arm")
-}
-
-#[cfg(target_os = "ios")] use std::ffi::c_char;
-#[cfg(target_os = "ios")]
-#[no_mangle]
-#[allow(clippy::missing_safety_doc)]
-pub unsafe extern "C" fn get_compressed_proof(program_data_json: *const c_char) -> *const c_char {
-  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-    let program_data_str = unsafe {
-      assert!(!program_data_json.is_null());
-      std::ffi::CStr::from_ptr(program_data_json).to_str().unwrap()
-    };
-    serde_json::from_str::<ProgramData>(program_data_str).unwrap()
-  }));
-
-  match result {
-    Ok(program_data) => {
-      let program_output = program::run(&program_data);
-      let compressed_verifier = CompressedVerifier::from(program_output);
-      let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
-      std::ffi::CString::new(serialized_compressed_verifier.proof.0).unwrap().into_raw()
-    },
-    Err(err) => {
-      let backtrace = std::backtrace::Backtrace::capture();
-
-      let out = if let Some(e) = err.downcast_ref::<&str>() {
-        format!("Captured Panic\nError: {}\n\nStack:\n{}", e, backtrace)
-      } else {
-        format!("Captured Panic\n{:#?}\n\nStack:\n{}", err, backtrace)
-      };
-
-      let out_json = serde_json::to_string_pretty(&out).unwrap(); // should never panic
-      std::ffi::CString::new(out_json).unwrap().into_raw() // should never panic
-    },
-  }
 }

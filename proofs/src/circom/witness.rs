@@ -23,6 +23,40 @@ pub fn generate_witness_from_generator_type(
   }
 }
 
+pub fn remap_inputs(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
+  let circom_input: CircomInput = serde_json::from_str(input_json).unwrap();
+  let mut unfuckulated = vec![];
+  unfuckulated.push((
+    "step_in".to_string(),
+    circom_input.step_in.into_iter().map(|s| BigInt::from_str(&s).unwrap()).collect(),
+  ));
+  for (k, v) in circom_input.extra {
+    let val = v
+      .as_array()
+      .unwrap()
+      .iter()
+      .map(|x| BigInt::from_str(&x.as_number().unwrap().to_string()).unwrap())
+      .collect::<Vec<BigInt>>();
+    unfuckulated.push((k, val));
+  }
+  unfuckulated
+}
+
+#[cfg(all(target_os = "ios", target_arch = "aarch64"))]
+rust_witness::witness!(aesgcmfold);
+
+pub fn aes_gcm_fold_wrapper(input_json: &str) -> Vec<F<G1>> {
+  #[cfg(all(target_os = "ios", target_arch = "aarch64"))]
+  {
+    let r = aesgcmfold_witness(remap_inputs(input_json))
+      .into_iter()
+      .map(|bigint| F::<G1>::from_str_vartime(&bigint.to_string()).unwrap())
+      .collect();
+    return r;
+  }
+  panic!("rust-witness only supported on arm")
+}
+
 pub fn generate_witness_from_graph(
   input_json: &str,
   graph_data: &[u8],

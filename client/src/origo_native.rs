@@ -85,7 +85,6 @@ async fn generate_program_data(witness: &WitnessData, proving: ProvingData) -> P
   let rom_len = (pt.len() + janky_padding) / 16;
   janky_plaintext_padding.extend(pt);
 
-  #[cfg(not(target_arch = "aarch64"))]
   let private_input = json!({
     "private_input": {
       "key": sized_key,
@@ -113,7 +112,7 @@ async fn generate_program_data(witness: &WitnessData, proving: ProvingData) -> P
     "witnesses": vec![vec![F::<G1>::from(0)]],
   });
 
-  #[cfg(target_arch = "aarch64")]
+  #[cfg(all(target_os = "ios", target_arch = "aarch64"))]
   let private_input = json!({
     "private_input": {
       "key": sized_key,
