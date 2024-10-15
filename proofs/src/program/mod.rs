@@ -151,7 +151,6 @@ pub fn run(program_data: &ProgramData) -> ProgramOutput {
       // When running in browser, the witness is passed as input.
       Some(program_data.witnesses[op_code as usize].clone())
     } else if is_mobile {
-
       // TODO: Obviously this code is horrible. Migration to circom-witnesscalc
       // will help. In the mean time, do the dirty to benchmark performance. 
       match wit_type.clone() {
@@ -163,7 +162,7 @@ pub fn run(program_data: &ProgramData) -> ProgramOutput {
               memory.circuits[op_code as usize].curr_private_input.as_ref().unwrap(),
             );
 
-            Some(aes_gcm_fold_Wrapper(&in_json))
+            Some(aes_gcm_fold_wrapper(&in_json))
           } else {
             panic!("Mobile only supports aes-gcm-fold")
           };

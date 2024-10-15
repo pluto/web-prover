@@ -108,12 +108,18 @@ fn remap_inputs(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
   }
   unfuckulated
 }
-#[cfg(target_arch = "aarch64")]
-fn aes_gcm_fold_Wrapper(input_json: &str) -> Vec<F<G1>> {
-  aesgcmfold_witness(remap_inputs(input_json))
-    .into_iter()
-    .map(|bigint| F::<G1>::from_str_vartime(&bigint.to_string()).unwrap())
-    .collect()
+
+fn aes_gcm_fold_wrapper(input_json: &str) -> Vec<F<G1>> {
+  #[cfg(target_arch = "aarch64")]
+  {
+    let r = aesgcmfold_witness(remap_inputs(input_json))
+      .into_iter()
+      .map(|bigint| F::<G1>::from_str_vartime(&bigint.to_string()).unwrap())
+      .collect();
+    return r
+  }
+  panic!("rust-witness only supported on arm")
+
 }
 
 #[cfg(target_os = "ios")] use std::ffi::c_char;
