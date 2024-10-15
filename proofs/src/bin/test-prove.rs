@@ -1,12 +1,9 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use proofs::{
-  program::{self},
-  ProgramData,
-};
+// use proofs::program::{self};
 // use proofs::{program, ProgramData};
-use tracing::{info, Level};
+use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
 #[derive(Parser, Debug)]

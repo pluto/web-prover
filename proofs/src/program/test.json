@@ -1,0 +1,22 @@
+{
+    "private_inputs": {
+        "external": {
+            "start_index": 0,
+            "end_index": 0,
+            "value": [
+                5,
+                7
+            ]
+        },
+        "plaintext": {
+            "start_index": 1,
+            "end_index": 2,
+            "value": [
+                1,
+                2,
+                3,
+                4
+            ]
+        }
+    }
+}

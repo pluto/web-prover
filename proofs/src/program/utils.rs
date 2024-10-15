@@ -1,15 +1,14 @@
-use std::{collections::BTreeMap, str::FromStr};
+use std::str::FromStr;
 
 use bellpepper_core::{
   boolean::{AllocatedBit, Boolean},
   LinearCombination,
 };
-use circom::CircomInput;
 use itertools::Itertools;
 use num_bigint::BigInt;
-use serde_json::json;
 
 use super::*;
+use crate::circom::CircomInput;
 
 #[allow(clippy::type_complexity)]
 pub fn next_rom_index_and_pc<CS: ConstraintSystem<F<G1>>>(
@@ -112,69 +111,6 @@ pub fn get_selector_vec_from_index<CS: ConstraintSystem<F<G1>>>(
   Ok(selector)
 }
 
-// TODO: This may not be the best now that we have variable rom and stuff, but I replaced the
-// `num_folds` with `rom.len()` as a simple patch
-// This function NEEDS reworked, but we should just rethink how we prep inputs for this stuff
-// anyway, so I'm leaving this as tech debt, sorry.
-pub fn map_private_inputs<T: SetupStatus>(
-  program_data: &ProgramData<T>,
-) -> Vec<HashMap<String, Value>> {
-  // TODO: should have private input for each unique ROM opcode -- agreed
-  let mut opcode_frequency = BTreeMap::<u64, usize>::new();
-  for opcode in program_data.rom.iter() {
-    if let Some(freq) = opcode_frequency.get_mut(opcode) {
-      *freq = *freq + 1;
-    } else {
-      opcode_frequency.insert(*opcode, 1);
-    }
-  }
-  let (last_key, _) = opcode_frequency.iter().next_back().unwrap();
-  assert_eq!(program_data.private_inputs.len() as u64 - 1, *last_key);
-
-  let mut private_inputs: Vec<HashMap<String, Value>> = Vec::new();
-  // tracks iteration of opcodes in ROM
-  let mut curr_opcode_frequency = HashMap::<u64, usize>::new();
-
-  for opcode in program_data.rom.iter() {
-    let curr_private_input = program_data.private_inputs[*opcode as usize].clone();
-
-    match curr_private_input.get("fold_input") {
-      None =>
-      // TODO: This is dumb and really only makes the `tests::test_run` pass. This is inadvisable to
-      // actually use!
-        private_inputs.push(curr_private_input.clone()),
-
-      Some(fold_input) => {
-        let mut map = curr_private_input.clone();
-        map.remove("fold_input");
-
-        let opcode_freq = opcode_frequency.get(opcode).unwrap();
-        let i = curr_opcode_frequency.get(opcode).unwrap_or(&0);
-
-        for (key, values) in fold_input.as_object().unwrap() {
-          let batch_size = values.as_array().unwrap().len() / opcode_freq;
-          info!("key: {}, batch size: {}, opcode_freq: {}", key, batch_size, opcode_freq);
-          for val in values.as_array().unwrap().chunks(batch_size).skip(*i).take(1) {
-            let mut data: Vec<Value> = Vec::new();
-            for individual in val {
-              data.push(individual.clone());
-            }
-            map.insert(key.clone(), json!(data));
-          }
-        }
-        private_inputs.push(map);
-      },
-    }
-    if let Some(freq) = curr_opcode_frequency.get_mut(opcode) {
-      *freq = *freq + 1;
-    } else {
-      curr_opcode_frequency.insert(*opcode, 1);
-    }
-  }
-
-  private_inputs
-}
-
 pub fn into_input_json(public_input: &[F<G1>], private_input: &HashMap<String, Value>) -> String {
   let decimal_stringified_input: Vec<String> = public_input
     .iter()
@@ -203,30 +139,4 @@ pub fn remap_inputs(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
     remapped.push((k, val));
   }
   remapped
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  #[tracing_test::traced_test]
-  fn test_map_private_inputs() {
-    let read = std::fs::read("examples/parse_batch_wc.json").unwrap();
-    let circuit_data: ProgramData<Offline> = serde_json::from_slice(&read).unwrap();
-
-    let inputs = map_private_inputs(&circuit_data);
-    assert_eq!(inputs.len(), 4);
-    assert_eq!(inputs[0].get("data").unwrap().as_array().unwrap().len(), 40);
-  }
-
-  #[test]
-  #[tracing_test::traced_test]
-  fn test_map_private_inputs_complex() {
-    let read = std::fs::read("examples/aes_http_json_extract.json").unwrap();
-    let circuit_data: ProgramData<Offline> = serde_json::from_slice(&read).unwrap();
-
-    let inputs = map_private_inputs(&circuit_data);
-    assert_eq!(inputs.len(), 16);
-  }
 }

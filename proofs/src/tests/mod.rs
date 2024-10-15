@@ -1,7 +1,5 @@
 //! This test module is effectively testing a static (comptime) circuit dispatch supernova program
 
-use ff::PrimeField;
-use program::utils::remap_inputs;
 use proving_ground::supernova::RecursiveSNARK;
 
 use super::*;

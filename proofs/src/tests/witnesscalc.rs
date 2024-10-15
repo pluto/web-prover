@@ -1,8 +1,10 @@
 use std::str::FromStr;
 
+use program::data::Expanded;
 use serde_json::json;
 
 use super::*;
+use crate::program::data::{R1CSType, SetupData, WitnessGeneratorType};
 
 const ADD_EXTERNAL_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/add_external.bin");
 const SQUARE_ZEROTH_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/square_zeroth.bin");
@@ -26,8 +28,7 @@ fn get_setup_data() -> SetupData {
   }
 }
 
-// TODO: This likely won't work until we adaptively resize the ROM given the `SetupData`
-fn run_entry(setup_data: SetupData) -> (ProgramData<Online>, RecursiveSNARK<E1>) {
+fn run_entry(setup_data: SetupData) -> (ProgramData<Online, Expanded>, RecursiveSNARK<E1>) {
   let mut external_input0: HashMap<String, Value> = HashMap::new();
   external_input0.insert("external".to_string(), json!(EXTERNAL_INPUTS[0]));
   let mut external_input1: HashMap<String, Value> = HashMap::new();
@@ -47,7 +48,7 @@ fn run_entry(setup_data: SetupData) -> (ProgramData<Online>, RecursiveSNARK<E1>)
     rom: ROM.to_vec(),
     initial_nivc_input: INIT_PUBLIC_INPUT.to_vec(),
     private_inputs,
-    witnesses: vec![vec![]],
+    witnesses: vec![],
   };
   let recursive_snark = program::run(&program_data);
   (program_data, recursive_snark)

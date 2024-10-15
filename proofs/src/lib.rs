@@ -1,6 +1,5 @@
 use std::{collections::HashMap, io::Write, path::PathBuf};
 
-use circom::{r1cs::R1CS, CircomCircuit};
 use ff::Field;
 use proving_ground::{
   provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
@@ -10,7 +9,13 @@ use proving_ground::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tracing::{debug, error, info, trace};
+#[cfg(feature = "timing")] use tracing::trace;
+use tracing::{debug, error, info};
+
+use crate::{
+  circom::CircomCircuit,
+  program::data::{Expanded, Online, ProgramData, R1CSType, SetupData, WitnessGeneratorType},
+};
 
 pub mod circom;
 pub mod program;
@@ -28,120 +33,15 @@ pub type S2 = BatchedRelaxedR1CSSNARK<E2, EE2>;
 
 pub type F<G> = <G as Group>::Scalar;
 
-pub trait SetupStatus {
-  type PublicParams;
-  // type R1CS: Clone;
-}
-// #[derive(Clone)]
-pub struct Online;
-impl SetupStatus for Online {
-  type PublicParams = PublicParams<E1>;
-  // type R1CS = R1CS;
-}
-pub struct Offline;
-impl SetupStatus for Offline {
-  type PublicParams = PathBuf;
-  // type R1CS = R1CSType;
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SetupData {
-  pub r1cs_types:              Vec<R1CSType>,
-  pub witness_generator_types: Vec<WitnessGeneratorType>,
-  pub max_rom_length:          usize,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ProgramData<S: SetupStatus> {
-  pub public_params:      S::PublicParams,
-  pub setup_data:         SetupData,
-  pub rom:                Vec<u64>, // TODO: Put the inputs in here (use aliases)
-  pub initial_nivc_input: Vec<u64>,
-  pub private_inputs:     Vec<HashMap<String, Value>>,
-  pub witnesses:          Vec<Vec<F<G1>>>,
-}
-
-impl ProgramData<Offline> {
-  pub fn into_online(self) -> ProgramData<Online> {
-    let file = std::fs::read(&self.public_params).unwrap();
-    let public_params = bincode::deserialize(&file).unwrap();
-    let Self {
-      setup_data,
-      rom,
-      initial_nivc_input: initial_public_input,
-      private_inputs: private_input,
-      witnesses,
-      ..
-    } = self;
-    ProgramData {
-      public_params,
-      setup_data,
-      rom,
-      initial_nivc_input: initial_public_input,
-      private_inputs: private_input,
-      witnesses,
-    }
-  }
-}
-
-impl ProgramData<Online> {
-  pub fn into_offline(self, path: PathBuf) -> ProgramData<Offline> {
-    let serialized = bincode::serialize(&self.public_params).unwrap();
-    if let Some(parent) = path.parent() {
-      std::fs::create_dir_all(parent).unwrap();
-    }
-    let mut file = std::fs::File::create(&path).unwrap();
-    file.write_all(&serialized).unwrap();
-
-    let Self {
-      setup_data,
-      rom,
-      initial_nivc_input: initial_public_input,
-      private_inputs: private_input,
-      witnesses,
-      ..
-    } = self;
-    ProgramData {
-      public_params: path,
-      setup_data,
-      rom,
-      initial_nivc_input: initial_public_input,
-      private_inputs: private_input,
-      witnesses,
-    }
-  }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum R1CSType {
-  #[serde(rename = "file")]
-  File { path: PathBuf },
-  #[serde(rename = "raw")]
-  Raw(Vec<u8>),
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum WitnessGeneratorType {
-  #[serde(rename = "wasm")]
-  Wasm { path: String, wtns_path: String },
-  #[serde(rename = "circom-witnesscalc")]
-  CircomWitnesscalc { path: String },
-  #[serde(rename = "browser")] // TODO: Can we merge this with Raw?
-  Browser,
-  #[serde(skip)]
-  Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
-  #[serde(skip)]
-  RustWitness(fn(&str) -> Vec<F<G1>>),
-}
-
 #[cfg(not(target_os = "ios"))]
-pub fn compute_web_proof(program_data: &ProgramData<Online>) -> Vec<u8> {
+pub fn compute_web_proof(program_data: &ProgramData<Online, Expanded>) -> Vec<u8> {
   let recursive_snark = program::run(program_data);
   // TODO: Unecessary 2x generation of pk,vk, but it is cheap. Refactor later if need be!
   let proof = program::compress_proof(&recursive_snark, &program_data.public_params);
   let serialized_proof = proof.serialize_and_compress();
   serialized_proof.0
 }
+
 #[cfg(target_os = "ios")] use std::ffi::c_char;
 #[cfg(target_os = "ios")]
 #[no_mangle]

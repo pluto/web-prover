@@ -1,23 +1,21 @@
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
+use data::Expanded;
 use proof::Proof;
 use proving_ground::{
   supernova::{NonUniformCircuit, RecursiveSNARK, StepCircuit},
   traits::snark::default_ck_hint,
 };
-use utils::{into_input_json, map_private_inputs};
+use utils::into_input_json;
 
 use super::*;
 
+pub mod data;
 pub mod utils;
 
 pub struct Memory {
   pub circuits: Vec<RomCircuit>,
   pub rom:      Vec<u64>,
-}
-
-impl Memory {
-  pub fn populate_witnesses(&mut self, program_data: &ProgramData<Online>) {}
 }
 
 #[derive(Clone)]
@@ -86,7 +84,7 @@ pub fn setup(setup_data: &SetupData) -> PublicParams<E1> {
   public_params
 }
 
-pub fn run(program_data: &ProgramData<Online>) -> RecursiveSNARK<E1> {
+pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
   info!("Starting SuperNova program...");
 
   // Resize the rom to be the `max_rom_length` committed to in the `SetupData`
@@ -98,9 +96,6 @@ pub fn run(program_data: &ProgramData<Online>) -> RecursiveSNARK<E1> {
     program_data.initial_nivc_input.iter().map(|val| F::<G1>::from(*val)).collect();
   z0_primary.push(F::<G1>::ZERO); // rom_index = 0
   z0_primary.extend(rom.iter().map(|opcode| <E1 as Engine>::Scalar::from(*opcode)));
-
-  // Get the private inputs needed for circuits
-  // let private_inputs = map_private_inputs(program_data);
 
   let z0_secondary = vec![F::<G2>::ZERO];
 
