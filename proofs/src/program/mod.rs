@@ -3,7 +3,10 @@ use arecibo::{
   traits::{circuit::StepCircuit, snark::default_ck_hint},
 };
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
-use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
+use circom::{
+  r1cs::R1CS,
+  witness::{aes_gcm_fold_wrapper, generate_witness_from_generator_type},
+};
 use utils::{into_input_json, map_private_inputs};
 
 use super::*;
@@ -141,20 +144,42 @@ pub fn run(program_data: &ProgramData) -> ProgramOutput {
     memory.circuits[op_code as usize].curr_public_input = Some(next_public_input);
 
     let wit_type = memory.circuits[op_code as usize].witness_generator_type.clone();
-    let is_browser = match wit_type {
-      WitnessGeneratorType::Browser => true,
-      _ => false,
+    let (is_browser, is_mobile) = match wit_type.clone() {
+      WitnessGeneratorType::Browser => (true, false),
+      WitnessGeneratorType::Mobile { circuit } => (false, true),
+      _ => (false, false),
     };
 
     memory.circuits[op_code as usize].circuit.witness = if is_browser {
       // When running in browser, the witness is passed as input.
       Some(program_data.witnesses[op_code as usize].clone())
+    } else if is_mobile {
+      // TODO: Obviously this code is horrible. Migration to circom-witnesscalc
+      // will help. In the mean time, do the dirty to benchmark performance.
+      match wit_type.clone() {
+        WitnessGeneratorType::Mobile { circuit } => {
+          let r = if circuit == "aes-gcm-fold" {
+            let arity = memory.circuits[op_code as usize].circuit.arity().clone();
+            let in_json = into_input_json(
+              &memory.circuits[op_code as usize].curr_public_input.as_ref().unwrap()[..arity],
+              memory.circuits[op_code as usize].curr_private_input.as_ref().unwrap(),
+            );
+
+            Some(aes_gcm_fold_wrapper(&in_json))
+          } else {
+            panic!("Mobile only supports aes-gcm-fold")
+          };
+          r
+        },
+        _ => panic!("Mobile only supported"),
+      }
     } else {
       let arity = memory.circuits[op_code as usize].circuit.arity().clone();
       let in_json = into_input_json(
         &memory.circuits[op_code as usize].curr_public_input.as_ref().unwrap()[..arity],
         memory.circuits[op_code as usize].curr_private_input.as_ref().unwrap(),
       );
+
       let witness = generate_witness_from_generator_type(&in_json, &wit_type);
       Some(witness)
     };

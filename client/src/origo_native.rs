@@ -22,7 +22,7 @@ use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::O
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
-use crate::{config, errors, origo::SignBody, Proof};
+use crate::{config, config::ProvingData, errors, origo::SignBody, Proof};
 
 const AES_GCM_FOLD_R1CS: &str = "proofs/examples/circuit_data/aes-gcm-fold.r1cs";
 const AES_GCM_FOLD_WASM: &str = "proofs/examples/circuit_data/aes-gcm-fold_js/aes-gcm-fold.wasm";
@@ -33,7 +33,7 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
 
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
 
-  let program_data = generate_program_data(&witness).await;
+  let program_data = generate_program_data(&witness, config.proving).await;
   let program_output = program::run(&program_data);
   let compressed_verifier = CompressedVerifier::from(program_output);
   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
@@ -42,7 +42,7 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
 }
 
 // TODO: Dedup origo_native and origo_wasm. The difference is the witness/r1cs preparation.
-async fn generate_program_data(witness: &WitnessData) -> ProgramData {
+async fn generate_program_data(witness: &WitnessData, proving: ProvingData) -> ProgramData {
   debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
   debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
 
@@ -105,6 +105,31 @@ async fn generate_program_data(witness: &WitnessData) -> ProgramData {
               "path": AES_GCM_FOLD_WASM,
               "wtns_path": "witness.wtns (unused)"
           }
+      }
+    ],
+    "rom": vec![0; rom_len],
+    "initial_public_input": vec![0; 48],
+    "witnesses": vec![vec![F::<G1>::from(0)]],
+  });
+
+  #[cfg(all(target_os = "ios", target_arch = "aarch64"))]
+  let private_input = json!({
+    "private_input": {
+      "key": sized_key,
+      "iv": sized_iv,
+      "fold_input": {
+        "plainText": janky_plaintext_padding,
+      },
+      "aad": padded_aad,
+    },
+    "r1cs_types": [{
+      "raw": proving.r1cs
+    }],
+    "witness_generator_types": [
+      {
+        "mobile": {
+          "circuit": "aes-gcm-fold"
+        }
       }
     ],
     "rom": vec![0; rom_len],

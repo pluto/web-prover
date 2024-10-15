@@ -1,14 +1,16 @@
 #![feature(internal_output_capture)]
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use arecibo::{
   provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
   spartan::batched::BatchedRelaxedR1CSSNARK,
   traits::{circuit::TrivialCircuit, Engine, Group},
 };
-use circom::CircomCircuit;
+use circom::{CircomCircuit, CircomInput};
 use compress::CompressedVerifier;
-use ff::Field;
+use ff::{Field, PrimeField};
+use num_bigint::BigInt;
+use program::ProgramOutput;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, error, info, trace};
@@ -66,51 +68,17 @@ pub enum WitnessGeneratorType {
   CircomWitnesscalc { path: String },
   #[serde(rename = "browser")] // TODO: Can we merge this with Raw?
   Browser,
+  #[serde(rename = "mobile")]
+  Mobile { circuit: String },
   #[serde(skip)]
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
   #[serde(skip)]
   RustWitness(fn(&str) -> Vec<F<G1>>),
 }
 
-#[cfg(not(target_os = "ios"))]
 pub fn get_compressed_proof(program_data: ProgramData) -> Vec<u8> {
   let program_output = program::run(&program_data);
   let compressed_verifier = CompressedVerifier::from(program_output);
   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
   serialized_compressed_verifier.proof.0
-}
-
-#[cfg(target_os = "ios")] use std::ffi::c_char;
-#[cfg(target_os = "ios")]
-#[no_mangle]
-#[allow(clippy::missing_safety_doc)]
-pub unsafe extern "C" fn get_compressed_proof(program_data_json: *const c_char) -> *const c_char {
-  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-    let program_data_str = unsafe {
-      assert!(!program_data_json.is_null());
-      std::ffi::CStr::from_ptr(program_data_json).to_str().unwrap()
-    };
-    serde_json::from_str::<ProgramData>(program_data_str).unwrap()
-  }));
-
-  match result {
-    Ok(program_data) => {
-      let program_output = program::run(&program_data);
-      let compressed_verifier = CompressedVerifier::from(program_output);
-      let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
-      std::ffi::CString::new(serialized_compressed_verifier.proof.0).unwrap().into_raw()
-    },
-    Err(err) => {
-      let backtrace = std::backtrace::Backtrace::capture();
-
-      let out = if let Some(e) = err.downcast_ref::<&str>() {
-        format!("Captured Panic\nError: {}\n\nStack:\n{}", e, backtrace)
-      } else {
-        format!("Captured Panic\n{:#?}\n\nStack:\n{}", err, backtrace)
-      };
-
-      let out_json = serde_json::to_string_pretty(&out).unwrap(); // should never panic
-      std::ffi::CString::new(out_json).unwrap().into_raw() // should never panic
-    },
-  }
 }
