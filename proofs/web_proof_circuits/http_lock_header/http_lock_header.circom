@@ -3,12 +3,12 @@ pragma circom 2.1.9;
 include "parser-attestor/circuits/http/interpreter.circom";
 include "parser-attestor/circuits/utils/array.circom";
 
-template LockHeader(DATA_BYTES, headerNameLen, headerValueLen) {
+template LockHeader(TOTAL_BYTES, DATA_BYTES, headerNameLen, headerValueLen) {
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~~ Set sizes at compile time ~~    
     // Total number of variables in the parser for each byte of data
     var PER_ITERATION_DATA_LENGTH = 5;
-    var TOTAL_BYTES               = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1); // data + parser vars
+    var TOTAL_BYTES_USED          = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1); // data + parser vars
     // ------------------------------------------------------------------------------------------------------------------ //
 
     // ------------------------------------------------------------------------------------------------------------------ //
@@ -53,6 +53,10 @@ template LockHeader(DATA_BYTES, headerNameLen, headerValueLen) {
         step_out[DATA_BYTES + i * 5 + 3] <== step_in[DATA_BYTES + i * 5 + 3];
         step_out[DATA_BYTES + i * 5 + 4] <== step_in[DATA_BYTES + i * 5 + 4];
     }
+        // Pad remaining with zeros
+    for (var i = TOTAL_BYTES_USED ; i < TOTAL_BYTES ; i++ ) {
+        step_out[i] <== 0;
+    }
 }
 
 // TODO: Handrolled template that I haven't tested YOLO.
@@ -79,5 +83,5 @@ template FirstStringMatch(dataLen, keyLen) {
     position <== counter;
 }
 
-component main { public [step_in] } = LockHeader(320, 12, 31);
+component main { public [step_in] } = LockHeader(4160, 320, 12, 31);
 

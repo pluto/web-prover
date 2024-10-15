@@ -2,12 +2,12 @@ pragma circom 2.1.9;
 
 include "parser-attestor/circuits/json/parser/parser.circom";
 
-template JsonParseNIVC(DATA_BYTES, MAX_STACK_HEIGHT) {
+template JsonParseNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT) {
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~~ Set sizes at compile time ~~    
     // Total number of variables in the parser for each byte of data
     var PER_ITERATION_DATA_LENGTH = MAX_STACK_HEIGHT * 2 + 2;
-    var TOTAL_BYTES               = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1);
+    var TOTAL_BYTES_USED          = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1);
     // ------------------------------------------------------------------------------------------------------------------ //
 
     // Read in from previous NIVC step (AESNIVC)
@@ -52,8 +52,9 @@ template JsonParseNIVC(DATA_BYTES, MAX_STACK_HEIGHT) {
         step_out[DATA_BYTES + i * PER_ITERATION_DATA_LENGTH + MAX_STACK_HEIGHT * 2]     <== State[i].next_parsing_string;
         step_out[DATA_BYTES + i * PER_ITERATION_DATA_LENGTH + MAX_STACK_HEIGHT * 2 + 1] <== State[i].next_parsing_number;
     }
+    // No need to pad as this is currently when TOTAL_BYTES == TOTAL_BYTES_USED
     // ------------------------------------------------------------------------------------------------------------------ //
 }
 
-component main { public [step_in] } = JsonParseNIVC(250, 5);
+component main { public [step_in] } = JsonParseNIVC(4160, 320, 5);
 

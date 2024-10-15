@@ -2,12 +2,12 @@ pragma circom 2.1.9;
 
 include "parser-attestor/circuits/http/interpreter.circom";
 
-template HTTPMaskBodyNIVC(DATA_BYTES) {
+template HTTPMaskBodyNIVC(TOTAL_BYTES, DATA_BYTES) {
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~~ Set sizes at compile time ~~    
     // Total number of variables in the parser for each byte of data
     var PER_ITERATION_DATA_LENGTH = 5;
-    var TOTAL_BYTES               = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1); // data + parser vars
+    // -> var TOTAL_BYTES         = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1); // data + parser vars
     // ------------------------------------------------------------------------------------------------------------------ //
 
     // ------------------------------------------------------------------------------------------------------------------ //
@@ -24,11 +24,15 @@ template HTTPMaskBodyNIVC(DATA_BYTES) {
 
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Write out to next NIVC step
-    signal output step_out[DATA_BYTES];
+    signal output step_out[TOTAL_BYTES];
     for (var i = 0 ; i < DATA_BYTES ; i++) {
         step_out[i] <== data[i] * parsing_body[i];
     }
+    // Write out padded with zeros
+    for (var i = DATA_BYTES ; i < TOTAL_BYTES ; i++) {
+        step_out[i] <== 0;
+    }
 }
 
-component main { public [step_in] } = HTTPMaskBodyNIVC(320);
+component main { public [step_in] } = HTTPMaskBodyNIVC(4160, 320);
 

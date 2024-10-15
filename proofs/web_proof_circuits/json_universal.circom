@@ -2,13 +2,13 @@ pragma circom 2.1.9;
 
 include "parser-attestor/circuits/json/interpreter.circom";
 
-template JsonMaskObjectNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValueLen) {
+template JsonMaskObjectNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValueLen) {
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~~ Set sizes at compile time ~~    
     // Total number of variables in the parser for each byte of data
     assert(MAX_STACK_HEIGHT >= 2);
     var PER_ITERATION_DATA_LENGTH = MAX_STACK_HEIGHT * 2 + 2;
-    var TOTAL_BYTES               = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1); // data + parser vars
+    var TOTAL_BYTES_USED          = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1); // data + parser vars
     // ------------------------------------------------------------------------------------------------------------------ //
     
     // ------------------------------------------------------------------------------------------------------------------ //
@@ -103,15 +103,16 @@ template JsonMaskObjectNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValueLen
     for (var i = DATA_BYTES ; i < TOTAL_BYTES ; i++) {
         step_out[i] <== step_in[i];
     }
+    // No need to pad as this is currently when TOTAL_BYTES == TOTAL_BYTES_USED
 }
 
-template JsonMaskArrayIndexNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxValueLen) {
+template JsonMaskArrayIndexNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxValueLen) {
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~~ Set sizes at compile time ~~    
     // Total number of variables in the parser for each byte of data
     assert(MAX_STACK_HEIGHT >= 2);
     var PER_ITERATION_DATA_LENGTH = MAX_STACK_HEIGHT * 2 + 2;
-    var TOTAL_BYTES               = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1);
+    var TOTAL_BYTES_USED          = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1);
     // ------------------------------------------------------------------------------------------------------------------ //
 
     // ------------------------------------------------------------------------------------------------------------------ //
@@ -168,4 +169,5 @@ template JsonMaskArrayIndexNIVC(DATA_BYTES, MAX_STACK_HEIGHT, maxValueLen) {
     for (var i = DATA_BYTES ; i < TOTAL_BYTES ; i++) {
         step_out[i] <== step_in[i];
     }
+    // No need to pad as this is currently when TOTAL_BYTES == TOTAL_BYTES_USED
 }

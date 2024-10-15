@@ -54,7 +54,6 @@ impl StepCircuit<F<G1>> for RomCircuit {
     pc: Option<&AllocatedNum<F<G1>>>,
     z: &[AllocatedNum<F<G1>>],
   ) -> Result<(Option<AllocatedNum<F<G1>>>, Vec<AllocatedNum<F<G1>>>), SynthesisError> {
-    dbg!(z.len());
     let rom_index = &z[self.circuit.arity()]; // jump to where we pushed pc data into CS
     let allocated_rom = &z[self.circuit.arity() + 1..]; // jump to where we pushed rom data into C
     let (rom_index_next, pc_next) = utils::next_rom_index_and_pc(

@@ -1,3 +1,6 @@
+use std::io::Read;
+
+use flate2::{read::ZlibDecoder, write::ZlibEncoder};
 use serde_json::json;
 
 use super::*;
@@ -11,8 +14,8 @@ pub struct Input {
 
 impl Input {
   pub fn split_values(&self) -> (Vec<usize>, Vec<Vec<Value>>) {
-    let chunk_size = self.end_index - self.start_index + 1;
-    assert_eq!(self.value.len() % chunk_size, 0);
+    assert_eq!(self.value.len() % (self.end_index - self.start_index + 1), 0);
+    let chunk_size = self.value.len() / (self.end_index - self.start_index + 1);
     (
       (self.start_index..self.end_index + 1).collect(),
       self.value.chunks(chunk_size).map(|chunk| chunk.to_vec()).collect(),
@@ -90,8 +93,8 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
 
     for (label, input) in self.private_inputs.iter() {
       let (indices, split_inputs) = input.split_values();
-      for (idx, input) in indices.iter().zip(split_inputs) {
-        private_inputs[*idx].insert(label.to_owned(), json!(input));
+      for (idx, input) in indices.into_iter().zip(split_inputs) {
+        private_inputs[idx].insert(label.to_owned(), json!(input));
       }
     }
 
@@ -103,7 +106,10 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
 impl<W: WitnessStatus> ProgramData<Offline, W> {
   pub fn into_online(self) -> ProgramData<Online, W> {
     let file = std::fs::read(&self.public_params).unwrap();
-    let public_params = bincode::deserialize(&file).unwrap();
+    let mut decoder = ZlibDecoder::new(&file[..]);
+    let mut decompressed = Vec::new();
+    decoder.read_to_end(&mut decompressed).unwrap();
+    let public_params = bincode::deserialize(&decompressed).unwrap();
     let Self { setup_data, rom, initial_nivc_input, private_inputs, witnesses, .. } = self;
     ProgramData { public_params, setup_data, rom, initial_nivc_input, private_inputs, witnesses }
   }
@@ -112,11 +118,14 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
 impl<W: WitnessStatus> ProgramData<Online, W> {
   pub fn into_offline(self, path: PathBuf) -> ProgramData<Offline, W> {
     let serialized = bincode::serialize(&self.public_params).unwrap();
+    let mut encoder = ZlibEncoder::new(Vec::new(), flate2::Compression::best());
+    encoder.write_all(&serialized).unwrap();
+    let compressed = encoder.finish().unwrap();
     if let Some(parent) = path.parent() {
       std::fs::create_dir_all(parent).unwrap();
     }
     let mut file = std::fs::File::create(&path).unwrap();
-    file.write_all(&serialized).unwrap();
+    file.write_all(&compressed).unwrap();
 
     let Self { setup_data, rom, initial_nivc_input, private_inputs, witnesses, .. } = self;
     ProgramData {
@@ -155,7 +164,6 @@ mod tests {
     private_inputs: HashMap<String, Input>,
   }
 
-  // TODO: THIS TEST ACTUALLY FAILS AND I NEED TO FIX IT.
   #[test]
   #[tracing_test::traced_test]
   fn test_deserialize_inputs() {

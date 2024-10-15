@@ -6,19 +6,19 @@ include "parser-attestor/circuits/utils/bytes.circom";
 
 // TODO: Note that TOTAL_BYTES will match what we have for AESGCMFOLD step_out
 // I have not gone through to double check the sizes of everything yet.
-template LockStartLine(DATA_BYTES, beginningLen, middleLen, finalLen) {
+template LockStartLine(TOTAL_BYTES, DATA_BYTES, beginningLen, middleLen, finalLen) {
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~~ Set sizes at compile time ~~    
     // Total number of variables in the parser for each byte of data
     var AES_BYTES                 = DATA_BYTES + 50; // TODO: Might be wrong, but good enough for now
     var PER_ITERATION_DATA_LENGTH = 5;
-    var TOTAL_BYTES               = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1); // data + parser vars
+    var TOTAL_BYTES_USED          = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1); // data + parser vars
     // ------------------------------------------------------------------------------------------------------------------ //
 
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Unravel from previous NIVC step ~
     // Read in from previous NIVC step (JsonParseNIVC)
-    signal input step_in[AES_BYTES]; 
+    signal input step_in[TOTAL_BYTES]; 
 
     signal data[DATA_BYTES];
     for (var i = 0 ; i < DATA_BYTES ; i++) {
@@ -105,19 +105,22 @@ template LockStartLine(DATA_BYTES, beginningLen, middleLen, finalLen) {
 
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Write out to next NIVC step (Lock Header)
-    signal output step_out[AES_BYTES];
-    for (var i = 0 ; i < AES_BYTES ; i++) {
+    signal output step_out[TOTAL_BYTES];
+    for (var i = 0 ; i < DATA_BYTES ; i++) {
         // add plaintext http input to step_out
-        // step_out[i] <== step_in[50 + i];
-        step_out[i] <== 0;
+        step_out[i] <== step_in[50 + i];
 
         // add parser state
-        // step_out[DATA_BYTES + i * 5]     <== State[i].next_parsing_start;
-        // step_out[DATA_BYTES + i * 5 + 1] <== State[i].next_parsing_header;
-        // step_out[DATA_BYTES + i * 5 + 2] <== State[i].next_parsing_field_name;
-        // step_out[DATA_BYTES + i * 5 + 3] <== State[i].next_parsing_field_value;
-        // step_out[DATA_BYTES + i * 5 + 4] <== State[i].next_parsing_body;
+        step_out[DATA_BYTES + i * 5]     <== State[i].next_parsing_start;
+        step_out[DATA_BYTES + i * 5 + 1] <== State[i].next_parsing_header;
+        step_out[DATA_BYTES + i * 5 + 2] <== State[i].next_parsing_field_name;
+        step_out[DATA_BYTES + i * 5 + 3] <== State[i].next_parsing_field_value;
+        step_out[DATA_BYTES + i * 5 + 4] <== State[i].next_parsing_body;
+    }
+    // Pad remaining with zeros
+    for (var i = TOTAL_BYTES_USED ; i < TOTAL_BYTES ; i++ ) {
+        step_out[i] <== 0;
     }
 }
 
-component main { public [step_in] } = LockStartLine(320, 8, 3, 2);
+component main { public [step_in] } = LockStartLine(4160, 320, 8, 3, 2);

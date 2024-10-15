@@ -123,7 +123,6 @@ pub fn into_input_json(public_input: &[F<G1>], private_input: &HashMap<String, V
 
 pub fn remap_inputs(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
   let circom_input: CircomInput = serde_json::from_str(input_json).unwrap();
-  dbg!(&circom_input);
   let mut remapped = vec![];
   remapped.push((
     "step_in".to_string(),
