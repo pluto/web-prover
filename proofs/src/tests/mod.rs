@@ -122,7 +122,7 @@ fn test_end_to_end_proofs() {
     ],
     max_rom_length:          MAX_ROM_LENGTH,
   };
-
+  dbg!(&HTTP_LOCK_VERSION.1.iter().map(|x| json!(x)).collect::<Vec<Value>>());
   debug!("Setting up `Memory`...");
   let public_params = program::setup(&setup_data);
 
@@ -144,6 +144,7 @@ fn test_end_to_end_proofs() {
     end_index:   0,
     value:       HTTP_LOCK_MESSAGE.1.iter().map(|x| json!(x)).collect(),
   });
+  dbg!(&private_inputs);
 
   // // Lock header information
   // private_inputs.insert(HTTP_LOCK_HEADER_NAME.0.to_owned(), Input {
@@ -169,7 +170,7 @@ fn test_end_to_end_proofs() {
     witnesses: vec![],
   }
   .into_expanded();
-
+  dbg!(&program_data.private_inputs);
   let recursive_snark = program::run(&program_data);
 
   // let res = "\"Taylor Swift\"";

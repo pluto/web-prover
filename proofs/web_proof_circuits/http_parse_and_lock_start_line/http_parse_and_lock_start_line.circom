@@ -105,17 +105,18 @@ template LockStartLine(DATA_BYTES, beginningLen, middleLen, finalLen) {
 
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Write out to next NIVC step (Lock Header)
-    signal output step_out[TOTAL_BYTES];
-    for (var i = 0 ; i < DATA_BYTES ; i++) {
+    signal output step_out[AES_BYTES];
+    for (var i = 0 ; i < AES_BYTES ; i++) {
         // add plaintext http input to step_out
-        step_out[i] <== step_in[50 + i];
+        // step_out[i] <== step_in[50 + i];
+        step_out[i] <== 0;
 
         // add parser state
-        step_out[DATA_BYTES + i * 5]     <== State[i].next_parsing_start;
-        step_out[DATA_BYTES + i * 5 + 1] <== State[i].next_parsing_header;
-        step_out[DATA_BYTES + i * 5 + 2] <== State[i].next_parsing_field_name;
-        step_out[DATA_BYTES + i * 5 + 3] <== State[i].next_parsing_field_value;
-        step_out[DATA_BYTES + i * 5 + 4] <== State[i].next_parsing_body;
+        // step_out[DATA_BYTES + i * 5]     <== State[i].next_parsing_start;
+        // step_out[DATA_BYTES + i * 5 + 1] <== State[i].next_parsing_header;
+        // step_out[DATA_BYTES + i * 5 + 2] <== State[i].next_parsing_field_name;
+        // step_out[DATA_BYTES + i * 5 + 3] <== State[i].next_parsing_field_value;
+        // step_out[DATA_BYTES + i * 5 + 4] <== State[i].next_parsing_body;
     }
 }
 

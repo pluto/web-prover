@@ -155,10 +155,12 @@ mod tests {
     private_inputs: HashMap<String, Input>,
   }
 
+  // TODO: THIS TEST ACTUALLY FAILS AND I NEED TO FIX IT.
   #[test]
   #[tracing_test::traced_test]
   fn test_deserialize_inputs() {
     let mock_inputs: MockInputs = serde_json::from_str(JSON).unwrap();
+    dbg!(&mock_inputs.private_inputs);
     assert!(mock_inputs.private_inputs.contains_key("external"));
     assert!(mock_inputs.private_inputs.contains_key("plaintext"));
   }
