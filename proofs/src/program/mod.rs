@@ -196,17 +196,16 @@ pub fn compress_proof(
 
 fn initialize_circuit_list(setup_data: &SetupData) -> Vec<RomCircuit> {
   let mut circuits = vec![];
-  for (circuit_index, (r1cs_path, witness_generator_type)) in
+  for (circuit_index, (r1cs_type, witness_generator_type)) in
     setup_data.r1cs_types.iter().zip(setup_data.witness_generator_types.iter()).enumerate()
   {
-    let circuit = circom::CircomCircuit { r1cs: R1CS::from(r1cs_path), witness: None };
+    let circuit = circom::CircomCircuit { r1cs: R1CS::from(r1cs_type), witness: None };
     let rom_circuit = RomCircuit {
       circuit,
       circuit_index,
       rom_size: setup_data.max_rom_length,
       nivc_io: None,
       private_input: None,
-
       witness_generator_type: witness_generator_type.clone(),
     };
 
