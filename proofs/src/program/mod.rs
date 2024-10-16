@@ -88,7 +88,11 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
   info!("Starting SuperNova program...");
 
   // Resize the rom to be the `max_rom_length` committed to in the `SetupData`
-  let mut rom = program_data.rom.clone();
+  let mut rom = program_data
+    .rom
+    .iter()
+    .map(|opcode_config| program_data.rom_data.get(&opcode_config.name).unwrap().opcode)
+    .collect::<Vec<u64>>();
   rom.resize(program_data.setup_data.max_rom_length, u64::MAX);
 
   // Get the public inputs needed for circuits
@@ -103,17 +107,14 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
   let mut next_public_input = z0_primary.clone();
 
   let circuits = initialize_circuit_list(&program_data.setup_data); // TODO: AwK?
-  let mut memory = Memory { rom, circuits };
+  let mut memory = Memory { rom: rom.clone(), circuits };
 
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
-  for (idx, &op_code) in
-    program_data.rom.iter().enumerate().take_while(|&(_, &op_code)| op_code != u64::MAX)
-  {
+  for (idx, &op_code) in rom.iter().enumerate().take_while(|(_, &op_code)| op_code != u64::MAX) {
     info!("Step {} of ROM", idx);
-    debug!("Opcode = {}", op_code);
-    memory.circuits[op_code as usize].private_input =
-      Some(program_data.private_inputs[idx].clone());
+    debug!("Opcode = {:?}", op_code);
+    memory.circuits[op_code as usize].private_input = Some(program_data.inputs[idx].clone());
     memory.circuits[op_code as usize].nivc_io = Some(next_public_input);
 
     let wit_type = memory.circuits[op_code as usize].witness_generator_type.clone();
