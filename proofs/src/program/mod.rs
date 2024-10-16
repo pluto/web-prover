@@ -69,11 +69,15 @@ impl StepCircuit<F<G1>> for RomCircuit {
   }
 }
 
+// TODO: This is like a one-time use setup that overlaps some with `ProgramData::into_online()`.
+// Worth checking out how to make this simpler, clearer, more efficient.
 pub fn setup(setup_data: &SetupData) -> PublicParams<E1> {
   // Optionally time the setup stage for the program
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
 
+  // TODO: I don't think we want to have to call `initialize_circuit_list` more than once on setup
+  // ever and it seems like it may get used more frequently.
   let circuits = initialize_circuit_list(setup_data);
   let memory = Memory { circuits, rom: vec![0; setup_data.max_rom_length] }; // Note, `rom` here is not used in setup, only `circuits`
   let public_params = PublicParams::setup(&memory, &*default_ck_hint(), &*default_ck_hint());

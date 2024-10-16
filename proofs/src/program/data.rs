@@ -1,6 +1,7 @@
 use std::io::Read;
 
 use flate2::{read::ZlibDecoder, write::ZlibEncoder};
+use proving_ground::supernova::{get_circuit_shapes, AuxParams};
 use serde_json::json;
 
 use super::*;
@@ -105,11 +106,33 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
 
 impl<W: WitnessStatus> ProgramData<Offline, W> {
   pub fn into_online(self) -> ProgramData<Online, W> {
+    #[cfg(feature = "timing")]
+    let time = std::time::Instant::now();
+
     let file = std::fs::read(&self.public_params).unwrap();
     let mut decoder = ZlibDecoder::new(&file[..]);
     let mut decompressed = Vec::new();
     decoder.read_to_end(&mut decompressed).unwrap();
-    let public_params = bincode::deserialize(&decompressed).unwrap();
+    let aux_params: AuxParams<E1> = bincode::deserialize(&decompressed).unwrap();
+
+    #[cfg(feature = "timing")]
+    let aux_params_duration = {
+      let aux_params_duration = time.elapsed();
+      trace!("Reading in `AuxParams` elapsed: {:?}", aux_params_duration);
+      aux_params_duration
+    };
+
+    // TODO: get the circuit shapes needed
+    let circuits = initialize_circuit_list(&self.setup_data);
+    let memory = Memory { circuits, rom: vec![0; self.setup_data.max_rom_length] }; // Note, `rom` here is not used in setup, only `circuits`
+    let circuit_shapes = get_circuit_shapes(&memory);
+    #[cfg(feature = "timing")]
+    {
+      let circuit_shapes_duration = time.elapsed() - aux_params_duration;
+      trace!("`get_circuit_shapes()` elapsed: {:?}", circuit_shapes_duration);
+    }
+
+    let public_params = PublicParams::<E1>::from_parts(circuit_shapes, aux_params);
     let Self { setup_data, rom, initial_nivc_input, private_inputs, witnesses, .. } = self;
     ProgramData { public_params, setup_data, rom, initial_nivc_input, private_inputs, witnesses }
   }
@@ -119,11 +142,13 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   pub fn into_offline(self, path: PathBuf) -> ProgramData<Offline, W> {
     let (_, aux_params) = self.public_params.into_parts();
     let serialized = bincode::serialize(&aux_params).unwrap();
+    dbg!(&serialized.len());
     // TODO: May not need to do flate2 compression. Need to test this actually shrinks things
     // meaningfully -- otherwise remove.
     let mut encoder = ZlibEncoder::new(Vec::new(), flate2::Compression::best());
     encoder.write_all(&serialized).unwrap();
     let compressed = encoder.finish().unwrap();
+    dbg!(&compressed.len());
     if let Some(parent) = path.parent() {
       std::fs::create_dir_all(parent).unwrap();
     }

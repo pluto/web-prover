@@ -1,6 +1,5 @@
 //! This test module is effectively testing a static (comptime) circuit dispatch supernova program
 
-use flate2::write::ZlibEncoder;
 use proving_ground::supernova::RecursiveSNARK;
 use serde_json::json;
 
