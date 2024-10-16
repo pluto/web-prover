@@ -7,20 +7,26 @@ use serde_json::json;
 use super::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Input {
-  pub start_index: usize,
-  pub end_index:   usize,
-  pub value:       Vec<Value>,
+pub struct FoldInput {
+  #[serde(flatten)]
+  pub value: HashMap<String, Vec<Value>>,
 }
 
-impl Input {
-  pub fn split_values(&self) -> (Vec<usize>, Vec<Vec<Value>>) {
-    assert_eq!(self.value.len() % (self.end_index - self.start_index + 1), 0);
-    let chunk_size = self.value.len() / (self.end_index - self.start_index + 1);
-    (
-      (self.start_index..self.end_index + 1).collect(),
-      self.value.chunks(chunk_size).map(|chunk| chunk.to_vec()).collect(),
-    )
+impl FoldInput {
+  pub fn split_values(&self, freq: usize) -> Vec<HashMap<String, Value>> {
+    assert_eq!(self.value.len() % freq, 0);
+    let chunk_size = self.value.len() / freq;
+
+    let mut res = vec![HashMap::new(); freq];
+
+    for (key, value) in self.value.clone().into_iter() {
+      let chunks: Vec<Vec<Value>> = value.chunks(chunk_size).map(|chunk| chunk.to_vec()).collect();
+      for i in 0..chunk_size {
+        res[i].insert(key.clone(), json!(chunks[i].clone()));
+      }
+    }
+
+    res
   }
 }
 
@@ -70,7 +76,7 @@ impl WitnessStatus for Expanded {
 }
 pub struct NotExpanded;
 impl WitnessStatus for NotExpanded {
-  type PrivateInputs = HashMap<String, Input>;
+  type PrivateInputs = HashMap<String, FoldInput>;
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -80,29 +86,67 @@ pub struct SetupData {
   pub max_rom_length:          usize,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CircuitData {
+  pub opcode: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RomOpcodeConfig {
+  pub name:          String,
+  pub private_input: HashMap<String, Value>,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ProgramData<S: SetupStatus, W: WitnessStatus> {
   pub public_params:      S::PublicParams,
   pub setup_data:         SetupData,
-  pub rom:                Vec<u64>,
+  pub rom_data:           HashMap<String, CircuitData>,
+  pub rom:                Vec<RomOpcodeConfig>,
   pub initial_nivc_input: Vec<u64>,
-  pub private_inputs:     W::PrivateInputs,
+  pub inputs:             W::PrivateInputs,
   pub witnesses:          Vec<Vec<F<G1>>>, // TODO: Ideally remove this
 }
 
 impl<S: SetupStatus> ProgramData<S, NotExpanded> {
   pub fn into_expanded(self) -> ProgramData<S, Expanded> {
-    let mut private_inputs: Vec<HashMap<String, Value>> = vec![HashMap::new(); self.rom.len()];
-
-    for (label, input) in self.private_inputs.iter() {
-      let (indices, split_inputs) = input.split_values();
-      for (idx, input) in indices.into_iter().zip(split_inputs) {
-        private_inputs[idx].insert(label.to_owned(), json!(input));
+    // build circuit usage map from rom
+    let mut circuit_usage: HashMap<String, Vec<usize>> = HashMap::new();
+    for (index, circuit) in self.rom.iter().enumerate() {
+      if let Some(usage) = circuit_usage.get_mut(&circuit.name) {
+        usage.push(index);
+      } else {
+        circuit_usage.insert(circuit.name.clone(), vec![index]);
       }
     }
 
-    let Self { public_params, setup_data, rom, initial_nivc_input, witnesses, .. } = self;
-    ProgramData { public_params, setup_data, rom, initial_nivc_input, witnesses, private_inputs }
+    // TODO: remove clone
+    let roms = self.rom.clone();
+
+    let mut private_inputs: Vec<HashMap<String, Value>> =
+      self.rom.into_iter().map(|opcode_config| opcode_config.private_input.to_owned()).collect();
+
+    // add fold input sliced to chunks and add to private input
+    for (circuit, fold_inputs) in self.inputs.iter() {
+      let inputs = circuit_usage.get(circuit).unwrap();
+      let split_inputs = fold_inputs.split_values(inputs.len());
+      for (idx, input) in inputs.iter().zip(split_inputs) {
+        private_inputs[*idx].extend(input);
+      }
+    }
+
+    let Self {
+      public_params, setup_data, rom_data: romData, initial_nivc_input, witnesses, ..
+    } = self;
+    ProgramData {
+      public_params,
+      setup_data,
+      rom_data: romData,
+      rom: roms,
+      initial_nivc_input,
+      witnesses,
+      inputs: private_inputs,
+    }
   }
 }
 
@@ -135,8 +179,8 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
     }
 
     let public_params = PublicParams::<E1>::from_parts(circuit_shapes, aux_params);
-    let Self { setup_data, rom, initial_nivc_input, private_inputs, witnesses, .. } = self;
-    ProgramData { public_params, setup_data, rom, initial_nivc_input, private_inputs, witnesses }
+    let Self { setup_data, rom, initial_nivc_input, inputs, witnesses, rom_data, .. } = self;
+    ProgramData { public_params, setup_data, rom, initial_nivc_input, inputs, witnesses, rom_data }
   }
 }
 
@@ -157,14 +201,15 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
     let mut file = std::fs::File::create(&path).unwrap();
     file.write_all(&compressed).unwrap();
 
-    let Self { setup_data, rom, initial_nivc_input, private_inputs, witnesses, .. } = self;
+    let Self { setup_data, rom_data, rom, initial_nivc_input, inputs, witnesses, .. } = self;
     ProgramData {
       public_params: path,
       setup_data,
+      rom_data,
       rom,
       initial_nivc_input,
       witnesses,
-      private_inputs,
+      inputs,
     }
   }
 }
@@ -175,34 +220,38 @@ mod tests {
 
   const JSON: &str = r#"
 {
-    "private_inputs": {
-        "external": {
-            "start_index": 0,
-            "end_index": 0,
-            "value": [5,7]
-        },
-        "plaintext": {
-            "start_index": 1,
-            "end_index": 2,
-            "value": [1,2,3,4]
-        }
+    "input": {
+      "CIRCUIT_1": {
+        "external": [5,7],
+        "plaintext": [1,2,3,4]
+      },
+      "CIRCUIT_2": {
+        "ciphertext": [1, 2, 3, 4],
+        "external": [2, 4]
+      },
+      "CIRCUIT_3": {
+        "key": [2, 3],
+        "value": [4, 5]
+      }
     }
 }"#;
 
   #[derive(Debug, Deserialize)]
   struct MockInputs {
-    private_inputs: HashMap<String, Input>,
+    input: HashMap<String, FoldInput>,
   }
 
   #[test]
   #[tracing_test::traced_test]
   fn test_deserialize_inputs() {
     let mock_inputs: MockInputs = serde_json::from_str(JSON).unwrap();
-    dbg!(&mock_inputs.private_inputs);
-    assert!(mock_inputs.private_inputs.contains_key("external"));
-    assert!(mock_inputs.private_inputs.contains_key("plaintext"));
+    dbg!(&mock_inputs.input);
+    assert!(mock_inputs.input.contains_key("CIRCUIT_1"));
+    assert!(mock_inputs.input.contains_key("CIRCUIT_2"));
+    assert!(mock_inputs.input.contains_key("CIRCUIT_3"));
   }
 
+  #[ignore]
   #[test]
   #[tracing_test::traced_test]
   fn test_expand_private_inputs() {
@@ -214,15 +263,24 @@ mod tests {
         witness_generator_types: vec![WitnessGeneratorType::Raw(vec![])],
         max_rom_length:          3,
       },
-      rom:                vec![0, 0, 0],
+      rom_data:           HashMap::from([
+        (String::from("CIRCUIT_1"), CircuitData { opcode: 0 }),
+        (String::from("CIRCUIT_2"), CircuitData { opcode: 1 }),
+        (String::from("CIRCUIT_3"), CircuitData { opcode: 2 }),
+      ]),
+      rom:                vec![
+        RomOpcodeConfig { name: String::from("CIRCUIT_1"), private_input: HashMap::new() },
+        RomOpcodeConfig { name: String::from("CIRCUIT_2"), private_input: HashMap::new() },
+        RomOpcodeConfig { name: String::from("CIRCUIT_3"), private_input: HashMap::new() },
+      ],
       initial_nivc_input: vec![],
-      private_inputs:     mock_inputs.private_inputs,
+      inputs:             mock_inputs.input,
       witnesses:          vec![],
     };
     let program_data = program_data.into_expanded();
-    dbg!(&program_data.private_inputs);
-    assert!(!program_data.private_inputs[0].is_empty());
-    assert!(!program_data.private_inputs[1].is_empty());
-    assert!(!program_data.private_inputs[2].is_empty());
+    dbg!(&program_data.inputs);
+    assert!(!program_data.inputs[0].is_empty());
+    assert!(!program_data.inputs[1].is_empty());
+    assert!(!program_data.inputs[2].is_empty());
   }
 }

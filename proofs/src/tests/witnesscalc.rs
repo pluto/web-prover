@@ -33,23 +33,30 @@ fn run_entry(setup_data: SetupData) -> (ProgramData<Online, Expanded>, Recursive
   external_input0.insert("external".to_string(), json!(EXTERNAL_INPUTS[0]));
   let mut external_input1: HashMap<String, Value> = HashMap::new();
   external_input1.insert("external".to_string(), json!(EXTERNAL_INPUTS[1]));
-  let private_inputs = vec![
-    external_input0,
-    HashMap::new(),
-    HashMap::new(),
-    external_input1,
-    HashMap::new(),
-    HashMap::new(),
+  let rom_data = HashMap::from([
+    (String::from("ADD_EXTERNAL"), CircuitData { opcode: 0 }),
+    (String::from("SQUARE_ZEROTH"), CircuitData { opcode: 1 }),
+    (String::from("SWAP_MEMORY"), CircuitData { opcode: 2 }),
+  ]);
+  let rom = vec![
+    RomOpcodeConfig { name: String::from("ADD_EXTERNAL"), private_input: external_input0 },
+    RomOpcodeConfig { name: String::from("SQUARE_ZEROTH"), private_input: HashMap::new() },
+    RomOpcodeConfig { name: String::from("SWAP_MEMORY"), private_input: HashMap::new() },
+    RomOpcodeConfig { name: String::from("ADD_EXTERNAL"), private_input: external_input1 },
+    RomOpcodeConfig { name: String::from("SQUARE_ZEROTH"), private_input: HashMap::new() },
+    RomOpcodeConfig { name: String::from("SWAP_MEMORY"), private_input: HashMap::new() },
   ];
   let public_params = program::setup(&setup_data);
-  let program_data = ProgramData {
+  let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
     setup_data,
-    rom: ROM.to_vec(),
+    rom_data,
+    rom,
     initial_nivc_input: INIT_PUBLIC_INPUT.to_vec(),
-    private_inputs,
+    inputs: HashMap::new(),
     witnesses: vec![],
-  };
+  }
+  .into_expanded();
   let recursive_snark = program::run(&program_data);
   (program_data, recursive_snark)
 }
