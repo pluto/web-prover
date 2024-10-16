@@ -117,7 +117,10 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
 
 impl<W: WitnessStatus> ProgramData<Online, W> {
   pub fn into_offline(self, path: PathBuf) -> ProgramData<Offline, W> {
-    let serialized = bincode::serialize(&self.public_params).unwrap();
+    let (_, aux_params) = self.public_params.into_parts();
+    let serialized = bincode::serialize(&aux_params).unwrap();
+    // TODO: May not need to do flate2 compression. Need to test this actually shrinks things
+    // meaningfully -- otherwise remove.
     let mut encoder = ZlibEncoder::new(Vec::new(), flate2::Compression::best());
     encoder.write_all(&serialized).unwrap();
     let compressed = encoder.finish().unwrap();
