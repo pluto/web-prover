@@ -8,7 +8,7 @@ include "parser-attestor/circuits/utils/bytes.circom";
 // I have not gone through to double check the sizes of everything yet.
 template LockStartLine(TOTAL_BYTES, DATA_BYTES, beginningLen, middleLen, finalLen) {
     // ------------------------------------------------------------------------------------------------------------------ //
-    // ~~ Set sizes at compile time ~~    
+    // ~~ Set sizes at compile time ~~
     // Total number of variables in the parser for each byte of data
     var AES_BYTES                 = DATA_BYTES + 50; // TODO: Might be wrong, but good enough for now
     var PER_ITERATION_DATA_LENGTH = 5;
@@ -18,7 +18,7 @@ template LockStartLine(TOTAL_BYTES, DATA_BYTES, beginningLen, middleLen, finalLe
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Unravel from previous NIVC step ~
     // Read in from previous NIVC step (JsonParseNIVC)
-    signal input step_in[TOTAL_BYTES]; 
+    signal input step_in[TOTAL_BYTES];
 
     signal data[DATA_BYTES];
     for (var i = 0 ; i < DATA_BYTES ; i++) {
