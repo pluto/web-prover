@@ -36,7 +36,7 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
-          echo /usr/local/opt/llvm@18/bin >> $GITHUB_PATH
+          echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
 
       - uses: Swatinem/rust-cache@v2
         with:

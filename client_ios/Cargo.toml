@@ -20,6 +20,7 @@ tracing-subscriber.workspace=true
 tokio="1.39.1"
 
 proofs={ path="../proofs" }
+
 # TODO warning: profiles for the non root package will be ignored, specify profiles at the workspace root
 # try to get the final file size to be as small as possible
 # [profile.release]

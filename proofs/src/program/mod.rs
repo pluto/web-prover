@@ -121,21 +121,45 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
     memory.circuits[op_code as usize].nivc_io = Some(next_public_input);
 
     let wit_type = memory.circuits[op_code as usize].witness_generator_type.clone();
+    let (is_browser, is_mobile) = match wit_type.clone() {
+      WitnessGeneratorType::Browser => (true, false),
+      WitnessGeneratorType::Mobile { circuit } => (false, true),
+      _ => (false, false),
+    };
 
-    memory.circuits[op_code as usize].circuit.witness =
-      if matches!(wit_type, WitnessGeneratorType::Browser) {
-        // When running in browser, the witness is passed as input.
-        Some(program_data.witnesses[op_code as usize].clone())
-      } else {
-        let arity = memory.circuits[op_code as usize].circuit.arity();
-        let in_json = into_input_json(
-          &memory.circuits[op_code as usize].nivc_io.as_ref().unwrap()[..arity],
-          memory.circuits[op_code as usize].private_input.as_ref().unwrap(),
-        );
+    memory.circuits[op_code as usize].circuit.witness = if is_browser {
+      // When running in browser, the witness is passed as input.
+      Some(program_data.witnesses[op_code as usize].clone())
+    } else if is_mobile {
+      // TODO: Obviously this code is horrible. Migration to circom-witnesscalc
+      // will help. In the mean time, do the dirty to benchmark performance.
+      match wit_type.clone() {
+        WitnessGeneratorType::Mobile { circuit } => {
+          let r = if circuit == "aes-gcm-fold" {
+            let arity = memory.circuits[op_code as usize].circuit.arity().clone();
+            let in_json = into_input_json(
+              &memory.circuits[op_code as usize].curr_public_input.as_ref().unwrap()[..arity],
+              memory.circuits[op_code as usize].curr_private_input.as_ref().unwrap(),
+            );
 
-        let witness = generate_witness_from_generator_type(&in_json, &wit_type);
-        Some(witness)
-      };
+            Some(aes_gcm_fold_wrapper(&in_json))
+          } else {
+            panic!("Mobile only supports aes-gcm-fold")
+          };
+          r
+        },
+        _ => panic!("Mobile only supported"),
+      }
+    } else {
+      let arity = memory.circuits[op_code as usize].circuit.arity().clone();
+      let in_json = into_input_json(
+        &memory.circuits[op_code as usize].curr_public_input.as_ref().unwrap()[..arity],
+        memory.circuits[op_code as usize].curr_private_input.as_ref().unwrap(),
+      );
+
+      let witness = generate_witness_from_generator_type(&in_json, &wit_type);
+      Some(witness)
+    };
 
     let circuit_primary = memory.primary_circuit(op_code as usize);
     let circuit_secondary = memory.secondary_circuit();

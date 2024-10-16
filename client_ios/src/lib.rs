@@ -2,6 +2,7 @@ use std::{
   collections::HashMap,
   ffi::{c_char, CStr, CString},
   path::PathBuf,
+  time::Instant,
 };
 
 use client::{config::Config, errors::ClientErrors};
@@ -14,6 +15,7 @@ use proofs::{
   },
   ProgramData, R1CSType, WitnessGeneratorType, F, G1, G2,
 };
+use tracing::debug;
 
 #[derive(serde::Serialize)]
 struct Output {
@@ -40,7 +42,10 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
     };
     let config: Config = serde_json::from_str(config_str).unwrap();
     let rt = tokio::runtime::Runtime::new().unwrap();
+    let start = Instant::now();
+    debug!("starting proving");
     let proof = rt.block_on(client::prover_inner(config)).unwrap();
+    debug!("done proving: {:?}", Instant::now() - start);
     serde_json::to_string_pretty(&proof).unwrap()
   }));
 
