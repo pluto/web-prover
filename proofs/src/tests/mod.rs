@@ -26,7 +26,7 @@ const MAX_ROM_LENGTH: usize = 10; // TODO: This should be able to be longer
 const JSON_MAX_ROM_LENGTH: usize = 35;
 
 // Circuit 0
-const AES_GCM_R1CS: &[u8] = include_bytes!("../../web_proof_circuits/aes_gcm/aes_gcm.circom");
+const AES_GCM_R1CS: &[u8] = include_bytes!("../../web_proof_circuits/aes_gcm/aes_gcm.r1cs");
 const AES_GCM_GRAPH: &[u8] = include_bytes!("../../web_proof_circuits/aes_gcm/aes_gcm.bin");
 
 // Circuit 1

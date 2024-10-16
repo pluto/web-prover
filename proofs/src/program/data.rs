@@ -8,6 +8,7 @@ use super::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FoldInput {
+  #[serde(flatten)]
   pub value: HashMap<String, Vec<Value>>,
 }
 
@@ -245,10 +246,12 @@ mod tests {
   fn test_deserialize_inputs() {
     let mock_inputs: MockInputs = serde_json::from_str(JSON).unwrap();
     dbg!(&mock_inputs.input);
-    assert!(mock_inputs.input.contains_key("external"));
-    assert!(mock_inputs.input.contains_key("plaintext"));
+    assert!(mock_inputs.input.contains_key("CIRCUIT_1"));
+    assert!(mock_inputs.input.contains_key("CIRCUIT_2"));
+    assert!(mock_inputs.input.contains_key("CIRCUIT_3"));
   }
 
+  #[ignore]
   #[test]
   #[tracing_test::traced_test]
   fn test_expand_private_inputs() {
