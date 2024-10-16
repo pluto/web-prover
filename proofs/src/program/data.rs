@@ -40,6 +40,8 @@ pub enum WitnessGeneratorType {
   CircomWitnesscalc { path: String },
   #[serde(rename = "browser")] // TODO: Can we merge this with Raw?
   Browser,
+  #[serde(rename = "mobile")]
+  Mobile { circuit: String },
   #[serde(skip)]
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
   #[serde(skip)]

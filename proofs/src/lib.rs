@@ -1,10 +1,8 @@
 use std::{collections::HashMap, io::Write, path::PathBuf, str::FromStr};
 
-use circom::{CircomCircuit, CircomInput};
-use compress::CompressedVerifier;
-use ff::{Field, PrimeField};
+use circom::CircomCircuit;
+use ff::Field;
 use num_bigint::BigInt;
-use program::ProgramOutput;
 use proving_ground::{
   provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
   spartan::batched::BatchedRelaxedR1CSSNARK,
@@ -16,9 +14,8 @@ use serde_json::Value;
 #[cfg(feature = "timing")] use tracing::trace;
 use tracing::{debug, error, info};
 
-use crate::{
-  circom::CircomCircuit,
-  program::data::{Expanded, Online, ProgramData, R1CSType, SetupData, WitnessGeneratorType},
+use crate::program::data::{
+  Expanded, Online, ProgramData, R1CSType, SetupData, WitnessGeneratorType,
 };
 
 pub mod circom;

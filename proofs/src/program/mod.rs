@@ -1,5 +1,8 @@
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
-use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
+use circom::{
+  r1cs::R1CS,
+  witness::{aes_gcm_fold_wrapper, generate_witness_from_generator_type},
+};
 use data::Expanded;
 use proof::Proof;
 use proving_ground::{
@@ -138,8 +141,8 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
           let r = if circuit == "aes-gcm-fold" {
             let arity = memory.circuits[op_code as usize].circuit.arity().clone();
             let in_json = into_input_json(
-              &memory.circuits[op_code as usize].curr_public_input.as_ref().unwrap()[..arity],
-              memory.circuits[op_code as usize].curr_private_input.as_ref().unwrap(),
+              &memory.circuits[op_code as usize].nivc_io.as_ref().unwrap()[..arity],
+              memory.circuits[op_code as usize].private_input.as_ref().unwrap(),
             );
 
             Some(aes_gcm_fold_wrapper(&in_json))
@@ -153,8 +156,8 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
     } else {
       let arity = memory.circuits[op_code as usize].circuit.arity().clone();
       let in_json = into_input_json(
-        &memory.circuits[op_code as usize].curr_public_input.as_ref().unwrap()[..arity],
-        memory.circuits[op_code as usize].curr_private_input.as_ref().unwrap(),
+        &memory.circuits[op_code as usize].nivc_io.as_ref().unwrap()[..arity],
+        memory.circuits[op_code as usize].private_input.as_ref().unwrap(),
       );
 
       let witness = generate_witness_from_generator_type(&in_json, &wit_type);
