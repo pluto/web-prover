@@ -142,7 +142,7 @@ fn test_end_to_end_proofs() {
 
   let setup_data = SetupData {
     r1cs_types:              vec![
-      // R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
       R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
       R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
       R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
@@ -152,7 +152,7 @@ fn test_end_to_end_proofs() {
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      // WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
@@ -175,32 +175,32 @@ fn test_end_to_end_proofs() {
 
   debug!("Creating ROM");
 
-  let rom_data = HashMap::from([
-    (String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 0 }),
-    (String::from("HTTP_LOCK_HEADER_1"), CircuitData { opcode: 1 }),
-    (String::from("HTTP_BODY_EXTRACT"), CircuitData { opcode: 2 }),
-    (String::from("JSON_PARSE"), CircuitData { opcode: 3 }),
-    (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 4 }),
-    (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 4 }),
-    (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 5 }),
-    (String::from("JSON_MASK_OBJECT_4"), CircuitData { opcode: 4 }),
-    (String::from("JSON_MASK_OBJECT_5"), CircuitData { opcode: 4 }),
-    (String::from("EXTRACT_VALUE"), CircuitData { opcode: 6 }),
-  ]);
-
   // let rom_data = HashMap::from([
-  //   (String::from("AES_GCM_1"), CircuitData { opcode: 0 }),
-  //   (String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 1 }),
-  //   (String::from("HTTP_LOCK_HEADER_1"), CircuitData { opcode: 2 }),
-  //   (String::from("HTTP_BODY_EXTRACT"), CircuitData { opcode: 3 }),
-  //   (String::from("JSON_PARSE"), CircuitData { opcode: 4 }),
-  //   (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 5 }),
-  //   (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 5 }),
-  //   (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 6 }),
-  //   (String::from("JSON_MASK_OBJECT_4"), CircuitData { opcode: 5 }),
-  //   (String::from("JSON_MASK_OBJECT_5"), CircuitData { opcode: 5 }),
-  //   (String::from("EXTRACT_VALUE"), CircuitData { opcode: 7 }),
+  //   (String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 0 }),
+  //   (String::from("HTTP_LOCK_HEADER_1"), CircuitData { opcode: 1 }),
+  //   (String::from("HTTP_BODY_EXTRACT"), CircuitData { opcode: 2 }),
+  //   (String::from("JSON_PARSE"), CircuitData { opcode: 3 }),
+  //   (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 4 }),
+  //   (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 4 }),
+  //   (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 5 }),
+  //   (String::from("JSON_MASK_OBJECT_4"), CircuitData { opcode: 4 }),
+  //   (String::from("JSON_MASK_OBJECT_5"), CircuitData { opcode: 4 }),
+  //   (String::from("EXTRACT_VALUE"), CircuitData { opcode: 6 }),
   // ]);
+
+  let rom_data = HashMap::from([
+    (String::from("AES_GCM_1"), CircuitData { opcode: 0 }),
+    (String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 1 }),
+    (String::from("HTTP_LOCK_HEADER_1"), CircuitData { opcode: 2 }),
+    (String::from("HTTP_BODY_EXTRACT"), CircuitData { opcode: 3 }),
+    (String::from("JSON_PARSE"), CircuitData { opcode: 4 }),
+    (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 5 }),
+    (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 5 }),
+    (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 6 }),
+    (String::from("JSON_MASK_OBJECT_4"), CircuitData { opcode: 5 }),
+    (String::from("JSON_MASK_OBJECT_5"), CircuitData { opcode: 5 }),
+    (String::from("EXTRACT_VALUE"), CircuitData { opcode: 7 }),
+  ]);
 
   let aes_rom_opcode_config = RomOpcodeConfig {
     name:          String::from("AES_GCM_1"),
@@ -212,9 +212,9 @@ fn test_end_to_end_proofs() {
   };
 
   debug!("Creating `private_inputs`...");
-  // let mut rom = vec![aes_rom_opcode_config; AES_PLAINTEXT.1.len() / BYTES_PER_FOLD];
-  // rom.extend([
-  let rom = vec![
+  let mut rom = vec![aes_rom_opcode_config; AES_PLAINTEXT.1.len() / BYTES_PER_FOLD];
+  rom.extend([
+    // let rom = vec![
     RomOpcodeConfig {
       name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
       private_input: HashMap::from([
@@ -275,7 +275,7 @@ fn test_end_to_end_proofs() {
       ]),
     },
     RomOpcodeConfig { name: String::from("EXTRACT_VALUE"), private_input: HashMap::new() },
-  ];
+  ]);
 
   let inputs = HashMap::from([(String::from("AES_GCM_1"), FoldInput {
     value: HashMap::from([(
@@ -294,8 +294,8 @@ fn test_end_to_end_proofs() {
     rom_data,
     rom,
     initial_nivc_input,
-    inputs: HashMap::new(),
-    // inputs,
+    // inputs: HashMap::new(),
+    inputs,
     witnesses: vec![],
   }
   .into_expanded();
