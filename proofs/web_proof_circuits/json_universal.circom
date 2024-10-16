@@ -2,15 +2,15 @@ pragma circom 2.1.9;
 
 include "parser-attestor/circuits/json/interpreter.circom";
 
-template JsonMaskObjectNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen, maxValueLen) {
+template JsonMaskObjectNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen) {
     // ------------------------------------------------------------------------------------------------------------------ //
-    // ~~ Set sizes at compile time ~~    
+    // ~~ Set sizes at compile time ~~
     // Total number of variables in the parser for each byte of data
     assert(MAX_STACK_HEIGHT >= 2);
     var PER_ITERATION_DATA_LENGTH = MAX_STACK_HEIGHT * 2 + 2;
     var TOTAL_BYTES_USED          = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1); // data + parser vars
     // ------------------------------------------------------------------------------------------------------------------ //
-    
+
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Unravel from previous NIVC step ~
     // Read in from previous NIVC step (JsonParseNIVC)
@@ -40,7 +40,7 @@ template JsonMaskObjectNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen
     // Key data to use to point to which object to extract
     signal input key[maxKeyLen];
     signal input keyLen;
-    
+
     // flag determining whether this byte is matched value
     signal is_value_match[DATA_BYTES - maxKeyLen];
     // final mask
@@ -61,7 +61,7 @@ template JsonMaskObjectNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen
     // parsing_key[0] <== InsideKey()(stack[0][0], parsingData[0][0], parsingData[0][1]);
     // parsing_value[0] <== InsideValueObject()(stack[0][0], stack[0][1], parsingData[0][0], parsingData[0][1]);
 
-    // Initialize values knowing 0th bit of data will never be a key/value 
+    // Initialize values knowing 0th bit of data will never be a key/value
     parsing_key[0]   <== 0;
     parsing_value[0] <== 0;
     is_key_match[0]  <== 0;
@@ -89,6 +89,7 @@ template JsonMaskObjectNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen
 
         // mask = currently parsing value and all subsequent keys matched
         mask[data_idx] <== data[data_idx] * or[data_idx];
+
     }
 
     // Write the `step_out` with masked data
@@ -106,9 +107,9 @@ template JsonMaskObjectNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen
     // No need to pad as this is currently when TOTAL_BYTES == TOTAL_BYTES_USED
 }
 
-template JsonMaskArrayIndexNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxValueLen) {
+template JsonMaskArrayIndexNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT) {
     // ------------------------------------------------------------------------------------------------------------------ //
-    // ~~ Set sizes at compile time ~~    
+    // ~~ Set sizes at compile time ~~
     // Total number of variables in the parser for each byte of data
     assert(MAX_STACK_HEIGHT >= 2);
     var PER_ITERATION_DATA_LENGTH = MAX_STACK_HEIGHT * 2 + 2;

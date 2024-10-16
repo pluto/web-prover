@@ -18,7 +18,7 @@ ios:
 # Finally run test using these files
 proof:
 	circom web_proof_circuits/aes_gcm/aes_gcm.circom --r1cs -o web_proof_circuits/aes_gcm -l node_modules
-	build-circuit web_proof_circuits/aes_gcm/aes_gcm.circom web_proof_circuits/aes_gcm/aes_gcm.bin -l node_modules
+	# build-circuit web_proof_circuits/aes_gcm/aes_gcm.circom web_proof_circuits/aes_gcm/aes_gcm.bin -l node_modules
 
 	# - These work ----------------------------------------------------------------------------------------------------------- #
 	# HTTP parse and lock start line, ~18.6K constraints
@@ -50,6 +50,10 @@ proof:
 	# JSON mask array index, 3749 constraints
 	circom web_proof_circuits/json_mask_array_index/json_mask_array_index.circom --r1cs -o web_proof_circuits/json_mask_array_index -l node_modules
 	build-circuit web_proof_circuits/json_mask_array_index/json_mask_array_index.circom web_proof_circuits/json_mask_array_index/json_mask_array_index.bin -l node_modules
+
+	# Extract final, ~80K constraints
+	circom web_proof_circuits/extract_value/extract_value.circom --r1cs -o web_proof_circuits/extract_value/ -l node_modules
+	build-circuit web_proof_circuits/extract_value/extract_value.circom web_proof_circuits/extract_value/extract_value.bin -l node_modules
 	# ------------------------------------------------------------------------------------------------------------------------ #
 
-	cargo test --release -- tests::test_end_to_end_proofs --exact --ignored
+	cargo test --release -- tests::test_end_to_end_proofs --exact --show-output

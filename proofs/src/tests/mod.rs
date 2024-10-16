@@ -1,28 +1,19 @@
 //! This test module is effectively testing a static (comptime) circuit dispatch supernova program
 
+use flate2::write::ZlibEncoder;
+use program::data::{CircuitData, RomOpcodeConfig};
 use proving_ground::supernova::RecursiveSNARK;
 use serde_json::json;
 
 use super::*;
-use crate::program::data::{Input, NotExpanded};
+use crate::program::data::{FoldInput, NotExpanded};
 
 mod rustwitness;
 mod witnesscalc;
 
-const ROM: &[u64] = &[0, 1, 2, 0, 1, 2];
-
-const ADD_EXTERNAL_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/add_external.r1cs");
-const SQUARE_ZEROTH_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/square_zeroth.r1cs");
-const SWAP_MEMORY_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/swap_memory.r1cs");
-
-const INIT_PUBLIC_INPUT: [u64; 2] = [1, 2];
-const EXTERNAL_INPUTS: [[u64; 2]; 2] = [[5, 7], [13, 1]];
-const MAX_ROM_LENGTH: usize = 10; // TODO: This should be able to be longer
-
 // -----------------------------------------------------------------------------------------------
-// // JSON Proof Material
-const JSON_ROM: [u8; 9] = [0, 1, 2, 3, 4, 4, 5, 4, 4];
-const JSON_MAX_ROM_LENGTH: usize = 9;
+// JSON Proof Material
+const JSON_MAX_ROM_LENGTH: usize = 15;
 
 // Circuit 0
 const HTTP_PARSE_AND_LOCK_START_LINE_R1CS: &[u8] = include_bytes!(
@@ -61,6 +52,11 @@ const JSON_MASK_ARRAY_INDEX_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/json_mask_array_index/json_mask_array_index.r1cs");
 const JSON_MASK_ARRAY_INDEX_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/json_mask_array_index/json_mask_array_index.bin");
+
+const EXTRACT_VALUE_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/extract_value/extract_value.r1cs");
+const EXTRACT_VALUE_GRAPH: &[u8] =
+  include_bytes!("../../web_proof_circuits/extract_value/extract_value.bin");
 
 const AES_BYTES: [u8; 50] = [0; 50];
 
@@ -132,6 +128,7 @@ fn test_end_to_end_proofs() {
       R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
+      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
       WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
@@ -140,6 +137,7 @@ fn test_end_to_end_proofs() {
       WitnessGeneratorType::Raw(JSON_PARSE_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
     ],
     max_rom_length:          JSON_MAX_ROM_LENGTH,
   };
@@ -153,91 +151,84 @@ fn test_end_to_end_proofs() {
   // let compressed = encoder.finish().unwrap();
   // debug!("Length of serialized PP: {:?}", compressed.len());
 
+  debug!("Creating ROM");
+
+  let rom_data = HashMap::from([
+    (String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 0 }),
+    (String::from("HTTP_LOCK_HEADER_1"), CircuitData { opcode: 1 }),
+    (String::from("HTTP_BODY_EXTRACT"), CircuitData { opcode: 2 }),
+    (String::from("JSON_PARSE"), CircuitData { opcode: 3 }),
+    (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 4 }),
+    (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 4 }),
+    (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 5 }),
+    (String::from("JSON_MASK_OBJECT_4"), CircuitData { opcode: 4 }),
+    (String::from("JSON_MASK_OBJECT_5"), CircuitData { opcode: 4 }),
+    (String::from("EXTRACT_VALUE"), CircuitData { opcode: 6 }),
+  ]);
+
   debug!("Creating `private_inputs`...");
-  let mut private_inputs = HashMap::new();
-  // Lock start line information
-  private_inputs.insert(HTTP_LOCK_VERSION.0.to_owned(), Input {
-    start_index: 0,
-    end_index:   0,
-    value:       HTTP_LOCK_VERSION.1.iter().map(|x| json!(x)).collect(),
-  });
-  private_inputs.insert(HTTP_LOCK_STATUS.0.to_owned(), Input {
-    start_index: 0,
-    end_index:   0,
-    value:       HTTP_LOCK_STATUS.1.iter().map(|x| json!(x)).collect(),
-  });
-  private_inputs.insert(HTTP_LOCK_MESSAGE.0.to_owned(), Input {
-    start_index: 0,
-    end_index:   0,
-    value:       HTTP_LOCK_MESSAGE.1.iter().map(|x| json!(x)).collect(),
-  });
-
-  // Lock header information
-  private_inputs.insert(HTTP_LOCK_HEADER_NAME.0.to_owned(), Input {
-    start_index: 1,
-    end_index:   1,
-    value:       HTTP_LOCK_HEADER_NAME.1.iter().map(|x| json!(x)).collect(),
-  });
-  private_inputs.insert(HTTP_LOCK_HEADER_VALUE.0.to_owned(), Input {
-    start_index: 1,
-    end_index:   1,
-    value:       HTTP_LOCK_HEADER_VALUE.1.iter().map(|x| json!(x)).collect(),
-  });
-
-  // JSON Mask KV 1
-  private_inputs.insert(JSON_MASK_KEY_DEPTH_1.0.to_owned(), Input {
-    start_index: 4,
-    end_index:   4,
-    value:       JSON_MASK_KEY_DEPTH_1.1.iter().map(|x| json!(x)).collect(),
-  });
-  private_inputs.insert(JSON_MASK_KEYLEN_DEPTH_1.0.to_owned(), Input {
-    start_index: 4,
-    end_index:   4,
-    value:       JSON_MASK_KEYLEN_DEPTH_1.1.iter().map(|x| json!(x)).collect(),
-  });
-
-  // JSON Mask KV 2
-  private_inputs.insert(JSON_MASK_KEY_DEPTH_2.0.to_owned(), Input {
-    start_index: 5,
-    end_index:   5,
-    value:       JSON_MASK_KEY_DEPTH_2.1.iter().map(|x| json!(x)).collect(),
-  });
-  private_inputs.insert(JSON_MASK_KEYLEN_DEPTH_2.0.to_owned(), Input {
-    start_index: 5,
-    end_index:   5,
-    value:       JSON_MASK_KEYLEN_DEPTH_2.1.iter().map(|x| json!(x)).collect(),
-  });
-
-  // JSON Mask array index 0 depth 3
-  private_inputs.insert(JSON_MASK_ARR_DEPTH_3.0.to_owned(), Input {
-    start_index: 6,
-    end_index:   6,
-    value:       JSON_MASK_ARR_DEPTH_3.1.iter().map(|x| json!(x)).collect(),
-  });
-
-  // JSON Mask KV 4
-  private_inputs.insert(JSON_MASK_KEY_DEPTH_4.0.to_owned(), Input {
-    start_index: 7,
-    end_index:   7,
-    value:       JSON_MASK_KEY_DEPTH_4.1.iter().map(|x| json!(x)).collect(),
-  });
-  private_inputs.insert(JSON_MASK_KEYLEN_DEPTH_4.0.to_owned(), Input {
-    start_index: 7,
-    end_index:   7,
-    value:       JSON_MASK_KEYLEN_DEPTH_4.1.iter().map(|x| json!(x)).collect(),
-  });
-
-  // JSON Mask KV 5
-  private_inputs.insert(JSON_MASK_KEY_DEPTH_5.0.to_owned(), Input {
-    start_index: 8,
-    end_index:   8,
-    value:       JSON_MASK_KEY_DEPTH_5.1.iter().map(|x| json!(x)).collect(),
-  });
-  private_inputs.insert(JSON_MASK_KEYLEN_DEPTH_5.0.to_owned(), Input {
-    start_index: 8,
-    end_index:   8,
-    value:       JSON_MASK_KEYLEN_DEPTH_5.1.iter().map(|x| json!(x)).collect(),
-  });
+  let rom = vec![
+    RomOpcodeConfig {
+      name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
+      private_input: HashMap::from([
+        (String::from(HTTP_LOCK_VERSION.0), json!(HTTP_LOCK_VERSION.1)),
+        (String::from(HTTP_LOCK_MESSAGE.0), json!(HTTP_LOCK_MESSAGE.1)),
+        (String::from(HTTP_LOCK_STATUS.0), json!(HTTP_LOCK_STATUS.1)),
+      ]),
+    },
+    RomOpcodeConfig {
+      name:          String::from("HTTP_LOCK_HEADER_1"),
+      private_input: HashMap::from([
+        (String::from(HTTP_LOCK_HEADER_NAME.0), json!(HTTP_LOCK_HEADER_NAME.1)),
+        (String::from(HTTP_LOCK_HEADER_VALUE.0), json!(HTTP_LOCK_HEADER_VALUE.1)),
+      ]),
+    },
+    RomOpcodeConfig {
+      name:          String::from("HTTP_BODY_EXTRACT"),
+      private_input: HashMap::new(),
+    },
+    RomOpcodeConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
+    RomOpcodeConfig {
+      name:          String::from("JSON_MASK_OBJECT_1"),
+      private_input: HashMap::from([
+        (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
+        (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
+      ]),
+    },
+    RomOpcodeConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
+    RomOpcodeConfig {
+      name:          String::from("JSON_MASK_OBJECT_2"),
+      private_input: HashMap::from([
+        (String::from(JSON_MASK_KEY_DEPTH_2.0), json!(JSON_MASK_KEY_DEPTH_2.1)),
+        (String::from(JSON_MASK_KEYLEN_DEPTH_2.0), json!(JSON_MASK_KEYLEN_DEPTH_2.1)),
+      ]),
+    },
+    RomOpcodeConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
+    RomOpcodeConfig {
+      name:          String::from("JSON_MASK_ARRAY_3"),
+      private_input: HashMap::from([(
+        String::from(JSON_MASK_ARR_DEPTH_3.0),
+        json!(JSON_MASK_ARR_DEPTH_3.1),
+      )]),
+    },
+    RomOpcodeConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
+    RomOpcodeConfig {
+      name:          String::from("JSON_MASK_OBJECT_4"),
+      private_input: HashMap::from([
+        (String::from(JSON_MASK_KEY_DEPTH_4.0), json!(JSON_MASK_KEY_DEPTH_4.1)),
+        (String::from(JSON_MASK_KEYLEN_DEPTH_4.0), json!(JSON_MASK_KEYLEN_DEPTH_4.1)),
+      ]),
+    },
+    RomOpcodeConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
+    RomOpcodeConfig {
+      name:          String::from("JSON_MASK_OBJECT_5"),
+      private_input: HashMap::from([
+        (String::from(JSON_MASK_KEY_DEPTH_5.0), json!(JSON_MASK_KEY_DEPTH_5.1)),
+        (String::from(JSON_MASK_KEYLEN_DEPTH_5.0), json!(JSON_MASK_KEYLEN_DEPTH_5.1)),
+      ]),
+    },
+    RomOpcodeConfig { name: String::from("EXTRACT_VALUE"), private_input: HashMap::new() },
+  ];
 
   let mut initial_nivc_input = AES_BYTES.to_vec();
   initial_nivc_input.extend(PLAIN_TEXT.iter());
@@ -246,14 +237,15 @@ fn test_end_to_end_proofs() {
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
     setup_data,
-    rom: JSON_ROM.into_iter().map(u64::from).collect(),
+    rom_data,
+    rom,
     initial_nivc_input,
-    private_inputs,
+    inputs: HashMap::new(),
     witnesses: vec![],
   }
   .into_expanded();
   let recursive_snark = program::run(&program_data);
-  dbg!(recursive_snark.zi_primary());
+  // dbg!(recursive_snark.zi_primary());
 
   // let res = "\"Taylor Swift\"";
   // let final_mem =
