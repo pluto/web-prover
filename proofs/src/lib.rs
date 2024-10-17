@@ -44,6 +44,8 @@ impl SetupStatus for Offline {
   // type R1CS = R1CSType;
 }
 
+const TEST_JSON: &str = include_str!("../examples/aes_fold.json");
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SetupData {
   pub r1cs_types:              Vec<R1CSType>,

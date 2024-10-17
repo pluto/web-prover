@@ -10,8 +10,7 @@ use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
-  circom::witness::load_witness_from_bin_reader, compress::CompressedVerifier, program,
-  ProgramData, WitnessGeneratorType, F, G1,
+  circom::witness::load_witness_from_bin_reader, program, ProgramData, WitnessGeneratorType, F, G1,
 };
 use serde_json::json;
 use tls_client2::{
@@ -34,15 +33,15 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
 
   let program_data = generate_program_data(&witness).await;
-  let program_output = program::run(&program_data);
-  let compressed_verifier = CompressedVerifier::from(program_output);
-  let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
+  let recursive_snark = program::run(&program_data);
+  let compressed_proof = program::compress_proof(&recursive_snark, &program_data.public_params);
+  let serialized_compressed_proof = compressed_proof.serialize_and_compress();
 
-  Ok(crate::Proof::Origo(serialized_compressed_verifier.proof.0))
+  Ok(crate::Proof::Origo(serialized_compressed_proof.0))
 }
 
 // TODO: Dedup origo_native and origo_wasm. The difference is the witness/r1cs preparation.
-async fn generate_program_data(witness: &WitnessData) -> ProgramData {
+async fn generate_program_data(witness: &WitnessData) -> ProgramData<proofs::Online> {
   debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
   debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
 
