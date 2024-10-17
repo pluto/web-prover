@@ -18,8 +18,7 @@ rust-witness = { git = "https://github.com/chancehudson/rust-witness" }
 paste = "1.0"
 
 
-proving_ground = { path = "../../pluto/proving_ground" }
-# proving_ground = { git = "https://github.com/pluto/proving_ground", rev = "dcdc708" }
+proving_ground = { git = "https://github.com/pluto/proving_ground", rev = "c58e3c1" } # proving_ground = { path = "../../pluto/proving_ground" }
 ff = { version = "0.13", default-features = false, features = ["derive"] }
 bellpepper-core = "0.4"
 halo2curves = "0.6.1"
