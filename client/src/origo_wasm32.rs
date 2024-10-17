@@ -12,8 +12,8 @@ use proofs::{
   circom::witness::load_witness_from_bin_reader,
   program,
   program::data::{
-    CircuitData, Expanded, FoldInput, NotExpanded, Online, ProgramData, R1CSType, RomOpcodeConfig,
-    SetupData, WitnessGeneratorType,
+    CircuitData, Expanded, FoldInput, InstructionConfig, NotExpanded, Online, ProgramData,
+    R1CSType, SetupData, WitnessGeneratorType,
   },
 };
 use serde::Serialize;
@@ -111,7 +111,7 @@ async fn generate_program_data(
     // chooses an extraction
   ]);
 
-  let aes_rom_opcode_config = RomOpcodeConfig {
+  let aes_rom_opcode_config = InstructionConfig {
     name:          aes_instr.clone(),
     private_input: HashMap::from([
       (String::from("key"), json!(sized_key)),

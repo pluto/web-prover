@@ -16,9 +16,11 @@ ios:
 # First generate the R1CS files using Circom
 # Second generate the graph bin files using circom-witnesscalc
 # Finally run test using these files
-proof:
+aes:
 	# AES-GCM, ~500K constraints (for now we need wasm witgen)
 	circom web_proof_circuits/aes_gcm/aes_gcm.circom --r1cs --wasm -o web_proof_circuits/aes_gcm -l node_modules
+
+circuits: aes
 	build-circuit web_proof_circuits/aes_gcm/aes_gcm.circom web_proof_circuits/aes_gcm/aes_gcm.bin -l node_modules
 
 	# HTTP parse and lock start line, ~18.6K constraints
@@ -56,4 +58,5 @@ proof:
 	build-circuit web_proof_circuits/extract_value/extract_value.circom web_proof_circuits/extract_value/extract_value.bin -l node_modules
 	# ------------------------------------------------------------------------------------------------------------------------ #
 
+proof: circuit
 	cargo test --release -- tests::test_end_to_end_proofs --exact --show-output
