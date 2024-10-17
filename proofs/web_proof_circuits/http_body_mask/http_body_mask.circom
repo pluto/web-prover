@@ -13,7 +13,7 @@ template HTTPMaskBodyNIVC(TOTAL_BYTES, DATA_BYTES) {
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Unravel from previous NIVC step ~
     // Read in from previous NIVC step (HttpParseAndLockStartLine or HTTPLockHeader)
-    signal input step_in[TOTAL_BYTES];
+    signal input step_in[TOTAL_BYTES + 1]; // ADD ONE FOR JSON LATER
 
     signal data[DATA_BYTES];
     signal parsing_body[DATA_BYTES];
@@ -24,7 +24,7 @@ template HTTPMaskBodyNIVC(TOTAL_BYTES, DATA_BYTES) {
 
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Write out to next NIVC step
-    signal output step_out[TOTAL_BYTES];
+    signal output step_out[TOTAL_BYTES + 1];
     for (var i = 0 ; i < DATA_BYTES ; i++) {
         step_out[i] <== data[i] * parsing_body[i];
     }
@@ -32,6 +32,7 @@ template HTTPMaskBodyNIVC(TOTAL_BYTES, DATA_BYTES) {
     for (var i = DATA_BYTES ; i < TOTAL_BYTES ; i++) {
         step_out[i] <== 0;
     }
+    step_out[TOTAL_BYTES] <== 0;
 }
 
 component main { public [step_in] } = HTTPMaskBodyNIVC(4160, 320);

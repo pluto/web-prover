@@ -18,7 +18,7 @@ template LockStartLine(TOTAL_BYTES, DATA_BYTES, beginningLen, middleLen, finalLe
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Unravel from previous NIVC step ~
     // Read in from previous NIVC step (JsonParseNIVC)
-    signal input step_in[TOTAL_BYTES];
+    signal input step_in[TOTAL_BYTES + 1]; // ADD 1 FOR JSON STUFF LATER
 
     signal data[DATA_BYTES];
     for (var i = 0 ; i < DATA_BYTES ; i++) {
@@ -105,7 +105,7 @@ template LockStartLine(TOTAL_BYTES, DATA_BYTES, beginningLen, middleLen, finalLe
 
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Write out to next NIVC step (Lock Header)
-    signal output step_out[TOTAL_BYTES];
+    signal output step_out[TOTAL_BYTES + 1];
     for (var i = 0 ; i < DATA_BYTES ; i++) {
         // add plaintext http input to step_out
         step_out[i] <== step_in[50 + i];
@@ -121,6 +121,7 @@ template LockStartLine(TOTAL_BYTES, DATA_BYTES, beginningLen, middleLen, finalLe
     for (var i = TOTAL_BYTES_USED ; i < TOTAL_BYTES ; i++ ) {
         step_out[i] <== 0;
     }
+    step_out[TOTAL_BYTES] <== 0;
 }
 
 component main { public [step_in] } = LockStartLine(4160, 320, 8, 3, 2);

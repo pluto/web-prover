@@ -11,7 +11,7 @@ template JsonParseNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT) {
     // ------------------------------------------------------------------------------------------------------------------ //
 
     // Read in from previous NIVC step (AESNIVC)
-    signal input step_in[TOTAL_BYTES];
+    signal input step_in[TOTAL_BYTES + 1]; // ADD 1 TO TRACK DEPTH LAATER ON
 
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Parse JSON ~
@@ -38,7 +38,7 @@ template JsonParseNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT) {
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Write to `step_out` for next NIVC step
     // Pass the data bytes back out in the first `step_out` signals
-    signal output step_out[TOTAL_BYTES];
+    signal output step_out[TOTAL_BYTES + 1];
     for (var i = 0 ; i < DATA_BYTES ; i++) {
         step_out[i] <== step_in[i];
     }
@@ -53,6 +53,7 @@ template JsonParseNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT) {
         step_out[DATA_BYTES + i * PER_ITERATION_DATA_LENGTH + MAX_STACK_HEIGHT * 2 + 1] <== State[i].next_parsing_number;
     }
     // No need to pad as this is currently when TOTAL_BYTES == TOTAL_BYTES_USED
+    step_out[TOTAL_BYTES] <== 0; // Initial depth set to 0 for extraction
     // ------------------------------------------------------------------------------------------------------------------ //
 }
 

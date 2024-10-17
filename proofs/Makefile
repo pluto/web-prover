@@ -53,7 +53,7 @@ circuits: aes
 	circom web_proof_circuits/json_mask_array_index/json_mask_array_index.circom --r1cs -o web_proof_circuits/json_mask_array_index -l node_modules
 	build-circuit web_proof_circuits/json_mask_array_index/json_mask_array_index.circom web_proof_circuits/json_mask_array_index/json_mask_array_index.bin -l node_modules
 
-	# Extract final, ~80K constraints
+	# Extract final, ~6.5K constraints
 	circom web_proof_circuits/extract_value/extract_value.circom --r1cs -o web_proof_circuits/extract_value/ -l node_modules
 	build-circuit web_proof_circuits/extract_value/extract_value.circom web_proof_circuits/extract_value/extract_value.bin -l node_modules
 	# ------------------------------------------------------------------------------------------------------------------------ #

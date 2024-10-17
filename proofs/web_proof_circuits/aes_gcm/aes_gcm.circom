@@ -23,7 +23,7 @@ template AESGCMFOLD(bytesPerFold, totalBytes, inputBytes) {
     // step_in[20..21] => foldedBlocks
     // step_in[22] => plainText matching // TODO: ccan just check, don't need to carry over
     // step_in[23] => cipherText matching // TODO: ccan just check, don't need to carry over
-    signal input step_in[inputBytes];
+    signal input step_in[inputBytes + 1];
 
     // For now, attempt to support variable fold size. Potential fix at 16 in the future.
     component aes = AESGCMFOLDABLE(bytesPerFold, totalBytes\16);
@@ -48,7 +48,7 @@ template AESGCMFOLD(bytesPerFold, totalBytes, inputBytes) {
     aes.foldedBlocks <== step_in[inputIndex];
 
     // Fold Outputs
-    signal output step_out[inputBytes];
+    signal output step_out[inputBytes + 1];
     var outputIndex = 0;
     for (var i = 0 ; i < bytesPerFold - 4 ; i++) {
         step_out[outputIndex] <== 0;
@@ -86,6 +86,7 @@ template AESGCMFOLD(bytesPerFold, totalBytes, inputBytes) {
     for(var i = 50 ; i < inputBytes ; i++) {
         step_out[i] <== step_in[i];
     }
+    step_out[inputBytes] <== 0;
 }
 
 component main { public [step_in] } = AESGCMFOLD(16, 320, 4160);

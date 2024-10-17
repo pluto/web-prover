@@ -23,7 +23,7 @@ const MAX_ROM_LENGTH: usize = 10; // TODO: This should be able to be longer
 
 // -----------------------------------------------------------------------------------------------
 // JSON Proof Material
-const JSON_MAX_ROM_LENGTH: usize = 35;
+const JSON_MAX_ROM_LENGTH: usize = 31;
 
 // Circuit 0
 const AES_GCM_R1CS: &[u8] = include_bytes!("../../web_proof_circuits/aes_gcm/aes_gcm.r1cs");
@@ -232,7 +232,6 @@ fn test_end_to_end_proofs() {
         (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
       ]),
     },
-    InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
     InstructionConfig {
       name:          String::from("JSON_MASK_OBJECT_2"),
       private_input: HashMap::from([
@@ -240,7 +239,6 @@ fn test_end_to_end_proofs() {
         (String::from(JSON_MASK_KEYLEN_DEPTH_2.0), json!(JSON_MASK_KEYLEN_DEPTH_2.1)),
       ]),
     },
-    InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
     InstructionConfig {
       name:          String::from("JSON_MASK_ARRAY_3"),
       private_input: HashMap::from([(
@@ -248,7 +246,6 @@ fn test_end_to_end_proofs() {
         json!(JSON_MASK_ARR_DEPTH_3.1),
       )]),
     },
-    InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
     InstructionConfig {
       name:          String::from("JSON_MASK_OBJECT_4"),
       private_input: HashMap::from([
@@ -256,7 +253,6 @@ fn test_end_to_end_proofs() {
         (String::from(JSON_MASK_KEYLEN_DEPTH_4.0), json!(JSON_MASK_KEYLEN_DEPTH_4.1)),
       ]),
     },
-    InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
     InstructionConfig {
       name:          String::from("JSON_MASK_OBJECT_5"),
       private_input: HashMap::from([
@@ -279,7 +275,8 @@ fn test_end_to_end_proofs() {
 
   let mut initial_nivc_input = AES_BYTES.to_vec();
   initial_nivc_input.extend(AES_PLAINTEXT.1.iter());
-  initial_nivc_input.resize(4160, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
+  initial_nivc_input.resize(4161, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits (+1 now for tracking json depth on
+                                      // folds)
   let initial_nivc_input = initial_nivc_input.into_iter().map(u64::from).collect();
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,

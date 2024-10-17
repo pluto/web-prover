@@ -14,7 +14,7 @@ template LockHeader(TOTAL_BYTES, DATA_BYTES, headerNameLen, headerValueLen) {
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Unravel from previous NIVC step ~
     // Read in from previous NIVC step (HttpParseAndLockStartLine or HTTPLockHeader)
-    signal input step_in[TOTAL_BYTES];
+    signal input step_in[TOTAL_BYTES + 1]; // ADD ONE FOR JSON LATER ON
 
     signal data[DATA_BYTES];
     for (var i = 0 ; i < DATA_BYTES ; i++) {
@@ -41,7 +41,7 @@ template LockHeader(TOTAL_BYTES, DATA_BYTES, headerNameLen, headerValueLen) {
 
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Write out to next NIVC step
-    signal output step_out[TOTAL_BYTES];
+    signal output step_out[TOTAL_BYTES + 1];
     for (var i = 0 ; i < DATA_BYTES ; i++) {
         // add plaintext http input to step_out
         step_out[i] <== step_in[i];
@@ -57,6 +57,7 @@ template LockHeader(TOTAL_BYTES, DATA_BYTES, headerNameLen, headerValueLen) {
     for (var i = TOTAL_BYTES_USED ; i < TOTAL_BYTES ; i++ ) {
         step_out[i] <== 0;
     }
+    step_out[TOTAL_BYTES] <== 0;
 }
 
 // TODO: Handrolled template that I haven't tested YOLO.

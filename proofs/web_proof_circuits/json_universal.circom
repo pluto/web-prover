@@ -14,7 +14,7 @@ template JsonMaskObjectNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Unravel from previous NIVC step ~
     // Read in from previous NIVC step (JsonParseNIVC)
-    signal input step_in[TOTAL_BYTES];
+    signal input step_in[TOTAL_BYTES + 1]; // ADD 1 TO TRACK CURRENT STACK POINTER
 
     // Grab the raw data bytes from the `step_in` variable
     signal data[DATA_BYTES];
@@ -64,24 +64,32 @@ template JsonMaskObjectNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen
     // Initialize values knowing 0th bit of data will never be a key/value
     parsing_key[0]   <== 0;
     parsing_value[0] <== 0;
-    is_key_match[0]  <== 0;
+    is_key_match[0]  <== 0; 
 
-    is_next_pair_at_depth[0]  <== NextKVPairAtDepth(MAX_STACK_HEIGHT, 0)(stack[0], data[0]);
+    component stackSelector[DATA_BYTES];
+    stackSelector[0] = ArraySelector(MAX_STACK_HEIGHT, 2);
+    stackSelector[0].in <== stack[0];
+    stackSelector[0].index <== step_in[TOTAL_BYTES];
+
+    is_next_pair_at_depth[0]  <== NextKVPairAtDepth(MAX_STACK_HEIGHT)(stack[0], data[0],step_in[TOTAL_BYTES]);
     is_key_match_for_value[1] <== Mux1()([is_key_match_for_value[0] * (1-is_next_pair_at_depth[0]), is_key_match[0] * (1-is_next_pair_at_depth[0])], is_key_match[0]);
     is_value_match[0]         <== parsing_value[0] * is_key_match_for_value[1];
 
     mask[0] <== data[0] * is_value_match[0];
 
     for(var data_idx = 1; data_idx < DATA_BYTES - maxKeyLen; data_idx++) {
-        parsing_key[data_idx] <== InsideKey()(stack[data_idx][0], parsingData[data_idx][0], parsingData[data_idx][1]);
-        parsing_value[data_idx] <== InsideValueObject()(stack[data_idx][0], stack[data_idx][1], parsingData[data_idx][0], parsingData[data_idx][1]);
+        stackSelector[data_idx] = ArraySelector(MAX_STACK_HEIGHT, 2);
+        stackSelector[data_idx].in <== stack[data_idx];
+        stackSelector[data_idx].index <== step_in[TOTAL_BYTES];
+        parsing_key[data_idx] <== InsideKey()(stackSelector[data_idx].out, parsingData[data_idx][0], parsingData[data_idx][1]);
+        parsing_value[data_idx] <== InsideValueObject()(stackSelector[data_idx].out, stack[data_idx][1], parsingData[data_idx][0], parsingData[data_idx][1]);
 
         // to get correct value, check:
         // - key matches at current index and depth of key is as specified
         // - whether next KV pair starts
         // - whether key matched for a value (propogate key match until new KV pair of lower depth starts)
         is_key_match[data_idx] <== KeyMatchAtIndex(DATA_BYTES, maxKeyLen, data_idx)(data, key, keyLen, parsing_key[data_idx]);
-        is_next_pair_at_depth[data_idx] <== NextKVPairAtDepth(MAX_STACK_HEIGHT, 0)(stack[data_idx], data[data_idx]);
+        is_next_pair_at_depth[data_idx] <== NextKVPairAtDepth(MAX_STACK_HEIGHT)(stack[data_idx], data[data_idx], step_in[TOTAL_BYTES]);
         is_key_match_for_value[data_idx+1] <== Mux1()([is_key_match_for_value[data_idx] * (1-is_next_pair_at_depth[data_idx]), is_key_match[data_idx] * (1-is_next_pair_at_depth[data_idx])], is_key_match[data_idx]);
         is_value_match[data_idx] <== is_key_match_for_value[data_idx+1] * parsing_value[data_idx];
 
@@ -93,7 +101,7 @@ template JsonMaskObjectNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen
     }
 
     // Write the `step_out` with masked data
-    signal output step_out[TOTAL_BYTES];
+    signal output step_out[TOTAL_BYTES + 1];
     for (var i = 0 ; i < DATA_BYTES - maxKeyLen ; i++) {
         step_out[i] <== mask[i];
     }
@@ -105,6 +113,7 @@ template JsonMaskObjectNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT, maxKeyLen
         step_out[i] <== step_in[i];
     }
     // No need to pad as this is currently when TOTAL_BYTES == TOTAL_BYTES_USED
+    step_out[TOTAL_BYTES] <== step_in[TOTAL_BYTES] + 1;
 }
 
 template JsonMaskArrayIndexNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT) {
@@ -119,7 +128,7 @@ template JsonMaskArrayIndexNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT) {
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Unravel from previous NIVC step ~
     // Read in from previous NIVC step (JsonParseNIVC)
-    signal input step_in[TOTAL_BYTES];
+    signal input step_in[TOTAL_BYTES + 1]; // ADD 1 FOR CURRENT STACK POINTER
 
     // Grab the raw data bytes from the `step_in` variable
     signal data[DATA_BYTES];
@@ -151,18 +160,36 @@ template JsonMaskArrayIndexNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT) {
     signal parsing_array[DATA_BYTES];
     signal or[DATA_BYTES];
 
-    parsing_array[0] <== InsideArrayIndexObject()(stack[0][0], stack[0][1], parsingData[0][0], parsingData[0][1], index);
+    component stackSelector[DATA_BYTES];
+    stackSelector[0] = ArraySelector(MAX_STACK_HEIGHT, 2);
+    stackSelector[0].in <== stack[0];
+    stackSelector[0].index <== step_in[TOTAL_BYTES];
+
+    component nextStackSelector[DATA_BYTES];
+    nextStackSelector[0]   = ArraySelector(MAX_STACK_HEIGHT, 2);
+    nextStackSelector[0].in    <== stack[0];
+    nextStackSelector[0].index <== step_in[TOTAL_BYTES] + 1;
+
+    parsing_array[0] <== InsideArrayIndexObject()(stackSelector[0].out, nextStackSelector[0].out, parsingData[0][0], parsingData[0][1], index);
     mask[0]          <== data[0] * parsing_array[0];
 
     for(var data_idx = 1; data_idx < DATA_BYTES; data_idx++) {
-        parsing_array[data_idx] <== InsideArrayIndexObject()(stack[data_idx][0], stack[data_idx][1], parsingData[data_idx][0], parsingData[data_idx][1], index);
+        stackSelector[data_idx]       = ArraySelector(MAX_STACK_HEIGHT, 2);
+        stackSelector[data_idx].in    <== stack[data_idx];
+        stackSelector[data_idx].index <== step_in[TOTAL_BYTES];
+
+        nextStackSelector[data_idx]       = ArraySelector(MAX_STACK_HEIGHT, 2);
+        nextStackSelector[data_idx].in    <== stack[data_idx];
+        nextStackSelector[data_idx].index <== step_in[TOTAL_BYTES] + 1;
+
+        parsing_array[data_idx] <== InsideArrayIndexObject()(stackSelector[data_idx].out, nextStackSelector[data_idx].out, parsingData[data_idx][0], parsingData[data_idx][1], index);
 
         or[data_idx] <== OR()(parsing_array[data_idx], parsing_array[data_idx - 1]);
         mask[data_idx] <== data[data_idx] * or[data_idx];
     }
 
     // Write the `step_out` with masked data
-    signal output step_out[TOTAL_BYTES];
+    signal output step_out[TOTAL_BYTES + 1];
     for (var i = 0 ; i < DATA_BYTES ; i++) {
         step_out[i] <== mask[i];
     }
@@ -171,4 +198,34 @@ template JsonMaskArrayIndexNIVC(TOTAL_BYTES, DATA_BYTES, MAX_STACK_HEIGHT) {
         step_out[i] <== step_in[i];
     }
     // No need to pad as this is currently when TOTAL_BYTES == TOTAL_BYTES_USED
+    step_out[TOTAL_BYTES] <== step_in[TOTAL_BYTES] + 1;
+}
+
+template ArraySelector(m, n) {
+    signal input in[m][n];
+    signal input index;
+    signal output out[n];
+    assert(index >= 0 && index < m);
+
+    signal selector[m];
+    component Equal[m];
+    for (var i = 0; i < m; i++) {
+        selector[i] <== IsEqual()([index, i]);
+    }
+
+    var sum = 0;
+    for (var i = 0; i < m; i++) {
+        sum += selector[i];
+    }
+    sum === 1;
+
+    signal sums[n][m+1];
+    // note: loop order is column-wise, not row-wise
+    for (var j = 0; j < n; j++) {
+        sums[j][0] <== 0;
+        for (var i = 0; i < m; i++) {
+            sums[j][i+1] <== sums[j][i] + in[i][j] * selector[i];
+        }
+        out[j] <== sums[j][m];
+    }
 }
