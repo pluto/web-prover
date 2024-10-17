@@ -39,12 +39,12 @@ fn run_entry(setup_data: SetupData) -> (ProgramData<Online, Expanded>, Recursive
     (String::from("SWAP_MEMORY"), CircuitData { opcode: 2 }),
   ]);
   let rom = vec![
-    RomOpcodeConfig { name: String::from("ADD_EXTERNAL"), private_input: external_input0 },
-    RomOpcodeConfig { name: String::from("SQUARE_ZEROTH"), private_input: HashMap::new() },
-    RomOpcodeConfig { name: String::from("SWAP_MEMORY"), private_input: HashMap::new() },
-    RomOpcodeConfig { name: String::from("ADD_EXTERNAL"), private_input: external_input1 },
-    RomOpcodeConfig { name: String::from("SQUARE_ZEROTH"), private_input: HashMap::new() },
-    RomOpcodeConfig { name: String::from("SWAP_MEMORY"), private_input: HashMap::new() },
+    InstructionConfig { name: String::from("ADD_EXTERNAL"), private_input: external_input0 },
+    InstructionConfig { name: String::from("SQUARE_ZEROTH"), private_input: HashMap::new() },
+    InstructionConfig { name: String::from("SWAP_MEMORY"), private_input: HashMap::new() },
+    InstructionConfig { name: String::from("ADD_EXTERNAL"), private_input: external_input1 },
+    InstructionConfig { name: String::from("SQUARE_ZEROTH"), private_input: HashMap::new() },
+    InstructionConfig { name: String::from("SWAP_MEMORY"), private_input: HashMap::new() },
   ];
   let public_params = program::setup(&setup_data);
   let program_data = ProgramData::<Online, NotExpanded> {

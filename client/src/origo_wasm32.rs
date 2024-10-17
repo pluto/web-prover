@@ -9,8 +9,12 @@ use arecibo::{provider::Bn256EngineKZG, supernova::RecursiveSNARK};
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
-  circom::witness::load_witness_from_bin_reader, program,
-  program::data::{ProgramData, SetupData, WitnessGeneratorType, R1CSType, Online, NotExpanded, Expanded, CircuitData, RomOpcodeConfig, FoldInput},
+  circom::witness::load_witness_from_bin_reader,
+  program,
+  program::data::{
+    CircuitData, Expanded, FoldInput, NotExpanded, Online, ProgramData, R1CSType, RomOpcodeConfig,
+    SetupData, WitnessGeneratorType,
+  },
 };
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -41,7 +45,10 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
   Ok(crate::Proof::Origo(serialized_compressed_verifier.0))
 }
 
-async fn generate_program_data(witness: &WitnessData, proving: ProvingData) -> ProgramData<Online, Expanded> {
+async fn generate_program_data(
+  witness: &WitnessData,
+  proving: ProvingData,
+) -> ProgramData<Online, Expanded> {
   debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
   debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
 
@@ -79,7 +86,7 @@ async fn generate_program_data(witness: &WitnessData, proving: ProvingData) -> P
   // serde_json::to_value(&aad).unwrap());
 
   // TODO: Is padding the approach we want or change to support variable length?
-  let janky_padding = pt.len() % 16;
+  let janky_padding = if pt.len() % 16 != 0 { 16 - pt.len() % 16 } else { 0 };
   let mut janky_plaintext_padding = vec![0; janky_padding];
   let rom_len = (pt.len() + janky_padding) / 16;
   janky_plaintext_padding.extend(pt);
@@ -93,10 +100,8 @@ async fn generate_program_data(witness: &WitnessData, proving: ProvingData) -> P
     r1cs_types:              vec![
       R1CSType::Raw(proving.r1cs), // TODO: Load more including extractors
     ],
-    witness_generator_types: vec![
-      WitnessGeneratorType::Browser,
-    ],
-    max_rom_length: 10,
+    witness_generator_types: vec![WitnessGeneratorType::Browser],
+    max_rom_length:          10,
   };
 
   let aes_instr = String::from("AES_GCM_1");
@@ -107,7 +112,7 @@ async fn generate_program_data(witness: &WitnessData, proving: ProvingData) -> P
   ]);
 
   let aes_rom_opcode_config = RomOpcodeConfig {
-    name: aes_instr.clone(),
+    name:          aes_instr.clone(),
     private_input: HashMap::from([
       (String::from("key"), json!(sized_key)),
       (String::from("iv"), json!(sized_iv)),
@@ -123,24 +128,24 @@ async fn generate_program_data(witness: &WitnessData, proving: ProvingData) -> P
     )]),
   })]);
 
-  
-  let mut initial_input = vec![0; 23]; // default number of step_in. 
+  let mut initial_input = vec![0; 23]; // default number of step_in.
   initial_input.extend(janky_plaintext_padding.iter());
   initial_input.resize(4160, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
   let final_input: Vec<u64> = initial_input.into_iter().map(u64::from).collect();
-  
-  // TODO: Load this from a file. Run this in preprocessing step. 
+
+  // TODO: Load this from a file. Run this in preprocessing step.
   let public_params = program::setup(&setup_data);
 
   return ProgramData::<Online, NotExpanded> {
     public_params,
     setup_data,
-    rom: rom.to_vec(),
+    rom,
     rom_data,
     initial_nivc_input: final_input.to_vec(),
     inputs,
     witnesses,
-  }.into_expanded();
+  }
+  .into_expanded();
 }
 
 async fn proxy(config: config::Config, session_id: String) -> (SignBody, WitnessData) {

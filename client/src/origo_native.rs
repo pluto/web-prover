@@ -1,19 +1,19 @@
-use std::{
-  collections::HashMap,
-  io::{BufReader, Cursor},
-  path::PathBuf,
-  sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
-use arecibo::{provider::Bn256EngineKZG, supernova::RecursiveSNARK};
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
-  circom::witness::load_witness_from_bin_reader, compress::CompressedVerifier, program,
-  data::{ProgramData, WitnessGeneratorType}, F, G1,
+  program::{
+    self,
+    data::{
+      CircuitData, Expanded, FoldInput, InstructionConfig, NotExpanded, Online, ProgramData,
+      R1CSType, SetupData, WitnessGeneratorType,
+    },
+  },
+  F, G1,
 };
-use serde_json::json;
+use serde_json::{json, Value};
 use tls_client2::{
   origo::{OrigoConnection, WitnessData},
   CipherSuite, Decrypter2, ProtocolVersion,
@@ -24,8 +24,10 @@ use tracing::debug;
 
 use crate::{config, config::ProvingData, errors, origo::SignBody, Proof};
 
-const AES_GCM_FOLD_R1CS: &str = "proofs/examples/circuit_data/aes-gcm-fold.r1cs";
-const AES_GCM_FOLD_WASM: &str = "proofs/examples/circuit_data/aes-gcm-fold_js/aes-gcm-fold.wasm";
+const AES_GCM_FOLD_R1CS: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/aes_gcm/aes_gcm.r1cs");
+const AES_GCM_FOLD_WASM: &str = "proofs/web_proof_circuits/aes_gcm/aes_gcm_js/aes_gcm.wasm";
+const AES_GCM_GRAPH: &[u8] = include_bytes!("../../proofs/web_proof_circuits/aes_gcm/aes_gcm.bin");
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
@@ -35,14 +37,17 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
 
   let program_data = generate_program_data(&witness, config.proving).await;
   let program_output = program::run(&program_data);
-  let compressed_verifier = CompressedVerifier::from(program_output);
+  let compressed_verifier = program::compress_proof(&program_output, &program_data.public_params);
   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
 
-  Ok(crate::Proof::Origo(serialized_compressed_verifier.proof.0))
+  Ok(crate::Proof::Origo(serialized_compressed_verifier.0))
 }
 
 // TODO: Dedup origo_native and origo_wasm. The difference is the witness/r1cs preparation.
-async fn generate_program_data(witness: &WitnessData, proving: ProvingData) -> ProgramData {
+async fn generate_program_data(
+  witness: &WitnessData,
+  proving: ProvingData,
+) -> ProgramData<Online, Expanded> {
   debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
   debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
 
@@ -80,37 +85,64 @@ async fn generate_program_data(witness: &WitnessData, proving: ProvingData) -> P
   // serde_json::to_value(&aad).unwrap());
 
   // TODO: Is padding the approach we want or change to support variable length?
-  let janky_padding = pt.len() % 16;
+  let janky_padding = if pt.len() % 16 != 0 { 16 - pt.len() % 16 } else { 0 };
   let mut janky_plaintext_padding = vec![0; janky_padding];
   let rom_len = (pt.len() + janky_padding) / 16;
   janky_plaintext_padding.extend(pt);
 
-  let private_input = json!({
-    "private_input": [{
-      "key": sized_key,
-      "iv": sized_iv,
-      "fold_input": {
-        "plainText": janky_plaintext_padding,
-      },
-      "aad": padded_aad,
-    }],
-    "r1cs_types": [{
-      "file": {
-          "path": AES_GCM_FOLD_R1CS
-      }
-    }],
-    "witness_generator_types": [
-      {
-          "wasm": {
-              "path": AES_GCM_FOLD_WASM,
-              "wtns_path": "witness.wtns (unused)"
-          }
-      }
+  let setup_data = SetupData {
+    r1cs_types:              vec![
+      R1CSType::Raw(AES_GCM_FOLD_R1CS.to_vec()), // TODO: Load more including extractors
     ],
-    "rom": vec![0; rom_len],
-    "initial_public_input": vec![0; 48],
-    "witnesses": vec![vec![F::<G1>::from(0)]],
-  });
+    witness_generator_types: vec![WitnessGeneratorType::Wasm {
+      path:      AES_GCM_FOLD_WASM.to_string(),
+      wtns_path: String::from("witness.wtns"),
+    }],
+    max_rom_length:          20,
+  };
+
+  let aes_instr = String::from("AES_GCM_1");
+  let rom_data = HashMap::from([
+    (aes_instr.clone(), CircuitData { opcode: 0 }),
+    // TODO: Add more opcodes for extraction, determine how a web proof
+    // chooses an extraction
+  ]);
+
+  let aes_rom_opcode_config = InstructionConfig {
+    name:          aes_instr.clone(),
+    private_input: HashMap::from([
+      (String::from("key"), json!(sized_key)),
+      (String::from("iv"), json!(sized_iv)),
+      (String::from("aad"), json!(padded_aad)),
+    ]),
+  };
+
+  let rom = vec![aes_rom_opcode_config; rom_len];
+  let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
+    value: HashMap::from([(
+      String::from("plainText"),
+      janky_plaintext_padding.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
+    )]),
+  })]);
+
+  let mut initial_input = vec![0; 23]; // default number of step_in.
+  initial_input.extend(janky_plaintext_padding.iter());
+  initial_input.resize(4160, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
+  let final_input: Vec<u64> = initial_input.into_iter().map(u64::from).collect();
+
+  // TODO: Load this from a file. Run this in preprocessing step.
+  let public_params = program::setup(&setup_data);
+
+  return ProgramData::<Online, NotExpanded> {
+    public_params,
+    setup_data,
+    rom,
+    rom_data,
+    initial_nivc_input: final_input.to_vec(),
+    inputs,
+    witnesses: vec![vec![F::<G1>::from(0)]],
+  }
+  .into_expanded();
 
   #[cfg(all(target_os = "ios", target_arch = "aarch64"))]
   let private_input = json!({
@@ -137,7 +169,7 @@ async fn generate_program_data(witness: &WitnessData, proving: ProvingData) -> P
     "witnesses": vec![vec![F::<G1>::from(0)]],
   });
 
-  serde_json::from_value(private_input).unwrap()
+  // serde_json::from_value(private_input).unwrap()
 }
 
 async fn proxy(config: config::Config, session_id: String) -> (SignBody, WitnessData) {

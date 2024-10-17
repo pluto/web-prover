@@ -8,10 +8,6 @@ use tracing::debug;
 
 use crate::errors;
 
-const AES_GCM_FOLD_R1CS: &str = "proofs/examples/circuit_data/aes-gcm-fold.r1cs";
-const AES_GCM_FOLD_WASM: &str = "proofs/examples/circuit_data/aes-gcm-fold_js/aes-gcm-fold.wasm";
-const AES_GCM_FOLD_WTNS: &str = "witness.wtns";
-
 #[derive(Serialize)]
 pub struct SignBody {
   pub hs_server_aes_iv:  String,

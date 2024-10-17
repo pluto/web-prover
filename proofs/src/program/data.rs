@@ -17,10 +17,11 @@ impl FoldInput {
     let mut res = vec![HashMap::new(); freq];
 
     for (key, value) in self.value.clone().into_iter() {
+      debug!("key: {:?}, freq: {}, value_len: {}", key, freq, value.len());
       assert_eq!(value.len() % freq, 0);
       let chunk_size = value.len() / freq;
       let chunks: Vec<Vec<Value>> = value.chunks(chunk_size).map(|chunk| chunk.to_vec()).collect();
-      for i in 0..chunk_size {
+      for i in 0..freq {
         res[i].insert(key.clone(), json!(chunks[i].clone()));
       }
     }
@@ -91,7 +92,7 @@ pub struct CircuitData {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct RomOpcodeConfig {
+pub struct InstructionConfig {
   pub name:          String,
   pub private_input: HashMap<String, Value>,
 }
@@ -101,7 +102,7 @@ pub struct ProgramData<S: SetupStatus, W: WitnessStatus> {
   pub public_params:      S::PublicParams,
   pub setup_data:         SetupData,
   pub rom_data:           HashMap<String, CircuitData>,
-  pub rom:                Vec<RomOpcodeConfig>,
+  pub rom:                Vec<InstructionConfig>,
   pub initial_nivc_input: Vec<u64>,
   pub inputs:             W::PrivateInputs,
   pub witnesses:          Vec<Vec<F<G1>>>, // TODO: Ideally remove this
@@ -110,24 +111,20 @@ pub struct ProgramData<S: SetupStatus, W: WitnessStatus> {
 impl<S: SetupStatus> ProgramData<S, NotExpanded> {
   pub fn into_expanded(self) -> ProgramData<S, Expanded> {
     // build circuit usage map from rom
-    let mut circuit_usage: HashMap<String, Vec<usize>> = HashMap::new();
+    let mut instruction_usage: HashMap<String, Vec<usize>> = HashMap::new();
     for (index, circuit) in self.rom.iter().enumerate() {
-      if let Some(usage) = circuit_usage.get_mut(&circuit.name) {
+      if let Some(usage) = instruction_usage.get_mut(&circuit.name) {
         usage.push(index);
       } else {
-        circuit_usage.insert(circuit.name.clone(), vec![index]);
+        instruction_usage.insert(circuit.name.clone(), vec![index]);
       }
     }
-
-    // TODO: remove clone
-    let roms = self.rom.clone();
-
     let mut private_inputs: Vec<HashMap<String, Value>> =
-      self.rom.into_iter().map(|opcode_config| opcode_config.private_input.to_owned()).collect();
+      self.rom.iter().map(|opcode_config| opcode_config.private_input.to_owned()).collect();
 
     // add fold input sliced to chunks and add to private input
-    for (circuit, fold_inputs) in self.inputs.iter() {
-      let inputs = circuit_usage.get(circuit).unwrap();
+    for (circuit_label, fold_inputs) in self.inputs.iter() {
+      let inputs = instruction_usage.get(circuit_label).unwrap();
       let split_inputs = fold_inputs.split_values(inputs.len());
       for (idx, input) in inputs.iter().zip(split_inputs) {
         private_inputs[*idx].extend(input);
@@ -141,7 +138,7 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
       public_params,
       setup_data,
       rom_data: romData,
-      rom: roms,
+      rom: self.rom,
       initial_nivc_input,
       witnesses,
       inputs: private_inputs,
@@ -268,9 +265,18 @@ mod tests {
         (String::from("CIRCUIT_3"), CircuitData { opcode: 2 }),
       ]),
       rom:                vec![
-        RomOpcodeConfig { name: String::from("CIRCUIT_1"), private_input: HashMap::new() },
-        RomOpcodeConfig { name: String::from("CIRCUIT_2"), private_input: HashMap::new() },
-        RomOpcodeConfig { name: String::from("CIRCUIT_3"), private_input: HashMap::new() },
+        InstructionConfig {
+          name:          String::from("CIRCUIT_1"),
+          private_input: HashMap::new(),
+        },
+        InstructionConfig {
+          name:          String::from("CIRCUIT_2"),
+          private_input: HashMap::new(),
+        },
+        InstructionConfig {
+          name:          String::from("CIRCUIT_3"),
+          private_input: HashMap::new(),
+        },
       ],
       initial_nivc_input: vec![],
       inputs:             mock_inputs.input,
