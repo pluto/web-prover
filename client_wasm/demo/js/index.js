@@ -29,13 +29,13 @@ function end() {
 }
 
 const getConstraints = async function(circuit) {
-  const r1csUrl = new URL(`${circuit}.r1cs`, `https://localhost:8090/build/${circuit}`).toString();
+  const r1csUrl = new URL(`${circuit}.r1cs`, `https://localhost:8090/build/${circuit}/`).toString();
   const r1cs = await fetch(r1csUrl).then((r) => r.arrayBuffer());
   return r1cs;
 }
 
 const getWitnessGenerator = async function(circuit) {
-  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/${circuit}_js/`).toString();
+  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/${circuit}/${circuit}_js/`).toString();
   const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
   return wasm;
 }
@@ -62,20 +62,18 @@ const generateWitnessBytes = async function(inputs) {
 };
 
 // TODO: Migrate this from hardcoded to generated in WASM. 
+
+
 var inputs = [{
     "key": [49,49,49,49,49,49,49,49,49,49,49,49,49,49,49,49], 
     "iv": [49,49,49,49,49,49,49,49,49,49,49,49], 
     "plainText": [116,101,115,116,104,101,108,108,111,48,48,48,48,48,48,48],
     "aad": [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-    "step_in": [
-      [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-      [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-      [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0]
-    ]
+    "step_in": new Array(4160).fill(0),
 }];
 
 // TODO: Configurable identifiers
-var circuit = "aes-gcm-fold";
+var circuit = "aes_gcm";
 var r1cs = await getConstraints(circuit);
 var witnesses = await generateWitnessBytes(inputs);
 

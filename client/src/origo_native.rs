@@ -11,7 +11,7 @@ use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
   circom::witness::load_witness_from_bin_reader, compress::CompressedVerifier, program,
-  ProgramData, WitnessGeneratorType, F, G1,
+  data::{ProgramData, WitnessGeneratorType}, F, G1,
 };
 use serde_json::json;
 use tls_client2::{

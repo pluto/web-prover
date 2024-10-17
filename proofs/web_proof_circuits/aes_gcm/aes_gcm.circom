@@ -18,11 +18,11 @@ template AESGCMFOLD(bytesPerFold, totalBytes, inputBytes) {
 
     // Output from the last encryption step
     // Always use last bytes for inputs which are not same size.
-    // step_in[0..16] => lastCounter
-    // step_in[16..32] => lastTag
-    // step_in[32..48] => foldedBlocks
-    // step_in[48] => plainText matching // TODO: ccan just check, don't need to carry over
-    // step_in[49] => cipherText matching // TODO: ccan just check, don't need to carry over
+    // step_in[0..4] => lastCounter
+    // step_in[4..20] => lastTag
+    // step_in[20..21] => foldedBlocks
+    // step_in[22] => plainText matching // TODO: ccan just check, don't need to carry over
+    // step_in[23] => cipherText matching // TODO: ccan just check, don't need to carry over
     signal input step_in[inputBytes];
 
     // For now, attempt to support variable fold size. Potential fix at 16 in the future.

@@ -17,8 +17,9 @@ ios:
 # Second generate the graph bin files using circom-witnesscalc
 # Finally run test using these files
 proof:
-	# AES-GCM, ~500K constraints
+	# AES-GCM, ~500K constraints (for now we need wasm witgen)
 	circom web_proof_circuits/aes_gcm/aes_gcm.circom --r1cs -o web_proof_circuits/aes_gcm -l node_modules
+	circom web_proof_circuits/aes_gcm/aes_gcm.circom --wasm -o web_proof_circuits/aes_gcm -l node_modules
 	build-circuit web_proof_circuits/aes_gcm/aes_gcm.circom web_proof_circuits/aes_gcm/aes_gcm.bin -l node_modules
 
 	# HTTP parse and lock start line, ~18.6K constraints
