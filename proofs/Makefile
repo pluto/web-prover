@@ -17,7 +17,7 @@ ios:
 # Second generate the graph bin files using circom-witnesscalc
 # Finally run test using these files
 aes:
-	# AES-GCM, ~500K constraints (for now we need wasm witgen)
+	# AES-GCM, ~500K constraints (for now we need wasm witgen for rust witness bindings)
 	circom web_proof_circuits/aes_gcm/aes_gcm.circom --r1cs --wasm -o web_proof_circuits/aes_gcm -l node_modules
 
 circuits: aes
