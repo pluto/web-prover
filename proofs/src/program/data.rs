@@ -64,7 +64,8 @@ impl SetupStatus for Online {
 }
 pub struct Offline;
 impl SetupStatus for Offline {
-  type PublicParams = PathBuf;
+  // type PublicParams = PathBuf;
+  type PublicParams = Vec<u8>;
 }
 
 pub trait WitnessStatus {
@@ -131,13 +132,11 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
       }
     }
 
-    let Self {
-      public_params, setup_data, rom_data: romData, initial_nivc_input, witnesses, ..
-    } = self;
+    let Self { public_params, setup_data, rom_data, initial_nivc_input, witnesses, .. } = self;
     ProgramData {
       public_params,
       setup_data,
-      rom_data: romData,
+      rom_data,
       rom: self.rom,
       initial_nivc_input,
       witnesses,
@@ -151,10 +150,14 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
     #[cfg(feature = "timing")]
     let time = std::time::Instant::now();
 
-    let file = std::fs::read(&self.public_params).unwrap();
+    // let file = std::fs::read(&self.public_params).unwrap();
+    debug!("zlib init");
+    let file = self.public_params;
     let mut decoder = ZlibDecoder::new(&file[..]);
     let mut decompressed = Vec::new();
+    info!("starting decoding!");
     decoder.read_to_end(&mut decompressed).unwrap();
+    info!("starting deserializing");
     let aux_params: AuxParams<E1> = bincode::deserialize(&decompressed).unwrap();
 
     #[cfg(feature = "timing")]
@@ -165,8 +168,10 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
     };
 
     // TODO: get the circuit shapes needed
+    info!("circuit list");
     let circuits = initialize_circuit_list(&self.setup_data);
     let memory = Memory { circuits, rom: vec![0; self.setup_data.max_rom_length] }; // Note, `rom` here is not used in setup, only `circuits`
+    info!("circuit shapes");
     let circuit_shapes = get_circuit_shapes(&memory);
     #[cfg(feature = "timing")]
     {
@@ -174,6 +179,7 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
       trace!("`get_circuit_shapes()` elapsed: {:?}", circuit_shapes_duration);
     }
 
+    info!("public params from parts");
     let public_params = PublicParams::<E1>::from_parts(circuit_shapes, aux_params);
     let Self { setup_data, rom, initial_nivc_input, inputs, witnesses, rom_data, .. } = self;
     ProgramData { public_params, setup_data, rom, initial_nivc_input, inputs, witnesses, rom_data }
@@ -199,7 +205,7 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
 
     let Self { setup_data, rom_data, rom, initial_nivc_input, inputs, witnesses, .. } = self;
     ProgramData {
-      public_params: path,
+      public_params: compressed,
       setup_data,
       rom_data,
       rom,
@@ -253,7 +259,7 @@ mod tests {
   fn test_expand_private_inputs() {
     let mock_inputs: MockInputs = serde_json::from_str(JSON).unwrap();
     let program_data = ProgramData::<Offline, NotExpanded> {
-      public_params:      PathBuf::new(),
+      public_params:      vec![],
       setup_data:         SetupData {
         r1cs_types:              vec![R1CSType::Raw(vec![])],
         witness_generator_types: vec![WitnessGeneratorType::Raw(vec![])],

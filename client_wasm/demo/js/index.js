@@ -28,30 +28,36 @@ function end() {
   console.log(seconds + " seconds");
 }
 
-const getConstraints = async function(circuit) {
+const getConstraints = async function (circuit) {
   const r1csUrl = new URL(`${circuit}.r1cs`, `https://localhost:8090/build/${circuit}/`).toString();
   const r1cs = await fetch(r1csUrl).then((r) => r.arrayBuffer());
   return r1cs;
 }
 
-const getWitnessGenerator = async function(circuit) {
+const getWitnessGenerator = async function (circuit) {
   const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/${circuit}/${circuit}_js/`).toString();
   const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
   return wasm;
 }
 
-const generateWitnessBytes = async function(inputs) {
+const getSerializedPublicParams = async function (setupFile) {
+  const ppUrl = new URL(`${setupFile}.bin`, "https://localhost:8090/build/").toString();
+  const pp = await fetch(ppUrl).then((r) => r.arrayBuffer());
+  return pp;
+}
+
+const generateWitnessBytes = async function (inputs) {
   const _snarkjs = import("snarkjs");
   const snarkjs = await _snarkjs;
   const wasm = await getWitnessGenerator(circuit);
 
   let witnesses = [];
-  for(var i =0; i<2; i++) { 
+  for (var i = 0; i < 2; i++) {
     const witStart = +Date.now();
-    let wtns = {type:"mem"};
+    let wtns = { type: "mem" };
     await snarkjs.wtns.calculate(inputs[0], new Uint8Array(wasm), wtns);
     const witEnd = +Date.now();
-    console.log("witgen time:", witEnd-witStart);
+    console.log("witgen time:", witEnd - witStart);
     console.log("witness", wtns);
     witnesses.push({
       val: wtns.data
@@ -61,25 +67,26 @@ const generateWitnessBytes = async function(inputs) {
   return witnesses;
 };
 
-// TODO: Migrate this from hardcoded to generated in WASM. 
+// TODO: Migrate this from hardcoded to generated in WASM.
 
 
 var inputs = [{
-    "key": [49,49,49,49,49,49,49,49,49,49,49,49,49,49,49,49], 
-    "iv": [49,49,49,49,49,49,49,49,49,49,49,49], 
-    "plainText": [116,101,115,116,104,101,108,108,111,48,48,48,48,48,48,48],
-    "aad": [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-    "step_in": new Array(4160).fill(0),
+  "key": [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49],
+  "iv": [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49],
+  "plainText": [116, 101, 115, 116, 104, 101, 108, 108, 111, 48, 48, 48, 48, 48, 48, 48],
+  "aad": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "step_in": new Array(4160).fill(0),
 }];
 
 // TODO: Configurable identifiers
 var circuit = "aes_gcm";
 var r1cs = await getConstraints(circuit);
 var witnesses = await generateWitnessBytes(inputs);
+var pp = await getSerializedPublicParams("serialized_setup");
 
 start();
 
-// TODO: Call this in a web worker so the main thread doesn't hang. 
+// TODO: Call this in a web worker so the main thread doesn't hang.
 // Config for local development
 const proof = await prover({
   mode: "Origo",
@@ -94,6 +101,7 @@ const proof = await prover({
   proving: {
     r1cs: r1cs,
     witnesses: witnesses,
+    serialized_pp: pp,
   }
 });
 
