@@ -302,3 +302,25 @@ fn test_end_to_end_proofs() {
 
   assert_eq!(recursive_snark.zi_primary()[..res.len()], final_mem);
 }
+
+#[test]
+#[tracing_test::traced_test]
+fn test_offline_proofs() {
+  let setup_data = SetupData {
+    r1cs_types:              vec![R1CSType::Raw(AES_GCM_R1CS.to_vec())],
+    witness_generator_types: vec![WitnessGeneratorType::Browser],
+    max_rom_length:          10,
+  };
+  let public_params = program::setup(&setup_data);
+
+  let program_data = ProgramData::<Online, NotExpanded> {
+    public_params,
+    setup_data,
+    rom_data: HashMap::new(),
+    rom: vec![],
+    initial_nivc_input: vec![],
+    inputs: HashMap::new(),
+    witnesses: vec![vec![F::<G1>::from(0)]],
+  };
+  program_data.into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup.bin").unwrap());
+}
