@@ -14,12 +14,11 @@ pub struct FoldInput {
 
 impl FoldInput {
   pub fn split_values(&self, freq: usize) -> Vec<HashMap<String, Value>> {
-    assert_eq!(self.value.len() % freq, 0);
-    let chunk_size = self.value.len() / freq;
-
     let mut res = vec![HashMap::new(); freq];
 
     for (key, value) in self.value.clone().into_iter() {
+      assert_eq!(value.len() % freq, 0);
+      let chunk_size = value.len() / freq;
       let chunks: Vec<Vec<Value>> = value.chunks(chunk_size).map(|chunk| chunk.to_vec()).collect();
       for i in 0..chunk_size {
         res[i].insert(key.clone(), json!(chunks[i].clone()));

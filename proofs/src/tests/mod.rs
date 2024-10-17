@@ -302,9 +302,9 @@ fn test_end_to_end_proofs() {
   let recursive_snark = program::run(&program_data);
   // dbg!(recursive_snark.zi_primary());
 
-  // let res = "\"Taylor Swift\"";
-  // let final_mem =
-  //   res.as_bytes().into_iter().map(|val| F::<G1>::from(*val as u64)).collect::<Vec<F<G1>>>();
+  let res = "\"Taylor Swift\"";
+  let final_mem =
+    res.as_bytes().iter().map(|val| F::<G1>::from(*val as u64)).collect::<Vec<F<G1>>>();
 
-  // assert_eq!(recursive_snark.zi_primary()[..res.len()], final_mem);
+  assert_eq!(recursive_snark.zi_primary()[..res.len()], final_mem);
 }
