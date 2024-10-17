@@ -39,10 +39,18 @@ jobs:
           echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
           brew install protobuf
 
-      - name: Download and install Circom
-        run: |
-          CIRCOM_VERSION=2.1.9
+      - name: Download Circom (linux)
+        if: matrix.os == 'ubuntu-latest'
+        CIRCOM_VERSION=2.1.9
           curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-linux-amd64 -o circom
+
+      - name: Download Circom (macos)
+        if: matrix.os == 'ubuntu-latest'
+        CIRCOM_VERSION=2.1.9
+          curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-macos-amd64 -o circom
+
+      - name: Check Circom
+        run: |
           chmod +x circom
           sudo mv circom /usr/local/bin/
           circom --version
