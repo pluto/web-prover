@@ -48,15 +48,15 @@ jobs:
         run: | 
           CIRCOM_VERSION=2.1.9
           curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-linux-amd64 -o circom
+          chmod +x circom
+          sudo mv circom /usr/local/bin/
+          circom --version
 
       - name: Download Circom (macos)
         if: matrix.os == 'macos-latest'
         run: |
           CIRCOM_VERSION=2.1.9
           curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-macos-amd64 -o circom
-
-      - name: Check Circom
-        run: |
           chmod +x circom
           sudo mv circom /usr/local/bin/
           circom --version
