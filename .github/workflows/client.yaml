@@ -41,12 +41,12 @@ jobs:
 
       - name: Download Circom (linux)
         if: matrix.os == 'ubuntu-latest'
-        CIRCOM_VERSION=2.1.9
+          CIRCOM_VERSION=2.1.9
           curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-linux-amd64 -o circom
 
       - name: Download Circom (macos)
         if: matrix.os == 'ubuntu-latest'
-        CIRCOM_VERSION=2.1.9
+          CIRCOM_VERSION=2.1.9
           curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-macos-amd64 -o circom
 
       - name: Check Circom
