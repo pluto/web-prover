@@ -41,11 +41,13 @@ jobs:
 
       - name: Download Circom (linux)
         if: matrix.os == 'ubuntu-latest'
+        run: |
           CIRCOM_VERSION=2.1.9
           curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-linux-amd64 -o circom
 
       - name: Download Circom (macos)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'macos-latest'
+        run: |
           CIRCOM_VERSION=2.1.9
           curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-macos-amd64 -o circom
 
@@ -59,7 +61,7 @@ jobs:
           cd proofs
           npm install
           make aes
-          cd ..
+          cd .. 
           RUST_LOG=DEBUG cargo run --release -p notary -- --config ./fixture/notary-config.toml &
           sleep 30
           NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer cargo run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
