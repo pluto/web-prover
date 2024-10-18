@@ -42,12 +42,32 @@ jobs:
         with:
           cache-directories: |
             /Users/runner/Library/Caches/.wasm-pack
+      
+      - name: Download Circom (linux)
+        if: matrix.os == 'ubuntu-latest'
+          CIRCOM_VERSION=2.1.9
+          curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-linux-amd64 -o circom
+
+      - name: Download Circom (macos)
+        if: matrix.os == 'ubuntu-latest'
+          CIRCOM_VERSION=2.1.9
+          curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-macos-amd64 -o circom
+
+      - name: Check Circom
+        run: |
+          chmod +x circom
+          sudo mv circom /usr/local/bin/
+          circom --version
 
       # TODO run automated tests?
       #      wasm-pack test --firefox
       #      docs: https://rustwasm.github.io/docs/wasm-pack/tutorials/npm-browser-packages/testing-your-project.html
 
       - run: |
+          cd proofs
+          npm install
+          make aes
+          cd ..
           echo "$PATH"
           echo "$GITHUB_PATH"
           make wasm

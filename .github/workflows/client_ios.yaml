@@ -32,7 +32,28 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - run: make ios
+      - name: Download Circom (linux)
+        if: matrix.os == 'ubuntu-latest'
+          CIRCOM_VERSION=2.1.9
+          curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-linux-amd64 -o circom
+
+      - name: Download Circom (macos)
+        if: matrix.os == 'ubuntu-latest'
+          CIRCOM_VERSION=2.1.9
+          curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-macos-amd64 -o circom
+
+      - name: Check Circom
+        run: |
+          chmod +x circom
+          sudo mv circom /usr/local/bin/
+          circom --version
+      
+      - run: |
+          cd proofs
+          npm install
+          make aes
+          cd ..
+          make ios
 
       - uses: actions/upload-artifact@v4
         with:
