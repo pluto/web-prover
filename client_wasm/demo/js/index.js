@@ -7,7 +7,14 @@ import init, {
 
 const numConcurrency = navigator.hardwareConcurrency;
 
-await init();
+// Create a WebAssembly.Memory object
+const memory = new WebAssembly.Memory({
+  initial: 16384, // 256 pages = 16MB
+  maximum: 65536, // 1024 pages = 64MB
+  shared: true, // Enable shared memory
+});
+
+await init(undefined, memory);
 setup_tracing("debug,tlsn_extension_rs=debug");
 await initThreadPool(numConcurrency);
 
@@ -105,7 +112,7 @@ let proverConfig = {
 
 const proofWorker = new Worker(new URL("./proof.js", import.meta.url), { type: "module" });
 console.log("sending message to worker");
-proofWorker.postMessage(proverConfig);
+proofWorker.postMessage({ proverConfig, memory });
 
 proofWorker.onmessage = (event) => {
   if (event.data.error) {
