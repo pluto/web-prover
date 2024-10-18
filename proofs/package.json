@@ -5,7 +5,7 @@
   "dependencies": {
     "circomlib": "^2.0.5",
     "parser-attestor": "github:pluto/parser-attestor#b9feeeb240ddf867da85198de7d59e73cba4b008",
-    "aes-proof": "github:pluto/aes-proof#1d08e13ea4f381649cdff83f56d93444008b6548",
+    "aes-proof": "github:pluto/aes-proof#624ea55792414c8a1bf1ee1c5a55c77bfa793e7a",
     "@zk-email/circuits": "^6.1.1"
   }
 }
