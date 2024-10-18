@@ -57,6 +57,7 @@ jobs:
 
       - run: |
           cd proofs
+          npm install
           make aes
           cd ..
           RUST_LOG=DEBUG cargo run --release -p notary -- --config ./fixture/notary-config.toml &
