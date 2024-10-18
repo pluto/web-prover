@@ -151,11 +151,9 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
     let time = std::time::Instant::now();
 
     // let file = std::fs::read(&self.public_params).unwrap();
-    debug!("zlib init");
     let file = self.public_params;
     let mut decoder = ZlibDecoder::new(&file[..]);
     let mut decompressed = Vec::new();
-    info!("starting decoding!");
     decoder.read_to_end(&mut decompressed).unwrap();
     info!("starting deserializing");
     let aux_params: AuxParams<E1> = bincode::deserialize(&decompressed).unwrap();

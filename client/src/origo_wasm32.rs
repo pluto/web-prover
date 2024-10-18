@@ -5,7 +5,6 @@ use std::{
   sync::Arc,
 };
 
-use arecibo::{provider::Bn256EngineKZG, supernova::RecursiveSNARK};
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
@@ -26,7 +25,7 @@ use tls_client2::{
 };
 use tls_client_async2::bind_client;
 use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
-use tracing::{debug, info};
+use tracing::debug;
 use url::Url;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
@@ -37,19 +36,18 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
   let session_id = config.session_id();
   let (sb, witness) = proxy(config.clone(), session_id.clone()).await;
 
-  info!("signing by proxy!");
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
 
-  info!("generating NIVC program data!");
+  debug!("generating NIVC program data!");
   let program_data = generate_program_data(&witness, config.proving).await;
 
-  info!("starting proof generation!");
+  debug!("starting proof generation!");
   let program_output = program::run(&program_data);
 
-  info!("compressing proof!");
+  debug!("compressing proof!");
   let compressed_verifier = program::compress_proof(&program_output, &program_data.public_params);
 
-  info!("running compressed verifier!");
+  debug!("running compressed verifier!");
   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
 
   Ok(crate::Proof::Origo(serialized_compressed_verifier.0))
@@ -74,7 +72,6 @@ async fn generate_program_data(
   private_input.insert("key".to_string(), serde_json::to_value(&sized_key).unwrap());
   private_input.insert("iv".to_string(), serde_json::to_value(&sized_iv).unwrap());
 
-  info!("starting decryption!");
   let dec = Decrypter2::new(sized_key, sized_iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
   let (plaintext, meta) = dec
     .decrypt_tls13_aes(
@@ -96,7 +93,6 @@ async fn generate_program_data(
   // serde_json::to_value(&pt).unwrap()); private_input.insert("aad".to_string(),
   // serde_json::to_value(&aad).unwrap());
 
-  info!("starting input padding!");
   // TODO: Is padding the approach we want or change to support variable length?
   let janky_padding = if pt.len() % 16 != 0 { 16 - pt.len() % 16 } else { 0 };
   let mut janky_plaintext_padding = vec![0; janky_padding];
@@ -146,10 +142,9 @@ async fn generate_program_data(
   let final_input: Vec<u64> = initial_input.into_iter().map(u64::from).collect();
 
   // TODO: Load this from a file. Run this in preprocessing step.
+  debug!("generating public params");
   // let public_params = program::setup(&setup_data);
 
-  info!("offline -> online");
-  let serialized_file = Path::new("serialized_setup.bin");
   let pd = ProgramData::<Offline, NotExpanded> {
     public_params: proving.serialized_pp,
     setup_data,
@@ -161,7 +156,17 @@ async fn generate_program_data(
   }
   .into_online();
 
-  info!("online -> expanded");
+  // let pd = ProgramData::<Online, NotExpanded> {
+  //   public_params,
+  //   setup_data,
+  //   rom,
+  //   rom_data,
+  //   initial_nivc_input: final_input.to_vec(),
+  //   inputs,
+  //   witnesses,
+  // };
+
+  debug!("online -> expanded");
   pd.into_expanded()
 }
 
