@@ -86,9 +86,7 @@ var pp = await getSerializedPublicParams("serialized_setup");
 
 start();
 
-// TODO: Call this in a web worker so the main thread doesn't hang.
-// Config for local development
-const proof = await prover({
+let proverConfig = {
   mode: "Origo",
   notary_host: "localhost",
   notary_port: 7443,
@@ -103,7 +101,37 @@ const proof = await prover({
     witnesses: witnesses,
     serialized_pp: pp,
   }
-});
+};
+
+const proofWorker = new Worker(new URL("./proof.js", import.meta.url), { type: "module" });
+console.log("sending message to worker");
+proofWorker.postMessage(proverConfig);
+
+proofWorker.onmessage = (event) => {
+  if (event.data.error) {
+    console.error("Error from worker:", event.data.error);
+  } else {
+    console.log("proof generated!", event.data);
+  }
+}
+// TODO: Call this in a web worker so the main thread doesn't hang.
+// Config for local development
+// const proof = await prover({
+//   mode: "Origo",
+//   notary_host: "localhost",
+//   notary_port: 7443,
+//   target_method: "GET",
+//   target_url: "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json",
+//   target_headers: {},
+//   target_body: "",
+//   max_sent_data: 10000,
+//   max_recv_data: 10000,
+//   proving: {
+//     r1cs: r1cs,
+//     witnesses: witnesses,
+//     serialized_pp: pp,
+//   }
+// });
 
 // const proof = await prover({
 //   mode: "TLSN",
@@ -134,7 +162,7 @@ const proof = await prover({
 // });
 
 end();
-console.log(proof);
+// console.log(proof);
 
 // ./fixture/cets/notary.pub
 const pubkey =
