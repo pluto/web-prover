@@ -1,4 +1,5 @@
-use std::{collections::HashMap, io::Write, path::PathBuf, str::FromStr};
+#![feature(internal_output_capture)]
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use circom::CircomCircuit;
 use ff::Field;

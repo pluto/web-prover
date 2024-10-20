@@ -3,6 +3,7 @@ use std::io::Read;
 use flate2::{read::ZlibDecoder, write::ZlibEncoder};
 use proving_ground::supernova::{get_circuit_shapes, AuxParams};
 use serde_json::json;
+use std::io::Write;
 
 use super::*;
 

@@ -168,8 +168,6 @@ async fn generate_program_data(
     "initial_public_input": vec![0; 48],
     "witnesses": vec![vec![F::<G1>::from(0)]],
   });
-
-  // serde_json::from_value(private_input).unwrap()
 }
 
 async fn proxy(config: config::Config, session_id: String) -> (SignBody, WitnessData) {
