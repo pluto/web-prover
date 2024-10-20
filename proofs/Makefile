@@ -40,7 +40,15 @@ circuits: aes
 	# Extract final, ~80K constraints
 	circom web_proof_circuits/extract_value/extract_value.circom --r1cs -o web_proof_circuits/extract_value/ -l node_modules
 	build-circuit web_proof_circuits/extract_value/extract_value.circom web_proof_circuits/extract_value/extract_value.bin -l node_modules
-	# ------------------------------------------------------------------------------------------------------------------------ #
+
+	# Test circuits
+	circom examples/circuit_data/add_external.circom --r1cs -o examples/circuit_data -l node_modules
+	circom examples/circuit_data/square_zeroth.circom --r1cs -o examples/circuit_data -l node_modules
+	circom examples/circuit_data/swap_memory.circom --r1cs -o examples/circuit_data -l node_modules
+
+	build-circuit examples/circuit_data/add_external.circom examples/circuit_data/add_external.bin -l node_modules
+	build-circuit examples/circuit_data/square_zeroth.circom examples/circuit_data/square_zeroth.bin -l node_modules
+	build-circuit examples/circuit_data/swap_memory.circom examples/circuit_data/swap_memory.bin -l node_modules
 
 proof: circuit
 	cargo test --release -- tests::test_end_to_end_proofs --exact --show-output
