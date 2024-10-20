@@ -5,7 +5,7 @@ use circom::CircomCircuit;
 use ff::Field;
 use num_bigint::BigInt;
 use proving_ground::{
-  provider::{hyperkzg::EvaluationEngine, Bn256EngineKZG, GrumpkinEngine},
+  provider::{hyperkzg::EvaluationEngine, Bn256EngineIPA, Bn256EngineKZG, GrumpkinEngine},
   spartan::batched::BatchedRelaxedR1CSSNARK,
   supernova::{snark::CompressedSNARK, PublicParams, TrivialCircuit},
   traits::{Engine, Group},
@@ -24,11 +24,13 @@ pub mod program;
 pub mod proof;
 #[cfg(test)] mod tests;
 
-pub type E1 = Bn256EngineKZG;
+// pub type E1 = Bn256EngineKZG;
+pub type E1 = Bn256EngineIPA;
 pub type E2 = GrumpkinEngine;
 pub type G1 = <E1 as Engine>::GE;
 pub type G2 = <E2 as Engine>::GE;
-pub type EE1 = EvaluationEngine<halo2curves::bn256::Bn256, E1>;
+// pub type EE1 = EvaluationEngine<halo2curves::bn256::Bn256, E1>;
+pub type EE1 = proving_ground::provider::ipa_pc::EvaluationEngine<E1>;
 pub type EE2 = proving_ground::provider::ipa_pc::EvaluationEngine<E2>;
 pub type S1 = BatchedRelaxedR1CSSNARK<E1, EE1>;
 pub type S2 = BatchedRelaxedR1CSSNARK<E2, EE2>;
