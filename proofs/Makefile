@@ -4,10 +4,9 @@
 aes:
 	# AES-GCM, ~500K constraints (for now we need wasm witgen)
 	circom web_proof_circuits/aes_gcm/aes_gcm.circom --r1cs --wasm -o web_proof_circuits/aes_gcm -l node_modules
-
-circuits: aes
 	build-circuit web_proof_circuits/aes_gcm/aes_gcm.circom web_proof_circuits/aes_gcm/aes_gcm.bin -l node_modules
 
+circuits: aes
 	# HTTP parse and lock start line, ~18.6K constraints
 	circom web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.circom \
 		--r1cs -o web_proof_circuits/http_parse_and_lock_start_line -l node_modules
