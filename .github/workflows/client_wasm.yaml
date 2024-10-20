@@ -65,6 +65,13 @@ jobs:
       #      wasm-pack test --firefox
       #      docs: https://rustwasm.github.io/docs/wasm-pack/tutorials/npm-browser-packages/testing-your-project.html
 
+      - name: Setup circom-witnesscalc
+        run: | 
+          git clone https://github.com/iden3/circom-witnesscalc.git
+          cd circom-witnesscalc
+          cargo install --path .
+          echo $(which build-circuit)
+
       - run: |
           cd proofs
           npm install
