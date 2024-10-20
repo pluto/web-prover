@@ -42,7 +42,7 @@ jobs:
 
       - name: Setup circom-witnesscalc
         run: | 
-          git clone https://github.com/iden3/circom-witnesscalc.git
+          cd .. && git clone https://github.com/iden3/circom-witnesscalc.git
           cd circom-witnesscalc
           cargo install --path .
           echo $(which build-circuit)
