@@ -35,26 +35,16 @@ function end() {
   console.log(seconds + " seconds");
 }
 
-const getConstraints = async function (circuits) {
-  let circuit_r1cs = []
-  for (var i = 0; i < circuits.length; i++) {
-    let circuit = circuits[i];
-    const r1csUrl = new URL(`${circuit}.r1cs`, `https://localhost:8090/build/${circuit}/`).toString();
-    const r1cs = await fetch(r1csUrl).then((r) => r.arrayBuffer());
-    circuit_r1cs.push(r1cs);
-  }
-
-  return circuit_r1cs;
+const getConstraints = async function (circuit) {
+  const r1csUrl = new URL(`${circuit}.r1cs`, `https://localhost:8090/build/${circuit}/`).toString();
+  const r1cs = await fetch(r1csUrl).then((r) => r.arrayBuffer());
+  return r1cs;
 }
 
-const getWitnessGenerator = async function (circuits) {
-  let circuit_wasm = []
-  for (var i = 0; i < circuits.length; i++) {
-    let circuit = circuits[i];
-    const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/${circuit}/${circuit}_js/`).toString();
-    const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
-  }
-  return circuit_wasm;
+const getWitnessGenerator = async function (circuit) {
+  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/${circuit}/${circuit}_js/`).toString();
+  const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
+  return wasm;
 }
 
 const getSerializedPublicParams = async function (setupFile) {
@@ -123,7 +113,7 @@ var inputs = [{
 
 // TODO: Configurable identifiers
 // var circuit = "aes_gcm";
-var circuit = ["http_parse_and_lock_start_line", "http_lock_header", "http_body_mask", "json_parse", "json_mask_object", "json_mask_array_index", "extract_value"];
+var circuit = "http_parse_and_lock_start_line"
 var r1cs = await getConstraints(circuit);
 var witnesses = await generateWitnessBytes(inputs);
 var pp = await getSerializedPublicParams("serialized_setup_no_aes");
