@@ -35,16 +35,26 @@ function end() {
   console.log(seconds + " seconds");
 }
 
-const getConstraints = async function (circuit) {
-  const r1csUrl = new URL(`${circuit}.r1cs`, `https://localhost:8090/build/${circuit}/`).toString();
-  const r1cs = await fetch(r1csUrl).then((r) => r.arrayBuffer());
-  return r1cs;
+const getConstraints = async function (circuits) {
+  let circuit_r1cs = []
+  for (var i = 0; i < circuits.length; i++) {
+    let circuit = circuits[i];
+    const r1csUrl = new URL(`${circuit}.r1cs`, `https://localhost:8090/build/${circuit}/`).toString();
+    const r1cs = await fetch(r1csUrl).then((r) => r.arrayBuffer());
+    circuit_r1cs.push(r1cs);
+  }
+
+  return circuit_r1cs;
 }
 
-const getWitnessGenerator = async function (circuit) {
-  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/${circuit}/${circuit}_js/`).toString();
-  const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
-  return wasm;
+const getWitnessGenerator = async function (circuits) {
+  let circuit_wasm = []
+  for (var i = 0; i < circuits.length; i++) {
+    let circuit = circuits[i];
+    const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/${circuit}/${circuit}_js/`).toString();
+    const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
+  }
+  return circuit_wasm;
 }
 
 const getSerializedPublicParams = async function (setupFile) {
@@ -75,21 +85,48 @@ const generateWitnessBytes = async function (inputs) {
 };
 
 // TODO: Migrate this from hardcoded to generated in WASM.
+const DATA_BYTES = 320;
+const MAX_STACK_HEIGHT = 5;
+const PER_ITERATION_DATA_LENGTH = MAX_STACK_HEIGHT * 2 + 2;
+const TOTAL_BYTES_ACROSS_NIVC = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1) + 1;
+let http_response_plaintext = [
+  72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101, 110,
+  116, 45, 116, 121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106,
+  115, 111, 110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13, 10, 99,
+  111, 110, 116, 101, 110, 116, 45, 101, 110, 99, 111, 100, 105, 110, 103, 58, 32, 103, 122, 105,
+  112, 13, 10, 84, 114, 97, 110, 115, 102, 101, 114, 45, 69, 110, 99, 111, 100, 105, 110, 103, 58,
+  32, 99, 104, 117, 110, 107, 101, 100, 13, 10, 13, 10, 123, 13, 10, 32, 32, 32, 34, 100, 97, 116,
+  97, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 34, 105, 116, 101, 109, 115, 34, 58, 32,
+  91, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32,
+  32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34, 65, 114, 116, 105, 115,
+  116, 34, 44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 112, 114,
+  111, 102, 105, 108, 101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+  32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121, 108, 111, 114, 32, 83, 119,
+  105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13,
+  10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 93, 13,
+  10, 32, 32, 32, 125, 13, 10, 125];
+let jsonInput = Array(50).fill(0).concat(http_response_plaintext);
+let extendedJsonInput = jsonInput.concat(Array(Math.max(0, 4160 - jsonInput.length)).fill(0));
 
+console.log(extendedJsonInput);
 
 var inputs = [{
-  "key": [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49],
-  "iv": [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49],
-  "plainText": [116, 101, 115, 116, 104, 101, 108, 108, 111, 48, 48, 48, 48, 48, 48, 48],
-  "aad": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  "step_in": new Array(4160).fill(0),
+  // "key": [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49],
+  // "iv": [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49],
+  // "plainText": [116, 101, 115, 116, 104, 101, 108, 108, 111, 48, 48, 48, 48, 48, 48, 48],
+  // "aad": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "beginning": [72, 84, 84, 80, 47, 49, 46, 49],
+  "middle": [50, 48, 48],
+  "final": [79, 75],
+  "step_in": extendedJsonInput,
 }];
 
 // TODO: Configurable identifiers
-var circuit = "aes_gcm";
+// var circuit = "aes_gcm";
+var circuit = ["http_parse_and_lock_start_line", "http_lock_header", "http_body_mask", "json_parse", "json_mask_object", "json_mask_array_index", "extract_value"];
 var r1cs = await getConstraints(circuit);
 var witnesses = await generateWitnessBytes(inputs);
-var pp = await getSerializedPublicParams("serialized_setup");
+var pp = await getSerializedPublicParams("serialized_setup_no_aes");
 
 start();
 

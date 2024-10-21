@@ -33,6 +33,9 @@ const AES_GCM_GRAPH: &[u8] = include_bytes!("../../web_proof_circuits/aes_gcm/ae
 const HTTP_PARSE_AND_LOCK_START_LINE_R1CS: &[u8] = include_bytes!(
   "../../web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.r1cs"
 );
+const HTTP_PARSE_AND_LOCK_START_LINE_WASM: &str =
+  "../../web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line_js/\
+   http_parse_and_lock_start_line.wasm";
 const HTTP_PARSE_AND_LOCK_START_LINE_GRAPH: &[u8] = include_bytes!(
   "../../web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.bin"
 );
@@ -40,36 +43,48 @@ const HTTP_PARSE_AND_LOCK_START_LINE_GRAPH: &[u8] = include_bytes!(
 // Circuit 2
 const HTTP_LOCK_HEADER_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/http_lock_header/http_lock_header.r1cs");
+const HTTP_LOCK_HEADER_WASM: &str =
+  "../../web_proof_circuits/http_lock_header/http_lock_header_js/http_lock_header.wasm";
 const HTTP_LOCK_HEADER_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/http_lock_header/http_lock_header.bin");
 
 // Circuit 3
 const HTTP_BODY_MASK_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/http_body_mask/http_body_mask.r1cs");
+const HTTP_BODY_MASK_WASM: &str =
+  "../../web_proof_circuits/http_body_mask/http_body_mask_js/http_body_mask.wasm";
+
 const HTTP_BODY_MASK_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/http_body_mask/http_body_mask.bin");
 
 // Circuit 4
 const JSON_PARSE_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/json_parse/json_parse.r1cs");
+const JSON_PARSE_WASM: &str = "../../web_proof_circuits/json_parse/json_parse_js/json_parse.wasm";
 const JSON_PARSE_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/json_parse/json_parse.bin");
 
 // Circuit 5
 const JSON_MASK_OBJECT_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/json_mask_object/json_mask_object.r1cs");
+const JSON_MASK_OBJECT_WASM: &str =
+  "../../web_proof_circuits/json_mask_object/json_mask_object_js/json_mask_object.wasm";
 const JSON_MASK_OBJECT_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/json_mask_object/json_mask_object.bin");
 
 // Circuit 6
 const JSON_MASK_ARRAY_INDEX_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/json_mask_array_index/json_mask_array_index.r1cs");
+const JSON_MASK_ARRAY_WASM: &str =
+  "../../web_proof_circuits/json_mask_array/json_mask_array_js/json_mask_array.wasm";
 const JSON_MASK_ARRAY_INDEX_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/json_mask_array_index/json_mask_array_index.bin");
 
 // circuit 7
 const EXTRACT_VALUE_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/extract_value/extract_value.r1cs");
+const EXTRACT_VALUE_WASM: &str =
+  "../../web_proof_circuits/extract_value/extract_value_js/extract_value.wasm";
 const EXTRACT_VALUE_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/extract_value/extract_value.bin");
 
@@ -308,7 +323,7 @@ fn test_end_to_end_proofs() {
 fn test_offline_proofs() {
   let setup_data = SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+      // R1CSType::Raw(AES_GCM_R1CS.to_vec()),
       R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
       R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
       R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
@@ -318,20 +333,48 @@ fn test_offline_proofs() {
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
       // WitnessGeneratorType::Wasm {
       //   path:      String::from("../proofs/web_proof_circuits/aes_gcm/aes_gcm_js/aes_gcm.wasm"),
       //   wtns_path: String::from("witness.wtns"),
       // },
-      WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_PARSE_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
+      WitnessGeneratorType::Wasm {
+        path:      String::from(HTTP_PARSE_AND_LOCK_START_LINE_WASM),
+        wtns_path: String::from("witness.wtns"),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from(HTTP_LOCK_HEADER_WASM),
+        wtns_path: String::from("witness.wtns"),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from(HTTP_BODY_MASK_WASM),
+        wtns_path: String::from("witness.wtns"),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from(JSON_PARSE_WASM),
+        wtns_path: String::from("witness.wtns"),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from(JSON_MASK_OBJECT_WASM),
+        wtns_path: String::from("witness.wtns"),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from(JSON_MASK_ARRAY_WASM),
+        wtns_path: String::from("witness.wtns"),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from(EXTRACT_VALUE_WASM),
+        wtns_path: String::from("witness.wtns"),
+      },
+      // WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(JSON_PARSE_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
     ],
-    max_rom_length:          35,
+    max_rom_length:          10,
   };
   let public_params = program::setup(&setup_data);
 
@@ -344,5 +387,6 @@ fn test_offline_proofs() {
     inputs: HashMap::new(),
     witnesses: vec![vec![F::<G1>::from(0)]],
   };
-  program_data.into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup.bin").unwrap());
-}
+  program_data
+    .into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup_no_aes.bin").unwrap());
+} // #[test]// fn manifest(
