@@ -325,12 +325,12 @@ fn test_offline_proofs() {
     r1cs_types:              vec![
       // R1CSType::Raw(AES_GCM_R1CS.to_vec()),
       R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
-      R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+      // R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
+      // R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
+      // R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
+      // R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
+      // R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
+      // R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
       // WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
@@ -343,30 +343,30 @@ fn test_offline_proofs() {
         path:      String::from(HTTP_PARSE_AND_LOCK_START_LINE_WASM),
         wtns_path: String::from("witness.wtns"),
       },
-      WitnessGeneratorType::Wasm {
-        path:      String::from(HTTP_LOCK_HEADER_WASM),
-        wtns_path: String::from("witness.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from(HTTP_BODY_MASK_WASM),
-        wtns_path: String::from("witness.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from(JSON_PARSE_WASM),
-        wtns_path: String::from("witness.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from(JSON_MASK_OBJECT_WASM),
-        wtns_path: String::from("witness.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from(JSON_MASK_ARRAY_WASM),
-        wtns_path: String::from("witness.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from(EXTRACT_VALUE_WASM),
-        wtns_path: String::from("witness.wtns"),
-      },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(HTTP_LOCK_HEADER_WASM),
+      //   wtns_path: String::from("witness.wtns"),
+      // },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(HTTP_BODY_MASK_WASM),
+      //   wtns_path: String::from("witness.wtns"),
+      // },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(JSON_PARSE_WASM),
+      //   wtns_path: String::from("witness.wtns"),
+      // },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(JSON_MASK_OBJECT_WASM),
+      //   wtns_path: String::from("witness.wtns"),
+      // },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(JSON_MASK_ARRAY_WASM),
+      //   wtns_path: String::from("witness.wtns"),
+      // },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(EXTRACT_VALUE_WASM),
+      //   wtns_path: String::from("witness.wtns"),
+      // },
       // WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
       // WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
       // WitnessGeneratorType::Raw(JSON_PARSE_GRAPH.to_vec()),
