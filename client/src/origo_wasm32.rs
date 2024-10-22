@@ -30,7 +30,7 @@ use url::Url;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
-use crate::{config, config::ProvingData, errors, origo::SignBody, Proof};
+use crate::{circuits::*, config, config::ProvingData, errors, origo::SignBody, Proof};
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
@@ -94,6 +94,7 @@ async fn generate_program_data(
   // serde_json::to_value(&aad).unwrap());
 
   // TODO: Is padding the approach we want or change to support variable length?
+  let pt = AES_PLAINTEXT.1.to_vec();
   let janky_padding = if pt.len() % 16 != 0 { 16 - pt.len() % 16 } else { 0 };
   let mut janky_plaintext_padding = vec![0; janky_padding];
   let rom_len = (pt.len() + janky_padding) / 16;
@@ -106,17 +107,54 @@ async fn generate_program_data(
 
   let setup_data = SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(proving.r1cs), // TODO: Load more including extractors
+      // R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
+      // R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
+      // R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
+      // R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
+      // R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
+      // R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
-    witness_generator_types: vec![WitnessGeneratorType::Browser],
+    witness_generator_types: vec![
+      WitnessGeneratorType::Browser,
+      WitnessGeneratorType::Wasm {
+        path:      String::from(HTTP_LOCK_HEADER_WASM),
+        wtns_path: String::from("witness.wtns"),
+      },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(HTTP_BODY_MASK_WASM),
+      //   wtns_path: String::from("witness.wtns"),
+      // },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(JSON_PARSE_WASM),
+      //   wtns_path: String::from("witness.wtns"),
+      // },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(JSON_MASK_OBJECT_WASM),
+      //   wtns_path: String::from("witness.wtns"),
+      // },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(JSON_MASK_ARRAY_INDEX_WASM),
+      //   wtns_path: String::from("witness.wtns"),
+      // },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(EXTRACT_VALUE_WASM),
+      //   wtns_path: String::from("witness.wtns"),
+      // },
+    ],
     max_rom_length:          10,
   };
 
   let aes_instr = String::from("AES_GCM_1");
   let rom_data = HashMap::from([
     (aes_instr.clone(), CircuitData { opcode: 0 }),
-    // TODO: Add more opcodes for extraction, determine how a web proof
-    // chooses an extraction
+    (String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 1 }),
+    (String::from("HTTP_LOCK_HEADER_1"), CircuitData { opcode: 2 }),
+    (String::from("HTTP_BODY_EXTRACT"), CircuitData { opcode: 3 }),
+    (String::from("JSON_PARSE"), CircuitData { opcode: 4 }),
+    (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 5 }),
+    (String::from("EXTRACT_VALUE"), CircuitData { opcode: 7 }),
   ]);
 
   let aes_rom_opcode_config = InstructionConfig {
@@ -128,7 +166,42 @@ async fn generate_program_data(
     ]),
   };
 
-  let mut rom = vec![aes_rom_opcode_config; rom_len];
+  // let mut rom = vec![aes_rom_opcode_config; rom_len];
+  let mut rom = vec![];
+  rom.extend([
+    InstructionConfig {
+      name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
+      private_input: HashMap::from([
+        (String::from(HTTP_LOCK_VERSION.0), json!(HTTP_LOCK_VERSION.1)),
+        (String::from(HTTP_LOCK_MESSAGE.0), json!(HTTP_LOCK_MESSAGE.1)),
+        (String::from(HTTP_LOCK_STATUS.0), json!(HTTP_LOCK_STATUS.1)),
+      ]),
+    },
+    // InstructionConfig {
+    //   name:          String::from("HTTP_LOCK_HEADER_1"),
+    //   private_input: HashMap::from([
+    //     (String::from(HTTP_LOCK_HEADER_NAME.0), json!(HTTP_LOCK_HEADER_NAME.1)),
+    //     (String::from(HTTP_LOCK_HEADER_VALUE.0), json!(HTTP_LOCK_HEADER_VALUE.1)),
+    //   ]),
+    // },
+    // InstructionConfig {
+    //   name:          String::from("HTTP_BODY_EXTRACT"),
+    //   private_input: HashMap::new(),
+    // },
+    // InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
+    // InstructionConfig {
+    //   name:          String::from("JSON_MASK_OBJECT_1"),
+    //   private_input: HashMap::from([
+    //     (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
+    //     (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
+    //   ]),
+    // },
+    // InstructionConfig {
+    //   name:          String::from("EXTRACT_VALUE"),
+    //   private_input: HashMap::new(),
+    // },
+  ]);
+
   let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
     value: HashMap::from([(
       String::from("plainText"),
@@ -136,7 +209,7 @@ async fn generate_program_data(
     )]),
   })]);
 
-  let mut initial_input = vec![0; 23]; // default number of step_in.
+  let mut initial_input = vec![0; 50]; // default number of step_in.
   initial_input.extend(janky_plaintext_padding.iter());
   initial_input.resize(4160, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
   let final_input: Vec<u64> = initial_input.into_iter().map(u64::from).collect();
@@ -151,7 +224,7 @@ async fn generate_program_data(
     rom,
     rom_data,
     initial_nivc_input: final_input.to_vec(),
-    inputs,
+    inputs: HashMap::new(),
     witnesses,
   }
   .into_online();

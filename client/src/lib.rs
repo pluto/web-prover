@@ -6,6 +6,7 @@ pub mod origo;
 #[cfg(not(target_arch = "wasm32"))] mod origo_native;
 #[cfg(target_arch = "wasm32")] mod origo_wasm32;
 
+mod circuits;
 pub mod config;
 pub mod errors;
 mod tls;
