@@ -6,15 +6,6 @@ use std::{
 };
 
 use client::{config::Config, errors::ClientErrors};
-use proofs::{
-  compress::CompressedVerifier,
-  program,
-  tests::{
-    ADD_INTO_ZEROTH_GRAPH, ADD_INTO_ZEROTH_R1CS, INIT_PUBLIC_INPUT, ROM, SQUARE_ZEROTH_GRAPH,
-    SQUARE_ZEROTH_R1CS, SWAP_MEMORY_GRAPH, SWAP_MEMORY_R1CS,
-  },
-  ProgramData, R1CSType, WitnessGeneratorType, F, G1, G2,
-};
 use tracing::debug;
 
 #[derive(serde::Serialize)]
