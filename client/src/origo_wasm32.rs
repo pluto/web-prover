@@ -94,7 +94,7 @@ async fn generate_program_data(
   // serde_json::to_value(&aad).unwrap());
 
   // TODO: Is padding the approach we want or change to support variable length?
-  let pt = AES_PLAINTEXT.1.to_vec();
+  // let pt = AES_PLAINTEXT.1.to_vec();
   let janky_padding = if pt.len() % 16 != 0 { 16 - pt.len() % 16 } else { 0 };
   let mut janky_plaintext_padding = vec![0; janky_padding];
   let rom_len = (pt.len() + janky_padding) / 16;
@@ -107,9 +107,10 @@ async fn generate_program_data(
 
   let setup_data = SetupData {
     r1cs_types:              vec![
+      R1CSType::Raw(AES_GCM_FOLD_R1CS.to_vec()),
       // R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
+      // R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
+      // R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
       // R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
       // R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
       // R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
@@ -118,10 +119,10 @@ async fn generate_program_data(
     ],
     witness_generator_types: vec![
       WitnessGeneratorType::Browser,
-      WitnessGeneratorType::Wasm {
-        path:      String::from(HTTP_LOCK_HEADER_WASM),
-        wtns_path: String::from("witness.wtns"),
-      },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(HTTP_LOCK_HEADER_WASM),
+      //   wtns_path: String::from("witness.wtns"),
+      // },
       // WitnessGeneratorType::Wasm {
       //   path:      String::from(HTTP_BODY_MASK_WASM),
       //   wtns_path: String::from("witness.wtns"),
@@ -166,41 +167,41 @@ async fn generate_program_data(
     ]),
   };
 
-  // let mut rom = vec![aes_rom_opcode_config; rom_len];
-  let mut rom = vec![];
-  rom.extend([
-    InstructionConfig {
-      name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
-      private_input: HashMap::from([
-        (String::from(HTTP_LOCK_VERSION.0), json!(HTTP_LOCK_VERSION.1)),
-        (String::from(HTTP_LOCK_MESSAGE.0), json!(HTTP_LOCK_MESSAGE.1)),
-        (String::from(HTTP_LOCK_STATUS.0), json!(HTTP_LOCK_STATUS.1)),
-      ]),
-    },
-    // InstructionConfig {
-    //   name:          String::from("HTTP_LOCK_HEADER_1"),
-    //   private_input: HashMap::from([
-    //     (String::from(HTTP_LOCK_HEADER_NAME.0), json!(HTTP_LOCK_HEADER_NAME.1)),
-    //     (String::from(HTTP_LOCK_HEADER_VALUE.0), json!(HTTP_LOCK_HEADER_VALUE.1)),
-    //   ]),
-    // },
-    // InstructionConfig {
-    //   name:          String::from("HTTP_BODY_EXTRACT"),
-    //   private_input: HashMap::new(),
-    // },
-    // InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
-    // InstructionConfig {
-    //   name:          String::from("JSON_MASK_OBJECT_1"),
-    //   private_input: HashMap::from([
-    //     (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
-    //     (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
-    //   ]),
-    // },
-    // InstructionConfig {
-    //   name:          String::from("EXTRACT_VALUE"),
-    //   private_input: HashMap::new(),
-    // },
-  ]);
+  let mut rom = vec![aes_rom_opcode_config; rom_len];
+  // let mut rom = vec![];
+  // rom.extend([
+  // InstructionConfig {
+  //   name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
+  //   private_input: HashMap::from([
+  //     (String::from(HTTP_LOCK_VERSION.0), json!(HTTP_LOCK_VERSION.1)),
+  //     (String::from(HTTP_LOCK_MESSAGE.0), json!(HTTP_LOCK_MESSAGE.1)),
+  //     (String::from(HTTP_LOCK_STATUS.0), json!(HTTP_LOCK_STATUS.1)),
+  //   ]),
+  // },
+  // InstructionConfig {
+  //   name:          String::from("HTTP_LOCK_HEADER_1"),
+  //   private_input: HashMap::from([
+  //     (String::from(HTTP_LOCK_HEADER_NAME.0), json!(HTTP_LOCK_HEADER_NAME.1)),
+  //     (String::from(HTTP_LOCK_HEADER_VALUE.0), json!(HTTP_LOCK_HEADER_VALUE.1)),
+  //   ]),
+  // },
+  // InstructionConfig {
+  //   name:          String::from("HTTP_BODY_EXTRACT"),
+  //   private_input: HashMap::new(),
+  // },
+  // InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
+  // InstructionConfig {
+  //   name:          String::from("JSON_MASK_OBJECT_1"),
+  //   private_input: HashMap::from([
+  //     (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
+  //     (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
+  //   ]),
+  // },
+  // InstructionConfig {
+  //   name:          String::from("EXTRACT_VALUE"),
+  //   private_input: HashMap::new(),
+  // },
+  // ]);
 
   let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
     value: HashMap::from([(
@@ -216,28 +217,29 @@ async fn generate_program_data(
 
   // TODO: Load this from a file. Run this in preprocessing step.
   debug!("generating public params");
-  // let public_params = program::setup(&setup_data);
+  let public_params = program::setup(&setup_data);
 
-  let pd = ProgramData::<Offline, NotExpanded> {
-    public_params: proving.serialized_pp,
-    setup_data,
-    rom,
-    rom_data,
-    initial_nivc_input: final_input.to_vec(),
-    inputs: HashMap::new(),
-    witnesses,
-  }
-  .into_online();
-
-  // let pd = ProgramData::<Online, NotExpanded> {
-  //   public_params,
+  // let pd = ProgramData::<Offline, NotExpanded> {
+  //   public_params: proving.serialized_pp,
   //   setup_data,
   //   rom,
   //   rom_data,
   //   initial_nivc_input: final_input.to_vec(),
-  //   inputs,
+  //   inputs: HashMap::new(),
   //   witnesses,
-  // };
+  // }
+  // .into_online();
+
+  let pd = ProgramData::<Online, NotExpanded> {
+    public_params,
+    setup_data,
+    rom,
+    rom_data,
+    // initial_nivc_input: final_input.to_vec(),
+    initial_nivc_input: vec![0; 48],
+    inputs,
+    witnesses,
+  };
 
   debug!("online -> expanded");
   pd.into_expanded()

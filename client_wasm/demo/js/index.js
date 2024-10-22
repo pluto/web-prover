@@ -101,19 +101,24 @@ let extendedJsonInput = jsonInput.concat(Array(Math.max(0, 4160 - jsonInput.leng
 console.log(extendedJsonInput);
 
 var inputs = [{
-  // "key": [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49],
-  // "iv": [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49],
-  // "plainText": [116, 101, 115, 116, 104, 101, 108, 108, 111, 48, 48, 48, 48, 48, 48, 48],
-  // "aad": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  "beginning": [72, 84, 84, 80, 47, 49, 46, 49],
-  "middle": [50, 48, 48],
-  "final": [79, 75],
-  "step_in": extendedJsonInput,
+  "key": [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49],
+  "iv": [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49],
+  "plainText": [116, 101, 115, 116, 104, 101, 108, 108, 111, 48, 48, 48, 48, 48, 48, 48],
+  "aad": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "step_in": [
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  ]
+  // "beginning": [72, 84, 84, 80, 47, 49, 46, 49],
+  // "middle": [50, 48, 48],
+  // "final": [79, 75],
+  // "step_in": extendedJsonInput,
 }];
 
 // TODO: Configurable identifiers
 // var circuit = "aes_gcm";
-var circuit = "http_parse_and_lock_start_line"
+var circuit = "aes_gcm_fold";
 var r1cs = await getConstraints(circuit);
 var witnesses = await generateWitnessBytes(inputs);
 var pp = await getSerializedPublicParams("serialized_setup_no_aes");
