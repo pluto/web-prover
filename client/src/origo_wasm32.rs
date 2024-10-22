@@ -217,29 +217,30 @@ async fn generate_program_data(
 
   // TODO: Load this from a file. Run this in preprocessing step.
   debug!("generating public params");
-  let public_params = program::setup(&setup_data);
+  // let public_params = program::setup(&setup_data);
 
-  // let pd = ProgramData::<Offline, NotExpanded> {
-  //   public_params: proving.serialized_pp,
-  //   setup_data,
-  //   rom,
-  //   rom_data,
-  //   initial_nivc_input: final_input.to_vec(),
-  //   inputs: HashMap::new(),
-  //   witnesses,
-  // }
-  // .into_online();
-
-  let pd = ProgramData::<Online, NotExpanded> {
-    public_params,
+  let pd = ProgramData::<Offline, NotExpanded> {
+    public_params: proving.serialized_pp,
     setup_data,
     rom,
     rom_data,
     // initial_nivc_input: final_input.to_vec(),
     initial_nivc_input: vec![0; 48],
-    inputs,
+    inputs: HashMap::new(),
     witnesses,
-  };
+  }
+  .into_online();
+
+  // let pd = ProgramData::<Online, NotExpanded> {
+  //   public_params,
+  //   setup_data,
+  //   rom,
+  //   rom_data,
+  //   // initial_nivc_input: final_input.to_vec(),
+  //   initial_nivc_input: vec![0; 48],
+  //   inputs,
+  //   witnesses,
+  // };
 
   debug!("online -> expanded");
   pd.into_expanded()
