@@ -14,6 +14,7 @@ use utils::into_input_json;
 use super::*;
 
 pub mod data;
+pub mod manifest;
 pub mod utils;
 
 pub struct Memory {

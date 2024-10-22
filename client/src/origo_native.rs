@@ -121,10 +121,19 @@ async fn generate_program_data(
   janky_plaintext_padding.extend(pt);
 
   let aes_instr = String::from("AES_GCM_1");
+  // TODO: prepare rom data from manifest
   let rom_data = HashMap::from([
-    (aes_instr.clone(), CircuitData { opcode: 0 }),
-    // TODO: Add more opcodes for extraction, determine how a web proof
-    // chooses an extraction
+    (String::from("AES_GCM_1"), CircuitData { opcode: 0 }),
+    (String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 1 }),
+    (String::from("HTTP_LOCK_HEADER_1"), CircuitData { opcode: 2 }),
+    (String::from("HTTP_BODY_EXTRACT"), CircuitData { opcode: 3 }),
+    (String::from("JSON_PARSE"), CircuitData { opcode: 4 }),
+    (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 5 }),
+    (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 5 }),
+    (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 6 }),
+    (String::from("JSON_MASK_OBJECT_4"), CircuitData { opcode: 5 }),
+    (String::from("JSON_MASK_OBJECT_5"), CircuitData { opcode: 5 }),
+    (String::from("EXTRACT_VALUE"), CircuitData { opcode: 7 }),
   ]);
 
   let aes_rom_opcode_config = InstructionConfig {
@@ -136,7 +145,10 @@ async fn generate_program_data(
     ]),
   };
 
+  // TODO: update rom from manifest
   let rom = vec![aes_rom_opcode_config; rom_len];
+
+  // TODO: update fold input from manifest
   let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
     value: HashMap::from([(
       String::from("plainText"),

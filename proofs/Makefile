@@ -50,7 +50,7 @@ circuits: aes
 	build-circuit examples/circuit_data/square_zeroth.circom examples/circuit_data/square_zeroth.bin -l node_modules
 	build-circuit examples/circuit_data/swap_memory.circom examples/circuit_data/swap_memory.bin -l node_modules
 
-proof: circuit
+proof: circuits
 	cargo test --release -- tests::test_end_to_end_proofs --exact --show-output
 
 params:
