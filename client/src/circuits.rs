@@ -16,6 +16,11 @@ pub const AES_PLAINTEXT: (&str, [u8; 320]) = ("plainText", [
   10, 32, 32, 32, 125, 13, 10, 125,
 ]);
 
+pub const AES_GCM_FOLD_R1CS: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/aes_gcm_fold/aes_gcm_fold.r1cs");
+pub const AES_GCM_WASM: &str =
+  "../../proofs/web_proof_circuits/aes_gcm_fold/aes_gcm_fold_js/aes_gcm_fold.wasm";
+
 // Circuit 0
 pub const AES_GCM_R1CS: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/aes_gcm/aes_gcm.r1cs");
