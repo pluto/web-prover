@@ -1,13 +1,14 @@
+use std::str::FromStr;
+
 use bellpepper_core::{
   boolean::{AllocatedBit, Boolean},
   LinearCombination,
 };
-use circom::CircomInput;
 use itertools::Itertools;
 use num_bigint::BigInt;
-use serde_json::json;
 
 use super::*;
+use crate::circom::CircomInput;
 
 #[allow(clippy::type_complexity)]
 pub fn next_rom_index_and_pc<CS: ConstraintSystem<F<G1>>>(
@@ -55,7 +56,8 @@ pub fn next_rom_index_and_pc<CS: ConstraintSystem<F<G1>>>(
     allocated_rom
       .get(next_rom_index)
       .and_then(|v| v.get_value())
-      .unwrap_or(allocated_rom.get(current_rom_index).unwrap().get_value().unwrap())
+      .and_then(|value| if value == F::<G1>::from(u64::MAX) { None } else { Some(value) })
+      .unwrap_or_else(|| allocated_rom.get(current_rom_index).unwrap().get_value().unwrap())
   });
 
   Ok((rom_index_next, pc_next))
@@ -109,42 +111,6 @@ pub fn get_selector_vec_from_index<CS: ConstraintSystem<F<G1>>>(
   Ok(selector)
 }
 
-// TODO: This may not be the best now that we have variable rom and stuff, but I replaced the
-// `num_folds` with `rom.len()` as a simple patch
-// This function NEEDS reworked, but we should just rethink how we prep inputs for this stuff
-// anyway, so I'm leaving this as tech debt, sorry.
-pub fn map_private_inputs(program_data: &ProgramData) -> Vec<HashMap<String, Value>> {
-  let mut private_inputs: Vec<HashMap<String, Value>> = Vec::new();
-  match program_data.private_input.get("fold_input") {
-    None =>
-    // TODO: This is dumb and really only makes the `tests::test_run` pass. This is inadvisable to
-    // actually use!
-      for _ in 0..program_data.rom.len() {
-        private_inputs.push(program_data.private_input.clone());
-      },
-
-    Some(fold_input) =>
-      for i in 0..program_data.rom.len() {
-        let mut map = program_data.private_input.clone();
-        map.remove("fold_input");
-
-        for (key, values) in fold_input.as_object().unwrap() {
-          let batch_size = values.as_array().unwrap().len() / program_data.rom.len();
-          info!("key: {}, batch size: {}", key, batch_size);
-          for val in values.as_array().unwrap().chunks(batch_size).skip(i).take(1) {
-            let mut data: Vec<Value> = Vec::new();
-            for individual in val {
-              data.push(individual.clone());
-            }
-            map.insert(key.clone(), json!(data));
-          }
-        }
-        private_inputs.push(map);
-      },
-  }
-  private_inputs
-}
-
 pub fn into_input_json(public_input: &[F<G1>], private_input: &HashMap<String, Value>) -> String {
   let decimal_stringified_input: Vec<String> = public_input
     .iter()
@@ -155,18 +121,21 @@ pub fn into_input_json(public_input: &[F<G1>], private_input: &HashMap<String, V
   serde_json::to_string(&input).unwrap()
 }
 
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  #[tracing_test::traced_test]
-  fn test_map_private_inputs() {
-    let read = std::fs::read("examples/parse_batch_wc.json").unwrap();
-    let circuit_data: ProgramData = serde_json::from_slice(&read).unwrap();
-
-    let inputs = map_private_inputs(&circuit_data);
-    assert_eq!(inputs.len(), 4);
-    assert_eq!(inputs[0].get("data").unwrap().as_array().unwrap().len(), 40);
+pub fn remap_inputs(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
+  let circom_input: CircomInput = serde_json::from_str(input_json).unwrap();
+  let mut remapped = vec![];
+  remapped.push((
+    "step_in".to_string(),
+    circom_input.step_in.into_iter().map(|s| BigInt::from_str(&s).unwrap()).collect(),
+  ));
+  for (k, v) in circom_input.extra {
+    let val = v
+      .as_array()
+      .unwrap()
+      .iter()
+      .map(|x| BigInt::from_str(&x.as_number().unwrap().to_string()).unwrap())
+      .collect::<Vec<BigInt>>();
+    remapped.push((k, val));
   }
+  remapped
 }

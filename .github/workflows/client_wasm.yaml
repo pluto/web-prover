@@ -32,22 +32,55 @@ jobs:
       - run: rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
         if: matrix.os == 'macos-latest'
 
-      - name: Install LLVM and Clang to support 'ring' crate
+      - run: sudo apt install -y protobuf-compiler
+        if: matrix.os == 'ubuntu-latest'
+
+      - name: Install LLVM and Clang to support 'ring' crate and protobuf
         if: matrix.os == 'macos-latest'
         run: |
           brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
           echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
+          brew install protobuf
 
       - uses: Swatinem/rust-cache@v2
         with:
           cache-directories: |
             /Users/runner/Library/Caches/.wasm-pack
+      
+      - name: Download Circom (linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: | 
+          CIRCOM_VERSION=2.1.9
+          curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-linux-amd64 -o circom
+          chmod +x circom
+          sudo mv circom /usr/local/bin/
+          circom --version
+
+      - name: Download Circom (macos)
+        if: matrix.os == 'macos-latest'
+        run: |
+          CIRCOM_VERSION=2.1.9
+          curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-macos-amd64 -o circom
+          chmod +x circom
+          sudo mv circom /usr/local/bin/
+          circom --version
 
       # TODO run automated tests?
       #      wasm-pack test --firefox
       #      docs: https://rustwasm.github.io/docs/wasm-pack/tutorials/npm-browser-packages/testing-your-project.html
 
+      - name: Setup circom-witnesscalc
+        run: | 
+          cd .. && git clone https://github.com/iden3/circom-witnesscalc.git
+          cd circom-witnesscalc
+          cargo install --path .
+          echo $(which build-circuit)
+
       - run: |
+          cd proofs
+          npm install
+          make aes
+          cd ..
           echo "$PATH"
           echo "$GITHUB_PATH"
           make wasm

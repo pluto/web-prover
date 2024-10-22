@@ -1,4 +1,3 @@
-use ff::PrimeField;
 use fs::OpenOptions;
 
 use super::*;
@@ -162,6 +161,7 @@ fn read_constraints<R: Read>(mut reader: R, header: &Header) -> Vec<Constraint> 
   }
   vec
 }
+
 // TODO: This is only used for the wiremap which we don't currently use
 // fn read_map<R: Read>(mut reader: R, size: u64, header: &Header) -> Vec<u64> {
 //   assert_eq!(size, header.n_wires as u64 * 8);
@@ -177,25 +177,15 @@ fn read_constraints<R: Read>(mut reader: R, header: &Header) -> Vec<Constraint> 
 mod tests {
   use super::*;
 
-  const PARSE_FOLD_R1CS: &[u8] =
-    include_bytes!("../../examples/circuit_data/parse_fold_batch.r1cs");
-  const AES_FOLD_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/aes-gcm-fold.r1cs");
+  const ADD_EXTERNAL_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/add_external.r1cs");
 
   #[test]
   #[tracing_test::traced_test]
   fn test_r1cs_from_bin() {
-    let r1cs = R1CS::from(PARSE_FOLD_R1CS);
-    assert_eq!(r1cs.num_public_inputs, 6);
-    assert_eq!(r1cs.num_private_inputs, 40);
-  }
-
-  #[test]
-  #[tracing_test::traced_test]
-  fn test_r1cs_from_bin_aes_fold() {
-    let r1cs = R1CS::from(AES_FOLD_R1CS);
-    assert_eq!(r1cs.num_inputs, 97);
-    assert_eq!(r1cs.num_private_inputs, 60);
-    assert_eq!(r1cs.num_public_inputs, 48);
-    assert_eq!(r1cs.num_public_outputs, 48);
+    let r1cs = R1CS::from(ADD_EXTERNAL_R1CS);
+    assert_eq!(r1cs.num_inputs, 5); // TODO: What is the 5th input??
+    assert_eq!(r1cs.num_private_inputs, 2);
+    assert_eq!(r1cs.num_public_inputs, 2);
+    assert_eq!(r1cs.num_public_outputs, 2);
   }
 }

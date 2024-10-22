@@ -1,15 +1,18 @@
 wasm:
 	@# NOTE: This build depends on RUSTFLAGS in the client_wasm/.cargo/config.toml
 	-cargo install wasm-pack
-	-cd client_wasm/demo/static && ln -s ../../../proofs/examples/circuit_data build && cd ../../..
+	-cd client_wasm/demo/static && rm -f build && ln -s ../../../proofs/web_proof_circuits build && cd ../../..
 	cd client_wasm && \
 	  PATH="/opt/homebrew/opt/llvm@18/bin:/opt/homebrew/opt/llvm/bin:$$PATH" \
 	  rustup run nightly ~/.cargo/bin/wasm-pack build --release --target web ./ -- \
 	    -Z build-std=panic_abort,std
 
-wasm-debug:
+params:
+	cd proofs && make params
+
+wasm-debug: params
 	-cargo install wasm-pack
-	-cd client_wasm/demo/static && ln -s ../../../proofs/examples/circuit_data build && cd ../../..
+	-cd client_wasm/demo/static && rm -f build && ln -s ../../../proofs/web_proof_circuits build && cd ../../..
 	cd client_wasm && \
 	  PATH="/opt/homebrew/opt/llvm@18/bin:opt/homebrew/opt/llvm/bin:$$PATH" \
 	  rustup run nightly ~/.cargo/bin/wasm-pack build --debug --target web ./ -- \

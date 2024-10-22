@@ -34,3 +34,20 @@ To generate witness using wasm binary, just modify these keys in [setup](./setup
 ```
 
 > [!NOTE] `witness_calculator.js` is assumed to be in the same directory as wasm bin.
+
+
+## WASM note
+
+- run `test_offline_proof` to generate serialized public params using:
+```
+cargo test --release -- tests::test_offline_proofs --exact --show-output
+```
+
+- run notary:
+```
+RUST_LOG=debug cargo run --release -p notary -- --config ./fixture/notary-config.toml
+```
+
+- run `make wasm` or `make wasm-debug` (for better stacktraces in wasm (really necessary to debug))
+- run `make wasm-demo`
+- open `localhost:8090` and check console
