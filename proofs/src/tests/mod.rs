@@ -25,6 +25,8 @@ const MAX_ROM_LENGTH: usize = 10; // TODO: This should be able to be longer
 // JSON Proof Material
 const JSON_MAX_ROM_LENGTH: usize = 35;
 
+const AES_GCM_FOLD_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/aes_gcm_fold/aes_gcm_fold.r1cs");
 // Circuit 0
 const AES_GCM_R1CS: &[u8] = include_bytes!("../../web_proof_circuits/aes_gcm/aes_gcm.r1cs");
 const AES_GCM_GRAPH: &[u8] = include_bytes!("../../web_proof_circuits/aes_gcm/aes_gcm.bin");
@@ -323,8 +325,9 @@ fn test_end_to_end_proofs() {
 fn test_offline_proofs() {
   let setup_data = SetupData {
     r1cs_types:              vec![
+      R1CSType::Raw(AES_GCM_FOLD_R1CS.to_vec()),
       // R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
+      // R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
       // R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
       // R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
       // R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
@@ -333,16 +336,22 @@ fn test_offline_proofs() {
       // R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
+      WitnessGeneratorType::Wasm {
+        path:      String::from(
+          "../proofs/web_proof_circuits/aes_gcm_fold/aes_gcm_fold_js/aes_gcm_fold.wasm",
+        ),
+        wtns_path: "witness.wtns".to_string(),
+      },
       // WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
       // WitnessGeneratorType::Wasm {
       //   path:      String::from("../proofs/web_proof_circuits/aes_gcm/aes_gcm_js/aes_gcm.wasm"),
       //   wtns_path: String::from("witness.wtns"),
       // },
       // WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
-      WitnessGeneratorType::Wasm {
-        path:      String::from(HTTP_PARSE_AND_LOCK_START_LINE_WASM),
-        wtns_path: String::from("witness.wtns"),
-      },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(HTTP_PARSE_AND_LOCK_START_LINE_WASM),
+      //   wtns_path: String::from("witness.wtns"),
+      // },
       // WitnessGeneratorType::Wasm {
       //   path:      String::from(HTTP_LOCK_HEADER_WASM),
       //   wtns_path: String::from("witness.wtns"),
