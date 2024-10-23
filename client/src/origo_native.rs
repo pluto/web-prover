@@ -82,11 +82,6 @@ async fn generate_program_data(
   let mut padded_aad = vec![0; 16 - aad.len()];
   padded_aad.extend(aad);
 
-  // this somehow needs to be nested in this hashmap of values to be under another key called
-  // "fold_input" private_input.insert("plainText".to_string(),
-  // serde_json::to_value(&pt).unwrap()); private_input.insert("aad".to_string(),
-  // serde_json::to_value(&aad).unwrap());
-
   // TODO: Is padding the approach we want or change to support variable length?
   let janky_padding = if pt.len() % 16 != 0 { 16 - pt.len() % 16 } else { 0 };
   let mut janky_plaintext_padding = vec![0; janky_padding];
@@ -138,7 +133,7 @@ async fn generate_program_data(
   // TODO: Load this from a file. Run this in preprocessing step.
   let public_params = program::setup(&setup_data);
 
-  return ProgramData::<Online, NotExpanded> {
+  ProgramData::<Online, NotExpanded> {
     public_params,
     setup_data,
     rom,
@@ -147,34 +142,7 @@ async fn generate_program_data(
     inputs,
     witnesses: vec![vec![F::<G1>::from(0)]],
   }
-  .into_expanded();
-
-  // TODO (Colin): This code path is never actually hit. I'm tempted to just remove it, but won't in
-  // this commit.
-  // #[cfg(all(target_os = "ios", target_arch = "aarch64"))]
-  // let private_input = json!({
-  //   "private_input": {
-  //     "key": sized_key,
-  //     "iv": sized_iv,
-  //     "fold_input": {
-  //       "plainText": janky_plaintext_padding,
-  //     },
-  //     "aad": padded_aad,
-  //   },
-  //   "r1cs_types": [{
-  //     "raw": proving.r1cs
-  //   }],
-  //   "witness_generator_types": [
-  //     {
-  //       "mobile": {
-  //         "circuit": "aes-gcm-fold"
-  //       }
-  //     }
-  //   ],
-  //   "rom": vec![0; rom_len],
-  //   "initial_public_input": vec![0; 48],
-  //   "witnesses": vec![vec![F::<G1>::from(0)]],
-  // });
+  .into_expanded()
 }
 
 async fn proxy(config: config::Config, session_id: String) -> (SignBody, WitnessData) {
