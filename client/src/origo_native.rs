@@ -24,13 +24,10 @@ use tracing::debug;
 
 use crate::{config, config::ProvingData, errors, origo::SignBody, Proof};
 
-const AES_GCM_FOLD_R1CS: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/aes_gcm/aes_gcm.r1cs");
 // TODO (Colin): This was not needed and wasm really shouldn't be needed in `origo_native` version
 // of proving.
 // const AES_GCM_FOLD_WASM: &str =
 // "proofs/web_proof_circuits/aes_gcm/aes_gcm_js/aes_gcm.wasm";
-const AES_GCM_GRAPH: &[u8] = include_bytes!("../../proofs/web_proof_circuits/aes_gcm/aes_gcm.bin");
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
@@ -51,22 +48,16 @@ async fn generate_program_data(
   witness: &WitnessData,
   proving: ProvingData,
 ) -> ProgramData<Online, Expanded> {
+  // ----------------------------------------------------------------------------------------------------------------------- //
+  // - get AES key, IV, request ciphertext, request plaintext, and AAD -
   debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
   debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
 
-  let key: &[u8] = &witness.request.aes_key;
-  let iv: &[u8] = &witness.request.aes_iv;
-
-  let mut private_input = HashMap::new();
-
+  let key: [u8; 16] = witness.request.aes_key[..16].try_into().unwrap();
+  let iv: [u8; 12] = witness.request.aes_iv[..12].try_into().unwrap();
   let ct: &[u8] = witness.request.ciphertext.as_bytes();
-  let sized_key: [u8; 16] = key[..16].try_into().unwrap();
-  let sized_iv: [u8; 12] = iv[..12].try_into().unwrap();
 
-  private_input.insert("key".to_string(), serde_json::to_value(&sized_key).unwrap());
-  private_input.insert("iv".to_string(), serde_json::to_value(&sized_iv).unwrap());
-
-  let dec = Decrypter2::new(sized_key, sized_iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
+  let dec = Decrypter2::new(key, iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
   let (plaintext, meta) = dec
     .decrypt_tls13_aes(
       &OpaqueMessage {
@@ -81,25 +72,53 @@ async fn generate_program_data(
   let aad = hex::decode(meta.additional_data.to_owned()).unwrap();
   let mut padded_aad = vec![0; 16 - aad.len()];
   padded_aad.extend(aad);
+  // ----------------------------------------------------------------------------------------------------------------------- //
+
+  // TODO (Colin): ultimately we want to download the `AuxParams` here and deserialize to setup
+  // `PublicParams` alongside of calling `proving_ground::supernova::get_circuit_shapes` for this
+  // next step
+  // ----------------------------------------------------------------------------------------------------------------------- //
+  // - create program setup (creating new `PublicParams` each time, for the moment) -
+  let setup_data = SetupData {
+    r1cs_types:              vec![
+      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
+      R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
+      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+    ],
+    witness_generator_types: vec![
+      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_PARSE_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
+    ],
+    max_rom_length:          MAX_ROM_LENGTH,
+  };
+
+  debug!("Setting up `PublicParams`... (this may take a moment)");
+  let public_params = program::setup(&setup_data);
+  debug!("Created `PublicParams`!");
+  // ----------------------------------------------------------------------------------------------------------------------- //
+
+  // ----------------------------------------------------------------------------------------------------------------------- //
+  // - construct private inputs and program layout for AES proof -
+  let mut private_input = HashMap::new();
+  private_input.insert("key".to_string(), serde_json::to_value(&key).unwrap());
+  private_input.insert("iv".to_string(), serde_json::to_value(&iv).unwrap());
 
   // TODO: Is padding the approach we want or change to support variable length?
   let janky_padding = if pt.len() % 16 != 0 { 16 - pt.len() % 16 } else { 0 };
   let mut janky_plaintext_padding = vec![0; janky_padding];
   let rom_len = (pt.len() + janky_padding) / 16;
   janky_plaintext_padding.extend(pt);
-
-  let setup_data = SetupData {
-    r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_FOLD_R1CS.to_vec()), // TODO: Load more including extractors
-    ],
-    witness_generator_types: vec![WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec())],
-    // TODO (Colin): Note, this below witgen works as well, but witnesscalc is outperforming, so I
-    // am leaving it as the default use at the moment.
-    // witness_generator_types:
-    // vec![WitnessGeneratorType::Mobile {   circuit: "aes-gcm-fold".to_string(),
-    // }],
-    max_rom_length:          20,
-  };
 
   let aes_instr = String::from("AES_GCM_1");
   let rom_data = HashMap::from([
@@ -111,8 +130,8 @@ async fn generate_program_data(
   let aes_rom_opcode_config = InstructionConfig {
     name:          aes_instr.clone(),
     private_input: HashMap::from([
-      (String::from("key"), json!(sized_key)),
-      (String::from("iv"), json!(sized_iv)),
+      (String::from("key"), json!(key)),
+      (String::from("iv"), json!(iv)),
       (String::from("aad"), json!(padded_aad)),
     ]),
   };
@@ -125,13 +144,11 @@ async fn generate_program_data(
     )]),
   })]);
 
-  let mut initial_input = vec![0; 23]; // default number of step_in.
+  let mut initial_input = vec![0; 23]; // default number of step_in for AES
   initial_input.extend(janky_plaintext_padding.iter());
   initial_input.resize(4160, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
   let final_input: Vec<u64> = initial_input.into_iter().map(u64::from).collect();
-
-  // TODO: Load this from a file. Run this in preprocessing step.
-  let public_params = program::setup(&setup_data);
+  // ----------------------------------------------------------------------------------------------------------------------- //
 
   ProgramData::<Online, NotExpanded> {
     public_params,
@@ -264,3 +281,53 @@ async fn proxy(config: config::Config, session_id: String) -> (SignBody, Witness
 
   (sb, witness)
 }
+
+// -------------------------------------------------------------------------------------------------------------- //
+// - Circuits used for native web proof demo -
+// TODO (Colin): Likely we want to load these over the web instead of loading them directly into the
+// binary, but this sufficies for now.
+const MAX_ROM_LENGTH: usize = 35;
+// Circuit 0
+const AES_GCM_R1CS: &[u8] = include_bytes!("../../proofs/web_proof_circuits/aes_gcm/aes_gcm.r1cs");
+const AES_GCM_GRAPH: &[u8] = include_bytes!("../../proofs/web_proof_circuits/aes_gcm/aes_gcm.bin");
+// Circuit 1
+const HTTP_PARSE_AND_LOCK_START_LINE_R1CS: &[u8] = include_bytes!(
+  "../../proofs/web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.\
+   r1cs"
+);
+const HTTP_PARSE_AND_LOCK_START_LINE_GRAPH: &[u8] = include_bytes!(
+  "../../proofs/web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.\
+   bin"
+);
+// Circuit 2
+const HTTP_LOCK_HEADER_R1CS: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/http_lock_header/http_lock_header.r1cs");
+const HTTP_LOCK_HEADER_GRAPH: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/http_lock_header/http_lock_header.bin");
+// Circuit 3
+const HTTP_BODY_MASK_R1CS: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/http_body_mask/http_body_mask.r1cs");
+const HTTP_BODY_MASK_GRAPH: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/http_body_mask/http_body_mask.bin");
+// Circuit 4
+const JSON_PARSE_R1CS: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/json_parse/json_parse.r1cs");
+const JSON_PARSE_GRAPH: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/json_parse/json_parse.bin");
+// Circuit 5
+const JSON_MASK_OBJECT_R1CS: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/json_mask_object/json_mask_object.r1cs");
+const JSON_MASK_OBJECT_GRAPH: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/json_mask_object/json_mask_object.bin");
+// Circuit 6
+const JSON_MASK_ARRAY_INDEX_R1CS: &[u8] = include_bytes!(
+  "../../proofs/web_proof_circuits/json_mask_array_index/json_mask_array_index.r1cs"
+);
+const JSON_MASK_ARRAY_INDEX_GRAPH: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/json_mask_array_index/json_mask_array_index.bin");
+// circuit 7
+const EXTRACT_VALUE_R1CS: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/extract_value/extract_value.r1cs");
+const EXTRACT_VALUE_GRAPH: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/extract_value/extract_value.bin");
+// -------------------------------------------------------------------------------------------------------------- //
