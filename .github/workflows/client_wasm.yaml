@@ -1,12 +1,14 @@
 name: client_wasm
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
-    branches:
-      - "**"
+    branches: [ "main" ]
   pull_request:
-    branches:
-      - main
+    branches: [ "main" ]
 
 jobs:
   build:
@@ -46,10 +48,10 @@ jobs:
         with:
           cache-directories: |
             /Users/runner/Library/Caches/.wasm-pack
-      
+
       - name: Download Circom (linux)
         if: matrix.os == 'ubuntu-latest'
-        run: | 
+        run: |
           CIRCOM_VERSION=2.1.9
           curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-linux-amd64 -o circom
           chmod +x circom
@@ -70,7 +72,7 @@ jobs:
       #      docs: https://rustwasm.github.io/docs/wasm-pack/tutorials/npm-browser-packages/testing-your-project.html
 
       - name: Setup circom-witnesscalc
-        run: | 
+        run: |
           cd .. && git clone https://github.com/iden3/circom-witnesscalc.git
           cd circom-witnesscalc
           cargo install --path .

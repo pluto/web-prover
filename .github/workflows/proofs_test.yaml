@@ -1,13 +1,14 @@
 name: tests/proofs
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
   pull_request:
-    branches:
-      - main
-
+    branches: [ "main" ]
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -35,14 +36,14 @@ jobs:
         circom --version
 
     - name: Setup circom-witnesscalc
-      run: | 
+      run: |
         cd .. && git clone https://github.com/pluto/circom-witnesscalc.git
         cd circom-witnesscalc
         cargo install --path .
         echo $(which build-circuit)
 
     - name: Run tests
-      run: |  
+      run: |
         cd proofs
         npm install
         make circuits
