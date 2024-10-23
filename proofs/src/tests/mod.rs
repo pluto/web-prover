@@ -326,6 +326,7 @@ fn test_end_to_end_proofs() {
 
 #[test]
 #[tracing_test::traced_test]
+#[ignore]
 fn test_offline_proofs() {
   let setup_data = SetupData {
     r1cs_types:              vec![

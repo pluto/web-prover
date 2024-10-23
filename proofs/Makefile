@@ -54,4 +54,4 @@ proof: circuits
 	cargo test --release -- tests::test_end_to_end_proofs --exact --show-output
 
 params:
-	cargo test --release -- tests::test_offline_proofs --exact --show-output
+	cargo test --release -- tests::test_offline_proofs --exact --show-output --ignored
