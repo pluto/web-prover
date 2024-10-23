@@ -1,5 +1,7 @@
 //! This test module is effectively testing a static (comptime) circuit dispatch supernova program
 
+// TODO: (Colin): I'm noticing this module could use some TLC. There's a lot of lint here!
+
 use flate2::write::ZlibEncoder;
 use program::data::{CircuitData, InstructionConfig};
 use proving_ground::supernova::RecursiveSNARK;
@@ -136,6 +138,8 @@ const JSON_MASK_KEYLEN_DEPTH_4: (&str, [u8; 1]) = ("keyLen", [7]);
 const JSON_MASK_KEY_DEPTH_5: (&str, [u8; 10]) = ("key", [110, 97, 109, 101, 0, 0, 0, 0, 0, 0]); // "name"
 const JSON_MASK_KEYLEN_DEPTH_5: (&str, [u8; 1]) = ("keyLen", [4]);
 
+// TODO (Colin): This test requires JSON parse between all the JSON steps. REMOVE THIS REDUNDANCY
+// USING NEW CIRCUITS!
 #[test]
 #[tracing_test::traced_test]
 fn test_end_to_end_proofs() {
