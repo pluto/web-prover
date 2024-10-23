@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::program::data::{CircuitData, InstructionConfig, ProgramData};
+use crate::program::data::{CircuitData, InstructionConfig};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -12,12 +12,12 @@ pub enum Key {
   Num(usize),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct ResponseBody {
   json: Vec<Key>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Response {
   status:  String,
   version: String,
@@ -26,7 +26,7 @@ pub struct Response {
   body:    ResponseBody,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Request {
   method:  String,
   url:     String,
@@ -34,7 +34,7 @@ pub struct Request {
   headers: HashMap<String, String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Manifest {
   pub request:  Request,
   pub response: Response,
@@ -53,11 +53,12 @@ const JSON_MAX_KEY_LENGTH: usize = 10;
 const JSON_MASK_ARRAY_SIGNAL_NAME: &str = "index";
 
 impl Manifest {
-  /// generates [`ProgramData::rom_data`] and [`ProgramData::rom`] from [`Request`]
-  fn rom_from_request(
+  /// generates [`ProgramData::rom_data`] and [`ProgramData::rom`] from [`Manifest::request`]
+  pub fn rom_from_request(
     &self,
     opcode_start: u64,
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>) {
+    // http parse circuit
     let mut rom_data =
       HashMap::from([(String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData {
         opcode: opcode_start + 1,
@@ -77,6 +78,8 @@ impl Manifest {
         ),
       ]),
     }];
+
+    // headers
     for (i, (header_name, header_value)) in self.request.headers.iter().enumerate() {
       // pad name and value with zeroes
       let mut header_name_padded = [0u8; HTTP_HEADER_MAX_NAME_LENGTH];
@@ -99,10 +102,12 @@ impl Manifest {
     (rom_data, rom)
   }
 
-  fn rom_from_response(
+  /// generates ROM from [`Manifest::response`]
+  pub fn rom_from_response(
     &self,
     opcode_start: u64,
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>) {
+    // http parse
     let mut rom_data =
       HashMap::from([(String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData {
         opcode: opcode_start + 1,
@@ -124,6 +129,8 @@ impl Manifest {
         ),
       ]),
     }];
+
+    // headers
     for (i, (header_name, header_value)) in self.response.headers.iter().enumerate() {
       // pad name and value with zeroes
       let mut header_name_padded = [0u8; HTTP_HEADER_MAX_NAME_LENGTH];
@@ -142,18 +149,21 @@ impl Manifest {
       });
     }
 
+    // http body
     rom_data.insert(String::from("HTTP_BODY_EXTRACT"), CircuitData { opcode: opcode_start + 3 });
     rom.push(InstructionConfig {
       name:          String::from("HTTP_BODY_EXTRACT"),
       private_input: HashMap::new(),
     });
 
+    // json parse
     rom_data.insert(String::from("JSON_PARSE"), CircuitData { opcode: opcode_start + 4 });
     rom.push(InstructionConfig {
       name:          String::from("JSON_PARSE"),
       private_input: HashMap::new(),
     });
 
+    // json keys
     for (i, key) in self.response.body.json.iter().enumerate() {
       match key {
         Key::String(json_key) => {
@@ -185,6 +195,7 @@ impl Manifest {
       }
     }
 
+    // final extraction
     rom_data.insert(String::from("EXTRACT_VALUE"), CircuitData { opcode: opcode_start + 7 });
     rom.push(InstructionConfig {
       name:          String::from("EXTRACT_VALUE"),
