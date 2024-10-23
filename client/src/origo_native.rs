@@ -26,7 +26,10 @@ use crate::{config, config::ProvingData, errors, origo::SignBody, Proof};
 
 const AES_GCM_FOLD_R1CS: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/aes_gcm/aes_gcm.r1cs");
-const AES_GCM_FOLD_WASM: &str = "proofs/web_proof_circuits/aes_gcm/aes_gcm_js/aes_gcm.wasm";
+// TODO (Colin): This was not needed and wasm really shouldn't be needed in `origo_native` version
+// of proving.
+// const AES_GCM_FOLD_WASM: &str =
+// "proofs/web_proof_circuits/aes_gcm/aes_gcm_js/aes_gcm.wasm";
 const AES_GCM_GRAPH: &[u8] = include_bytes!("../../proofs/web_proof_circuits/aes_gcm/aes_gcm.bin");
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
@@ -94,10 +97,12 @@ async fn generate_program_data(
     r1cs_types:              vec![
       R1CSType::Raw(AES_GCM_FOLD_R1CS.to_vec()), // TODO: Load more including extractors
     ],
-    witness_generator_types: vec![WitnessGeneratorType::Wasm {
-      path:      AES_GCM_FOLD_WASM.to_string(),
-      wtns_path: String::from("witness.wtns"),
-    }],
+    witness_generator_types: vec![WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec())],
+    // TODO (Colin): Note, this below witgen works as well, but witnesscalc is outperforming, so I
+    // am leaving it as the default use at the moment.
+    // witness_generator_types:
+    // vec![WitnessGeneratorType::Mobile {   circuit: "aes-gcm-fold".to_string(),
+    // }],
     max_rom_length:          20,
   };
 
@@ -144,30 +149,32 @@ async fn generate_program_data(
   }
   .into_expanded();
 
-  #[cfg(all(target_os = "ios", target_arch = "aarch64"))]
-  let private_input = json!({
-    "private_input": {
-      "key": sized_key,
-      "iv": sized_iv,
-      "fold_input": {
-        "plainText": janky_plaintext_padding,
-      },
-      "aad": padded_aad,
-    },
-    "r1cs_types": [{
-      "raw": proving.r1cs
-    }],
-    "witness_generator_types": [
-      {
-        "mobile": {
-          "circuit": "aes-gcm-fold"
-        }
-      }
-    ],
-    "rom": vec![0; rom_len],
-    "initial_public_input": vec![0; 48],
-    "witnesses": vec![vec![F::<G1>::from(0)]],
-  });
+  // TODO (Colin): This code path is never actually hit. I'm tempted to just remove it, but won't in
+  // this commit.
+  // #[cfg(all(target_os = "ios", target_arch = "aarch64"))]
+  // let private_input = json!({
+  //   "private_input": {
+  //     "key": sized_key,
+  //     "iv": sized_iv,
+  //     "fold_input": {
+  //       "plainText": janky_plaintext_padding,
+  //     },
+  //     "aad": padded_aad,
+  //   },
+  //   "r1cs_types": [{
+  //     "raw": proving.r1cs
+  //   }],
+  //   "witness_generator_types": [
+  //     {
+  //       "mobile": {
+  //         "circuit": "aes-gcm-fold"
+  //       }
+  //     }
+  //   ],
+  //   "rom": vec![0; rom_len],
+  //   "initial_public_input": vec![0; 48],
+  //   "witnesses": vec![vec![F::<G1>::from(0)]],
+  // });
 }
 
 async fn proxy(config: config::Config, session_id: String) -> (SignBody, WitnessData) {
