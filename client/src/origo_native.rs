@@ -29,6 +29,8 @@ use crate::{config, config::ProvingData, errors, origo::SignBody, Proof};
 // const AES_GCM_FOLD_WASM: &str =
 // "proofs/web_proof_circuits/aes_gcm/aes_gcm_js/aes_gcm.wasm";
 
+const JSON_MAX_ROM_LENGTH: usize = 35;
+
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
   let (sb, witness) = proxy(config.clone(), session_id.clone()).await;
@@ -81,7 +83,7 @@ async fn generate_program_data(
   // - create program setup (creating new `PublicParams` each time, for the moment) -
   let setup_data = SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+      R1CSType::Raw(AES_GCM_FOLD_R1CS.to_vec()),
       R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
       R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
       R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
@@ -119,22 +121,11 @@ async fn generate_program_data(
   let mut janky_plaintext_padding = vec![0; janky_padding];
   let rom_len = (pt.len() + janky_padding) / 16;
   janky_plaintext_padding.extend(pt);
+  let (manifest_rom_data, mut manifest_rom) = proving.manifest.rom_from_request(0);
 
   let aes_instr = String::from("AES_GCM_1");
-  // TODO: prepare rom data from manifest
-  let rom_data = HashMap::from([
-    (String::from("AES_GCM_1"), CircuitData { opcode: 0 }),
-    (String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 1 }),
-    (String::from("HTTP_LOCK_HEADER_1"), CircuitData { opcode: 2 }),
-    (String::from("HTTP_BODY_EXTRACT"), CircuitData { opcode: 3 }),
-    (String::from("JSON_PARSE"), CircuitData { opcode: 4 }),
-    (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 5 }),
-    (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 5 }),
-    (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 6 }),
-    (String::from("JSON_MASK_OBJECT_4"), CircuitData { opcode: 5 }),
-    (String::from("JSON_MASK_OBJECT_5"), CircuitData { opcode: 5 }),
-    (String::from("EXTRACT_VALUE"), CircuitData { opcode: 7 }),
-  ]);
+  let mut rom_data = HashMap::from([(aes_instr.clone(), CircuitData { opcode: 0 })]);
+  // rom_data.extend(manifest_rom_data);
 
   let aes_rom_opcode_config = InstructionConfig {
     name:          aes_instr.clone(),
@@ -145,8 +136,8 @@ async fn generate_program_data(
     ]),
   };
 
-  // TODO: update rom from manifest
-  let rom = vec![aes_rom_opcode_config; rom_len];
+  let mut rom = vec![aes_rom_opcode_config; rom_len];
+  // rom.append(&mut manifest_rom);
 
   // TODO: update fold input from manifest
   let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
