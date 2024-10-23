@@ -81,7 +81,7 @@ jobs:
       - run: |
           cd proofs
           npm install
-          make aes
+          make circuits
           cd ..
           echo "$PATH"
           echo "$GITHUB_PATH"
