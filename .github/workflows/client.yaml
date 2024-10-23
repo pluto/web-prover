@@ -2,11 +2,9 @@ name: client
 
 on:
   push:
-    branches:
-      - "**"
+    branches: [ "main" ]
   pull_request:
-    branches:
-      - main
+    branches: [ "main" ]
 
 jobs:
   test:
@@ -58,7 +56,7 @@ jobs:
           circom --version
 
       - name: Setup circom-witnesscalc
-        run: | 
+        run: |
           cd .. && git clone https://github.com/iden3/circom-witnesscalc.git
           cd circom-witnesscalc
           cargo install --path .
@@ -68,7 +66,7 @@ jobs:
           cd proofs
           npm install
           make aes
-          cd .. 
+          cd ..
           RUST_LOG=DEBUG cargo run --release -p notary -- --config ./fixture/notary-config.toml &
           sleep 30
           NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer cargo run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json

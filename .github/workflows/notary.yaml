@@ -2,11 +2,9 @@ name: notary
 
 on:
   push:
-    branches:
-      - "**"
+    branches: [ "main" ]
   pull_request:
-    branches:
-      - main
+    branches: [ "main" ]
 
 jobs:
   build:

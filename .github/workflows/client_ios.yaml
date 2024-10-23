@@ -2,11 +2,9 @@ name: client_ios
 
 on:
   push:
-    branches:
-      - "**"
+    branches: [ "main" ]
   pull_request:
-    branches:
-      - main
+    branches: [ "main" ]
 
 jobs:
   build:
@@ -33,7 +31,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Download Circom (macos)
-        run: | 
+        run: |
           CIRCOM_VERSION=2.1.9
           curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-macos-amd64 -o circom
           chmod +x circom
@@ -41,12 +39,12 @@ jobs:
           circom --version
 
       - name: Setup circom-witnesscalc
-        run: | 
+        run: |
           cd .. && git clone https://github.com/iden3/circom-witnesscalc.git
           cd circom-witnesscalc
           cargo install --path .
           echo $(which build-circuit)
-      
+
       - run: |
           cd proofs
           npm install
