@@ -26,20 +26,20 @@ jobs:
       - name: Set up cache key
         id: cache-key
         run: |
-          # Find all circuit source files (adjust the pattern if needed)
-          circuit_files=$(find proofs/web_proof_circuits -type f -name '*.circom' -o -name '*.json')
-          # Generate a hash based on their content
-          content_hash=$(echo "$circuit_files" | xargs cat | sha256sum | cut -d' ' -f1)
-          echo "key=circuit-cache-${{ matrix.os }}-${content_hash}" >> $GITHUB_ENV
+          echo "circuit_key=circuit-cache-${{ hashFiles('proofs/**/*.circom') }}" >> $GITHUB_ENV
 
       - name: Cache Circuits
         id: circuit-cache
         uses: actions/cache@v3
         with:
-          path: proofs/web_proof_circuits/  # Path where generated files are stored
-          key: circuit-cache-${{ matrix.os }}-${{ env.key }}
+          path: |
+            proofs/web_proof_circuits/  # Path where generated files are stored
+            examples/
+            ~/.cargo/bin/build-circuit # Example binary from witnesscalc setup
+            ~/.cargo/bin/calc-witness
+          key: ${{ env.circuit_key }}
           restore-keys: |
-            circuit-cache-${{ matrix.os }}-
+            circuit-cache-
 
       - run: rustup toolchain install nightly --profile minimal --no-self-update
 
@@ -60,7 +60,7 @@ jobs:
           brew install protobuf
 
       - name: Download Circom (linux)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'macos-latest' && steps.circuit-cache.outputs.cache-hit != 'true'
         run: |
           CIRCOM_VERSION=2.1.9
           curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-linux-amd64 -o circom
@@ -69,7 +69,7 @@ jobs:
           circom --version
 
       - name: Download Circom (macos)
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && steps.circuit-cache.outputs.cache-hit != 'true'
         run: |
           CIRCOM_VERSION=2.1.9
           curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-macos-amd64 -o circom
@@ -78,6 +78,7 @@ jobs:
           circom --version
 
       - name: Setup circom-witnesscalc
+        if: steps.circuit-cache.outputs.cache-hit != 'true'
         run: |
           cd .. && git clone https://github.com/iden3/circom-witnesscalc.git
           cd circom-witnesscalc
@@ -89,7 +90,7 @@ jobs:
         run: |
           cd proofs
           npm install
-          make aes
+          make circuits
           cd ..
 
       - run: |
