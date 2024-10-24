@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [self-hosted, macos-latest]
 
     name: client on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -26,13 +26,13 @@ jobs:
       - run: rustup toolchain install nightly --profile minimal --no-self-update
 
       - run: rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'self-hosted'
 
       - run: rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
         if: matrix.os == 'macos-latest'
 
       - run: sudo apt install -y protobuf-compiler
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'self-hosted'
 
       - name: Install LLVM and Clang to support 'ring' crate and protobuf
         if: matrix.os == 'macos-latest'
@@ -42,7 +42,7 @@ jobs:
           brew install protobuf
 
       - name: Download Circom (linux)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'self-hosted'
         run: |
           CIRCOM_VERSION=2.1.9
           curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-linux-amd64 -o circom
@@ -61,7 +61,7 @@ jobs:
 
       - name: Setup circom-witnesscalc
         run: |
-          cd .. && git clone https://github.com/pluto/circom-witnesscalc.git
+          cd .. && rm -rf circom-witnesscalc; git clone https://github.com/pluto/circom-witnesscalc.git
           cd circom-witnesscalc
           cargo install --path .
           echo $(which build-circuit)
