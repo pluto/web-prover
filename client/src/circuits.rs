@@ -23,10 +23,10 @@ pub const AES_GCM_WASM: &str =
 
 // TODO (sambhav): add these circuits later
 // Circuit 0
-// pub const AES_GCM_R1CS: &[u8] =
-//   include_bytes!("../../proofs/web_proof_circuits/aes_gcm/aes_gcm.r1cs");
-// pub const AES_GCM_GRAPH: &[u8] =
-//   include_bytes!("../../proofs/web_proof_circuits/aes_gcm/aes_gcm.bin");
+pub const AES_GCM_R1CS: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/aes_gcm/aes_gcm.r1cs");
+pub const AES_GCM_GRAPH: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/aes_gcm/aes_gcm.bin");
 
 // // Circuit 1
 // pub const HTTP_PARSE_AND_LOCK_START_LINE_R1CS: &[u8] = include_bytes!(
