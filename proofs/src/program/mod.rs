@@ -211,6 +211,7 @@ pub fn compress_proof(
   recursive_snark: &RecursiveSNARK<E1>,
   public_params: &PublicParams<E1>,
 ) -> Proof<CompressedSNARK<E1, S1, S2>> {
+  debug!("Generating `CompressedSNARK`");
   let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(public_params).unwrap();
 
   // Optionally time the `CompressedSNARK` creation
@@ -219,6 +220,7 @@ pub fn compress_proof(
 
   let proof =
     Proof(CompressedSNARK::<E1, S1, S2>::prove(public_params, &pk, recursive_snark).unwrap());
+  debug!("`CompressedSNARK::prove completed!");
 
   #[cfg(feature = "timing")]
   trace!("`CompressedSNARK::prove` of `program::run()` elapsed: {:?}", time.elapsed());

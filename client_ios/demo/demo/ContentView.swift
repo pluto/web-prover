@@ -124,7 +124,8 @@ struct ContentView: View {
                             },
                             "target_method": "\(localMethod)",
                             "target_url": "\(localUrl)",
-                            "proving": {"r1cs": [\(arrayString)], "witnesses": [{"val":[]}]}}
+                            "proving": {"r1cs": [\(arrayString)], "witnesses": [{"val":[]}], "serialized_pp": []}
+                        }
                         """
                        
                        // NOTE: Witness generation happen in the library for ios

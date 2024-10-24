@@ -43,12 +43,12 @@ pub fn remap_inputs(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
 }
 
 #[cfg(all(target_os = "ios", target_arch = "aarch64"))]
-rust_witness::witness!(aesgcmfold);
+rust_witness::witness!(aesgcm);
 
 pub fn aes_gcm_fold_wrapper(input_json: &str) -> Vec<F<G1>> {
   #[cfg(all(target_os = "ios", target_arch = "aarch64"))]
   {
-    let r = aesgcmfold_witness(remap_inputs(input_json))
+    let r = aesgcm_witness(remap_inputs(input_json))
       .into_iter()
       .map(|bigint| F::<G1>::from_str_vartime(&bigint.to_string()).unwrap())
       .collect();
