@@ -33,8 +33,8 @@ jobs:
         uses: actions/cache@v3
         with:
           path: |
-            proofs/web_proof_circuits/  # Path where generated files are stored
-            examples/
+            proofs/web_proof_circuits/**  # Path where generated files are stored
+            examples/**
             ~/.cargo/bin/build-circuit # Example binary from witnesscalc setup
             ~/.cargo/bin/calc-witness
           key: ${{ env.circuit_key }}
@@ -60,7 +60,7 @@ jobs:
           brew install protobuf
 
       - name: Download Circom (linux)
-        if: matrix.os == 'ubuntu-latest' && steps.circuit-cache.outputs.cache-hit != 'true'
+        if: matrix.os == 'ubuntu-latest'
         run: |
           CIRCOM_VERSION=2.1.9
           curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-linux-amd64 -o circom
@@ -69,7 +69,7 @@ jobs:
           circom --version
 
       - name: Download Circom (macos)
-        if: matrix.os == 'macos-latest' && steps.circuit-cache.outputs.cache-hit != 'true'
+        if: matrix.os == 'macos-latest'
         run: |
           CIRCOM_VERSION=2.1.9
           curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-macos-amd64 -o circom
