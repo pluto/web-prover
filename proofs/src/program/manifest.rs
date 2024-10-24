@@ -85,7 +85,7 @@ const HTTP_HEADER_SIGNAL_VALUE: &str = "value";
 const HTTP_HEADER_MAX_NAME_LENGTH: usize = 20;
 const HTTP_HEADER_MAX_VALUE_LENGTH: usize = 35;
 const JSON_MASK_OBJECT_KEY_NAME: &str = "key";
-const JSON_MASK_OBEJCT_KEYLEN_NAME: &str = "keyLen";
+const JSON_MASK_OBJECT_KEYLEN_NAME: &str = "keyLen";
 const JSON_MAX_KEY_LENGTH: usize = 10;
 const JSON_MASK_ARRAY_SIGNAL_NAME: &str = "index";
 
@@ -214,7 +214,7 @@ impl Manifest {
             name:          format!("JSON_MASK_OBJECT_{}", i + 1),
             private_input: HashMap::from([
               (String::from(JSON_MASK_OBJECT_KEY_NAME), json!(json_key_padded)),
-              (String::from(JSON_MASK_OBEJCT_KEYLEN_NAME), json!([json_key.len()])),
+              (String::from(JSON_MASK_OBJECT_KEYLEN_NAME), json!([json_key.len()])),
             ]),
           });
         },
