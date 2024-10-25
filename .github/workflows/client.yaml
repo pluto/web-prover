@@ -41,6 +41,11 @@ jobs:
           echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
           brew install protobuf
 
+      - name: Download prebuilt web-prover-circuits artifact
+        run: |
+          curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/latest/download/circom-artifacts.zip
+          unzip -o circuits.zip -d proofs/web_proof_circuits
+
       - name: Download Circom (linux)
         if: matrix.os == 'self-hosted'
         run: |
@@ -69,7 +74,7 @@ jobs:
       - run: |
           cd proofs
           npm install
-          make circuits
+          make test-circuits
           cd ..
           RUST_LOG=DEBUG cargo run --release -p notary -- --config ./fixture/notary-config.toml &
           sleep 30

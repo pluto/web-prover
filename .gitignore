@@ -28,3 +28,6 @@ client/.rustc_info.json
 client_ios/headers/libclient_ios.h
 client_wasm/demo/static/build
 client_ios/demo/demo.xcodeproj/project.xcworkspace/xcuserdata/*.xcuserdatad/UserInterfaceState.xcuserstate
+
+# artifacts zipfile
+*.zip
