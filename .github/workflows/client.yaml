@@ -41,6 +41,10 @@ jobs:
           echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
           brew install protobuf
 
+      - name: Install unzip (linux)
+        if: matrix.os == 'self-hosted'
+        run: sudo apt install unzip -y
+
       - name: Download prebuilt web-prover-circuits artifact
         run: |
           curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/latest/download/circom-artifacts.zip
