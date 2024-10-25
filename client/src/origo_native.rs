@@ -22,12 +22,9 @@ use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::O
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
-use crate::{config, config::ProvingData, errors, origo::SignBody, Proof};
+use crate::{circuits::*, config, config::ProvingData, errors, origo::SignBody, Proof};
 
-// TODO (Colin): This was not needed and wasm really shouldn't be needed in `origo_native` version
-// of proving.
-// const AES_GCM_FOLD_WASM: &str =
-// "proofs/web_proof_circuits/aes_gcm/aes_gcm_js/aes_gcm.wasm";
+const JSON_MAX_ROM_LENGTH: usize = 35;
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
@@ -100,7 +97,7 @@ async fn generate_program_data(
       WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
     ],
-    max_rom_length:          MAX_ROM_LENGTH,
+    max_rom_length:          JSON_MAX_ROM_LENGTH,
   };
 
   debug!("Setting up `PublicParams`... (this may take a moment)");
@@ -121,11 +118,9 @@ async fn generate_program_data(
   janky_plaintext_padding.extend(pt);
 
   let aes_instr = String::from("AES_GCM_1");
-  let rom_data = HashMap::from([
-    (aes_instr.clone(), CircuitData { opcode: 0 }),
-    // TODO: Add more opcodes for extraction, determine how a web proof
-    // chooses an extraction
-  ]);
+  // TODO (Sambhav): Add more opcodes for extraction, determine how a web proof chooses an
+  // extraction
+  let rom_data = HashMap::from([(aes_instr.clone(), CircuitData { opcode: 0 })]);
 
   let aes_rom_opcode_config = InstructionConfig {
     name:          aes_instr.clone(),
@@ -137,6 +132,8 @@ async fn generate_program_data(
   };
 
   let rom = vec![aes_rom_opcode_config; rom_len];
+
+  // TODO (Sambhav): update fold input from manifest
   let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
     value: HashMap::from([(
       String::from("plainText"),
@@ -281,53 +278,3 @@ async fn proxy(config: config::Config, session_id: String) -> (SignBody, Witness
 
   (sb, witness)
 }
-
-// -------------------------------------------------------------------------------------------------------------- //
-// - Circuits used for native web proof demo -
-// TODO (Colin): Likely we want to load these over the web instead of loading them directly into the
-// binary, but this sufficies for now.
-const MAX_ROM_LENGTH: usize = 35;
-// Circuit 0
-const AES_GCM_R1CS: &[u8] = include_bytes!("../../proofs/web_proof_circuits/aes_gcm/aes_gcm.r1cs");
-const AES_GCM_GRAPH: &[u8] = include_bytes!("../../proofs/web_proof_circuits/aes_gcm/aes_gcm.bin");
-// Circuit 1
-const HTTP_PARSE_AND_LOCK_START_LINE_R1CS: &[u8] = include_bytes!(
-  "../../proofs/web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.\
-   r1cs"
-);
-const HTTP_PARSE_AND_LOCK_START_LINE_GRAPH: &[u8] = include_bytes!(
-  "../../proofs/web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.\
-   bin"
-);
-// Circuit 2
-const HTTP_LOCK_HEADER_R1CS: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/http_lock_header/http_lock_header.r1cs");
-const HTTP_LOCK_HEADER_GRAPH: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/http_lock_header/http_lock_header.bin");
-// Circuit 3
-const HTTP_BODY_MASK_R1CS: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/http_body_mask/http_body_mask.r1cs");
-const HTTP_BODY_MASK_GRAPH: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/http_body_mask/http_body_mask.bin");
-// Circuit 4
-const JSON_PARSE_R1CS: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/json_parse/json_parse.r1cs");
-const JSON_PARSE_GRAPH: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/json_parse/json_parse.bin");
-// Circuit 5
-const JSON_MASK_OBJECT_R1CS: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/json_mask_object/json_mask_object.r1cs");
-const JSON_MASK_OBJECT_GRAPH: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/json_mask_object/json_mask_object.bin");
-// Circuit 6
-const JSON_MASK_ARRAY_INDEX_R1CS: &[u8] = include_bytes!(
-  "../../proofs/web_proof_circuits/json_mask_array_index/json_mask_array_index.r1cs"
-);
-const JSON_MASK_ARRAY_INDEX_GRAPH: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/json_mask_array_index/json_mask_array_index.bin");
-// circuit 7
-const EXTRACT_VALUE_R1CS: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/extract_value/extract_value.r1cs");
-const EXTRACT_VALUE_GRAPH: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/extract_value/extract_value.bin");
-// -------------------------------------------------------------------------------------------------------------- //

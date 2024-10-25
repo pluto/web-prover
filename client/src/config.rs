@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use base64::prelude::*;
 use http_body_util::Full;
 use hyper::{body::Bytes, Request};
+use proofs::program::manifest::Manifest;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -25,7 +26,9 @@ pub struct ProvingData {
   pub witnesses:     Vec<Witness>,
   #[serde(with = "serde_bytes")]
   pub serialized_pp: Vec<u8>,
+  pub manifest:      Option<Manifest>,
 }
+
 #[derive(Deserialize, Clone, Debug)]
 pub struct Config {
   pub mode:                NotaryMode,
