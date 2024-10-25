@@ -35,13 +35,13 @@ pub enum Key {
 }
 
 /// JSON keys: `["a", "b", 0, "c"]`
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ResponseBody {
   json: Vec<Key>,
 }
 
 /// HTTP Response items required for circuits
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Response {
   /// HTTP response status
   status:  String,
@@ -56,7 +56,7 @@ pub struct Response {
 }
 
 /// HTTP Request items required for circuits
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Request {
   /// HTTP method (GET or POST)
   method:  String,
@@ -69,7 +69,7 @@ pub struct Request {
 }
 
 /// Manifest containing [`Request`] and [`Response`]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Manifest {
   /// HTTP request lock items
   pub request:  Request,
@@ -90,7 +90,8 @@ const JSON_MAX_KEY_LENGTH: usize = 10;
 const JSON_MASK_ARRAY_SIGNAL_NAME: &str = "index";
 
 impl Manifest {
-  /// generates [`ProgramData::rom_data`] and [`ProgramData::rom`] from [`Manifest::request`]
+  /// generates [`crate::program::ProgramData::rom_data`] and [`crate::program::ProgramData::rom`]
+  /// from [`Manifest::request`]
   pub fn rom_from_request(
     &self,
     opcode_start: u64,
