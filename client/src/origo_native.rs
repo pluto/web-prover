@@ -22,14 +22,7 @@ use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::O
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
-use crate::{
-  circuits::{AES_GCM_GRAPH, AES_GCM_R1CS},
-  config,
-  config::ProvingData,
-  errors,
-  origo::SignBody,
-  Proof,
-};
+use crate::{circuits::*, config, config::ProvingData, errors, origo::SignBody, Proof};
 
 const JSON_MAX_ROM_LENGTH: usize = 35;
 
@@ -86,25 +79,25 @@ async fn generate_program_data(
   let setup_data = SetupData {
     r1cs_types:              vec![
       R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      // R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
-      // R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
-      // R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
-      // R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
-      // R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-      // R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-      // R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
+      R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
+      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
       WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(JSON_PARSE_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_PARSE_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
     ],
-    max_rom_length:          20,
+    max_rom_length:          JSON_MAX_ROM_LENGTH,
   };
 
   debug!("Setting up `PublicParams`... (this may take a moment)");
@@ -123,11 +116,11 @@ async fn generate_program_data(
   let mut janky_plaintext_padding = vec![0; janky_padding];
   let rom_len = (pt.len() + janky_padding) / 16;
   janky_plaintext_padding.extend(pt);
-  let (manifest_rom_data, mut manifest_rom) = proving.manifest.rom_from_request(0);
 
   let aes_instr = String::from("AES_GCM_1");
-  let mut rom_data = HashMap::from([(aes_instr.clone(), CircuitData { opcode: 0 })]);
-  // rom_data.extend(manifest_rom_data);
+  // TODO (Sambhav): Add more opcodes for extraction, determine how a web proof chooses an
+  // extraction
+  let rom_data = HashMap::from([(aes_instr.clone(), CircuitData { opcode: 0 })]);
 
   let aes_rom_opcode_config = InstructionConfig {
     name:          aes_instr.clone(),
@@ -138,8 +131,7 @@ async fn generate_program_data(
     ]),
   };
 
-  let mut rom = vec![aes_rom_opcode_config; rom_len];
-  // rom.append(&mut manifest_rom);
+  let rom = vec![aes_rom_opcode_config; rom_len];
 
   // TODO (Sambhav): update fold input from manifest
   let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
