@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [self-hosted, macos-latest]
+        os: [ubuntu-latest, macos-latest]
 
     name: client on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -26,13 +26,17 @@ jobs:
       - run: rustup toolchain install nightly --profile minimal --no-self-update
 
       - run: rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
-        if: matrix.os == 'self-hosted'
+        if: matrix.os == 'ubuntu-latest'
 
       - run: rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
         if: matrix.os == 'macos-latest'
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
       - run: sudo apt install -y protobuf-compiler
-        if: matrix.os == 'self-hosted'
+        if: matrix.os == 'ubuntu-latest'
 
       - name: Install LLVM and Clang to support 'ring' crate and protobuf
         if: matrix.os == 'macos-latest'
@@ -42,7 +46,7 @@ jobs:
           brew install protobuf
 
       - name: Install unzip (linux)
-        if: matrix.os == 'self-hosted'
+        if: matrix.os == 'ubuntu-latest'
         run: sudo apt install unzip -y
 
       - name: Download prebuilt web-prover-circuits artifact

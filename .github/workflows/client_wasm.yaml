@@ -48,6 +48,7 @@ jobs:
         with:
           cache-directories: |
             /Users/runner/Library/Caches/.wasm-pack
+          cache-on-failure: true
 
       - name: Install unzip (linux)
         if: matrix.os == 'ubuntu-latest'

@@ -38,6 +38,8 @@ jobs:
           unzip -o circuits.zip -d proofs/web_proof_circuits
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
       - name: compile iOS
         run: |
