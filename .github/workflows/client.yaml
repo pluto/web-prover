@@ -50,36 +50,7 @@ jobs:
           curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/latest/download/circom-artifacts.zip
           unzip -o circuits.zip -d proofs/web_proof_circuits
 
-      - name: Download Circom (linux)
-        if: matrix.os == 'self-hosted'
-        run: |
-          CIRCOM_VERSION=2.1.9
-          curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-linux-amd64 -o circom
-          chmod +x circom
-          sudo mv circom /usr/local/bin/
-          circom --version
-
-      - name: Download Circom (macos)
-        if: matrix.os == 'macos-latest'
-        run: |
-          CIRCOM_VERSION=2.1.9
-          curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-macos-amd64 -o circom
-          chmod +x circom
-          sudo mv circom /usr/local/bin/
-          circom --version
-
-      - name: Setup circom-witnesscalc
-        run: |
-          cd .. && rm -rf circom-witnesscalc; git clone https://github.com/pluto/circom-witnesscalc.git
-          cd circom-witnesscalc
-          cargo install --path .
-          echo $(which build-circuit)
-
       - run: |
-          cd proofs
-          npm install
-          make test-circuits
-          cd ..
           RUST_LOG=DEBUG cargo run --release -p notary -- --config ./fixture/notary-config.toml &
           sleep 30
           NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer cargo run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
