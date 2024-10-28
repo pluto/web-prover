@@ -48,43 +48,23 @@ jobs:
         with:
           cache-directories: |
             /Users/runner/Library/Caches/.wasm-pack
+          cache-on-failure: true
 
-      - name: Download Circom (linux)
+      - name: Install unzip (linux)
         if: matrix.os == 'ubuntu-latest'
-        run: |
-          CIRCOM_VERSION=2.1.9
-          curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-linux-amd64 -o circom
-          chmod +x circom
-          sudo mv circom /usr/local/bin/
-          circom --version
+        run: sudo apt install unzip -y
 
-      - name: Download Circom (macos)
-        if: matrix.os == 'macos-latest'
+      - name: Download prebuilt web-prover-circuits artifact
         run: |
-          CIRCOM_VERSION=2.1.9
-          curl -L https://github.com/iden3/circom/releases/download/v$CIRCOM_VERSION/circom-macos-amd64 -o circom
-          chmod +x circom
-          sudo mv circom /usr/local/bin/
-          circom --version
+          curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/latest/download/circom-artifacts.zip
+          unzip -o circuits.zip -d proofs/web_proof_circuits
 
       # TODO run automated tests?
       #      wasm-pack test --firefox
       #      docs: https://rustwasm.github.io/docs/wasm-pack/tutorials/npm-browser-packages/testing-your-project.html
 
-      - name: Setup circom-witnesscalc
+      - name: compile wasm
         run: |
-          cd .. && git clone https://github.com/pluto/circom-witnesscalc.git
-          cd circom-witnesscalc
-          cargo install --path .
-          echo $(which build-circuit)
-
-      - run: |
-          cd proofs
-          npm install
-          make circuits
-          cd ..
-          echo "$PATH"
-          echo "$GITHUB_PATH"
           make wasm
 
       - run: "tar czf pkg.tar.gz ./pkg/*"
