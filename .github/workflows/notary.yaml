@@ -28,8 +28,6 @@ jobs:
 
       - run: rustup toolchain install nightly --profile minimal --no-self-update
 
-      - uses: Swatinem/rust-cache@v2
-
       - run: cargo build -p notary --release
 
       # TODO: store notary binary as github artifact
