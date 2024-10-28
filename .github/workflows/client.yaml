@@ -31,10 +31,6 @@ jobs:
       - run: rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
         if: matrix.os == 'macos-latest'
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-
       - run: sudo apt install -y protobuf-compiler
         if: matrix.os == 'self-hosted'
 

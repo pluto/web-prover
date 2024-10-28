@@ -37,10 +37,6 @@ jobs:
           curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/latest/download/circom-artifacts.zip
           unzip -o circuits.zip -d proofs/web_proof_circuits
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-
       - name: compile iOS
         run: |
           make ios
