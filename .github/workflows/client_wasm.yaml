@@ -44,12 +44,6 @@ jobs:
           echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
           brew install protobuf
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-directories: |
-            /Users/runner/Library/Caches/.wasm-pack
-          cache-on-failure: true
-
       - name: Install unzip (linux)
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt install unzip -y
