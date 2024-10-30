@@ -6,8 +6,10 @@ use circom::{
 use data::Expanded;
 use proof::Proof;
 use proving_ground::{
-  supernova::{NonUniformCircuit, RecursiveSNARK, StepCircuit},
+  r1cs::R1CSShape,
+  supernova::{get_circuit_shapes, NonUniformCircuit, RecursiveSNARK, StepCircuit},
   traits::snark::default_ck_hint,
+  R1CSWithArity,
 };
 use utils::into_input_json;
 
@@ -30,6 +32,20 @@ pub struct RomCircuit {
   pub nivc_io:                Option<Vec<F<G1>>>,
   pub private_input:          Option<HashMap<String, Value>>,
   pub witness_generator_type: WitnessGeneratorType,
+}
+
+// NOTE (Colin): This is added so we can cache only the active circuits we are using.
+impl Default for RomCircuit {
+  fn default() -> Self {
+    Self {
+      circuit:                CircomCircuit::default(),
+      circuit_index:          usize::MAX - 1,
+      rom_size:               0,
+      nivc_io:                None,
+      private_input:          None,
+      witness_generator_type: WitnessGeneratorType::Raw(vec![]),
+    }
+  }
 }
 
 impl NonUniformCircuit<E1> for Memory {
@@ -114,8 +130,13 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
   let mut recursive_snark_option = None;
   let mut next_public_input = z0_primary.clone();
 
+  // TODO (Colin): We are basically creating a `R1CS` for each circuit here, then also creating
+  // `R1CSWithArity` for the circuits in the `PublicParams`. Surely we don't need both?
   let circuits = initialize_circuit_list(&program_data.setup_data); // TODO: AwK?
   let mut memory = Memory { rom: rom.clone(), circuits };
+
+  let public_params = unsafe { std::ptr::read(&program_data.public_params) };
+  let aux_params = public_params.into_parts().1;
 
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
@@ -131,6 +152,13 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
       WitnessGeneratorType::Mobile { circuit } => (false, true),
       _ => (false, false),
     };
+
+    // NOTE (Colin): Alloc only the used R1CSWithArity
+    let mut temp_memory =
+      Memory { rom: vec![], circuits: vec![RomCircuit::default(); memory.circuits.len()] };
+    temp_memory.circuits[op_code as usize] = memory.circuits[op_code as usize].clone();
+    let temp_shapes = get_circuit_shapes(&temp_memory);
+    let public_params = PublicParams::from_parts_unchecked(temp_shapes, aux_params.clone());
 
     memory.circuits[op_code as usize].circuit.witness = if is_browser {
       // When running in browser, the witness is passed as input.

@@ -194,6 +194,10 @@ fn test_end_to_end_proofs() {
   debug!("Setting up `Memory`...");
   let public_params = program::setup(&setup_data);
 
+  // Dealloc the R1CSWithArity vec
+  let (_, aux_params) = public_params.into_parts();
+  let public_params = PublicParams::from_parts(vec![], aux_params);
+
   // Check size of PP
   // let serialized = bincode::serialize(&public_params).unwrap();
   // let mut encoder = ZlibEncoder::new(Vec::new(), flate2::Compression::best());
