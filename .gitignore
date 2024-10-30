@@ -1,6 +1,6 @@
 /logs/*
 webproof.json
-
+.vscode/*
 debug/
 target/
 
