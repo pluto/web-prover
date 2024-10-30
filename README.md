@@ -1,7 +1,21 @@
 # Web Prover
 
-TODO: Web Prover high level explainer  
-TODO: Explain project layout
+The web prover repository contains build piplines for two types of web-proofs: [tls notary](https://tlsnotary.org/) proofs and [origo proxy proofs](https://eprint.iacr.org/2024/447.pdf). Most of this work centers around the origo proofs as we built it from the ground up, while the tls notary team has done most of the lifting for their work. 
+
+The origo pipline of the web-prover repository is to test and build a collection of circom generated artificts used for web-proofs and compile them to two primary targets with a nova folding backend to be used in an end user SDK. The two compilation targets we compile to are ios mobile and web assembly and are referenced as the client.
+
+The repository is laid out as fallows:
+
+- `bin/`: a mock server for testing.
+- `client/`: contains components for the client that are share across both wasm and ios targets.
+- `client_ios/`: contains client components specific to the ios target.
+- `client_wasm/`: contains client components specific to the wasm target.
+- `fixture`: contains transport layer artifacts for testing such as tls certificates and configuration files for both origo and tls notary.
+- `notary`: contains contains binaries for our notary server which can notarize with both the tlsn server and the origo control flow.
+- `proofs`: contains all of our circom artifacts for the origo proofs as well as a set of extractor proofs to do selective disclosure over response data.
+- `tls`: contains a fork of rust-tls with a custom cryptography backend.
+
+Documentation is evolving throughout the repository as the pipeline becomes more stable. 
 
 ## Usage
 
