@@ -231,7 +231,7 @@ pub fn compress_proof(
 
 // TODO: May want to rethink this slightly as we also store the R1CS data inside the PP. Avoid
 // doubling up if possible (maybe need to use refs)
-fn initialize_circuit_list(setup_data: &SetupData) -> Vec<RomCircuit> {
+pub fn initialize_circuit_list(setup_data: &SetupData) -> Vec<RomCircuit> {
   let mut circuits = vec![];
   for (circuit_index, (r1cs_type, witness_generator_type)) in
     setup_data.r1cs_types.iter().zip(setup_data.witness_generator_types.iter()).enumerate()
