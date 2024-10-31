@@ -1,50 +1,49 @@
 [package]
-name = "proofs"
-version = "0.1.0"
-edition = "2021"
-build = "build.rs"
+name   ="proofs"
+version="0.1.0"
+edition="2021"
+build  ="build.rs"
 
 [[bin]]
-name = "test-prove"
+name="test-prove"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-circom_witnesscalc = { git = "https://github.com/pluto/circom-witnesscalc" } # Fork is needed apparently??
+circom_witnesscalc={ git="https://github.com/pluto/circom-witnesscalc" } # Fork is needed apparently??
 
 [dependencies]
-serde = "1.0"
-serde_json = "1.0"
+serde     ="1.0"
+serde_json="1.0"
 
-rust-witness = { git = "https://github.com/chancehudson/rust-witness" }
-paste = "1.0"
+rust-witness={ git="https://github.com/chancehudson/rust-witness" }
+paste       ="1.0"
 
+# proving_ground={ path="../../pluto/proving_ground" }
+proving_ground ={ git="https://github.com/pluto/proving_ground", rev="d22c953" }
+ff             ={ version="0.13", default-features=false, features=["derive"] }
+bellpepper-core="0.4"
+halo2curves    ="0.6.1"
 
-# proving_ground = { path = "../../pluto/proving_ground" }
-proving_ground = { git = "https://github.com/pluto/proving_ground", rev = "c58e3c1" }
-ff = { version = "0.13", default-features = false, features = ["derive"] }
-bellpepper-core = "0.4"
-halo2curves = "0.6.1"
+byteorder ="1.5"
+num-bigint="0.4"
+num-traits="0.2"
+itertools ="0.13"
 
-byteorder = "1.5"
-num-bigint = "0.4"
-num-traits = "0.2"
-itertools = "0.13"
+clap                        ={ version="4.5", features=["derive"] }
+tracing.workspace           =true
+tracing-subscriber.workspace=true
 
-clap = { version = "4.5", features = ["derive"] }
-tracing.workspace = true
-tracing-subscriber.workspace = true
+bincode="1.3"
+flate2 ="1.0"
 
-bincode = "1.3"
-flate2 = "1.0"
-
-anyhow = "1.0" # TODO: This should only ever be a dev-dep in my mind
+anyhow="1.0" # TODO: This should only ever be a dev-dep in my mind
 
 [dev-dependencies]
-tracing-test = "0.2.5"
+tracing-test="0.2.5"
 
 [build-dependencies]
-rust-witness = { git = "https://github.com/chancehudson/rust-witness" }
-paste = "1.0"
+rust-witness={ git="https://github.com/chancehudson/rust-witness" }
+paste       ="1.0"
 
 [features]
-verify-steps = []
-timing = []
+verify-steps=[]
+timing      =[]

@@ -37,10 +37,10 @@ pub type S2 = BatchedRelaxedR1CSSNARK<E2, EE2>;
 
 pub type F<G> = <G as Group>::Scalar;
 
-pub fn compute_web_proof(program_data: &ProgramData<Online, Expanded>) -> Vec<u8> {
-  let recursive_snark = program::run(program_data);
-  // TODO: Unecessary 2x generation of pk,vk, but it is cheap. Refactor later if need be!
-  let proof = program::compress_proof(&recursive_snark, &program_data.public_params);
-  let serialized_proof = proof.serialize_and_compress();
-  serialized_proof.0
-}
+// pub fn compute_web_proof(program_data: &ProgramData<Online, Expanded>) -> Vec<u8> {
+//   let recursive_snark = program::run(program_data);
+//   // TODO: Unecessary 2x generation of pk,vk, but it is cheap. Refactor later if need be!
+//   let proof = program::compress_proof(&recursive_snark, &program_data.public_params);
+//   let serialized_proof = proof.serialize_and_compress();
+//   serialized_proof.0
+// }

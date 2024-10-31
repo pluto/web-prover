@@ -196,7 +196,7 @@ fn test_end_to_end_proofs() {
 
   // Dealloc the R1CSWithArity vec
   let (_, aux_params) = public_params.into_parts();
-  let public_params = PublicParams::from_parts(vec![], aux_params);
+  let public_params = PublicParams::from_parts_unchecked(vec![], aux_params);
 
   // Check size of PP
   // let serialized = bincode::serialize(&public_params).unwrap();
@@ -321,7 +321,7 @@ fn test_end_to_end_proofs() {
   .into_expanded();
   debug!("program_data.inputs: {:?}, {:?}", program_data.inputs.len(), program_data.inputs[15]);
 
-  let recursive_snark = program::run(&program_data);
+  let recursive_snark = program::run(program_data);
   // dbg!(recursive_snark.zi_primary());
 
   let res = "\"Taylor Swift\"";

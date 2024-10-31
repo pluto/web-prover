@@ -108,7 +108,7 @@ pub fn setup(setup_data: &SetupData) -> PublicParams<E1> {
   public_params
 }
 
-pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
+pub fn run(program_data: ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
   info!("Starting SuperNova program...");
 
   // Resize the rom to be the `max_rom_length` committed to in the `SetupData`
@@ -135,7 +135,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
   let circuits = initialize_circuit_list(&program_data.setup_data); // TODO: AwK?
   let mut memory = Memory { rom: rom.clone(), circuits };
 
-  let public_params = unsafe { std::ptr::read(&program_data.public_params) };
+  let public_params = program_data.public_params;
   let aux_params = public_params.into_parts().1;
 
   #[cfg(feature = "timing")]
@@ -199,7 +199,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
 
     let mut recursive_snark = recursive_snark_option.unwrap_or_else(|| {
       RecursiveSNARK::new(
-        &program_data.public_params,
+        &public_params,
         &memory,
         &circuit_primary,
         &circuit_secondary,
@@ -210,15 +210,13 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
     });
 
     info!("Proving single step...");
-    recursive_snark
-      .prove_step(&program_data.public_params, &circuit_primary, &circuit_secondary)
-      .unwrap();
+    recursive_snark.prove_step(&public_params, &circuit_primary, &circuit_secondary).unwrap();
     info!("Done proving single step...");
 
     #[cfg(feature = "verify-steps")]
     {
       info!("Verifying single step...");
-      recursive_snark.verify(&program_data.public_params, &z0_primary, &z0_secondary).unwrap();
+      recursive_snark.verify(&public_params, &z0_primary, &z0_secondary).unwrap();
       info!("Single step verification done");
     }
 

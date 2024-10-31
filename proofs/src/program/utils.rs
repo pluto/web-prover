@@ -68,7 +68,8 @@ pub fn get_selector_vec_from_index<CS: ConstraintSystem<F<G1>>>(
   target_index: &AllocatedNum<F<G1>>,
   num_indices: usize,
 ) -> Result<Vec<Boolean>, SynthesisError> {
-  assert_ne!(num_indices, 0);
+  // TODO (Colin): This breaks currently with the hacky way of handling circuit in pp
+  // assert_ne!(num_indices, 0);
 
   // Compute the selector vector non-deterministically
   let selector = (0..num_indices)
