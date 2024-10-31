@@ -29,6 +29,11 @@ jobs:
       # Install the generic nightly toolchain
       - run: rustup toolchain install nightly-2024-10-28 --profile minimal --no-self-update
 
+      # Add the `rust-src` component and wasm target for WebAssembly builds
+      - run: |
+          rustup component add rust-src --toolchain nightly-2024-10-28
+          rustup target add wasm32-unknown-unknown --toolchain nightly-2024-10-28
+
       # Add platform-specific targets
       - run: rustup target add x86_64-unknown-linux-gnu --toolchain nightly-2024-10-28
         if: matrix.os == 'ubuntu-latest'

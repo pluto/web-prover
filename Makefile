@@ -4,7 +4,7 @@ wasm:
 	-cd client_wasm/demo/static && rm -f build && ln -s ../../../proofs/web_proof_circuits build && cd ../../..
 	cd client_wasm && \
 	  PATH="/opt/homebrew/opt/llvm@18/bin:/opt/homebrew/opt/llvm/bin:$$PATH" \
-	  rustup run nightly ~/.cargo/bin/wasm-pack build --release --target web ./ -- \
+	  rustup run nightly-2024-10-28 ~/.cargo/bin/wasm-pack build --release --target web ./ -- \
 	    -Z build-std=panic_abort,std
 
 params:
