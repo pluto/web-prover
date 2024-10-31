@@ -32,7 +32,8 @@ jobs:
 
     - name: Download prebuilt web-prover-circuits artifact
       run: |
-        curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/latest/download/circom-artifacts.zip
+        curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/latest/download/circom-artifacts-v0.2.3.zip
+
         unzip -o circuits.zip -d proofs/web_proof_circuits
 
     - name: Run tests

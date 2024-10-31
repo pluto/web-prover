@@ -26,13 +26,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: rustup toolchain install nightly --profile minimal --no-self-update
+      # Install the generic nightly toolchain
+      - run: rustup toolchain install nightly-2024-10-28 --profile minimal --no-self-update
 
-      - run: rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+      # Add the `rust-src` component and wasm target for WebAssembly builds
+      - run: |
+          rustup component add rust-src --toolchain nightly-2024-10-28
+          rustup target add wasm32-unknown-unknown --toolchain nightly-2024-10-28
+
+      # Add platform-specific targets
+      - run: rustup target add x86_64-unknown-linux-gnu --toolchain nightly-2024-10-28
         if: matrix.os == 'ubuntu-latest'
 
-      - run: rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
+      - run: rustup target add aarch64-apple-darwin --toolchain nightly-2024-10-28
         if: matrix.os == 'macos-latest'
+
+      # Add the rust-src component without a platform suffix
+      - run: rustup component add rust-src --toolchain nightly-2024-10-28
 
       - run: sudo apt install -y protobuf-compiler
         if: matrix.os == 'ubuntu-latest'
@@ -50,7 +60,7 @@ jobs:
 
       - name: Download prebuilt web-prover-circuits artifact
         run: |
-          curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/latest/download/circom-artifacts.zip
+          curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/latest/download/circom-artifacts-v0.2.3.zip
           unzip -o circuits.zip -d proofs/web_proof_circuits
 
       # TODO run automated tests?
