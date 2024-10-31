@@ -3,11 +3,8 @@
 // TODO: (Colin): I'm noticing this module could use some TLC. There's a lot of lint here!
 
 use flate2::write::ZlibEncoder;
-use program::{
-  data::{CircuitData, InstructionConfig},
-  initialize_circuit_list, Memory,
-};
-use proving_ground::supernova::{get_circuit_shapes, RecursiveSNARK};
+use program::data::{CircuitData, InstructionConfig};
+use proving_ground::supernova::RecursiveSNARK;
 use serde_json::json;
 
 use super::*;
@@ -411,49 +408,3 @@ fn test_offline_proofs() {
   program_data
     .into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup_no_aes.bin").unwrap());
 } // #[test]// fn manifest(
-
-#[test]
-#[tracing_test::traced_test]
-fn test_long_setup_data() {
-  let setup_data = SetupData {
-    r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
-      R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
-    ],
-    witness_generator_types: vec![
-      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_PARSE_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
-    ],
-    max_rom_length:          JSON_MAX_ROM_LENGTH,
-  };
-  debug!("Setting up `Memory`...");
-  let circuits = initialize_circuit_list(&setup_data);
-  let memory = Memory { circuits, rom: vec![0; setup_data.max_rom_length] };
-  let _circuit_shapes = get_circuit_shapes(&memory);
-}
-
-#[test]
-#[tracing_test::traced_test]
-fn test_short_setup_data() {
-  let setup_data = SetupData {
-    r1cs_types:              vec![R1CSType::Raw(AES_GCM_R1CS.to_vec())],
-    witness_generator_types: vec![WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec())],
-    max_rom_length:          JSON_MAX_ROM_LENGTH,
-  };
-  debug!("Setting up `Memory`...");
-  let circuits = initialize_circuit_list(&setup_data);
-  let memory = Memory { circuits, rom: vec![0; setup_data.max_rom_length] };
-  let _circuit_shapes = get_circuit_shapes(&memory);
-}
