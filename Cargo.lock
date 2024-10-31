@@ -4453,7 +4453,7 @@ dependencies = [
 [[package]]
 name = "proving_ground"
 version = "0.1.0"
-source = "git+https://github.com/pluto/proving_ground?rev=d22c953#d22c953e435bcd3676183af6c6a5de34e7bc38e6"
+source = "git+https://github.com/pluto/proving_ground?rev=8c28cc6#8c28cc6f0c380630fabb9a3c37107c62908dc58d"
 dependencies = [
  "bellpepper",
  "bellpepper-core",

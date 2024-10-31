@@ -108,7 +108,7 @@ pub fn setup(setup_data: &SetupData) -> PublicParams<E1> {
   public_params
 }
 
-pub fn run(program_data: ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
+pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
   info!("Starting SuperNova program...");
 
   // Resize the rom to be the `max_rom_length` committed to in the `SetupData`
@@ -135,8 +135,7 @@ pub fn run(program_data: ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
   let circuits = initialize_circuit_list(&program_data.setup_data); // TODO: AwK?
   let mut memory = Memory { rom: rom.clone(), circuits };
 
-  let public_params = program_data.public_params;
-  let aux_params = public_params.into_parts().1;
+  let aux_params = program_data.public_params.aux_params();
 
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
