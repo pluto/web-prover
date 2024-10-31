@@ -52,7 +52,7 @@ jobs:
           unzip -o circuits.zip -d proofs/web_proof_circuits
 
       - run: |
-          RUST_LOG=DEBUG cargo run --release -p notary -- --config ./fixture/notary-config.toml &
+          RUST_LOG=DEBUG cargo +nightly-2024-10-28 run --release -p notary -- --config ./fixture/notary-config.toml &
           sleep 30
           NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer cargo run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
           NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer cargo run --release -p client -- --config ./fixture/client.origo_tcp_local.json
