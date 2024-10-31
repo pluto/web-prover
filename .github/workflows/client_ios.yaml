@@ -23,6 +23,8 @@ jobs:
 
       - run: rustup toolchain install nightly-2024-09-25 --profile minimal --no-self-update
 
+      - run: rustup target add aarch64-apple-ios --toolchain nightly-2024-09-25
+
       - run: rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
 
       # TODO: do we need llvm for this?
@@ -34,7 +36,7 @@ jobs:
 
       - name: Download prebuilt web-prover-circuits artifact
         run: |
-          curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/latest/download/circom-artifacts.zip
+          curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/latest/download/circom-artifacts-v0.2.3.zip
           unzip -o circuits.zip -d proofs/web_proof_circuits
 
       - name: compile iOS
