@@ -26,14 +26,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: rustup toolchain install nightly-2024-09-25 --profile minimal --no-self-update
+      - run: rustup toolchain install nightly-2024-09-25-x86_64-unknown-linux-gnu --profile minimal --no-self-update
 
-      - run: rustup target add nightly-x86_64-unknown-linux-gnu --toolchain nightly-2024-09-25
-
-      - run: rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+      - run: rustup component add rust-src --toolchain nightly-2024-09-25-x86_64-unknown-linux-gnu
         if: matrix.os == 'ubuntu-latest'
 
-      - run: rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
+      - run: rustup component add rust-src --toolchain nightly-2024-09-25-aarch64-apple-darwin
         if: matrix.os == 'macos-latest'
 
       - run: sudo apt install -y protobuf-compiler
