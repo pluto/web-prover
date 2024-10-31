@@ -21,9 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: rustup toolchain install nightly-2024-09-25-aarch64-apple-darwin --profile minimal --no-self-update
+      - run: rustup toolchain install nightly-2024-10-28-aarch64-apple-darwin --profile minimal --no-self-update
 
-      - run: rustup component add rust-src --toolchain nightly-2024-09-25-aarch64-apple-darwin
+      - run: rustup component add rust-src --toolchain nightly-2024-10-28-aarch64-apple-darwin
 
       # TODO: do we need llvm for this?
       - name: Install LLVM and Clang to support 'ring' crate and protobuf for witnesscalc
