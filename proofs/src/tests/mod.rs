@@ -2,9 +2,9 @@
 
 // TODO: (Colin): I'm noticing this module could use some TLC. There's a lot of lint here!
 
+use client_side_prover::supernova::RecursiveSNARK;
 use flate2::write::ZlibEncoder;
 use program::data::{CircuitData, InstructionConfig};
-use proving_ground::supernova::RecursiveSNARK;
 use serde_json::json;
 
 use super::*;

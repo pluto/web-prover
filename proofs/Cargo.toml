@@ -17,11 +17,11 @@ serde_json="1.0"
 rust-witness={ git="https://github.com/chancehudson/rust-witness" }
 paste       ="1.0"
 
-# proving_ground={ path="../../pluto/proving_ground" }
-proving_ground ={ git="https://github.com/pluto/proving_ground", rev="8c28cc6" }
-ff             ={ version="0.13", default-features=false, features=["derive"] }
-bellpepper-core="0.4"
-halo2curves    ="0.6.1"
+# client_side_prover={ path="../../pluto/client_side_prover" }
+client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="316912f" }
+ff                ={ version="0.13", default-features=false, features=["derive"] }
+bellpepper-core   ="0.4"
+halo2curves       ="0.6.1"
 
 byteorder ="1.5"
 num-bigint="0.4"

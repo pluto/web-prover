@@ -5,7 +5,7 @@ use circom::{
 };
 use data::Expanded;
 use proof::Proof;
-use proving_ground::{
+use client_side_prover::{
   r1cs::R1CSShape,
   supernova::{get_circuit_shapes, NonUniformCircuit, RecursiveSNARK, StepCircuit},
   traits::snark::default_ck_hint,

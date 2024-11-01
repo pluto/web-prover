@@ -1340,6 +1340,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "client-side-prover"
+version = "0.1.0"
+source = "git+https://github.com/pluto/client-side-prover?rev=316912f#316912f90ffb83456adc7a0112c4fd268016bb8d"
+dependencies = [
+ "bellpepper",
+ "bellpepper-core",
+ "bincode",
+ "bitvec",
+ "byteorder",
+ "cfg-if",
+ "digest 0.10.7",
+ "ff",
+ "generic-array 1.1.0",
+ "getrandom 0.2.15",
+ "group",
+ "grumpkin-msm",
+ "halo2curves",
+ "itertools 0.13.0",
+ "neptune",
+ "num-bigint 0.4.6",
+ "num-integer",
+ "num-traits",
+ "once_cell",
+ "pairing",
+ "proptest",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "rand_core 0.6.4",
+ "rayon",
+ "rayon-scan",
+ "ref-cast",
+ "serde",
+ "sha3",
+ "static_assertions",
+ "subtle",
+ "thiserror",
+ "tracing",
+ "vergen",
+]
+
+[[package]]
 name = "client_ios"
 version = "0.1.0"
 dependencies = [
@@ -4338,6 +4379,7 @@ dependencies = [
  "byteorder",
  "circom_witnesscalc",
  "clap",
+ "client-side-prover",
  "ff",
  "flate2",
  "halo2curves",
@@ -4345,7 +4387,6 @@ dependencies = [
  "num-bigint 0.4.6",
  "num-traits",
  "paste",
- "proving_ground",
  "rust-witness",
  "serde",
  "serde_json",
@@ -4448,47 +4489,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4759aa0d3a6232fb8dbdb97b61de2c20047c68aca932c7ed76da9d788508d670"
 dependencies = [
  "prost 0.13.3",
-]
-
-[[package]]
-name = "proving_ground"
-version = "0.1.0"
-source = "git+https://github.com/pluto/proving_ground?rev=8c28cc6#8c28cc6f0c380630fabb9a3c37107c62908dc58d"
-dependencies = [
- "bellpepper",
- "bellpepper-core",
- "bincode",
- "bitvec",
- "byteorder",
- "cfg-if",
- "digest 0.10.7",
- "ff",
- "generic-array 1.1.0",
- "getrandom 0.2.15",
- "group",
- "grumpkin-msm",
- "halo2curves",
- "itertools 0.13.0",
- "neptune",
- "num-bigint 0.4.6",
- "num-integer",
- "num-traits",
- "once_cell",
- "pairing",
- "proptest",
- "rand 0.8.5",
- "rand_chacha 0.3.1",
- "rand_core 0.6.4",
- "rayon",
- "rayon-scan",
- "ref-cast",
- "serde",
- "sha3",
- "static_assertions",
- "subtle",
- "thiserror",
- "tracing",
- "vergen",
 ]
 
 [[package]]
