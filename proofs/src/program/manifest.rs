@@ -80,6 +80,12 @@ pub struct Manifest {
 const HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING: &str = "beginning";
 const HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE: &str = "middle";
 const HTTP_PARSE_AND_LOCK_START_LINE_FINAL: &str = "final";
+const HTTP_BEGINNING_LENGTH_SIGNAL: &str = "beginningLen";
+const HTTP_MIDDLE_LENGTH_SIGNAL: &str = "middleLen";
+const HTTP_FINAL_LENGTH_SIGNAL: &str = "finalLen";
+const HTTP_BEGINNING_MAX_LENGTH: usize = 10;
+const HTTP_MIDDLE_MAX_LENGTH: usize = 50;
+const HTTP_FINAL_MAX_LENGTH: usize = 10;
 const HTTP_HEADER_SIGNAL_NAME: &str = "header";
 const HTTP_HEADER_SIGNAL_VALUE: &str = "value";
 const HTTP_HEADER_MAX_NAME_LENGTH: usize = 20;
@@ -96,7 +102,18 @@ impl Manifest {
     &self,
     opcode_start: u64,
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>) {
-    // http parse circuit
+    // TODO(Sambhav): find a better way to prevent this code duplication for request and response
+    // pad http parse circuit input signals
+    let mut http_parse_beginning_padded = [0u8; HTTP_BEGINNING_MAX_LENGTH];
+    http_parse_beginning_padded[..self.request.method.len()]
+      .copy_from_slice(self.request.method.as_bytes());
+    let mut http_parse_middle_padded = [0u8; HTTP_MIDDLE_MAX_LENGTH];
+    http_parse_middle_padded[..self.request.url.len()].copy_from_slice(self.request.url.as_bytes());
+    let mut http_parse_final_padded = [0u8; HTTP_FINAL_MAX_LENGTH];
+    http_parse_final_padded[..self.request.version.len()]
+      .copy_from_slice(self.request.version.as_bytes());
+
+    // initialise rom data and rom
     let mut rom_data =
       HashMap::from([(String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData {
         opcode: opcode_start + 1,
@@ -106,14 +123,17 @@ impl Manifest {
       private_input: HashMap::from([
         (
           String::from(HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING),
-          json!(self.request.method.as_bytes()),
+          json!(http_parse_beginning_padded),
         ),
+        (String::from(HTTP_BEGINNING_LENGTH_SIGNAL), json!([self.request.method.len()])),
         // TODO: check how to enter correct url here
-        (String::from(HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE), json!(self.request.url.as_bytes())),
         (
-          String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL),
-          json!(self.request.version.as_bytes()),
+          String::from(HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE),
+          json!(http_parse_middle_padded.to_vec()),
         ),
+        (String::from(HTTP_MIDDLE_LENGTH_SIGNAL), json!([self.request.url.len()])),
+        (String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL), json!(http_parse_final_padded)),
+        (String::from(HTTP_FINAL_LENGTH_SIGNAL), json!([self.request.version.len()])),
       ]),
     }];
 
@@ -145,6 +165,17 @@ impl Manifest {
     &self,
     opcode_start: u64,
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>) {
+    // pad http parse circuit input signals
+    let mut http_parse_beginning_padded = [0u8; HTTP_BEGINNING_MAX_LENGTH];
+    http_parse_beginning_padded[..self.response.version.len()]
+      .copy_from_slice(self.request.version.as_bytes());
+    let mut http_parse_middle_padded = [0u8; HTTP_MIDDLE_MAX_LENGTH];
+    http_parse_middle_padded[..self.response.status.len()]
+      .copy_from_slice(self.response.status.as_bytes());
+    let mut http_parse_final_padded = [0u8; HTTP_FINAL_MAX_LENGTH];
+    http_parse_final_padded[..self.response.message.len()]
+      .copy_from_slice(self.response.message.as_bytes());
+
     // http parse
     let mut rom_data =
       HashMap::from([(String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData {
@@ -155,16 +186,16 @@ impl Manifest {
       private_input: HashMap::from([
         (
           String::from(HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING),
-          json!(self.response.version.as_bytes()),
+          json!(http_parse_beginning_padded),
         ),
+        (String::from(HTTP_BEGINNING_LENGTH_SIGNAL), json!([self.response.version.len()])),
         (
           String::from(HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE),
-          json!(self.response.status.as_bytes()),
+          json!(http_parse_middle_padded.to_vec()),
         ),
-        (
-          String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL),
-          json!(self.response.message.as_bytes()),
-        ),
+        (String::from(HTTP_MIDDLE_LENGTH_SIGNAL), json!([self.response.status.len()])),
+        (String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL), json!(http_parse_final_padded)),
+        (String::from(HTTP_FINAL_LENGTH_SIGNAL), json!([self.response.message.len()])),
       ]),
     }];
 
@@ -258,7 +289,7 @@ mod tests {
       "request": {
           "method": "GET",
           "version": "HTTP/1.1",
-          "url": "https://api.reddit.com/users/<% userId %>?query=foobar",
+          "url": "https://api.reddit.com/users/<userId>?query=foo",
           "headers": {
               "Content-Type": "application/json",
               "Authentication": "Bearer <% token %>"
@@ -298,7 +329,6 @@ mod tests {
   #[test]
   fn test_serialize() {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
-    dbg!(&manifest);
     assert_eq!(manifest.request.method, "GET");
   }
 
@@ -315,17 +345,38 @@ mod tests {
     assert_eq!(rom.len(), 1 + manifest.request.headers.len());
 
     // assert http parse inputs
+    let mut padded_request_method = [0u8; HTTP_BEGINNING_MAX_LENGTH];
+    padded_request_method[..manifest.request.method.len()]
+      .copy_from_slice(manifest.request.method.as_bytes());
+    let mut padded_request_url = [0u8; HTTP_MIDDLE_MAX_LENGTH];
+    padded_request_url[..manifest.request.url.len()]
+      .copy_from_slice(manifest.request.url.as_bytes());
+    let mut padded_request_version = [0u8; HTTP_FINAL_MAX_LENGTH];
+    padded_request_version[..manifest.request.version.len()]
+      .copy_from_slice(manifest.request.version.as_bytes());
     assert_eq!(
       rom[0].private_input.get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING)),
-      Some(&json!(manifest.request.method.as_bytes()))
+      Some(&json!(padded_request_method)),
+    );
+    assert_eq!(
+      rom[0].private_input.get(&String::from(HTTP_BEGINNING_LENGTH_SIGNAL)),
+      Some(&json!([manifest.request.method.len()]))
     );
     assert_eq!(
       rom[0].private_input.get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE)),
-      Some(&json!(manifest.request.url.as_bytes()))
+      Some(&json!(padded_request_url.to_vec()))
+    );
+    assert_eq!(
+      rom[0].private_input.get(&String::from(HTTP_MIDDLE_LENGTH_SIGNAL)),
+      Some(&json!([manifest.request.url.len()]))
     );
     assert_eq!(
       rom[0].private_input.get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL)),
-      Some(&json!(manifest.request.version.as_bytes()))
+      Some(&json!(padded_request_version))
+    );
+    assert_eq!(
+      rom[0].private_input.get(&String::from(HTTP_FINAL_LENGTH_SIGNAL)),
+      Some(&json!([manifest.request.version.len()]))
     );
 
     // assert final circuit
@@ -362,17 +413,27 @@ mod tests {
     );
 
     // assert http parse inputs
+    let mut padded_response_version = [0u8; HTTP_BEGINNING_MAX_LENGTH];
+    padded_response_version[..manifest.response.version.len()]
+      .copy_from_slice(manifest.response.version.as_bytes());
+    let mut padded_response_status = [0u8; HTTP_MIDDLE_MAX_LENGTH];
+    padded_response_status[..manifest.response.status.len()]
+      .copy_from_slice(manifest.response.status.as_bytes());
+    let mut padded_response_message = [0u8; HTTP_FINAL_MAX_LENGTH];
+    padded_response_message[..manifest.response.message.len()]
+      .copy_from_slice(manifest.response.message.as_bytes());
+
     assert_eq!(
       rom[0].private_input.get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING)),
-      Some(&json!(manifest.response.version.as_bytes()))
+      Some(&json!(padded_response_version))
     );
     assert_eq!(
       rom[0].private_input.get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE)),
-      Some(&json!(manifest.response.status.as_bytes()))
+      Some(&json!(padded_response_status.to_vec()))
     );
     assert_eq!(
       rom[0].private_input.get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL)),
-      Some(&json!(manifest.response.message.as_bytes()))
+      Some(&json!(padded_response_message))
     );
 
     // check final circuit is extract
