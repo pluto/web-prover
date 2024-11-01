@@ -26,8 +26,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: rustup toolchain install nightly --profile minimal --no-self-update
+      - run: rustup toolchain install nightly-2024-10-28
 
-      - run: cargo build -p notary --release
+      - run: cargo +nightly-2024-10-28 build -p notary --release
 
       # TODO: store notary binary as github artifact
