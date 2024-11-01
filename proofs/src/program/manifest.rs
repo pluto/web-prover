@@ -77,6 +77,10 @@ pub struct Manifest {
   pub response: Response,
 }
 
+const AES_INPUT_LENGTH: usize = 16;
+const AES_KEY_SIGNAL: &str = "key";
+const AES_IV_SIGNAL: &str = "iv";
+const AES_AAD_SIGNAL: &str = "aad";
 const HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING: &str = "beginning";
 const HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE: &str = "middle";
 const HTTP_PARSE_AND_LOCK_START_LINE_FINAL: &str = "final";
@@ -100,8 +104,29 @@ impl Manifest {
   /// from [`Manifest::request`]
   pub fn rom_from_request(
     &self,
-    opcode_start: u64,
+    aes_key: [u8; 16],
+    aes_iv: [u8; 12],
+    aes_aad: [u8; 16],
+    plaintext_len: usize,
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>) {
+    assert_eq!(plaintext_len % AES_INPUT_LENGTH, 0);
+    // TODO (Sambhav): convert this to nice crate errors
+    assert!(self.request.method.len() <= HTTP_BEGINNING_MAX_LENGTH);
+    assert!(self.request.url.len() <= HTTP_MIDDLE_MAX_LENGTH);
+    assert!(self.request.version.len() <= HTTP_FINAL_MAX_LENGTH);
+
+    let aes_instr = String::from("AES_GCM_1");
+    let mut rom_data = HashMap::from([(aes_instr.clone(), CircuitData { opcode: 0 })]);
+    let aes_rom_opcode_config = InstructionConfig {
+      name:          aes_instr.clone(),
+      private_input: HashMap::from([
+        (String::from(AES_KEY_SIGNAL), json!(aes_key)),
+        (String::from(AES_IV_SIGNAL), json!(aes_iv)),
+        (String::from(AES_AAD_SIGNAL), json!(aes_aad)),
+      ]),
+    };
+    let mut rom = vec![aes_rom_opcode_config; plaintext_len / AES_INPUT_LENGTH];
+
     // TODO(Sambhav): find a better way to prevent this code duplication for request and response
     // pad http parse circuit input signals
     let mut http_parse_beginning_padded = [0u8; HTTP_BEGINNING_MAX_LENGTH];
@@ -114,11 +139,8 @@ impl Manifest {
       .copy_from_slice(self.request.version.as_bytes());
 
     // initialise rom data and rom
-    let mut rom_data =
-      HashMap::from([(String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData {
-        opcode: opcode_start + 1,
-      })]);
-    let mut rom = vec![InstructionConfig {
+    rom_data.insert(String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 1 });
+    rom.push(InstructionConfig {
       name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
       private_input: HashMap::from([
         (
@@ -135,7 +157,7 @@ impl Manifest {
         (String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL), json!(http_parse_final_padded)),
         (String::from(HTTP_FINAL_LENGTH_SIGNAL), json!([self.request.version.len()])),
       ]),
-    }];
+    });
 
     // headers
     for (i, (header_name, header_value)) in self.request.headers.iter().enumerate() {
@@ -147,7 +169,7 @@ impl Manifest {
       header_value_padded[..header_value.len()].copy_from_slice(header_value.as_bytes());
 
       let name = format!("HTTP_LOCK_HEADER_{}", i + 1);
-      rom_data.insert(name.clone(), CircuitData { opcode: opcode_start + 2 });
+      rom_data.insert(name.clone(), CircuitData { opcode: 2 });
       rom.push(InstructionConfig {
         name,
         private_input: HashMap::from([
@@ -163,8 +185,30 @@ impl Manifest {
   /// generates ROM from [`Manifest::response`]
   pub fn rom_from_response(
     &self,
-    opcode_start: u64,
+    aes_key: [u8; 16],
+    aes_iv: [u8; 12],
+    aes_aad: [u8; 16],
+    plaintext_len: usize,
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>) {
+    assert_eq!(plaintext_len % AES_INPUT_LENGTH, 0);
+
+    // TODO (Sambhav): convert this to nice crate errors
+    assert!(self.response.version.len() <= HTTP_BEGINNING_MAX_LENGTH);
+    assert!(self.response.status.len() <= HTTP_MIDDLE_MAX_LENGTH);
+    assert!(self.response.message.len() <= HTTP_FINAL_MAX_LENGTH);
+
+    let aes_instr = String::from("AES_GCM_1");
+    let mut rom_data = HashMap::from([(aes_instr.clone(), CircuitData { opcode: 0 })]);
+    let aes_rom_opcode_config = InstructionConfig {
+      name:          aes_instr.clone(),
+      private_input: HashMap::from([
+        (String::from(AES_KEY_SIGNAL), json!(aes_key)),
+        (String::from(AES_IV_SIGNAL), json!(aes_iv)),
+        (String::from(AES_AAD_SIGNAL), json!(aes_aad)),
+      ]),
+    };
+    let mut rom = vec![aes_rom_opcode_config; plaintext_len / AES_INPUT_LENGTH];
+
     // pad http parse circuit input signals
     let mut http_parse_beginning_padded = [0u8; HTTP_BEGINNING_MAX_LENGTH];
     http_parse_beginning_padded[..self.response.version.len()]
@@ -177,11 +221,8 @@ impl Manifest {
       .copy_from_slice(self.response.message.as_bytes());
 
     // http parse
-    let mut rom_data =
-      HashMap::from([(String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData {
-        opcode: opcode_start + 1,
-      })]);
-    let mut rom = vec![InstructionConfig {
+    rom_data.insert(String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 1 });
+    rom.push(InstructionConfig {
       name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
       private_input: HashMap::from([
         (
@@ -197,7 +238,7 @@ impl Manifest {
         (String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL), json!(http_parse_final_padded)),
         (String::from(HTTP_FINAL_LENGTH_SIGNAL), json!([self.response.message.len()])),
       ]),
-    }];
+    });
 
     // headers
     for (i, (header_name, header_value)) in self.response.headers.iter().enumerate() {
@@ -208,7 +249,7 @@ impl Manifest {
       header_value_padded[..header_value.len()].copy_from_slice(header_value.as_bytes());
 
       let name = format!("HTTP_LOCK_HEADER_{}", i + 1);
-      rom_data.insert(name.clone(), CircuitData { opcode: opcode_start + 2 });
+      rom_data.insert(name.clone(), CircuitData { opcode: 2 });
       rom.push(InstructionConfig {
         name,
         private_input: HashMap::from([
@@ -219,14 +260,14 @@ impl Manifest {
     }
 
     // http body
-    rom_data.insert(String::from("HTTP_BODY_EXTRACT"), CircuitData { opcode: opcode_start + 3 });
+    rom_data.insert(String::from("HTTP_BODY_EXTRACT"), CircuitData { opcode: 3 });
     rom.push(InstructionConfig {
       name:          String::from("HTTP_BODY_EXTRACT"),
       private_input: HashMap::new(),
     });
 
     // json parse
-    rom_data.insert(String::from("JSON_PARSE"), CircuitData { opcode: opcode_start + 4 });
+    rom_data.insert(String::from("JSON_PARSE"), CircuitData { opcode: 4 });
     rom.push(InstructionConfig {
       name:          String::from("JSON_PARSE"),
       private_input: HashMap::new(),
@@ -239,9 +280,7 @@ impl Manifest {
           // pad json key
           let mut json_key_padded = [0u8; JSON_MAX_KEY_LENGTH];
           json_key_padded[..json_key.len()].copy_from_slice(json_key.as_bytes());
-          rom_data.insert(format!("JSON_MASK_OBJECT_{}", i + 1), CircuitData {
-            opcode: opcode_start + 5,
-          });
+          rom_data.insert(format!("JSON_MASK_OBJECT_{}", i + 1), CircuitData { opcode: 5 });
           rom.push(InstructionConfig {
             name:          format!("JSON_MASK_OBJECT_{}", i + 1),
             private_input: HashMap::from([
@@ -251,8 +290,7 @@ impl Manifest {
           });
         },
         Key::Num(index) => {
-          rom_data
-            .insert(format!("JSON_MASK_ARRAY_{}", i + 1), CircuitData { opcode: opcode_start + 6 });
+          rom_data.insert(format!("JSON_MASK_ARRAY_{}", i + 1), CircuitData { opcode: 6 });
           rom.push(InstructionConfig {
             name:          format!("JSON_MASK_ARRAY_{}", i + 1),
             private_input: HashMap::from([(
@@ -265,7 +303,7 @@ impl Manifest {
     }
 
     // final extraction
-    rom_data.insert(String::from("EXTRACT_VALUE"), CircuitData { opcode: opcode_start + 7 });
+    rom_data.insert(String::from("EXTRACT_VALUE"), CircuitData { opcode: 7 });
     rom.push(InstructionConfig {
       name:          String::from("EXTRACT_VALUE"),
       private_input: HashMap::new(),
@@ -279,6 +317,10 @@ impl Manifest {
 mod tests {
   use super::*;
 
+  const AES_KEY: (&str, [u8; 16]) =
+    ("key", [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49]);
+  const AES_IV: (&str, [u8; 12]) = ("iv", [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49]);
+  const AES_AAD: (&str, [u8; 16]) = ("aad", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
   const TEST_MANIFEST: &str = r#"
   {
       "manifestVersion": "1",
@@ -334,17 +376,20 @@ mod tests {
 
   #[test]
   fn generate_rom_from_request() {
+    let plaintext_len = 16;
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
-    let (rom_data, rom) = manifest.rom_from_request(0);
+    let (rom_data, rom) = manifest.rom_from_request(AES_KEY.1, AES_IV.1, AES_AAD.1, plaintext_len);
 
-    assert_eq!(rom_data.len(), 1 + manifest.request.headers.len());
+    // AES + HTTP parse + HTTP headers length
+    assert_eq!(rom_data.len(), 1 + 1 + manifest.request.headers.len());
     assert_eq!(rom_data.get(&String::from("HTTP_PARSE_AND_LOCK_START_LINE")).unwrap().opcode, 1);
 
     // should contain http parse and http headers
-    assert_eq!(rom.len(), 1 + manifest.request.headers.len());
+    assert_eq!(rom.len(), plaintext_len / AES_INPUT_LENGTH + 1 + manifest.request.headers.len());
 
     // assert http parse inputs
+    let http_instruction_len = plaintext_len / AES_INPUT_LENGTH;
     let mut padded_request_method = [0u8; HTTP_BEGINNING_MAX_LENGTH];
     padded_request_method[..manifest.request.method.len()]
       .copy_from_slice(manifest.request.method.as_bytes());
@@ -355,27 +400,33 @@ mod tests {
     padded_request_version[..manifest.request.version.len()]
       .copy_from_slice(manifest.request.version.as_bytes());
     assert_eq!(
-      rom[0].private_input.get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING)),
+      rom[http_instruction_len]
+        .private_input
+        .get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING)),
       Some(&json!(padded_request_method)),
     );
     assert_eq!(
-      rom[0].private_input.get(&String::from(HTTP_BEGINNING_LENGTH_SIGNAL)),
+      rom[http_instruction_len].private_input.get(&String::from(HTTP_BEGINNING_LENGTH_SIGNAL)),
       Some(&json!([manifest.request.method.len()]))
     );
     assert_eq!(
-      rom[0].private_input.get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE)),
+      rom[http_instruction_len]
+        .private_input
+        .get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE)),
       Some(&json!(padded_request_url.to_vec()))
     );
     assert_eq!(
-      rom[0].private_input.get(&String::from(HTTP_MIDDLE_LENGTH_SIGNAL)),
+      rom[http_instruction_len].private_input.get(&String::from(HTTP_MIDDLE_LENGTH_SIGNAL)),
       Some(&json!([manifest.request.url.len()]))
     );
     assert_eq!(
-      rom[0].private_input.get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL)),
+      rom[http_instruction_len]
+        .private_input
+        .get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL)),
       Some(&json!(padded_request_version))
     );
     assert_eq!(
-      rom[0].private_input.get(&String::from(HTTP_FINAL_LENGTH_SIGNAL)),
+      rom[http_instruction_len].private_input.get(&String::from(HTTP_FINAL_LENGTH_SIGNAL)),
       Some(&json!([manifest.request.version.len()]))
     );
 
@@ -388,31 +439,42 @@ mod tests {
 
   #[test]
   fn generate_rom_from_response() {
+    let plaintext_length = 160;
+
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
-    let opcode_start = 1;
-    let (rom_data, rom) = manifest.rom_from_response(opcode_start);
+    let (rom_data, rom) =
+      manifest.rom_from_response(AES_KEY.1, AES_IV.1, AES_AAD.1, plaintext_length);
 
-    // parse http + headers + body mask + json parse + json mask (object + array) + extract
+    // AES + parse http + headers + body mask + json parse + json mask (object + array) + extract
     assert_eq!(
       rom_data.len(),
-      1 + manifest.response.headers.len() + 1 + 1 + manifest.response.body.json.len() + 1
+      1 + 1 + manifest.response.headers.len() + 1 + 1 + manifest.response.body.json.len() + 1
     );
     assert_eq!(
       rom_data.get(&String::from("JSON_PARSE")).unwrap().opcode,
-      opcode_start + 1 + manifest.response.headers.len() as u64 + 1 + 1
+      1 + manifest.response.headers.len() as u64 + 1 + 1
     );
+    // HTTP parse + headers + body mask + json parse + json keys + extract value
     assert_eq!(
       rom_data.get(&String::from("EXTRACT_VALUE")).unwrap().opcode,
-      (1 + manifest.response.headers.len() + 1 + 1 + manifest.response.body.json.len() + 1) as u64
+      (manifest.response.headers.len() + 1 + 1 + manifest.response.body.json.len() + 1) as u64
     );
 
     assert_eq!(
       rom.len(),
-      1 + manifest.response.headers.len() + 1 + 1 + manifest.response.body.json.len() + 1
+      plaintext_length / AES_INPUT_LENGTH
+        + 1
+        + manifest.response.headers.len()
+        + 1
+        + 1
+        + manifest.response.body.json.len()
+        + 1
     );
 
     // assert http parse inputs
+    let http_instruction_len = plaintext_length / AES_INPUT_LENGTH;
+
     let mut padded_response_version = [0u8; HTTP_BEGINNING_MAX_LENGTH];
     padded_response_version[..manifest.response.version.len()]
       .copy_from_slice(manifest.response.version.as_bytes());
@@ -424,15 +486,21 @@ mod tests {
       .copy_from_slice(manifest.response.message.as_bytes());
 
     assert_eq!(
-      rom[0].private_input.get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING)),
+      rom[http_instruction_len]
+        .private_input
+        .get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING)),
       Some(&json!(padded_response_version))
     );
     assert_eq!(
-      rom[0].private_input.get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE)),
+      rom[http_instruction_len]
+        .private_input
+        .get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE)),
       Some(&json!(padded_response_status.to_vec()))
     );
     assert_eq!(
-      rom[0].private_input.get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL)),
+      rom[http_instruction_len]
+        .private_input
+        .get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL)),
       Some(&json!(padded_response_message))
     );
 
