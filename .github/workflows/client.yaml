@@ -24,10 +24,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - run: |
-        rustup toolchain install nightly-2024-10-28 --profile minimal --no-self-update
-        rustup component add rust-src --toolchain nightly-2024-10-28
-        rustup target add aarch64-apple-darwin --toolchain nightly-2024-10-28
-        rustup target add x86_64-unknown-linux-gnu
+          rustup toolchain install nightly-2024-10-28 --profile minimal --no-self-update
+          rustup component add rust-src --toolchain nightly-2024-10-28
+          rustup target add aarch64-apple-darwin --toolchain nightly-2024-10-28
+          rustup target add x86_64-unknown-linux-gnu
 
       - run: rustup component add rust-src --toolchain nightly-2024-09-25-aarch64-apple-darwin
         if: matrix.os == 'macos-latest'
