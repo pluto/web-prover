@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 
+use client_side_prover::supernova::{get_circuit_shapes, AuxParams};
 use flate2::{read::ZlibDecoder, write::ZlibEncoder};
-use proving_ground::supernova::{get_circuit_shapes, AuxParams};
 use serde_json::json;
 
 use super::*;

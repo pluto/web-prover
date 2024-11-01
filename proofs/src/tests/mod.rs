@@ -2,9 +2,9 @@
 
 // TODO: (Colin): I'm noticing this module could use some TLC. There's a lot of lint here!
 
+use client_side_prover::supernova::RecursiveSNARK;
 use flate2::write::ZlibEncoder;
 use program::data::{CircuitData, InstructionConfig};
-use proving_ground::supernova::RecursiveSNARK;
 use serde_json::json;
 
 use super::*;
@@ -190,6 +190,10 @@ fn test_end_to_end_proofs() {
   };
   debug!("Setting up `Memory`...");
   let public_params = program::setup(&setup_data);
+
+  // Dealloc the R1CSWithArity vec
+  let (_, aux_params) = public_params.into_parts();
+  let public_params = PublicParams::from_parts_unchecked(vec![], aux_params);
 
   // Check size of PP
   // let serialized = bincode::serialize(&public_params).unwrap();

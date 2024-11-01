@@ -45,6 +45,11 @@ pub struct CircomCircuit {
   pub witness: Option<Vec<F<G1>>>,
 }
 
+// NOTE (Colin): This is added so we can cache only the active circuits we are using.
+impl Default for CircomCircuit {
+  fn default() -> Self { Self { r1cs: R1CS::default(), witness: None } }
+}
+
 impl CircomCircuit {
   pub fn arity(&self) -> usize { self.r1cs.num_public_inputs }
 

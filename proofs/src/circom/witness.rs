@@ -98,6 +98,8 @@ pub fn generate_witness_from_witnesscalc_file(
   todo!("circom_witnesscalc not supported in wasm");
 }
 
+#[warn(missing_docs, clippy::missing_docs_in_private_items)]
+
 pub fn generate_witness_from_wasm_file(
   input_json: &str,
   wasm_path: &PathBuf,

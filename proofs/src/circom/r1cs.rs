@@ -17,6 +17,21 @@ pub struct R1CS {
   pub constraints:        Vec<Constraint>,
 }
 
+// NOTE (Colin): This is added so we can cache only the active circuits we are using.
+impl Default for R1CS {
+  fn default() -> Self {
+    Self {
+      num_private_inputs: 0,
+      num_public_inputs:  0,
+      num_public_outputs: 0,
+      num_inputs:         0,
+      num_aux:            0,
+      num_variables:      0,
+      constraints:        vec![],
+    }
+  }
+}
+
 // R1CSFile's header
 #[derive(Debug, Default)]
 pub struct Header {

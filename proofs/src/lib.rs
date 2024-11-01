@@ -2,14 +2,14 @@
 use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use circom::CircomCircuit;
-use ff::Field;
-use num_bigint::BigInt;
-use proving_ground::{
+use client_side_prover::{
   provider::{hyperkzg::EvaluationEngine, Bn256EngineIPA, Bn256EngineKZG, GrumpkinEngine},
   spartan::batched::BatchedRelaxedR1CSSNARK,
   supernova::{snark::CompressedSNARK, PublicParams, TrivialCircuit},
   traits::{Engine, Group},
 };
+use ff::Field;
+use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 #[cfg(feature = "timing")] use tracing::trace;
@@ -30,8 +30,8 @@ pub type E2 = GrumpkinEngine;
 pub type G1 = <E1 as Engine>::GE;
 pub type G2 = <E2 as Engine>::GE;
 // pub type EE1 = EvaluationEngine<halo2curves::bn256::Bn256, E1>;
-pub type EE1 = proving_ground::provider::ipa_pc::EvaluationEngine<E1>;
-pub type EE2 = proving_ground::provider::ipa_pc::EvaluationEngine<E2>;
+pub type EE1 = client_side_prover::provider::ipa_pc::EvaluationEngine<E1>;
+pub type EE2 = client_side_prover::provider::ipa_pc::EvaluationEngine<E2>;
 pub type S1 = BatchedRelaxedR1CSSNARK<E1, EE1>;
 pub type S2 = BatchedRelaxedR1CSSNARK<E2, EE2>;
 

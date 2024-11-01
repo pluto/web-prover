@@ -3,12 +3,14 @@ use circom::{
   r1cs::R1CS,
   witness::{aes_gcm_fold_wrapper, generate_witness_from_generator_type},
 };
+use client_side_prover::{
+  r1cs::R1CSShape,
+  supernova::{get_circuit_shapes, NonUniformCircuit, RecursiveSNARK, StepCircuit},
+  traits::snark::default_ck_hint,
+  R1CSWithArity,
+};
 use data::Expanded;
 use proof::Proof;
-use proving_ground::{
-  supernova::{NonUniformCircuit, RecursiveSNARK, StepCircuit},
-  traits::snark::default_ck_hint,
-};
 use utils::into_input_json;
 
 use super::*;
@@ -30,6 +32,20 @@ pub struct RomCircuit {
   pub nivc_io:                Option<Vec<F<G1>>>,
   pub private_input:          Option<HashMap<String, Value>>,
   pub witness_generator_type: WitnessGeneratorType,
+}
+
+// NOTE (Colin): This is added so we can cache only the active circuits we are using.
+impl Default for RomCircuit {
+  fn default() -> Self {
+    Self {
+      circuit:                CircomCircuit::default(),
+      circuit_index:          usize::MAX - 1,
+      rom_size:               0,
+      nivc_io:                None,
+      private_input:          None,
+      witness_generator_type: WitnessGeneratorType::Raw(vec![]),
+    }
+  }
 }
 
 impl NonUniformCircuit<E1> for Memory {
@@ -114,8 +130,12 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
   let mut recursive_snark_option = None;
   let mut next_public_input = z0_primary.clone();
 
+  // TODO (Colin): We are basically creating a `R1CS` for each circuit here, then also creating
+  // `R1CSWithArity` for the circuits in the `PublicParams`. Surely we don't need both?
   let circuits = initialize_circuit_list(&program_data.setup_data); // TODO: AwK?
   let mut memory = Memory { rom: rom.clone(), circuits };
+
+  let aux_params = program_data.public_params.aux_params();
 
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
@@ -131,6 +151,13 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
       WitnessGeneratorType::Mobile { circuit } => (false, true),
       _ => (false, false),
     };
+
+    // NOTE (Colin): Alloc only the used R1CSWithArity
+    let mut temp_memory =
+      Memory { rom: vec![], circuits: vec![RomCircuit::default(); memory.circuits.len()] };
+    temp_memory.circuits[op_code as usize] = memory.circuits[op_code as usize].clone();
+    let temp_shapes = get_circuit_shapes(&temp_memory);
+    let public_params = PublicParams::from_parts_unchecked(temp_shapes, aux_params.clone());
 
     memory.circuits[op_code as usize].circuit.witness = if is_browser {
       // When running in browser, the witness is passed as input.
@@ -171,7 +198,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
 
     let mut recursive_snark = recursive_snark_option.unwrap_or_else(|| {
       RecursiveSNARK::new(
-        &program_data.public_params,
+        &public_params,
         &memory,
         &circuit_primary,
         &circuit_secondary,
@@ -182,15 +209,13 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
     });
 
     info!("Proving single step...");
-    recursive_snark
-      .prove_step(&program_data.public_params, &circuit_primary, &circuit_secondary)
-      .unwrap();
+    recursive_snark.prove_step(&public_params, &circuit_primary, &circuit_secondary).unwrap();
     info!("Done proving single step...");
 
     #[cfg(feature = "verify-steps")]
     {
       info!("Verifying single step...");
-      recursive_snark.verify(&program_data.public_params, &z0_primary, &z0_secondary).unwrap();
+      recursive_snark.verify(&public_params, &z0_primary, &z0_secondary).unwrap();
       info!("Single step verification done");
     }
 
@@ -231,7 +256,7 @@ pub fn compress_proof(
 
 // TODO: May want to rethink this slightly as we also store the R1CS data inside the PP. Avoid
 // doubling up if possible (maybe need to use refs)
-fn initialize_circuit_list(setup_data: &SetupData) -> Vec<RomCircuit> {
+pub fn initialize_circuit_list(setup_data: &SetupData) -> Vec<RomCircuit> {
   let mut circuits = vec![];
   for (circuit_index, (r1cs_type, witness_generator_type)) in
     setup_data.r1cs_types.iter().zip(setup_data.witness_generator_types.iter()).enumerate()
