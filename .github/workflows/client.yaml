@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: | 
+      - run: |
         rustup toolchain install nightly-2024-10-28 --profile minimal --no-self-update
         rustup component add rust-src --toolchain nightly-2024-10-28
         rustup target add aarch64-apple-darwin --toolchain nightly-2024-10-28
