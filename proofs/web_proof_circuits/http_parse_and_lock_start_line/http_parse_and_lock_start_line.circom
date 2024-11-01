@@ -6,7 +6,7 @@ include "parser-attestor/circuits/utils/bytes.circom";
 
 // TODO: Note that TOTAL_BYTES will match what we have for AESGCMFOLD step_out
 // I have not gone through to double check the sizes of everything yet.
-template LockStartLine(TOTAL_BYTES, DATA_BYTES, beginningLen, middleLen, finalLen) {
+template ParseAndLockStartLine(TOTAL_BYTES, DATA_BYTES, MAX_BEGINNING_LENGTH, MAX_MIDDLE_LENGTH, MAX_FINAL_LENGTH) {
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~~ Set sizes at compile time ~~
     // Total number of variables in the parser for each byte of data
@@ -29,9 +29,12 @@ template LockStartLine(TOTAL_BYTES, DATA_BYTES, beginningLen, middleLen, finalLe
     // component dataASCII = ASCII(DATA_BYTES);
     // dataASCII.in <== data;
 
-    signal input beginning[beginningLen];
-    signal input middle[middleLen];
-    signal input final[finalLen];
+    signal input beginning[MAX_BEGINNING_LENGTH];
+    signal input beginning_length;
+    signal input middle[MAX_MIDDLE_LENGTH];
+    signal input middle_length;
+    signal input final[MAX_FINAL_LENGTH];
+    signal input final_length;
 
     // Initialze the parser
     component State[DATA_BYTES];
@@ -49,15 +52,14 @@ template LockStartLine(TOTAL_BYTES, DATA_BYTES, beginningLen, middleLen, finalLe
     we can make this more efficient by just comparing the first `beginningLen` bytes
     of the data ASCII against the beginning ASCII itself.
     */
-    // Check first beginning byte
-    signal beginningIsEqual[beginningLen];
-    beginningIsEqual[0] <== IsEqual()([data[0],beginning[0]]);
-    beginningIsEqual[0] === 1;
 
     // Setup to check middle bytes
     signal startLineMask[DATA_BYTES];
     signal middleMask[DATA_BYTES];
     signal finalMask[DATA_BYTES];
+    startLineMask[0] <== inStartLine()(State[0].parsing_start);
+    middleMask[0]    <== inStartMiddle()(State[0].parsing_start);
+    finalMask[0]     <== inStartEnd()(State[0].parsing_start);
 
     var middle_start_counter = 1;
     var middle_end_counter = 1;
@@ -72,12 +74,6 @@ template LockStartLine(TOTAL_BYTES, DATA_BYTES, beginningLen, middleLen, finalLe
         State[data_idx].parsing_body        <== State[data_idx - 1].next_parsing_body;
         State[data_idx].line_status         <== State[data_idx - 1].next_line_status;
 
-        // Check remaining beginning bytes
-        if(data_idx < beginningLen) {
-            beginningIsEqual[data_idx] <== IsEqual()([data[data_idx], beginning[data_idx]]);
-            beginningIsEqual[data_idx] === 1;
-        }
-
         // Set the masks based on parser state
         startLineMask[data_idx] <== inStartLine()(State[data_idx].parsing_start);
         middleMask[data_idx]    <== inStartMiddle()(State[data_idx].parsing_start);
@@ -90,18 +86,20 @@ template LockStartLine(TOTAL_BYTES, DATA_BYTES, beginningLen, middleLen, finalLe
     }
 
     // Additionally verify beginning had correct length
-    beginningLen === middle_start_counter - 1;
+    beginning_length === middle_start_counter - 1;
+
+    signal beginningMatch <== SubstringMatchWithIndexPadded(DATA_BYTES, MAX_BEGINNING_LENGTH)(data, beginning, beginning_length, 0);
 
     // Check middle is correct by substring match and length check
-    signal middleMatch <== SubstringMatchWithIndex(DATA_BYTES, middleLen)(data, middle, middle_start_counter);
+    signal middleMatch <== SubstringMatchWithIndexPadded(DATA_BYTES, MAX_MIDDLE_LENGTH)(data, middle, middle_length, middle_start_counter);
     middleMatch === 1;
-    middleLen === middle_end_counter - middle_start_counter - 1;
+    middle_length === middle_end_counter - middle_start_counter - 1;
 
     // Check final is correct by substring match and length check
-    signal finalMatch <== SubstringMatchWithIndex(DATA_BYTES, finalLen)(data, final, middle_end_counter);
+    signal finalMatch <== SubstringMatchWithIndexPadded(DATA_BYTES, MAX_FINAL_LENGTH)(data, final, final_length, middle_end_counter);
     finalMatch === 1;
     // -2 here for the CRLF
-    finalLen === final_end_counter - middle_end_counter - 2;
+    final_length === final_end_counter - middle_end_counter - 2;
 
     // ------------------------------------------------------------------------------------------------------------------ //
     // ~ Write out to next NIVC step (Lock Header)
@@ -123,4 +121,4 @@ template LockStartLine(TOTAL_BYTES, DATA_BYTES, beginningLen, middleLen, finalLe
     }
 }
 
-component main { public [step_in] } = LockStartLine(4160, 320, 8, 3, 2);
+component main { public [step_in] } = ParseAndLockStartLine(4160, 320, 10, 50, 10);

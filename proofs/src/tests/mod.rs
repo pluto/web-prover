@@ -3,7 +3,6 @@
 // TODO: (Colin): I'm noticing this module could use some TLC. There's a lot of lint here!
 
 use client_side_prover::supernova::RecursiveSNARK;
-use flate2::write::ZlibEncoder;
 use program::data::{CircuitData, InstructionConfig};
 use serde_json::json;
 
@@ -37,9 +36,9 @@ const AES_GCM_GRAPH: &[u8] = include_bytes!("../../web_proof_circuits/aes_gcm/ae
 const HTTP_PARSE_AND_LOCK_START_LINE_R1CS: &[u8] = include_bytes!(
   "../../web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.r1cs"
 );
-const HTTP_PARSE_AND_LOCK_START_LINE_WASM: &str =
-  "../../web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line_js/\
-   http_parse_and_lock_start_line.wasm";
+// const HTTP_PARSE_AND_LOCK_START_LINE_WASM: &str =
+//   "../../web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line_js/\
+//    http_parse_and_lock_start_line.wasm";
 const HTTP_PARSE_AND_LOCK_START_LINE_GRAPH: &[u8] = include_bytes!(
   "../../web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.bin"
 );
@@ -47,16 +46,16 @@ const HTTP_PARSE_AND_LOCK_START_LINE_GRAPH: &[u8] = include_bytes!(
 // Circuit 2
 const HTTP_LOCK_HEADER_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/http_lock_header/http_lock_header.r1cs");
-const HTTP_LOCK_HEADER_WASM: &str =
-  "../../web_proof_circuits/http_lock_header/http_lock_header_js/http_lock_header.wasm";
+// const HTTP_LOCK_HEADER_WASM: &str =
+//   "../../web_proof_circuits/http_lock_header/http_lock_header_js/http_lock_header.wasm";
 const HTTP_LOCK_HEADER_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/http_lock_header/http_lock_header.bin");
 
 // Circuit 3
 const HTTP_BODY_MASK_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/http_body_mask/http_body_mask.r1cs");
-const HTTP_BODY_MASK_WASM: &str =
-  "../../web_proof_circuits/http_body_mask/http_body_mask_js/http_body_mask.wasm";
+// const HTTP_BODY_MASK_WASM: &str =
+//   "../../web_proof_circuits/http_body_mask/http_body_mask_js/http_body_mask.wasm";
 
 const HTTP_BODY_MASK_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/http_body_mask/http_body_mask.bin");
@@ -71,24 +70,24 @@ const JSON_PARSE_GRAPH: &[u8] =
 // Circuit 5
 const JSON_MASK_OBJECT_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/json_mask_object/json_mask_object.r1cs");
-const JSON_MASK_OBJECT_WASM: &str =
-  "../../web_proof_circuits/json_mask_object/json_mask_object_js/json_mask_object.wasm";
+// const JSON_MASK_OBJECT_WASM: &str =
+//   "../../web_proof_circuits/json_mask_object/json_mask_object_js/json_mask_object.wasm";
 const JSON_MASK_OBJECT_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/json_mask_object/json_mask_object.bin");
 
 // Circuit 6
 const JSON_MASK_ARRAY_INDEX_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/json_mask_array_index/json_mask_array_index.r1cs");
-const JSON_MASK_ARRAY_WASM: &str =
-  "../../web_proof_circuits/json_mask_array/json_mask_array_js/json_mask_array.wasm";
+// const JSON_MASK_ARRAY_WASM: &str =
+//   "../../web_proof_circuits/json_mask_array/json_mask_array_js/json_mask_array.wasm";
 const JSON_MASK_ARRAY_INDEX_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/json_mask_array_index/json_mask_array_index.bin");
 
 // circuit 7
 const EXTRACT_VALUE_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/extract_value/extract_value.r1cs");
-const EXTRACT_VALUE_WASM: &str =
-  "../../web_proof_circuits/extract_value/extract_value_js/extract_value.wasm";
+// const EXTRACT_VALUE_WASM: &str =
+// "../../web_proof_circuits/extract_value/extract_value_js/extract_value.wasm";
 const EXTRACT_VALUE_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/extract_value/extract_value.bin");
 
@@ -117,9 +116,15 @@ const AES_KEY: (&str, [u8; 16]) =
   ("key", [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49]);
 const AES_IV: (&str, [u8; 12]) = ("iv", [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49]);
 const AES_AAD: (&str, [u8; 16]) = ("aad", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-const HTTP_LOCK_VERSION: (&str, [u8; 8]) = ("beginning", [72, 84, 84, 80, 47, 49, 46, 49]);
-const HTTP_LOCK_STATUS: (&str, [u8; 3]) = ("middle", [50, 48, 48]);
-const HTTP_LOCK_MESSAGE: (&str, [u8; 2]) = ("final", [79, 75]);
+const HTTP_LOCK_VERSION: (&str, [u8; 10]) = ("beginning", [72, 84, 84, 80, 47, 49, 46, 49, 0, 0]);
+const HTTP_BEGINNING_LENGTH: (&str, [u8; 1]) = ("beginning_length", [8]);
+const HTTP_LOCK_STATUS: (&str, [u8; 50]) = ("middle", [
+  50, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+]);
+const HTTP_MIDDLE_LENGTH: (&str, [u8; 1]) = ("middle_length", [3]);
+const HTTP_LOCK_MESSAGE: (&str, [u8; 10]) = ("final", [79, 75, 0, 0, 0, 0, 0, 0, 0, 0]);
+const HTTP_FINAL_LENGTH: (&str, [u8; 1]) = ("final_length", [2]);
 const HTTP_LOCK_HEADER_NAME: (&str, [u8; 12]) =
   ("header", [99, 111, 110, 116, 101, 110, 116, 45, 116, 121, 112, 101]);
 const HTTP_LOCK_HEADER_VALUE: (&str, [u8; 31]) = ("value", [
@@ -174,10 +179,6 @@ fn test_end_to_end_proofs() {
     ],
     witness_generator_types: vec![
       WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
-      // WitnessGeneratorType::Wasm {
-      //   path:      String::from("../proofs/web_proof_circuits/aes_gcm/aes_gcm_js/aes_gcm.wasm"),
-      //   wtns_path: String::from("witness.wtns"),
-      // },
       WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
@@ -234,8 +235,11 @@ fn test_end_to_end_proofs() {
       name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
       private_input: HashMap::from([
         (String::from(HTTP_LOCK_VERSION.0), json!(HTTP_LOCK_VERSION.1)),
+        (String::from(HTTP_BEGINNING_LENGTH.0), json!(HTTP_BEGINNING_LENGTH.1)),
+        (String::from(HTTP_LOCK_STATUS.0), json!(HTTP_LOCK_STATUS.1.to_vec())),
+        (String::from(HTTP_MIDDLE_LENGTH.0), json!(HTTP_MIDDLE_LENGTH.1)),
         (String::from(HTTP_LOCK_MESSAGE.0), json!(HTTP_LOCK_MESSAGE.1)),
-        (String::from(HTTP_LOCK_STATUS.0), json!(HTTP_LOCK_STATUS.1)),
+        (String::from(HTTP_FINAL_LENGTH.0), json!(HTTP_FINAL_LENGTH.1)),
       ]),
     },
     InstructionConfig {
