@@ -23,13 +23,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: rustup toolchain install nightly-2024-06-10 --profile minimal --no-self-update
-
-      - run: rustup component add rust-src --toolchain nightly-2024-06-10-x86_64-unknown-linux-gnu
-        if: matrix.os == 'self-hosted'
-
-      - run: rustup component add rust-src --toolchain nightly-2024-06-10-aarch64-apple-darwin
-        if: matrix.os == 'macos-latest'
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
       - run: sudo apt install -y protobuf-compiler
         if: matrix.os == 'self-hosted'
@@ -51,7 +48,7 @@ jobs:
           unzip -o circuits.zip -d proofs/web_proof_circuits
 
       - run: |
-          RUST_LOG=DEBUG cargo +nightly-2024-06-10 run --release -p notary -- --config ./fixture/notary-config.toml &
+          RUST_LOG=DEBUG cargo run --release -p notary -- --config ./fixture/notary-config.toml &
           sleep 30
           NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer cargo run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
           NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer cargo run --release -p client -- --config ./fixture/client.origo_tcp_local.json
