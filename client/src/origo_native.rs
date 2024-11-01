@@ -72,8 +72,8 @@ async fn generate_program_data(
   // ----------------------------------------------------------------------------------------------------------------------- //
 
   // TODO (Colin): ultimately we want to download the `AuxParams` here and deserialize to setup
-  // `PublicParams` alongside of calling `client_side_prover::supernova::get_circuit_shapes` for this
-  // next step
+  // `PublicParams` alongside of calling `client_side_prover::supernova::get_circuit_shapes` for
+  // this next step
   // ----------------------------------------------------------------------------------------------------------------------- //
   // - create program setup (creating new `PublicParams` each time, for the moment) -
   let setup_data = SetupData {

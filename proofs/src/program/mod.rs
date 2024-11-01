@@ -3,14 +3,14 @@ use circom::{
   r1cs::R1CS,
   witness::{aes_gcm_fold_wrapper, generate_witness_from_generator_type},
 };
-use data::Expanded;
-use proof::Proof;
 use client_side_prover::{
   r1cs::R1CSShape,
   supernova::{get_circuit_shapes, NonUniformCircuit, RecursiveSNARK, StepCircuit},
   traits::snark::default_ck_hint,
   R1CSWithArity,
 };
+use data::Expanded;
+use proof::Proof;
 use utils::into_input_json;
 
 use super::*;
