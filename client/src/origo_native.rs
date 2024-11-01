@@ -10,6 +10,7 @@ use proofs::{
       CircuitData, Expanded, FoldInput, InstructionConfig, NotExpanded, Online, ProgramData,
       R1CSType, SetupData, WitnessGeneratorType,
     },
+    manifest,
   },
   F, G1,
 };
@@ -66,6 +67,7 @@ async fn generate_program_data(
     )
     .unwrap();
   let pt = plaintext.payload.0.to_vec();
+  debug!("plaintext: {:?}", pt);
   let aad = hex::decode(meta.additional_data.to_owned()).unwrap();
   let mut padded_aad = vec![0; 16 - aad.len()];
   padded_aad.extend(aad);
@@ -117,21 +119,27 @@ async fn generate_program_data(
   let rom_len = (pt.len() + janky_padding) / 16;
   janky_plaintext_padding.extend(pt);
 
+  let (rom_data, rom) = proving.manifest.unwrap().rom_from_request(
+    &key,
+    &iv,
+    &padded_aad,
+    janky_plaintext_padding.len(),
+  );
   let aes_instr = String::from("AES_GCM_1");
-  // TODO (Sambhav): Add more opcodes for extraction, determine how a web proof chooses an
-  // extraction
-  let rom_data = HashMap::from([(aes_instr.clone(), CircuitData { opcode: 0 })]);
+  // // TODO (Sambhav): Add more opcodes for extraction, determine how a web proof chooses an
+  // // extraction
+  // let rom_data = HashMap::from([(aes_instr.clone(), CircuitData { opcode: 0 })]);
 
-  let aes_rom_opcode_config = InstructionConfig {
-    name:          aes_instr.clone(),
-    private_input: HashMap::from([
-      (String::from("key"), json!(key)),
-      (String::from("iv"), json!(iv)),
-      (String::from("aad"), json!(padded_aad)),
-    ]),
-  };
+  // let aes_rom_opcode_config = InstructionConfig {
+  //   name:          aes_instr.clone(),
+  //   private_input: HashMap::from([
+  //     (String::from("key"), json!(key)),
+  //     (String::from("iv"), json!(iv)),
+  //     (String::from("aad"), json!(padded_aad)),
+  //   ]),
+  // };
 
-  let rom = vec![aes_rom_opcode_config; rom_len];
+  // let rom = vec![aes_rom_opcode_config; rom_len];
 
   // TODO (Sambhav): update fold input from manifest
   let inputs = HashMap::from([(aes_instr.clone(), FoldInput {

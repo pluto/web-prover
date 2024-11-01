@@ -88,7 +88,7 @@ const HTTP_BEGINNING_LENGTH_SIGNAL: &str = "beginningLen";
 const HTTP_MIDDLE_LENGTH_SIGNAL: &str = "middleLen";
 const HTTP_FINAL_LENGTH_SIGNAL: &str = "finalLen";
 const HTTP_BEGINNING_MAX_LENGTH: usize = 10;
-const HTTP_MIDDLE_MAX_LENGTH: usize = 50;
+const HTTP_MIDDLE_MAX_LENGTH: usize = 150;
 const HTTP_FINAL_MAX_LENGTH: usize = 10;
 const HTTP_HEADER_SIGNAL_NAME: &str = "header";
 const HTTP_HEADER_SIGNAL_VALUE: &str = "value";
@@ -104,9 +104,9 @@ impl Manifest {
   /// from [`Manifest::request`]
   pub fn rom_from_request(
     &self,
-    aes_key: [u8; 16],
-    aes_iv: [u8; 12],
-    aes_aad: [u8; 16],
+    aes_key: &[u8],
+    aes_iv: &[u8],
+    aes_aad: &[u8],
     plaintext_len: usize,
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>) {
     assert_eq!(plaintext_len % AES_INPUT_LENGTH, 0);
@@ -379,7 +379,8 @@ mod tests {
     let plaintext_len = 16;
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
-    let (rom_data, rom) = manifest.rom_from_request(AES_KEY.1, AES_IV.1, AES_AAD.1, plaintext_len);
+    let (rom_data, rom) =
+      manifest.rom_from_request(&AES_KEY.1, &AES_IV.1, &AES_AAD.1, plaintext_len);
 
     // AES + HTTP parse + HTTP headers length
     assert_eq!(rom_data.len(), 1 + 1 + manifest.request.headers.len());

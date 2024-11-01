@@ -5,7 +5,7 @@ include "parser-attestor/circuits/utils/array.circom";
 
 template LockHeader(TOTAL_BYTES, DATA_BYTES, headerNameLen, headerValueLen) {
     // ------------------------------------------------------------------------------------------------------------------ //
-    // ~~ Set sizes at compile time ~~    
+    // ~~ Set sizes at compile time ~~
     // Total number of variables in the parser for each byte of data
     var PER_ITERATION_DATA_LENGTH = 5;
     var TOTAL_BYTES_USED          = DATA_BYTES * (PER_ITERATION_DATA_LENGTH + 1); // data + parser vars
@@ -83,5 +83,5 @@ template FirstStringMatch(dataLen, keyLen) {
     position <== counter;
 }
 
-component main { public [step_in] } = LockHeader(4160, 320, 12, 31);
+component main { public [step_in] } = LockHeader(4160, 320, 20, 35);
 

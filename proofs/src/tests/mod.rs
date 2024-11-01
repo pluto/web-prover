@@ -63,7 +63,8 @@ const HTTP_BODY_MASK_GRAPH: &[u8] =
 // Circuit 4
 const JSON_PARSE_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/json_parse/json_parse.r1cs");
-const JSON_PARSE_WASM: &str = "../../web_proof_circuits/json_parse/json_parse_js/json_parse.wasm";
+// const JSON_PARSE_WASM: &str =
+// "../../web_proof_circuits/json_parse/json_parse_js/json_parse.wasm";
 const JSON_PARSE_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/json_parse/json_parse.bin");
 
@@ -117,19 +118,22 @@ const AES_KEY: (&str, [u8; 16]) =
 const AES_IV: (&str, [u8; 12]) = ("iv", [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49]);
 const AES_AAD: (&str, [u8; 16]) = ("aad", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 const HTTP_LOCK_VERSION: (&str, [u8; 10]) = ("beginning", [72, 84, 84, 80, 47, 49, 46, 49, 0, 0]);
-const HTTP_BEGINNING_LENGTH: (&str, [u8; 1]) = ("beginning_length", [8]);
-const HTTP_LOCK_STATUS: (&str, [u8; 50]) = ("middle", [
+const HTTP_BEGINNING_LENGTH: (&str, [u8; 1]) = ("beginningLen", [8]);
+const HTTP_LOCK_STATUS: (&str, [u8; 150]) = ("middle", [
   50, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ]);
-const HTTP_MIDDLE_LENGTH: (&str, [u8; 1]) = ("middle_length", [3]);
+const HTTP_MIDDLE_LENGTH: (&str, [u8; 1]) = ("middleLen", [3]);
 const HTTP_LOCK_MESSAGE: (&str, [u8; 10]) = ("final", [79, 75, 0, 0, 0, 0, 0, 0, 0, 0]);
-const HTTP_FINAL_LENGTH: (&str, [u8; 1]) = ("final_length", [2]);
-const HTTP_LOCK_HEADER_NAME: (&str, [u8; 12]) =
-  ("header", [99, 111, 110, 116, 101, 110, 116, 45, 116, 121, 112, 101]);
-const HTTP_LOCK_HEADER_VALUE: (&str, [u8; 31]) = ("value", [
+const HTTP_FINAL_LENGTH: (&str, [u8; 1]) = ("finalLen", [2]);
+const HTTP_LOCK_HEADER_NAME: (&str, [u8; 20]) =
+  ("header", [99, 111, 110, 116, 101, 110, 116, 45, 116, 121, 112, 101, 0, 0, 0, 0, 0, 0, 0, 0]);
+const HTTP_LOCK_HEADER_VALUE: (&str, [u8; 35]) = ("value", [
   97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106, 115, 111, 110, 59, 32, 99, 104, 97,
-  114, 115, 101, 116, 61, 117, 116, 102, 45, 56,
+  114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 0, 0, 0, 0,
 ]);
 
 const JSON_MASK_KEY_DEPTH_1: (&str, [u8; 10]) = ("key", [100, 97, 116, 97, 0, 0, 0, 0, 0, 0]); // "data"
@@ -246,7 +250,7 @@ fn test_end_to_end_proofs() {
       name:          String::from("HTTP_LOCK_HEADER_1"),
       private_input: HashMap::from([
         (String::from(HTTP_LOCK_HEADER_NAME.0), json!(HTTP_LOCK_HEADER_NAME.1)),
-        (String::from(HTTP_LOCK_HEADER_VALUE.0), json!(HTTP_LOCK_HEADER_VALUE.1)),
+        (String::from(HTTP_LOCK_HEADER_VALUE.0), json!(HTTP_LOCK_HEADER_VALUE.1.to_vec())),
       ]),
     },
     InstructionConfig {
