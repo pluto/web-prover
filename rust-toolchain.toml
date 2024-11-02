@@ -2,10 +2,10 @@
 # https://rust-lang.github.io/rustup/overrides.html
 
 [toolchain]
-# what toolchain to use. 
-channel="nightly"
+# what toolchain to use.
+channel="nightly-2024-06-10"
 
-# option to specify a date to pin to a particular release 
+# option to specify a date to pin to a particular release
 # date = "2024-03-19"
 
 # profiles are groups of components to download when installing a toolchain.
