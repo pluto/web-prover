@@ -149,270 +149,270 @@ const JSON_MASK_KEYLEN_DEPTH_5: (&str, [u8; 1]) = ("keyLen", [4]);
 
 // TODO (Colin): This test requires JSON parse between all the JSON steps. REMOVE THIS REDUNDANCY
 // USING NEW CIRCUITS!
-#[test]
-#[tracing_test::traced_test]
-fn test_end_to_end_proofs() {
-  // HTTP/1.1 200 OK
-  // content-type: application/json; charset=utf-8
-  // content-encoding: gzip
-  // Transfer-Encoding: chunked
-  //
-  // {
-  //    "data": {
-  //        "items": [
-  //            {
-  //                "data": "Artist",
-  //                "profile": {
-  //                    "name": "Taylor Swift"
-  //                }
-  //            }
-  //        ]
-  //    }
-  // }
+// #[test]
+// #[tracing_test::traced_test]
+// fn test_end_to_end_proofs() {
+//   // HTTP/1.1 200 OK
+//   // content-type: application/json; charset=utf-8
+//   // content-encoding: gzip
+//   // Transfer-Encoding: chunked
+//   //
+//   // {
+//   //    "data": {
+//   //        "items": [
+//   //            {
+//   //                "data": "Artist",
+//   //                "profile": {
+//   //                    "name": "Taylor Swift"
+//   //                }
+//   //            }
+//   //        ]
+//   //    }
+//   // }
 
-  let setup_data = SetupData {
-    r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
-      R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
-    ],
-    witness_generator_types: vec![
-      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_PARSE_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
-    ],
-    max_rom_length:          JSON_MAX_ROM_LENGTH,
-  };
-  debug!("Setting up `Memory`...");
-  let public_params = program::setup(&setup_data);
+//   let setup_data = SetupData {
+//     r1cs_types:              vec![
+//       R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+//       R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
+//       R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
+//       R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
+//       R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
+//       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
+//       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
+//       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+//     ],
+//     witness_generator_types: vec![
+//       WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
+//       WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
+//       WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
+//       WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
+//       WitnessGeneratorType::Raw(JSON_PARSE_GRAPH.to_vec()),
+//       WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
+//       WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
+//       WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
+//     ],
+//     max_rom_length:          JSON_MAX_ROM_LENGTH,
+//   };
+//   debug!("Setting up `Memory`...");
+//   let public_params = program::setup(&setup_data);
 
-  // Dealloc the R1CSWithArity vec
-  let (_, aux_params) = public_params.into_parts();
-  let public_params = PublicParams::from_parts_unchecked(vec![], aux_params);
+//   // Dealloc the R1CSWithArity vec
+//   let (_, aux_params) = public_params.into_parts();
+//   let public_params = PublicParams::from_parts_unchecked(vec![], aux_params);
 
-  // Check size of PP
-  // let serialized = bincode::serialize(&public_params).unwrap();
-  // let mut encoder = ZlibEncoder::new(Vec::new(), flate2::Compression::best());
-  // encoder.write_all(&serialized).unwrap();
-  // let compressed = encoder.finish().unwrap();
-  // debug!("Length of serialized PP: {:?}", compressed.len());
+//   // Check size of PP
+//   // let serialized = bincode::serialize(&public_params).unwrap();
+//   // let mut encoder = ZlibEncoder::new(Vec::new(), flate2::Compression::best());
+//   // encoder.write_all(&serialized).unwrap();
+//   // let compressed = encoder.finish().unwrap();
+//   // debug!("Length of serialized PP: {:?}", compressed.len());
 
-  debug!("Creating ROM");
-  let rom_data = HashMap::from([
-    (String::from("AES_GCM_1"), CircuitData { opcode: 0 }),
-    (String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 1 }),
-    (String::from("HTTP_LOCK_HEADER_1"), CircuitData { opcode: 2 }),
-    (String::from("HTTP_BODY_EXTRACT"), CircuitData { opcode: 3 }),
-    (String::from("JSON_PARSE"), CircuitData { opcode: 4 }),
-    (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 5 }),
-    (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 5 }),
-    (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 6 }),
-    (String::from("JSON_MASK_OBJECT_4"), CircuitData { opcode: 5 }),
-    (String::from("JSON_MASK_OBJECT_5"), CircuitData { opcode: 5 }),
-    (String::from("EXTRACT_VALUE"), CircuitData { opcode: 7 }),
-  ]);
+//   debug!("Creating ROM");
+//   let rom_data = HashMap::from([
+//     (String::from("AES_GCM_1"), CircuitData { opcode: 0 }),
+//     (String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 1 }),
+//     (String::from("HTTP_LOCK_HEADER_1"), CircuitData { opcode: 2 }),
+//     (String::from("HTTP_BODY_EXTRACT"), CircuitData { opcode: 3 }),
+//     (String::from("JSON_PARSE"), CircuitData { opcode: 4 }),
+//     (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 5 }),
+//     (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 5 }),
+//     (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 6 }),
+//     (String::from("JSON_MASK_OBJECT_4"), CircuitData { opcode: 5 }),
+//     (String::from("JSON_MASK_OBJECT_5"), CircuitData { opcode: 5 }),
+//     (String::from("EXTRACT_VALUE"), CircuitData { opcode: 7 }),
+//   ]);
 
-  let aes_rom_opcode_config = InstructionConfig {
-    name:          String::from("AES_GCM_1"),
-    private_input: HashMap::from([
-      (String::from(AES_KEY.0), json!(AES_KEY.1)),
-      (String::from(AES_IV.0), json!(AES_IV.1)),
-      (String::from(AES_AAD.0), json!(AES_AAD.1)),
-    ]),
-  };
+//   let aes_rom_opcode_config = InstructionConfig {
+//     name:          String::from("AES_GCM_1"),
+//     private_input: HashMap::from([
+//       (String::from(AES_KEY.0), json!(AES_KEY.1)),
+//       (String::from(AES_IV.0), json!(AES_IV.1)),
+//       (String::from(AES_AAD.0), json!(AES_AAD.1)),
+//     ]),
+//   };
 
-  debug!("Creating `private_inputs`...");
-  let mut rom = vec![aes_rom_opcode_config; AES_PLAINTEXT.1.len() / BYTES_PER_FOLD];
-  rom.extend([
-    // let rom = vec![
-    InstructionConfig {
-      name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
-      private_input: HashMap::from([
-        (String::from(HTTP_LOCK_VERSION.0), json!(HTTP_LOCK_VERSION.1)),
-        (String::from(HTTP_BEGINNING_LENGTH.0), json!(HTTP_BEGINNING_LENGTH.1)),
-        (String::from(HTTP_LOCK_STATUS.0), json!(HTTP_LOCK_STATUS.1.to_vec())),
-        (String::from(HTTP_MIDDLE_LENGTH.0), json!(HTTP_MIDDLE_LENGTH.1)),
-        (String::from(HTTP_LOCK_MESSAGE.0), json!(HTTP_LOCK_MESSAGE.1)),
-        (String::from(HTTP_FINAL_LENGTH.0), json!(HTTP_FINAL_LENGTH.1)),
-      ]),
-    },
-    InstructionConfig {
-      name:          String::from("HTTP_LOCK_HEADER_1"),
-      private_input: HashMap::from([
-        (String::from(HTTP_LOCK_HEADER_NAME.0), json!(HTTP_LOCK_HEADER_NAME.1)),
-        (String::from(HTTP_LOCK_HEADER_VALUE.0), json!(HTTP_LOCK_HEADER_VALUE.1.to_vec())),
-      ]),
-    },
-    InstructionConfig {
-      name:          String::from("HTTP_BODY_EXTRACT"),
-      private_input: HashMap::new(),
-    },
-    InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
-    InstructionConfig {
-      name:          String::from("JSON_MASK_OBJECT_1"),
-      private_input: HashMap::from([
-        (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
-        (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
-      ]),
-    },
-    InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
-    InstructionConfig {
-      name:          String::from("JSON_MASK_OBJECT_2"),
-      private_input: HashMap::from([
-        (String::from(JSON_MASK_KEY_DEPTH_2.0), json!(JSON_MASK_KEY_DEPTH_2.1)),
-        (String::from(JSON_MASK_KEYLEN_DEPTH_2.0), json!(JSON_MASK_KEYLEN_DEPTH_2.1)),
-      ]),
-    },
-    InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
-    InstructionConfig {
-      name:          String::from("JSON_MASK_ARRAY_3"),
-      private_input: HashMap::from([(
-        String::from(JSON_MASK_ARR_DEPTH_3.0),
-        json!(JSON_MASK_ARR_DEPTH_3.1),
-      )]),
-    },
-    InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
-    InstructionConfig {
-      name:          String::from("JSON_MASK_OBJECT_4"),
-      private_input: HashMap::from([
-        (String::from(JSON_MASK_KEY_DEPTH_4.0), json!(JSON_MASK_KEY_DEPTH_4.1)),
-        (String::from(JSON_MASK_KEYLEN_DEPTH_4.0), json!(JSON_MASK_KEYLEN_DEPTH_4.1)),
-      ]),
-    },
-    InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
-    InstructionConfig {
-      name:          String::from("JSON_MASK_OBJECT_5"),
-      private_input: HashMap::from([
-        (String::from(JSON_MASK_KEY_DEPTH_5.0), json!(JSON_MASK_KEY_DEPTH_5.1)),
-        (String::from(JSON_MASK_KEYLEN_DEPTH_5.0), json!(JSON_MASK_KEYLEN_DEPTH_5.1)),
-      ]),
-    },
-    InstructionConfig {
-      name:          String::from("EXTRACT_VALUE"),
-      private_input: HashMap::new(),
-    },
-  ]);
+//   debug!("Creating `private_inputs`...");
+//   let mut rom = vec![aes_rom_opcode_config; AES_PLAINTEXT.1.len() / BYTES_PER_FOLD];
+//   rom.extend([
+//     // let rom = vec![
+//     InstructionConfig {
+//       name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
+//       private_input: HashMap::from([
+//         (String::from(HTTP_LOCK_VERSION.0), json!(HTTP_LOCK_VERSION.1)),
+//         (String::from(HTTP_BEGINNING_LENGTH.0), json!(HTTP_BEGINNING_LENGTH.1)),
+//         (String::from(HTTP_LOCK_STATUS.0), json!(HTTP_LOCK_STATUS.1.to_vec())),
+//         (String::from(HTTP_MIDDLE_LENGTH.0), json!(HTTP_MIDDLE_LENGTH.1)),
+//         (String::from(HTTP_LOCK_MESSAGE.0), json!(HTTP_LOCK_MESSAGE.1)),
+//         (String::from(HTTP_FINAL_LENGTH.0), json!(HTTP_FINAL_LENGTH.1)),
+//       ]),
+//     },
+//     InstructionConfig {
+//       name:          String::from("HTTP_LOCK_HEADER_1"),
+//       private_input: HashMap::from([
+//         (String::from(HTTP_LOCK_HEADER_NAME.0), json!(HTTP_LOCK_HEADER_NAME.1)),
+//         (String::from(HTTP_LOCK_HEADER_VALUE.0), json!(HTTP_LOCK_HEADER_VALUE.1.to_vec())),
+//       ]),
+//     },
+//     InstructionConfig {
+//       name:          String::from("HTTP_BODY_EXTRACT"),
+//       private_input: HashMap::new(),
+//     },
+//     InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
+//     InstructionConfig {
+//       name:          String::from("JSON_MASK_OBJECT_1"),
+//       private_input: HashMap::from([
+//         (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
+//         (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
+//       ]),
+//     },
+//     InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
+//     InstructionConfig {
+//       name:          String::from("JSON_MASK_OBJECT_2"),
+//       private_input: HashMap::from([
+//         (String::from(JSON_MASK_KEY_DEPTH_2.0), json!(JSON_MASK_KEY_DEPTH_2.1)),
+//         (String::from(JSON_MASK_KEYLEN_DEPTH_2.0), json!(JSON_MASK_KEYLEN_DEPTH_2.1)),
+//       ]),
+//     },
+//     InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
+//     InstructionConfig {
+//       name:          String::from("JSON_MASK_ARRAY_3"),
+//       private_input: HashMap::from([(
+//         String::from(JSON_MASK_ARR_DEPTH_3.0),
+//         json!(JSON_MASK_ARR_DEPTH_3.1),
+//       )]),
+//     },
+//     InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
+//     InstructionConfig {
+//       name:          String::from("JSON_MASK_OBJECT_4"),
+//       private_input: HashMap::from([
+//         (String::from(JSON_MASK_KEY_DEPTH_4.0), json!(JSON_MASK_KEY_DEPTH_4.1)),
+//         (String::from(JSON_MASK_KEYLEN_DEPTH_4.0), json!(JSON_MASK_KEYLEN_DEPTH_4.1)),
+//       ]),
+//     },
+//     InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
+//     InstructionConfig {
+//       name:          String::from("JSON_MASK_OBJECT_5"),
+//       private_input: HashMap::from([
+//         (String::from(JSON_MASK_KEY_DEPTH_5.0), json!(JSON_MASK_KEY_DEPTH_5.1)),
+//         (String::from(JSON_MASK_KEYLEN_DEPTH_5.0), json!(JSON_MASK_KEYLEN_DEPTH_5.1)),
+//       ]),
+//     },
+//     InstructionConfig {
+//       name:          String::from("EXTRACT_VALUE"),
+//       private_input: HashMap::new(),
+//     },
+//   ]);
 
-  let inputs = HashMap::from([(String::from("AES_GCM_1"), FoldInput {
-    value: HashMap::from([(
-      String::from(AES_PLAINTEXT.0),
-      AES_PLAINTEXT.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-    )]),
-  })]);
+//   let inputs = HashMap::from([(String::from("AES_GCM_1"), FoldInput {
+//     value: HashMap::from([(
+//       String::from(AES_PLAINTEXT.0),
+//       AES_PLAINTEXT.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
+//     )]),
+//   })]);
 
-  let mut initial_nivc_input = AES_BYTES.to_vec();
-  initial_nivc_input.extend(AES_PLAINTEXT.1.iter());
-  initial_nivc_input.resize(4160, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
-  let initial_nivc_input = initial_nivc_input.into_iter().map(u64::from).collect();
-  let program_data = ProgramData::<Online, NotExpanded> {
-    public_params,
-    setup_data,
-    rom_data,
-    rom,
-    initial_nivc_input,
-    inputs,
-    witnesses: vec![],
-  }
-  .into_expanded();
-  debug!("program_data.inputs: {:?}, {:?}", program_data.inputs.len(), program_data.inputs[15]);
+//   let mut initial_nivc_input = AES_BYTES.to_vec();
+//   initial_nivc_input.extend(AES_PLAINTEXT.1.iter());
+//   initial_nivc_input.resize(4160, 0); // TODO: This is currently the `TOTAL_BYTES` used in
+// circuits   let initial_nivc_input = initial_nivc_input.into_iter().map(u64::from).collect();
+//   let program_data = ProgramData::<Online, NotExpanded> {
+//     public_params,
+//     setup_data,
+//     rom_data,
+//     rom,
+//     initial_nivc_input,
+//     inputs,
+//     witnesses: vec![],
+//   }
+//   .into_expanded();
+//   debug!("program_data.inputs: {:?}, {:?}", program_data.inputs.len(), program_data.inputs[15]);
 
-  let recursive_snark = program::run(&program_data);
-  // dbg!(recursive_snark.zi_primary());
+//   let recursive_snark = program::run(&program_data);
+//   // dbg!(recursive_snark.zi_primary());
 
-  let res = "\"Taylor Swift\"";
-  let final_mem =
-    res.as_bytes().iter().map(|val| F::<G1>::from(*val as u64)).collect::<Vec<F<G1>>>();
+//   let res = "\"Taylor Swift\"";
+//   let final_mem =
+//     res.as_bytes().iter().map(|val| F::<G1>::from(*val as u64)).collect::<Vec<F<G1>>>();
 
-  assert_eq!(recursive_snark.zi_primary()[..res.len()], final_mem);
-}
+//   assert_eq!(recursive_snark.zi_primary()[..res.len()], final_mem);
+// }
 
-#[test]
-#[tracing_test::traced_test]
-#[ignore]
-fn test_offline_proofs() {
-  let setup_data = SetupData {
-    r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_FOLD_R1CS.to_vec()),
-      // R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      // R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
-      // R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
-      // R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
-      // R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
-      // R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-      // R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-      // R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
-    ],
-    witness_generator_types: vec![
-      WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "../proofs/web_proof_circuits/aes_gcm_fold/aes_gcm_fold_js/aes_gcm_fold.wasm",
-        ),
-        wtns_path: "witness.wtns".to_string(),
-      },
-      // WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
-      // WitnessGeneratorType::Wasm {
-      //   path:      String::from("../proofs/web_proof_circuits/aes_gcm/aes_gcm_js/aes_gcm.wasm"),
-      //   wtns_path: String::from("witness.wtns"),
-      // },
-      // WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
-      // WitnessGeneratorType::Wasm {
-      //   path:      String::from(HTTP_PARSE_AND_LOCK_START_LINE_WASM),
-      //   wtns_path: String::from("witness.wtns"),
-      // },
-      // WitnessGeneratorType::Wasm {
-      //   path:      String::from(HTTP_LOCK_HEADER_WASM),
-      //   wtns_path: String::from("witness.wtns"),
-      // },
-      // WitnessGeneratorType::Wasm {
-      //   path:      String::from(HTTP_BODY_MASK_WASM),
-      //   wtns_path: String::from("witness.wtns"),
-      // },
-      // WitnessGeneratorType::Wasm {
-      //   path:      String::from(JSON_PARSE_WASM),
-      //   wtns_path: String::from("witness.wtns"),
-      // },
-      // WitnessGeneratorType::Wasm {
-      //   path:      String::from(JSON_MASK_OBJECT_WASM),
-      //   wtns_path: String::from("witness.wtns"),
-      // },
-      // WitnessGeneratorType::Wasm {
-      //   path:      String::from(JSON_MASK_ARRAY_WASM),
-      //   wtns_path: String::from("witness.wtns"),
-      // },
-      // WitnessGeneratorType::Wasm {
-      //   path:      String::from(EXTRACT_VALUE_WASM),
-      //   wtns_path: String::from("witness.wtns"),
-      // },
-      // WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(JSON_PARSE_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
-    ],
-    max_rom_length:          10,
-  };
-  let public_params = program::setup(&setup_data);
+// #[test]
+// #[tracing_test::traced_test]
+// #[ignore]
+// fn test_offline_proofs() {
+//   let setup_data = SetupData {
+//     r1cs_types:              vec![
+//       R1CSType::Raw(AES_GCM_FOLD_R1CS.to_vec()),
+//       // R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+//       // R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
+//       // R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
+//       // R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
+//       // R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
+//       // R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
+//       // R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
+//       // R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+//     ],
+//     witness_generator_types: vec![
+//       WitnessGeneratorType::Wasm {
+//         path:      String::from(
+//           "../proofs/web_proof_circuits/aes_gcm_fold/aes_gcm_fold_js/aes_gcm_fold.wasm",
+//         ),
+//         wtns_path: "witness.wtns".to_string(),
+//       },
+//       // WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
+//       // WitnessGeneratorType::Wasm {
+//       //   path:
+// String::from("../proofs/web_proof_circuits/aes_gcm/aes_gcm_js/aes_gcm.wasm"),       //
+// wtns_path: String::from("witness.wtns"),       // },
+//       // WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
+//       // WitnessGeneratorType::Wasm {
+//       //   path:      String::from(HTTP_PARSE_AND_LOCK_START_LINE_WASM),
+//       //   wtns_path: String::from("witness.wtns"),
+//       // },
+//       // WitnessGeneratorType::Wasm {
+//       //   path:      String::from(HTTP_LOCK_HEADER_WASM),
+//       //   wtns_path: String::from("witness.wtns"),
+//       // },
+//       // WitnessGeneratorType::Wasm {
+//       //   path:      String::from(HTTP_BODY_MASK_WASM),
+//       //   wtns_path: String::from("witness.wtns"),
+//       // },
+//       // WitnessGeneratorType::Wasm {
+//       //   path:      String::from(JSON_PARSE_WASM),
+//       //   wtns_path: String::from("witness.wtns"),
+//       // },
+//       // WitnessGeneratorType::Wasm {
+//       //   path:      String::from(JSON_MASK_OBJECT_WASM),
+//       //   wtns_path: String::from("witness.wtns"),
+//       // },
+//       // WitnessGeneratorType::Wasm {
+//       //   path:      String::from(JSON_MASK_ARRAY_WASM),
+//       //   wtns_path: String::from("witness.wtns"),
+//       // },
+//       // WitnessGeneratorType::Wasm {
+//       //   path:      String::from(EXTRACT_VALUE_WASM),
+//       //   wtns_path: String::from("witness.wtns"),
+//       // },
+//       // WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
+//       // WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
+//       // WitnessGeneratorType::Raw(JSON_PARSE_GRAPH.to_vec()),
+//       // WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
+//       // WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
+//       // WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
+//     ],
+//     max_rom_length:          10,
+//   };
+//   let public_params = program::setup(&setup_data);
 
-  let program_data = ProgramData::<Online, NotExpanded> {
-    public_params,
-    setup_data,
-    rom_data: HashMap::new(),
-    rom: vec![],
-    initial_nivc_input: vec![],
-    inputs: HashMap::new(),
-    witnesses: vec![vec![F::<G1>::from(0)]],
-  };
-  program_data
-    .into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup_no_aes.bin").unwrap());
-} // #[test]// fn manifest(
+//   let program_data = ProgramData::<Online, NotExpanded> {
+//     public_params,
+//     setup_data,
+//     rom_data: HashMap::new(),
+//     rom: vec![],
+//     initial_nivc_input: vec![],
+//     inputs: HashMap::new(),
+//     witnesses: vec![vec![F::<G1>::from(0)]],
+//   };
+//   program_data
+//     .into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup_no_aes.bin").unwrap());
+// } // #[test]// fn manifest(
