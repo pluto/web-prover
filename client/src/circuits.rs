@@ -1,5 +1,5 @@
-pub const AES_GCM_FOLD_R1CS: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/aes_gcm_fold/aes_gcm_fold.r1cs");
+// pub const AES_GCM_FOLD_R1CS: &[u8] =
+//   include_bytes!("../../proofs/web_proof_circuits/aes_gcm_fold/aes_gcm_fold.r1cs");
 pub const AES_GCM_WASM: &str =
   "../../proofs/web_proof_circuits/aes_gcm_fold/aes_gcm_fold_js/aes_gcm_fold.wasm";
 
