@@ -39,7 +39,7 @@ pub struct CircuitJson {
   pub num_variables: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct CircomCircuit {
   pub r1cs:    R1CS,
   pub witness: Option<Vec<F<G1>>>,

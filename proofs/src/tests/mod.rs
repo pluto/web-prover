@@ -184,8 +184,8 @@ fn test_end_to_end_proofs() {
   let public_params = program::setup(&setup_data);
 
   // Dealloc the R1CSWithArity vec
-  // let (_, aux_params) = public_params.into_parts();
-  // let public_params = PublicParams::from_parts_unchecked(vec![], aux_params);
+  let (_, aux_params) = public_params.into_parts();
+  let public_params = PublicParams::from_parts_unchecked(vec![], aux_params);
 
   debug!("Creating ROM");
   let rom_data = HashMap::from([
