@@ -30,10 +30,10 @@ jobs:
     - name: Install unzip
       run: sudo apt install unzip -y
 
-    # - name: Download prebuilt web-prover-circuits artifact
-    #   run: |
-    #     curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/download/v0.2.3/circom-artifacts-v0.2.3.zip
-    #     unzip -o circuits.zip -d proofs/web_proof_circuits
+    - name: Download prebuilt web-prover-circuits artifact
+      run: |
+        curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/download/v0.2.3/circom-artifacts-v0.2.3.zip
+        unzip -o circuits.zip -d proofs/web_proof_circuits
 
     - name: Run tests
       run: |
