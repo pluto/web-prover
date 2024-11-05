@@ -3,7 +3,7 @@
 # Finally run test using these files
 
 web-prover-circuits:
-	curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/latest/download/circom-artifacts-target_512b-v0.2.6.zip
+	curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/latest/download/circom-artifacts-target_512b-v0.2.7.zip
 	unzip -o circuits.zip -d web_proof_circuits/target_512b/
 	rm circuits.zip
 

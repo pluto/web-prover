@@ -99,17 +99,26 @@ const AES_KEY: (&str, [u8; 16]) =
   ("key", [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49]);
 const AES_IV: (&str, [u8; 12]) = ("iv", [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49]);
 const AES_AAD: (&str, [u8; 16]) = ("aad", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-const HTTP_LOCK_VERSION: (&str, [u8; 10]) = ("beginning", [72, 84, 84, 80, 47, 49, 46, 49, 0, 0]);
-const HTTP_BEGINNING_LENGTH: (&str, [u8; 1]) = ("beginningLen", [8]);
-const HTTP_LOCK_STATUS: (&str, [u8; 100]) = ("middle", [
+const HTTP_LOCK_VERSION: (&str, [u8; 50]) = ("beginning", [
+  72, 84, 84, 80, 47, 49, 46, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+]);
+const HTTP_BEGINNING_LENGTH: (&str, [u8; 1]) = ("beginning_length", [8]);
+const HTTP_LOCK_STATUS: (&str, [u8; 200]) = ("middle", [
   50, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0,
 ]);
-const HTTP_MIDDLE_LENGTH: (&str, [u8; 1]) = ("middleLen", [3]);
-const HTTP_LOCK_MESSAGE: (&str, [u8; 10]) = ("final", [79, 75, 0, 0, 0, 0, 0, 0, 0, 0]);
-const HTTP_FINAL_LENGTH: (&str, [u8; 1]) = ("finalLen", [2]);
+const HTTP_MIDDLE_LENGTH: (&str, [u8; 1]) = ("middle_length", [3]);
+const HTTP_LOCK_MESSAGE: (&str, [u8; 50]) = ("final", [
+  79, 75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+]);
+const HTTP_FINAL_LENGTH: (&str, [u8; 1]) = ("final_length", [2]);
 const HTTP_LOCK_HEADER_NAME: (&str, [u8; 50]) = ("header", [
   99, 111, 110, 116, 101, 110, 116, 45, 116, 121, 112, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -220,11 +229,11 @@ fn test_end_to_end_proofs() {
     InstructionConfig {
       name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
       private_input: HashMap::from([
-        (String::from(HTTP_LOCK_VERSION.0), json!(HTTP_LOCK_VERSION.1)),
+        (String::from(HTTP_LOCK_VERSION.0), json!(HTTP_LOCK_VERSION.1.to_vec())),
         (String::from(HTTP_BEGINNING_LENGTH.0), json!(HTTP_BEGINNING_LENGTH.1)),
         (String::from(HTTP_LOCK_STATUS.0), json!(HTTP_LOCK_STATUS.1.to_vec())),
         (String::from(HTTP_MIDDLE_LENGTH.0), json!(HTTP_MIDDLE_LENGTH.1)),
-        (String::from(HTTP_LOCK_MESSAGE.0), json!(HTTP_LOCK_MESSAGE.1)),
+        (String::from(HTTP_LOCK_MESSAGE.0), json!(HTTP_LOCK_MESSAGE.1.to_vec())),
         (String::from(HTTP_FINAL_LENGTH.0), json!(HTTP_FINAL_LENGTH.1)),
       ]),
     },
