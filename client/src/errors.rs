@@ -1,12 +1,32 @@
+use std::{array::TryFromSliceError, string::FromUtf8Error};
+
+use hex::FromHexError;
+use reqwest::Error as ReqwestError;
+#[cfg(not(target_arch = "wasm32"))]
+use rustls::client::InvalidDnsNameError;
 use thiserror::Error;
+use tls_client2::{origo::OrigoConnection, BackendError, Error};
+use tls_core::dns::InvalidDnsNameError as vendored_InvalidDnsNameError;
+// use tlsn_core::commitment::builder::TranscriptCommitmentBuilderError; Cannot get this
+// because in current version it is private
 #[cfg(not(target_arch = "wasm32"))]
 use tokio_rustls::rustls;
+
+impl From<TryFromSliceError> for ClientErrors {
+  fn from(err: TryFromSliceError) -> ClientErrors { ClientErrors::Other(err.to_string()) }
+}
 
 #[derive(Debug, Error)]
 pub enum ClientErrors {
   #[cfg(not(target_arch = "wasm32"))]
   #[error(transparent)]
   RustTls(#[from] rustls::Error),
+
+  #[error(transparent)]
+  FromUtf8(#[from] FromUtf8Error),
+
+  #[error(transparent)]
+  Reqwest(#[from] ReqwestError),
 
   #[error(transparent)]
   Io(#[from] std::io::Error),
@@ -58,6 +78,31 @@ pub enum ClientErrors {
 
   #[error(transparent)]
   SubstringsProofBuilder(#[from] tlsn_core::proof::SubstringsProofBuilderError),
+
+  #[error(transparent)]
+  ProofError(#[from] proofs::errors::ProofError),
+
+  #[error(transparent)]
+  HexDecode(#[from] FromHexError),
+
+  #[error(transparent)]
+  BackendError(#[from] BackendError),
+
+  #[error(transparent)]
+  VendoredInvalidDnsNameError(#[from] vendored_InvalidDnsNameError),
+
+  #[cfg(not(target_arch = "wasm32"))]
+  #[error(transparent)]
+  InvalidDnsNameError(#[from] InvalidDnsNameError),
+
+  #[error(transparent)]
+  Error(#[from] Error),
+
+  #[error("Other error: {0}")]
+  Other(String),
+
+  #[error(transparent)]
+  Cancled(#[from] futures::channel::oneshot::Canceled),
 }
 
 #[cfg(target_arch = "wasm32")]

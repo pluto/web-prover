@@ -4420,6 +4420,7 @@ dependencies = [
  "rust-witness",
  "serde",
  "serde_json",
+ "thiserror",
  "tracing",
  "tracing-subscriber",
  "tracing-test",

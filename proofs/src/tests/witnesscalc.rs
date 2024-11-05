@@ -28,7 +28,9 @@ fn get_setup_data() -> SetupData {
   }
 }
 
-fn run_entry(setup_data: SetupData) -> (ProgramData<Online, Expanded>, RecursiveSNARK<E1>) {
+fn run_entry(
+  setup_data: SetupData,
+) -> Result<(ProgramData<Online, Expanded>, RecursiveSNARK<E1>), ProofError> {
   let mut external_input0: HashMap<String, Value> = HashMap::new();
   external_input0.insert("external".to_string(), json!(EXTERNAL_INPUTS[0]));
   let mut external_input1: HashMap<String, Value> = HashMap::new();
@@ -68,16 +70,16 @@ fn run_entry(setup_data: SetupData) -> (ProgramData<Online, Expanded>, Recursive
     inputs: HashMap::new(),
     witnesses: vec![],
   }
-  .into_expanded();
-  let recursive_snark = program::run(&program_data);
-  (program_data, recursive_snark)
+  .into_expanded()?;
+  let recursive_snark = program::run(&program_data).unwrap();
+  Ok((program_data, recursive_snark))
 }
 
 #[test]
 #[tracing_test::traced_test]
 fn test_run() {
   let setup_data = get_setup_data();
-  let (_, proof) = run_entry(setup_data);
+  let (_, proof) = run_entry(setup_data).unwrap();
   // [1,2] + [5,7]
   // --> [6,9]
   // --> [36,9]
@@ -107,14 +109,15 @@ fn test_run() {
 #[tracing_test::traced_test]
 fn test_run_serialized_verify() {
   let setup_data = get_setup_data();
-  let (program_data, recursive_snark) = run_entry(setup_data);
+  let (program_data, recursive_snark) = run_entry(setup_data).unwrap();
 
   // Pseudo-offline the `PublicParams` and regenerate it
-  let program_data = program_data.into_offline(PathBuf::from_str(TEST_OFFLINE_PATH).unwrap());
-  let program_data = program_data.into_online();
+  let program_data =
+    program_data.into_offline(PathBuf::from_str(TEST_OFFLINE_PATH).unwrap()).unwrap();
+  let program_data = program_data.into_online().unwrap();
 
   // Create the compressed proof with the offlined `PublicParams`
-  let proof = program::compress_proof(&recursive_snark, &program_data.public_params);
+  let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
 
   // Serialize the proof and zlib compress further
   let serialized_compressed_proof = proof.serialize_and_compress();

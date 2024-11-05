@@ -69,18 +69,18 @@ const JSON_MASK_KEYLEN_DEPTH_1: (&str, [u8; 1]) = ("keyLen", [4]);
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
-  let (sb, witness) = proxy(config.clone(), session_id.clone()).await;
+  let (sb, witness) = proxy(config.clone(), session_id.clone()).await?;
 
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
 
   debug!("generating NIVC program data!");
-  let program_data = generate_program_data(&witness, config.proving).await;
+  let program_data = generate_program_data(&witness, config.proving).await?;
 
   debug!("starting proof generation!");
-  let program_output = program::run(&program_data);
+  let program_output = program::run(&program_data)?;
 
   debug!("compressing proof!");
-  let compressed_verifier = program::compress_proof(&program_output, &program_data.public_params);
+  let compressed_verifier = program::compress_proof(&program_output, &program_data.public_params)?;
 
   debug!("running compressed verifier!");
   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
@@ -91,7 +91,7 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
 async fn generate_program_data(
   witness: &WitnessData,
   proving: ProvingData,
-) -> ProgramData<Online, Expanded> {
+) -> Result<ProgramData<Online, Expanded>, errors::ClientErrors> {
   debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
   debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
 
@@ -101,25 +101,23 @@ async fn generate_program_data(
   let mut private_input = HashMap::new();
 
   let ct: &[u8] = witness.request.ciphertext.as_bytes();
-  let sized_key: [u8; 16] = key[..16].try_into().unwrap();
-  let sized_iv: [u8; 12] = iv[..12].try_into().unwrap();
+  let sized_key: [u8; 16] = key[..16].try_into()?;
+  let sized_iv: [u8; 12] = iv[..12].try_into()?;
 
-  private_input.insert("key".to_string(), serde_json::to_value(&sized_key).unwrap());
-  private_input.insert("iv".to_string(), serde_json::to_value(&sized_iv).unwrap());
+  private_input.insert("key".to_string(), serde_json::to_value(&sized_key)?);
+  private_input.insert("iv".to_string(), serde_json::to_value(&sized_iv)?);
 
   let dec = Decrypter2::new(sized_key, sized_iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
-  let (plaintext, meta) = dec
-    .decrypt_tls13_aes(
-      &OpaqueMessage {
-        typ:     ContentType::ApplicationData,
-        version: ProtocolVersion::TLSv1_3,
-        payload: Payload::new(hex::decode(ct).unwrap()),
-      },
-      0,
-    )
-    .unwrap();
+  let (plaintext, meta) = dec.decrypt_tls13_aes(
+    &OpaqueMessage {
+      typ:     ContentType::ApplicationData,
+      version: ProtocolVersion::TLSv1_3,
+      payload: Payload::new(hex::decode(ct)?),
+    },
+    0,
+  )?;
   let pt = plaintext.payload.0.to_vec();
-  let aad = hex::decode(meta.additional_data.to_owned()).unwrap();
+  let aad = hex::decode(meta.additional_data.to_owned())?;
   let mut padded_aad = vec![0; 16 - aad.len()];
   padded_aad.extend(aad);
 
@@ -132,7 +130,7 @@ async fn generate_program_data(
 
   let mut witnesses = Vec::new();
   for w in proving.witnesses {
-    witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w.val))));
+    witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w.val)))?);
   }
 
   let setup_data = SetupData {
@@ -254,18 +252,21 @@ async fn generate_program_data(
   // };
 
   debug!("online -> expanded");
-  pd.into_expanded()
+  Ok(pd?.into_expanded()?)
 }
 
-async fn proxy(config: config::Config, session_id: String) -> (SignBody, WitnessData) {
+async fn proxy(
+  config: config::Config,
+  session_id: String,
+) -> Result<(SignBody, WitnessData), errors::ClientErrors> {
   // TODO build sanitized query
   let wss_url = format!(
     "wss://{}:{}/v1/origo?session_id={}&target_host={}&target_port={}",
     config.notary_host,
     config.notary_port,
     session_id.clone(),
-    config.target_host(),
-    config.target_port(),
+    config.target_host()?,
+    config.target_port()?,
   );
 
   let root_store = crate::tls::tls_client2_default_root_store();
@@ -279,11 +280,10 @@ async fn proxy(config: config::Config, session_id: String) -> (SignBody, Witness
   let client = tls_client2::ClientConnection::new(
     Arc::new(client_config),
     Box::new(tls_client2::RustCryptoBackend13::new(origo_conn.clone())),
-    tls_client2::ServerName::try_from(config.target_host().as_str()).unwrap(),
-  )
-  .unwrap();
+    tls_client2::ServerName::try_from(config.target_host()?.as_str())?,
+  )?;
 
-  let (_, ws_stream) = WsMeta::connect(wss_url.to_string(), None).await.unwrap();
+  let (_, ws_stream) = WsMeta::connect(wss_url.to_string(), None).await?;
 
   let (mut client_tls_conn, tls_fut) = bind_client(ws_stream.into_io(), client);
 
@@ -298,7 +298,7 @@ async fn proxy(config: config::Config, session_id: String) -> (SignBody, Witness
   spawn_local(handled_tls_fut);
 
   let (mut request_sender, connection) =
-    hyper::client::conn::http1::handshake(client_tls_conn).await.unwrap();
+    hyper::client::conn::http1::handshake(client_tls_conn).await?;
 
   let (connection_sender, connection_receiver) = oneshot::channel();
   let connection_fut = connection.without_shutdown();
@@ -308,11 +308,11 @@ async fn proxy(config: config::Config, session_id: String) -> (SignBody, Witness
   };
   spawn_local(handled_connection_fut);
 
-  let response = request_sender.send_request(config.to_request()).await.unwrap();
+  let response = request_sender.send_request(config.to_request()?).await?;
 
   assert_eq!(response.status(), StatusCode::OK);
 
-  let mut client_socket = connection_receiver.await.unwrap().unwrap().io.into_inner();
+  let mut client_socket = connection_receiver.await.unwrap()?.io.into_inner();
   client_socket.close().await.unwrap();
 
   let server_aes_iv =
@@ -326,7 +326,7 @@ async fn proxy(config: config::Config, session_id: String) -> (SignBody, Witness
     hs_server_aes_key: hex::encode(server_aes_key.to_vec()),
   };
 
-  (sb, witness)
+  Ok((sb, witness))
 }
 
 use core::slice;

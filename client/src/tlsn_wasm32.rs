@@ -25,13 +25,19 @@ use web_sys::{Headers, Request as WebsysRequest, RequestInit, RequestMode, Respo
 use web_time::Instant;
 use ws_stream_wasm::*;
 
-use crate::{config::Config, tlsn::send_request};
+use crate::{config::Config, errors::ClientErrors, tlsn::send_request};
 
 // uses websockets to connect to notary and websocket proxy
-pub async fn setup_connection(config: &mut Config, prover_config: ProverConfig) -> Prover<Closed> {
+pub async fn setup_connection(
+  config: &mut Config,
+  prover_config: ProverConfig,
+) -> Result<Prover<Closed>, ClientErrors> {
   let session_id = config.session_id();
 
-  let websocket_proxy_url = config.websocket_proxy_url.clone().unwrap();
+  let websocket_proxy_url = config.websocket_proxy_url.clone();
+  let websocket_proxy_url = websocket_proxy_url
+    .as_ref()
+    .ok_or_else(|| ClientErrors::Other("websocket_proxy_url is missing".to_string()))?;
 
   let wss_url = format!(
     "wss://{}:{}/v1/tlsnotary?session_id={}",
@@ -40,35 +46,38 @@ pub async fn setup_connection(config: &mut Config, prover_config: ProverConfig) 
     session_id.clone(),
   );
 
-  let (_, notary_ws_stream) = WsMeta::connect(wss_url, None).await.unwrap();
+  let (_, notary_ws_stream) = WsMeta::connect(wss_url, None).await?;
   let notary_ws_stream_into = notary_ws_stream.into_io();
 
-  let prover = Prover::new(prover_config).setup(notary_ws_stream_into).await.unwrap();
+  let prover = Prover::new(prover_config).setup(notary_ws_stream_into).await?;
 
   let ws_query = url::form_urlencoded::Serializer::new(String::new())
     .extend_pairs([
-      ("target_host", config.target_host()),
-      ("target_port", config.target_port().to_string()),
+      ("target_host", config.target_host()?),
+      ("target_port", config.target_port()?.to_string()),
     ])
     .finish();
 
   let (_, client_ws_stream) =
-    WsMeta::connect(format!("{}?{}", websocket_proxy_url, ws_query), None).await.unwrap();
+    WsMeta::connect(format!("{}?{}", websocket_proxy_url, ws_query), None).await?;
   let client_ws_stream_into = client_ws_stream.into_io();
 
-  let (mpc_tls_connection, prover_fut) = prover.connect(client_ws_stream_into).await.unwrap();
+  let (mpc_tls_connection, prover_fut) = prover.connect(client_ws_stream_into).await?;
 
   let (prover_sender, prover_receiver) = oneshot::channel();
   let handled_prover_fut = async {
     let result = prover_fut.await;
     let _ = prover_sender.send(result);
   };
+
+  // let p_receiver = prover_receiver.await.unwrap()?.io.into_inner().into_inner();
+
   spawn_local(handled_prover_fut);
 
   let mpc_tls_connection = unsafe { FuturesIo::new(mpc_tls_connection) };
 
   let (mut request_sender, connection) =
-    hyper::client::conn::http1::handshake(mpc_tls_connection).await.unwrap();
+    hyper::client::conn::http1::handshake(mpc_tls_connection).await?;
 
   let (connection_sender, connection_receiver) = oneshot::channel();
   let connection_fut = connection.without_shutdown();
@@ -78,12 +87,12 @@ pub async fn setup_connection(config: &mut Config, prover_config: ProverConfig) 
   };
   spawn_local(handled_connection_fut);
 
-  send_request(request_sender, config.to_request()).await;
+  send_request(request_sender, config.to_request()?).await;
 
-  let mut client_socket = connection_receiver.await.unwrap().unwrap().io.into_inner();
-  client_socket.close().await.unwrap();
+  let mut client_socket = connection_receiver.await??.io.into_inner();
+  client_socket.close().await?;
 
-  prover_receiver.await.unwrap().unwrap()
+  Ok(prover_receiver.await??)
 }
 
 use core::slice;

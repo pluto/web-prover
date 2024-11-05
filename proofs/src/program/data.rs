@@ -108,7 +108,7 @@ pub struct ProgramData<S: SetupStatus, W: WitnessStatus> {
 }
 
 impl<S: SetupStatus> ProgramData<S, NotExpanded> {
-  pub fn into_expanded(self) -> ProgramData<S, Expanded> {
+  pub fn into_expanded(self) -> Result<ProgramData<S, Expanded>, ProofError> {
     // build circuit usage map from rom
     let mut instruction_usage: HashMap<String, Vec<usize>> = HashMap::new();
     for (index, circuit) in self.rom.iter().enumerate() {
@@ -123,15 +123,23 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
 
     // add fold input sliced to chunks and add to private input
     for (circuit_label, fold_inputs) in self.inputs.iter() {
-      let inputs = instruction_usage.get(circuit_label).unwrap();
-      let split_inputs = fold_inputs.split_values(inputs.len());
-      for (idx, input) in inputs.iter().zip(split_inputs) {
-        private_inputs[*idx].extend(input);
+      if let Some(inputs) = instruction_usage.get(circuit_label) {
+        for (idx, input) in fold_inputs.split_values(inputs.len()).into_iter().enumerate() {
+          let input_idx = inputs.get(idx).ok_or_else(|| {
+            ProofError::Other(format!(
+              "Index {} not found in inputs for circuit label {}",
+              idx, circuit_label
+            ))
+          })?;
+          private_inputs[*input_idx].extend(input);
+        }
+      } else {
+        return Err(ProofError::Other(format!("Circuit label {} not found in rom", circuit_label)));
       }
     }
 
     let Self { public_params, setup_data, rom_data, initial_nivc_input, witnesses, .. } = self;
-    ProgramData {
+    Ok(ProgramData {
       public_params,
       setup_data,
       rom_data,
@@ -139,22 +147,21 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
       initial_nivc_input,
       witnesses,
       inputs: private_inputs,
-    }
+    })
   }
 }
 
 impl<W: WitnessStatus> ProgramData<Offline, W> {
-  pub fn into_online(self) -> ProgramData<Online, W> {
+  pub fn into_online(self) -> Result<ProgramData<Online, W>, ProofError> {
     #[cfg(feature = "timing")]
     let time = std::time::Instant::now();
 
-    // let file = std::fs::read(&self.public_params).unwrap();
     let file = self.public_params;
     let mut decoder = ZlibDecoder::new(&file[..]);
     let mut decompressed = Vec::new();
-    decoder.read_to_end(&mut decompressed).unwrap();
+    decoder.read_to_end(&mut decompressed)?;
     info!("starting deserializing");
-    let aux_params: AuxParams<E1> = bincode::deserialize(&decompressed).unwrap();
+    let aux_params: AuxParams<E1> = bincode::deserialize(&decompressed)?;
 
     #[cfg(feature = "timing")]
     let aux_params_duration = {
@@ -165,7 +172,7 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
 
     // TODO: get the circuit shapes needed
     info!("circuit list");
-    let circuits = initialize_circuit_list(&self.setup_data);
+    let circuits = initialize_circuit_list(&self.setup_data)?;
     let memory = Memory { circuits, rom: vec![0; self.setup_data.max_rom_length] }; // Note, `rom` here is not used in setup, only `circuits`
     info!("circuit shapes");
     let circuit_shapes = get_circuit_shapes(&memory);
@@ -178,29 +185,37 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
     info!("public params from parts");
     let public_params = PublicParams::<E1>::from_parts(circuit_shapes, aux_params);
     let Self { setup_data, rom, initial_nivc_input, inputs, witnesses, rom_data, .. } = self;
-    ProgramData { public_params, setup_data, rom, initial_nivc_input, inputs, witnesses, rom_data }
+    Ok(ProgramData {
+      public_params,
+      setup_data,
+      rom,
+      initial_nivc_input,
+      inputs,
+      witnesses,
+      rom_data,
+    })
   }
 }
 
 impl<W: WitnessStatus> ProgramData<Online, W> {
-  pub fn into_offline(self, path: PathBuf) -> ProgramData<Offline, W> {
+  pub fn into_offline(self, path: PathBuf) -> Result<ProgramData<Offline, W>, ProofError> {
     let (_, aux_params) = self.public_params.into_parts();
-    let serialized = bincode::serialize(&aux_params).unwrap();
+    let serialized = bincode::serialize(&aux_params)?;
     dbg!(&serialized.len());
     // TODO: May not need to do flate2 compression. Need to test this actually shrinks things
     // meaningfully -- otherwise remove.
     let mut encoder = ZlibEncoder::new(Vec::new(), flate2::Compression::best());
-    encoder.write_all(&serialized).unwrap();
-    let compressed = encoder.finish().unwrap();
+    encoder.write_all(&serialized)?;
+    let compressed = encoder.finish()?;
     dbg!(&compressed.len());
     if let Some(parent) = path.parent() {
-      std::fs::create_dir_all(parent).unwrap();
+      std::fs::create_dir_all(parent)?;
     }
-    let mut file = std::fs::File::create(&path).unwrap();
-    file.write_all(&compressed).unwrap();
+    let mut file = std::fs::File::create(&path)?;
+    file.write_all(&compressed)?;
 
     let Self { setup_data, rom_data, rom, initial_nivc_input, inputs, witnesses, .. } = self;
-    ProgramData {
+    Ok(ProgramData {
       public_params: compressed,
       setup_data,
       rom_data,
@@ -208,7 +223,7 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
       initial_nivc_input,
       witnesses,
       inputs,
-    }
+    })
   }
 }
 
@@ -284,7 +299,7 @@ mod tests {
       inputs:             mock_inputs.input,
       witnesses:          vec![],
     };
-    let program_data = program_data.into_expanded();
+    let program_data = program_data.into_expanded().unwrap();
     dbg!(&program_data.inputs);
     assert!(!program_data.inputs[0].is_empty());
     assert!(!program_data.inputs[1].is_empty());
