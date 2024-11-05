@@ -20,77 +20,59 @@ const SWAP_MEMORY_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/swap
 
 const INIT_PUBLIC_INPUT: [u64; 2] = [1, 2];
 const EXTERNAL_INPUTS: [[u64; 2]; 2] = [[5, 7], [13, 1]];
-const MAX_ROM_LENGTH: usize = 10; // TODO: This should be able to be longer
+const MAX_ROM_LENGTH: usize = 10;
 
 // -----------------------------------------------------------------------------------------------
 // JSON Proof Material
 const JSON_MAX_ROM_LENGTH: usize = 35;
 
-// const AES_GCM_FOLD_R1CS: &[u8] =
-//   include_bytes!("../../web_proof_circuits/aes_gcm_fold/aes_gcm_fold.r1cs");
 // Circuit 0
-const AES_GCM_R1CS: &[u8] = include_bytes!("../../web_proof_circuits/aes_gcm/aes_gcm.r1cs");
-const AES_GCM_GRAPH: &[u8] = include_bytes!("../../web_proof_circuits/aes_gcm/aes_gcm.bin");
+const AES_GCM_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/aes_gctr_nivc_512b.r1cs");
+const AES_GCM_GRAPH: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/aes_gctr_nivc_512b.bin");
 
 // Circuit 1
-const HTTP_PARSE_AND_LOCK_START_LINE_R1CS: &[u8] = include_bytes!(
-  "../../web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.r1cs"
-);
-// const HTTP_PARSE_AND_LOCK_START_LINE_WASM: &str =
-//   "../../web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line_js/\
-//    http_parse_and_lock_start_line.wasm";
-const HTTP_PARSE_AND_LOCK_START_LINE_GRAPH: &[u8] = include_bytes!(
-  "../../web_proof_circuits/http_parse_and_lock_start_line/http_parse_and_lock_start_line.bin"
-);
+const HTTP_PARSE_AND_LOCK_START_LINE_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/http_parse_and_lock_start_line_512b.r1cs");
+const HTTP_PARSE_AND_LOCK_START_LINE_GRAPH: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/http_parse_and_lock_start_line_512b.bin");
 
 // Circuit 2
 const HTTP_LOCK_HEADER_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/http_lock_header/http_lock_header.r1cs");
-// const HTTP_LOCK_HEADER_WASM: &str =
-//   "../../web_proof_circuits/http_lock_header/http_lock_header_js/http_lock_header.wasm";
+  include_bytes!("../../web_proof_circuits/target_512b/http_lock_header_512b.r1cs");
 const HTTP_LOCK_HEADER_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/http_lock_header/http_lock_header.bin");
+  include_bytes!("../../web_proof_circuits/target_512b/http_lock_header_512b.bin");
 
 // Circuit 3
 const HTTP_BODY_MASK_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/http_body_mask/http_body_mask.r1cs");
-// const HTTP_BODY_MASK_WASM: &str =
-//   "../../web_proof_circuits/http_body_mask/http_body_mask_js/http_body_mask.wasm";
-
+  include_bytes!("../../web_proof_circuits/target_512b/http_body_mask_512b.r1cs");
 const HTTP_BODY_MASK_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/http_body_mask/http_body_mask.bin");
+  include_bytes!("../../web_proof_circuits/target_512b/http_body_mask_512b.bin");
 
 // Circuit 4
 const JSON_PARSE_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/json_parse/json_parse.r1cs");
-// const JSON_PARSE_WASM: &str =
-// "../../web_proof_circuits/json_parse/json_parse_js/json_parse.wasm";
+  include_bytes!("../../web_proof_circuits/target_512b/json_parse_512b.r1cs");
 const JSON_PARSE_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/json_parse/json_parse.bin");
+  include_bytes!("../../web_proof_circuits/target_512b/json_parse_512b.bin");
 
 // Circuit 5
 const JSON_MASK_OBJECT_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/json_mask_object/json_mask_object.r1cs");
-// const JSON_MASK_OBJECT_WASM: &str =
-//   "../../web_proof_circuits/json_mask_object/json_mask_object_js/json_mask_object.wasm";
+  include_bytes!("../../web_proof_circuits/target_512b/json_mask_object_512b.r1cs");
 const JSON_MASK_OBJECT_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/json_mask_object/json_mask_object.bin");
+  include_bytes!("../../web_proof_circuits/target_512b/json_mask_object_512b.bin");
 
 // Circuit 6
 const JSON_MASK_ARRAY_INDEX_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/json_mask_array_index/json_mask_array_index.r1cs");
-// const JSON_MASK_ARRAY_WASM: &str =
-//   "../../web_proof_circuits/json_mask_array/json_mask_array_js/json_mask_array.wasm";
+  include_bytes!("../../web_proof_circuits/target_512b/json_mask_array_index_512b.r1cs");
 const JSON_MASK_ARRAY_INDEX_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/json_mask_array_index/json_mask_array_index.bin");
+  include_bytes!("../../web_proof_circuits/target_512b/json_mask_array_index_512b.bin");
 
 // circuit 7
 const EXTRACT_VALUE_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/extract_value/extract_value.r1cs");
-// const EXTRACT_VALUE_WASM: &str =
-// "../../web_proof_circuits/extract_value/extract_value_js/extract_value.wasm";
+  include_bytes!("../../web_proof_circuits/target_512b/json_extract_value_512b.r1cs");
 const EXTRACT_VALUE_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/extract_value/extract_value.bin");
+  include_bytes!("../../web_proof_circuits/target_512b/json_extract_value_512b.bin");
 
 const BYTES_PER_FOLD: usize = 16;
 const AES_BYTES: [u8; 50] = [0; 50];
@@ -117,18 +99,29 @@ const AES_KEY: (&str, [u8; 16]) =
   ("key", [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49]);
 const AES_IV: (&str, [u8; 12]) = ("iv", [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49]);
 const AES_AAD: (&str, [u8; 16]) = ("aad", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-const HTTP_LOCK_VERSION: (&str, [u8; 8]) = ("beginning", [72, 84, 84, 80, 47, 49, 46, 49]);
+const HTTP_LOCK_VERSION: (&str, [u8; 10]) = ("beginning", [72, 84, 84, 80, 47, 49, 46, 49, 0, 0]);
 const HTTP_BEGINNING_LENGTH: (&str, [u8; 1]) = ("beginningLen", [8]);
-const HTTP_LOCK_STATUS: (&str, [u8; 3]) = ("middle", [50, 48, 48]);
-const HTTP_MIDDLE_LENGTH: (&str, [u8; 1]) = ("middleLen", [3]);
-const HTTP_LOCK_MESSAGE: (&str, [u8; 2]) = ("final", [79, 75]);
-const HTTP_FINAL_LENGTH: (&str, [u8; 1]) = ("finalLen", [2]);
-const HTTP_LOCK_HEADER_NAME: (&str, [u8; 12]) =
-  ("header", [99, 111, 110, 116, 101, 110, 116, 45, 116, 121, 112, 101]);
-const HTTP_LOCK_HEADER_VALUE: (&str, [u8; 31]) = ("value", [
-  97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106, 115, 111, 110, 59, 32, 99, 104, 97,
-  114, 115, 101, 116, 61, 117, 116, 102, 45, 56,
+const HTTP_LOCK_STATUS: (&str, [u8; 100]) = ("middle", [
+  50, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0,
 ]);
+const HTTP_MIDDLE_LENGTH: (&str, [u8; 1]) = ("middleLen", [3]);
+const HTTP_LOCK_MESSAGE: (&str, [u8; 10]) = ("final", [79, 75, 0, 0, 0, 0, 0, 0, 0, 0]);
+const HTTP_FINAL_LENGTH: (&str, [u8; 1]) = ("finalLen", [2]);
+const HTTP_LOCK_HEADER_NAME: (&str, [u8; 50]) = ("header", [
+  99, 111, 110, 116, 101, 110, 116, 45, 116, 121, 112, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+]);
+const HTTP_LOCK_HEADER_NAME_LENGTH: (&str, [u8; 1]) = ("headerNameLength", [12]);
+const HTTP_LOCK_HEADER_VALUE: (&str, [u8; 100]) = ("value", [
+  97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106, 115, 111, 110, 59, 32, 99, 104, 97,
+  114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+]);
+const HTTP_LOCK_HEADER_VALUE_LENGTH: (&str, [u8; 1]) = ("headerValueLength", [31]);
 
 const JSON_MASK_KEY_DEPTH_1: (&str, [u8; 10]) = ("key", [100, 97, 116, 97, 0, 0, 0, 0, 0, 0]); // "data"
 const JSON_MASK_KEYLEN_DEPTH_1: (&str, [u8; 1]) = ("keyLen", [4]);
@@ -141,8 +134,11 @@ const JSON_MASK_KEYLEN_DEPTH_4: (&str, [u8; 1]) = ("keyLen", [7]);
 const JSON_MASK_KEY_DEPTH_5: (&str, [u8; 10]) = ("key", [110, 97, 109, 101, 0, 0, 0, 0, 0, 0]); // "name"
 const JSON_MASK_KEYLEN_DEPTH_5: (&str, [u8; 1]) = ("keyLen", [4]);
 
-// TODO (Colin): This test requires JSON parse between all the JSON steps. REMOVE THIS REDUNDANCY
-// USING NEW CIRCUITS!
+const MAX_STACK_HEIGHT: usize = 10;
+const PER_ITERATION_DATA_LENGTH: usize = MAX_STACK_HEIGHT * 2 + 2;
+
+const TOTAL_BYTES_ACROSS_NIVC: usize = 512 * (PER_ITERATION_DATA_LENGTH + 1) + 1;
+
 #[test]
 #[tracing_test::traced_test]
 fn test_end_to_end_proofs() {
@@ -194,19 +190,12 @@ fn test_end_to_end_proofs() {
   let (_, aux_params) = public_params.into_parts();
   let public_params = PublicParams::from_parts_unchecked(vec![], aux_params);
 
-  // Check size of PP
-  // let serialized = bincode::serialize(&public_params).unwrap();
-  // let mut encoder = ZlibEncoder::new(Vec::new(), flate2::Compression::best());
-  // encoder.write_all(&serialized).unwrap();
-  // let compressed = encoder.finish().unwrap();
-  // debug!("Length of serialized PP: {:?}", compressed.len());
-
   debug!("Creating ROM");
   let rom_data = HashMap::from([
     (String::from("AES_GCM_1"), CircuitData { opcode: 0 }),
     (String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 1 }),
     (String::from("HTTP_LOCK_HEADER_1"), CircuitData { opcode: 2 }),
-    (String::from("HTTP_BODY_EXTRACT"), CircuitData { opcode: 3 }),
+    (String::from("HTTP_BODY_MASK"), CircuitData { opcode: 3 }),
     (String::from("JSON_PARSE"), CircuitData { opcode: 4 }),
     (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 5 }),
     (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 5 }),
@@ -228,30 +217,30 @@ fn test_end_to_end_proofs() {
   debug!("Creating `private_inputs`...");
   let mut rom = vec![aes_rom_opcode_config; AES_PLAINTEXT.1.len() / BYTES_PER_FOLD];
   rom.extend([
-    // let rom = vec![
     InstructionConfig {
       name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
       private_input: HashMap::from([
         (String::from(HTTP_LOCK_VERSION.0), json!(HTTP_LOCK_VERSION.1)),
-        // (String::from(HTTP_BEGINNING_LENGTH.0), json!(HTTP_BEGINNING_LENGTH.1)),
+        (String::from(HTTP_BEGINNING_LENGTH.0), json!(HTTP_BEGINNING_LENGTH.1)),
         (String::from(HTTP_LOCK_STATUS.0), json!(HTTP_LOCK_STATUS.1.to_vec())),
-        // (String::from(HTTP_MIDDLE_LENGTH.0), json!(HTTP_MIDDLE_LENGTH.1)),
+        (String::from(HTTP_MIDDLE_LENGTH.0), json!(HTTP_MIDDLE_LENGTH.1)),
         (String::from(HTTP_LOCK_MESSAGE.0), json!(HTTP_LOCK_MESSAGE.1)),
-        // (String::from(HTTP_FINAL_LENGTH.0), json!(HTTP_FINAL_LENGTH.1)),
+        (String::from(HTTP_FINAL_LENGTH.0), json!(HTTP_FINAL_LENGTH.1)),
       ]),
     },
     InstructionConfig {
       name:          String::from("HTTP_LOCK_HEADER_1"),
       private_input: HashMap::from([
-        (String::from(HTTP_LOCK_HEADER_NAME.0), json!(HTTP_LOCK_HEADER_NAME.1)),
+        (String::from(HTTP_LOCK_HEADER_NAME_LENGTH.0), json!(HTTP_LOCK_HEADER_NAME_LENGTH.1)),
+        (String::from(HTTP_LOCK_HEADER_NAME.0), json!(HTTP_LOCK_HEADER_NAME.1.to_vec())),
+        (String::from(HTTP_LOCK_HEADER_VALUE_LENGTH.0), json!(HTTP_LOCK_HEADER_VALUE_LENGTH.1)),
         (String::from(HTTP_LOCK_HEADER_VALUE.0), json!(HTTP_LOCK_HEADER_VALUE.1.to_vec())),
       ]),
     },
     InstructionConfig {
-      name:          String::from("HTTP_BODY_EXTRACT"),
+      name:          String::from("HTTP_BODY_MASK"),
       private_input: HashMap::new(),
     },
-    InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
     InstructionConfig {
       name:          String::from("JSON_MASK_OBJECT_1"),
       private_input: HashMap::from([
@@ -259,7 +248,6 @@ fn test_end_to_end_proofs() {
         (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
       ]),
     },
-    InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
     InstructionConfig {
       name:          String::from("JSON_MASK_OBJECT_2"),
       private_input: HashMap::from([
@@ -267,7 +255,6 @@ fn test_end_to_end_proofs() {
         (String::from(JSON_MASK_KEYLEN_DEPTH_2.0), json!(JSON_MASK_KEYLEN_DEPTH_2.1)),
       ]),
     },
-    InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
     InstructionConfig {
       name:          String::from("JSON_MASK_ARRAY_3"),
       private_input: HashMap::from([(
@@ -275,7 +262,6 @@ fn test_end_to_end_proofs() {
         json!(JSON_MASK_ARR_DEPTH_3.1),
       )]),
     },
-    InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
     InstructionConfig {
       name:          String::from("JSON_MASK_OBJECT_4"),
       private_input: HashMap::from([
@@ -283,7 +269,6 @@ fn test_end_to_end_proofs() {
         (String::from(JSON_MASK_KEYLEN_DEPTH_4.0), json!(JSON_MASK_KEYLEN_DEPTH_4.1)),
       ]),
     },
-    InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
     InstructionConfig {
       name:          String::from("JSON_MASK_OBJECT_5"),
       private_input: HashMap::from([
@@ -306,7 +291,7 @@ fn test_end_to_end_proofs() {
 
   let mut initial_nivc_input = AES_BYTES.to_vec();
   initial_nivc_input.extend(AES_PLAINTEXT.1.iter());
-  initial_nivc_input.resize(4160, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
+  initial_nivc_input.resize(TOTAL_BYTES_ACROSS_NIVC, 0);
   let initial_nivc_input = initial_nivc_input.into_iter().map(u64::from).collect();
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
@@ -318,10 +303,8 @@ fn test_end_to_end_proofs() {
     witnesses: vec![],
   }
   .into_expanded();
-  debug!("program_data.inputs: {:?}, {:?}", program_data.inputs.len(), program_data.inputs[15]);
 
   let recursive_snark = program::run(&program_data);
-  // dbg!(recursive_snark.zi_primary());
 
   let res = "\"Taylor Swift\"";
   let final_mem =
