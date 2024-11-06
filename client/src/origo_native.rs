@@ -121,20 +121,6 @@ async fn generate_program_data(
     janky_plaintext_padding.len(),
   );
   let aes_instr = String::from("AES_GCM_1");
-  // // TODO (Sambhav): Add more opcodes for extraction, determine how a web proof chooses an
-  // // extraction
-  // let rom_data = HashMap::from([(aes_instr.clone(), CircuitData { opcode: 0 })]);
-
-  // let aes_rom_opcode_config = InstructionConfig {
-  //   name:          aes_instr.clone(),
-  //   private_input: HashMap::from([
-  //     (String::from("key"), json!(key)),
-  //     (String::from("iv"), json!(iv)),
-  //     (String::from("aad"), json!(padded_aad)),
-  //   ]),
-  // };
-
-  // let rom = vec![aes_rom_opcode_config; rom_len];
 
   // TODO (Sambhav): update fold input from manifest
   let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
@@ -144,9 +130,9 @@ async fn generate_program_data(
     )]),
   })]);
 
-  let mut initial_input = vec![0; 23]; // default number of step_in for AES
+  let mut initial_input = vec![];
   initial_input.extend(janky_plaintext_padding.iter());
-  initial_input.resize(1028, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
+  initial_input.resize(TOTAL_BYTES_ACROSS_NIVC, 0);
   let final_input: Vec<u64> = initial_input.into_iter().map(u64::from).collect();
   // ----------------------------------------------------------------------------------------------------------------------- //
 

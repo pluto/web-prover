@@ -1,3 +1,8 @@
+
+// Depends on the circuit input sizes
+pub const MAX_PLAINTEXT_BYTES: usize = 512;
+pub const TOTAL_BYTES_ACROSS_NIVC: usize = MAX_PLAINTEXT_BYTES * 2 + 4;
+
 // Circuit 0
 pub const AES_GCM_R1CS: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_512b/aes_gctr_nivc_512b.r1cs");
