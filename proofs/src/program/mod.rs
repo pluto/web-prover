@@ -155,11 +155,12 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
     };
 
     // NOTE (Colin): Alloc only the used R1CSWithArity
-    let mut temp_memory =
-      Memory { rom: vec![], circuits: vec![RomCircuit::default(); memory.circuits.len()] };
-    temp_memory.circuits[op_code as usize] = memory.circuits[op_code as usize].clone();
-    let temp_shapes = get_circuit_shapes(&temp_memory);
-    let public_params = PublicParams::from_parts_unchecked(temp_shapes, aux_params.clone());
+    // let mut temp_memory =
+    //   Memory { rom: vec![], circuits: vec![RomCircuit::default(); memory.circuits.len()] };
+    // temp_memory.circuits[op_code as usize] = memory.circuits[op_code as usize].clone();
+    // let temp_shapes = get_circuit_shapes(&temp_memory);
+    // let public_params = PublicParams::from_parts_unchecked(temp_shapes, aux_params.clone());
+    let public_params = &program_data.public_params;
 
     memory.circuits[op_code as usize].circuit.witness = if is_browser {
       // When running in browser, the witness is passed as input.

@@ -36,17 +36,6 @@ function end() {
 const _snarkjs = import("snarkjs");
 const snarkjs = await _snarkjs;
 
-const getConstraints = async function (circuits) {
-  var r1cses = [];
-  circuits.forEach(async circuit => {
-    const r1csUrl = new URL(`${circuit}.r1cs`, `https://localhost:8090/build/target_512b/`).toString();
-    const r1cs = await fetch(r1csUrl).then((r) => r.arrayBuffer());
-    r1cses.push(r1cs);
-  });
-
-  return r1cses;
-}
-
 const getWitnessGenerator = async function (circuit) {
   const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/target_512b/${circuit}_js/`).toString();
   const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
@@ -93,11 +82,36 @@ const generateWitnessBytes = async function (circuits, inputs) {
     val: wtns.data
   });
 
+  console.log("http lock header");
+  let wtnsHttp = await generateWitness(circuits[2], inputs[2]);
+  witnesses.push({
+    val: wtnsHttp.data
+  });
+
+  console.log("http body mask");
+  let wtnsHttp2 = await generateWitness(circuits[3], inputs[3]);
+  witnesses.push({
+    val: wtnsHttp2.data
+  });
+
+  console.log("json mask object");
+  let wtnsJson = await generateWitness(circuits[4], inputs[4]);
+  witnesses.push({
+    val: wtnsJson.data,
+  });
+
+  console.log("json extract value");
+  let wtnsFinal = await generateWitness(circuits[6], inputs[6]);
+  console.log("wtnsFinal", wtnsFinal);
+  witnesses.push({
+    val: wtnsFinal.data,
+  });
+
   return witnesses;
 };
 
 // TODO: Migrate this from hardcoded to generated in WASM.
-const TOTAL_BYTES_ACROSS_NIVC = 512 * 2 + 4;
+const TOTAL_BYTES_ACROSS_NIVC = 512 + 4;
 let http_response_plaintext = [
   72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101, 110,
   116, 45, 116, 121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106,
@@ -115,8 +129,20 @@ let http_response_plaintext = [
   10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 93, 13,
   10, 32, 32, 32, 125, 13, 10, 125];
 let input = Array(50).fill(0).concat(http_response_plaintext);
-let extendedInput = input.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - input.length)).fill(0));
+// let extendedInput = input.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - input.length)).fill(0));
+let extendedInput = Array(TOTAL_BYTES_ACROSS_NIVC).fill(0);
 let extendedHTTPInput = http_response_plaintext.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - http_response_plaintext.length)).fill(0));
+
+let jsonInput = [123, 13, 10, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32,
+  32, 34, 105, 116, 101, 109, 115, 34, 58, 32, 91, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+  32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116,
+  97, 34, 58, 32, 34, 65, 114, 116, 105, 115, 116, 34, 44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32,
+  32, 32, 32, 32, 32, 32, 32, 34, 112, 114, 111, 102, 105, 108, 101, 34, 58, 32, 123, 13, 10, 32,
+  32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32,
+  34, 84, 97, 121, 108, 111, 114, 32, 83, 119, 105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32,
+  32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125,
+  13, 10, 32, 32, 32, 32, 32, 32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125];
+let jsonExtendedInput = jsonInput.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - jsonInput.length)).fill(0));
 
 var inputs = [{
   "key": [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49],
@@ -146,10 +172,34 @@ var inputs = [{
   ],
   "final_length": [2],
   "step_in": extendedHTTPInput,
-}];
+}, {
+  "header": [
+    99, 111, 110, 116, 101, 110, 116, 45, 116, 121, 112, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  ],
+  "headerNameLength": [12],
+  "value": [
+    97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106, 115, 111, 110, 59, 32, 99, 104, 97,
+    114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  ],
+  "headerValueLength": [31],
+  "step_in": extendedHTTPInput,
+},
+{
+  "step_in": extendedHTTPInput,
+},
+{ "key": [100, 97, 116, 97, 0, 0, 0, 0, 0, 0], "keyLen": [4], "step_in": jsonExtendedInput },
+// { "key": [105, 116, 101, 109, 115, 0, 0, 0, 0, 0], "keyLen": [5], "step_in": jsonExtendedInput },
+{ "index": [0] },
+// { "key": [112, 114, 111, 102, 105, 108, 101, 0, 0, 0], "keyLen": [7] },
+// { "key": [110, 97, 109, 101, 0, 0, 0, 0, 0, 0], "keyLen": [4] },
+{ "step_in": jsonExtendedInput },
+];
 
 // TODO: Configurable identifiers
-var circuits = ["aes_gctr_nivc_512b", "http_parse_and_lock_start_line_512b"];
+var circuits = ["aes_gctr_nivc_512b", "http_parse_and_lock_start_line_512b", "http_lock_header_512b", "http_body_mask_512b", "json_mask_object_512b", "json_mask_array_index_512b", "json_extract_value_512b"];
 // var r1cs = await getConstraints(circuits);
 var witnesses = await generateWitnessBytes(circuits, inputs);
 
