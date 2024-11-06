@@ -32,6 +32,27 @@ use ws_stream_wasm::WsMeta;
 
 use crate::{circuits::*, config, config::ProvingData, errors, origo::SignBody, Proof};
 
+const HTTP_LOCK_VERSION: (&str, [u8; 50]) = ("beginning", [
+  72, 84, 84, 80, 47, 49, 46, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+]);
+const HTTP_BEGINNING_LENGTH: (&str, [u8; 1]) = ("beginning_length", [8]);
+const HTTP_LOCK_STATUS: (&str, [u8; 200]) = ("middle", [
+  50, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0,
+]);
+const HTTP_MIDDLE_LENGTH: (&str, [u8; 1]) = ("middle_length", [3]);
+const HTTP_LOCK_MESSAGE: (&str, [u8; 50]) = ("final", [
+  79, 75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+]);
+const HTTP_FINAL_LENGTH: (&str, [u8; 1]) = ("final_length", [2]);
+
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
   let (sb, witness) = proxy(config.clone(), session_id.clone()).await;
@@ -88,11 +109,6 @@ async fn generate_program_data(
   let mut padded_aad = vec![0; 16 - aad.len()];
   padded_aad.extend(aad);
 
-  // this somehow needs to be nested in this hashmap of values to be under another key called
-  // "fold_input" private_input.insert("plainText".to_string(),
-  // serde_json::to_value(&pt).unwrap()); private_input.insert("aad".to_string(),
-  // serde_json::to_value(&aad).unwrap());
-
   // TODO: Is padding the approach we want or change to support variable length?
   // let pt = AES_PLAINTEXT.1.to_vec();
   let janky_padding = if pt.len() % 16 != 0 { 16 - pt.len() % 16 } else { 0 };
@@ -108,8 +124,7 @@ async fn generate_program_data(
   let setup_data = SetupData {
     r1cs_types:              vec![
       R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      // R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      // R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
       // R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
       // R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
       // R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
@@ -118,6 +133,7 @@ async fn generate_program_data(
       // R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
+      WitnessGeneratorType::Browser,
       WitnessGeneratorType::Browser,
       // WitnessGeneratorType::Wasm {
       //   path:      String::from(HTTP_LOCK_HEADER_WASM),
@@ -144,7 +160,7 @@ async fn generate_program_data(
       //   wtns_path: String::from("witness.wtns"),
       // },
     ],
-    max_rom_length:          10,
+    max_rom_length:          20,
   };
 
   let aes_instr = String::from("AES_GCM_1");
@@ -168,40 +184,42 @@ async fn generate_program_data(
   };
 
   let mut rom = vec![aes_rom_opcode_config; rom_len];
-  // let mut rom = vec![];
-  // rom.extend([
-  // InstructionConfig {
-  //   name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
-  //   private_input: HashMap::from([
-  //     (String::from(HTTP_LOCK_VERSION.0), json!(HTTP_LOCK_VERSION.1)),
-  //     (String::from(HTTP_LOCK_MESSAGE.0), json!(HTTP_LOCK_MESSAGE.1)),
-  //     (String::from(HTTP_LOCK_STATUS.0), json!(HTTP_LOCK_STATUS.1)),
-  //   ]),
-  // },
-  // InstructionConfig {
-  //   name:          String::from("HTTP_LOCK_HEADER_1"),
-  //   private_input: HashMap::from([
-  //     (String::from(HTTP_LOCK_HEADER_NAME.0), json!(HTTP_LOCK_HEADER_NAME.1)),
-  //     (String::from(HTTP_LOCK_HEADER_VALUE.0), json!(HTTP_LOCK_HEADER_VALUE.1)),
-  //   ]),
-  // },
-  // InstructionConfig {
-  //   name:          String::from("HTTP_BODY_EXTRACT"),
-  //   private_input: HashMap::new(),
-  // },
-  // InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
-  // InstructionConfig {
-  //   name:          String::from("JSON_MASK_OBJECT_1"),
-  //   private_input: HashMap::from([
-  //     (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
-  //     (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
-  //   ]),
-  // },
-  // InstructionConfig {
-  //   name:          String::from("EXTRACT_VALUE"),
-  //   private_input: HashMap::new(),
-  // },
-  // ]);
+  rom.extend([
+    InstructionConfig {
+      name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
+      private_input: HashMap::from([
+        (String::from(HTTP_LOCK_VERSION.0), json!(HTTP_LOCK_VERSION.1.to_vec())),
+        (String::from(HTTP_BEGINNING_LENGTH.0), json!(HTTP_BEGINNING_LENGTH.1)),
+        (String::from(HTTP_LOCK_STATUS.0), json!(HTTP_LOCK_STATUS.1.to_vec())),
+        (String::from(HTTP_MIDDLE_LENGTH.0), json!(HTTP_MIDDLE_LENGTH.1)),
+        (String::from(HTTP_LOCK_MESSAGE.0), json!(HTTP_LOCK_MESSAGE.1.to_vec())),
+        (String::from(HTTP_FINAL_LENGTH.0), json!(HTTP_FINAL_LENGTH.1)),
+      ]),
+    },
+    // InstructionConfig {
+    //   name:          String::from("HTTP_LOCK_HEADER_1"),
+    //   private_input: HashMap::from([
+    //     (String::from(HTTP_LOCK_HEADER_NAME.0), json!(HTTP_LOCK_HEADER_NAME.1)),
+    //     (String::from(HTTP_LOCK_HEADER_VALUE.0), json!(HTTP_LOCK_HEADER_VALUE.1)),
+    //   ]),
+    // },
+    // InstructionConfig {
+    //   name:          String::from("HTTP_BODY_EXTRACT"),
+    //   private_input: HashMap::new(),
+    // },
+    // InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
+    // InstructionConfig {
+    //   name:          String::from("JSON_MASK_OBJECT_1"),
+    //   private_input: HashMap::from([
+    //     (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
+    //     (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
+    //   ]),
+    // },
+    // InstructionConfig {
+    //   name:          String::from("EXTRACT_VALUE"),
+    //   private_input: HashMap::new(),
+    // },
+  ]);
 
   let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
     value: HashMap::from([(
@@ -212,35 +230,34 @@ async fn generate_program_data(
 
   let mut initial_input = vec![0; 50]; // default number of step_in.
   initial_input.extend(janky_plaintext_padding.iter());
-  initial_input.resize(4160, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
+  initial_input.resize(1028, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
   let final_input: Vec<u64> = initial_input.into_iter().map(u64::from).collect();
 
   // TODO: Load this from a file. Run this in preprocessing step.
   debug!("generating public params");
-  // let public_params = program::setup(&setup_data);
+  let public_params = program::setup(&setup_data);
 
-  let pd = ProgramData::<Offline, NotExpanded> {
-    public_params: proving.serialized_pp,
-    setup_data,
-    rom,
-    rom_data,
-    // initial_nivc_input: final_input.to_vec(),
-    initial_nivc_input: vec![0; 48],
-    inputs: HashMap::new(),
-    witnesses,
-  }
-  .into_online();
-
-  // let pd = ProgramData::<Online, NotExpanded> {
-  //   public_params,
+  // let pd = ProgramData::<Offline, NotExpanded> {
+  //   public_params: proving.serialized_pp,
   //   setup_data,
   //   rom,
   //   rom_data,
   //   // initial_nivc_input: final_input.to_vec(),
   //   initial_nivc_input: vec![0; 48],
-  //   inputs,
+  //   inputs: HashMap::new(),
   //   witnesses,
-  // };
+  // }
+  // .into_online();
+
+  let pd = ProgramData::<Online, NotExpanded> {
+    public_params,
+    setup_data,
+    rom,
+    rom_data,
+    initial_nivc_input: final_input.to_vec(),
+    inputs,
+    witnesses,
+  };
 
   debug!("online -> expanded");
   pd.into_expanded()

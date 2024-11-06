@@ -163,7 +163,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
 
     memory.circuits[op_code as usize].circuit.witness = if is_browser {
       // When running in browser, the witness is passed as input.
-      Some(program_data.witnesses[op_code as usize].clone())
+      Some(program_data.witnesses[idx].clone())
     } else if is_mobile {
       // TODO: Obviously this code is horrible. Migration to circom-witnesscalc
       // will help. In the mean time, do the dirty to benchmark performance.
