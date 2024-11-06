@@ -10,6 +10,7 @@ use proofs::{
       CircuitData, Expanded, FoldInput, InstructionConfig, NotExpanded, Online, ProgramData,
       R1CSType, SetupData, WitnessGeneratorType,
     },
+    manifest,
   },
   F, G1,
 };
@@ -66,6 +67,7 @@ async fn generate_program_data(
     )
     .unwrap();
   let pt = plaintext.payload.0.to_vec();
+  debug!("plaintext: {:?}", pt);
   let aad = hex::decode(meta.additional_data.to_owned()).unwrap();
   let mut padded_aad = vec![0; 16 - aad.len()];
   padded_aad.extend(aad);
@@ -82,7 +84,6 @@ async fn generate_program_data(
       R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
       R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
       R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
-      R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
@@ -92,7 +93,6 @@ async fn generate_program_data(
       WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_PARSE_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
@@ -100,9 +100,6 @@ async fn generate_program_data(
     max_rom_length:          JSON_MAX_ROM_LENGTH,
   };
 
-  debug!("Setting up `PublicParams`... (this may take a moment)");
-  let public_params = program::setup(&setup_data);
-  debug!("Created `PublicParams`!");
   // ----------------------------------------------------------------------------------------------------------------------- //
 
   // ----------------------------------------------------------------------------------------------------------------------- //
@@ -117,21 +114,13 @@ async fn generate_program_data(
   let rom_len = (pt.len() + janky_padding) / 16;
   janky_plaintext_padding.extend(pt);
 
+  let (rom_data, rom) = proving.manifest.unwrap().rom_from_request(
+    &key,
+    &iv,
+    &padded_aad,
+    janky_plaintext_padding.len(),
+  );
   let aes_instr = String::from("AES_GCM_1");
-  // TODO (Sambhav): Add more opcodes for extraction, determine how a web proof chooses an
-  // extraction
-  let rom_data = HashMap::from([(aes_instr.clone(), CircuitData { opcode: 0 })]);
-
-  let aes_rom_opcode_config = InstructionConfig {
-    name:          aes_instr.clone(),
-    private_input: HashMap::from([
-      (String::from("key"), json!(key)),
-      (String::from("iv"), json!(iv)),
-      (String::from("aad"), json!(padded_aad)),
-    ]),
-  };
-
-  let rom = vec![aes_rom_opcode_config; rom_len];
 
   // TODO (Sambhav): update fold input from manifest
   let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
@@ -141,11 +130,15 @@ async fn generate_program_data(
     )]),
   })]);
 
-  let mut initial_input = vec![0; 23]; // default number of step_in for AES
+  let mut initial_input = vec![];
   initial_input.extend(janky_plaintext_padding.iter());
-  initial_input.resize(4160, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
+  initial_input.resize(TOTAL_BYTES_ACROSS_NIVC, 0);
   let final_input: Vec<u64> = initial_input.into_iter().map(u64::from).collect();
   // ----------------------------------------------------------------------------------------------------------------------- //
+
+  debug!("Setting up `PublicParams`... (this may take a moment)");
+  let public_params = program::setup(&setup_data);
+  debug!("Created `PublicParams`!");
 
   ProgramData::<Online, NotExpanded> {
     public_params,

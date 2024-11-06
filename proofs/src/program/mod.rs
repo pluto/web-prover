@@ -11,6 +11,7 @@ use client_side_prover::{
 };
 use data::Expanded;
 use proof::Proof;
+use tracing::trace;
 use utils::into_input_json;
 
 use super::*;
@@ -143,6 +144,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
     info!("Step {} of ROM", idx);
     debug!("Opcode = {:?}", op_code);
     memory.circuits[op_code as usize].private_input = Some(program_data.inputs[idx].clone());
+    trace!("private input: {:?}", memory.circuits[op_code as usize].private_input);
     memory.circuits[op_code as usize].nivc_io = Some(next_public_input);
 
     let wit_type = memory.circuits[op_code as usize].witness_generator_type.clone();
