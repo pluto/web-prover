@@ -50,12 +50,6 @@ const HTTP_BODY_MASK_R1CS: &[u8] =
 const HTTP_BODY_MASK_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/target_512b/http_body_mask_512b.bin");
 
-// Circuit 4
-const JSON_PARSE_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/json_parse_512b.r1cs");
-const JSON_PARSE_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/json_parse_512b.bin");
-
 // Circuit 5
 const JSON_MASK_OBJECT_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/target_512b/json_mask_object_512b.r1cs");
@@ -143,10 +137,7 @@ const JSON_MASK_KEYLEN_DEPTH_4: (&str, [u8; 1]) = ("keyLen", [7]);
 const JSON_MASK_KEY_DEPTH_5: (&str, [u8; 10]) = ("key", [110, 97, 109, 101, 0, 0, 0, 0, 0, 0]); // "name"
 const JSON_MASK_KEYLEN_DEPTH_5: (&str, [u8; 1]) = ("keyLen", [4]);
 
-const MAX_STACK_HEIGHT: usize = 10;
-const PER_ITERATION_DATA_LENGTH: usize = MAX_STACK_HEIGHT * 2 + 2;
-
-const TOTAL_BYTES_ACROSS_NIVC: usize = 512 * (PER_ITERATION_DATA_LENGTH + 1) + 1;
+const TOTAL_BYTES_ACROSS_NIVC: usize = 512 * 2 + 4;
 
 #[test]
 #[tracing_test::traced_test]
@@ -175,7 +166,6 @@ fn test_end_to_end_proofs() {
       R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
       R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
       R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
-      R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
@@ -185,7 +175,6 @@ fn test_end_to_end_proofs() {
       WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_PARSE_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
@@ -205,13 +194,12 @@ fn test_end_to_end_proofs() {
     (String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 1 }),
     (String::from("HTTP_LOCK_HEADER_1"), CircuitData { opcode: 2 }),
     (String::from("HTTP_BODY_MASK"), CircuitData { opcode: 3 }),
-    (String::from("JSON_PARSE"), CircuitData { opcode: 4 }),
-    (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 5 }),
-    (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 5 }),
-    (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 6 }),
-    (String::from("JSON_MASK_OBJECT_4"), CircuitData { opcode: 5 }),
-    (String::from("JSON_MASK_OBJECT_5"), CircuitData { opcode: 5 }),
-    (String::from("EXTRACT_VALUE"), CircuitData { opcode: 7 }),
+    (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 4 }),
+    (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 4 }),
+    (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 5 }),
+    (String::from("JSON_MASK_OBJECT_4"), CircuitData { opcode: 4 }),
+    (String::from("JSON_MASK_OBJECT_5"), CircuitData { opcode: 4 }),
+    (String::from("EXTRACT_VALUE"), CircuitData { opcode: 6 }),
   ]);
 
   let aes_rom_opcode_config = InstructionConfig {

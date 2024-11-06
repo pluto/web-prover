@@ -408,7 +408,7 @@ mod tests {
       rom[http_instruction_len]
         .private_input
         .get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING)),
-      Some(&json!(padded_request_method)),
+      Some(&json!(padded_request_method.to_vec())),
     );
     assert_eq!(
       rom[http_instruction_len].private_input.get(&String::from(HTTP_BEGINNING_LENGTH_SIGNAL)),
@@ -428,7 +428,7 @@ mod tests {
       rom[http_instruction_len]
         .private_input
         .get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL)),
-      Some(&json!(padded_request_version))
+      Some(&json!(padded_request_version.to_vec()))
     );
     assert_eq!(
       rom[http_instruction_len].private_input.get(&String::from(HTTP_FINAL_LENGTH_SIGNAL)),
@@ -454,11 +454,7 @@ mod tests {
     // AES + parse http + headers + body mask + json mask (object + array) + extract
     assert_eq!(
       rom_data.len(),
-      1 + 1 + manifest.response.headers.len() + 1 + 1 + manifest.response.body.json.len() + 1
-    );
-    assert_eq!(
-      rom_data.get(&String::from("JSON_PARSE")).unwrap().opcode,
-      1 + manifest.response.headers.len() as u64 + 1 + 1
+      1 + 1 + manifest.response.headers.len() + 1 + manifest.response.body.json.len() + 1
     );
     // HTTP parse + headers + body mask + json keys + extract value
     assert_eq!(
@@ -471,7 +467,6 @@ mod tests {
       plaintext_length / AES_INPUT_LENGTH
         + 1
         + manifest.response.headers.len()
-        + 1
         + 1
         + manifest.response.body.json.len()
         + 1
@@ -494,7 +489,7 @@ mod tests {
       rom[http_instruction_len]
         .private_input
         .get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING)),
-      Some(&json!(padded_response_version))
+      Some(&json!(padded_response_version.to_vec()))
     );
     assert_eq!(
       rom[http_instruction_len]
@@ -506,7 +501,7 @@ mod tests {
       rom[http_instruction_len]
         .private_input
         .get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL)),
-      Some(&json!(padded_response_message))
+      Some(&json!(padded_response_message.to_vec()))
     );
 
     // check final circuit is extract
