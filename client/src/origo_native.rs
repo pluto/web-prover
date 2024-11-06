@@ -84,7 +84,6 @@ async fn generate_program_data(
       R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
       R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
       R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
-      R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
@@ -94,7 +93,6 @@ async fn generate_program_data(
       WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_PARSE_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
@@ -102,9 +100,6 @@ async fn generate_program_data(
     max_rom_length:          JSON_MAX_ROM_LENGTH,
   };
 
-  debug!("Setting up `PublicParams`... (this may take a moment)");
-  let public_params = program::setup(&setup_data);
-  debug!("Created `PublicParams`!");
   // ----------------------------------------------------------------------------------------------------------------------- //
 
   // ----------------------------------------------------------------------------------------------------------------------- //
@@ -151,9 +146,14 @@ async fn generate_program_data(
 
   let mut initial_input = vec![0; 23]; // default number of step_in for AES
   initial_input.extend(janky_plaintext_padding.iter());
-  initial_input.resize(4160, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
+  initial_input.resize(1028, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
   let final_input: Vec<u64> = initial_input.into_iter().map(u64::from).collect();
   // ----------------------------------------------------------------------------------------------------------------------- //
+
+  debug!("Setting up `PublicParams`... (this may take a moment)");
+  let public_params = program::setup(&setup_data);
+  debug!("Created `PublicParams`!");
+
 
   ProgramData::<Online, NotExpanded> {
     public_params,

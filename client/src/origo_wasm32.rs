@@ -107,7 +107,7 @@ async fn generate_program_data(
 
   let setup_data = SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_FOLD_R1CS.to_vec()),
+      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
       // R1CSType::Raw(AES_GCM_R1CS.to_vec()),
       // R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
       // R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),

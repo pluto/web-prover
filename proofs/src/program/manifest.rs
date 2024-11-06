@@ -81,19 +81,24 @@ const AES_INPUT_LENGTH: usize = 16;
 const AES_KEY_SIGNAL: &str = "key";
 const AES_IV_SIGNAL: &str = "iv";
 const AES_AAD_SIGNAL: &str = "aad";
+
+// Parse and Lock
 const HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING: &str = "beginning";
 const HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE: &str = "middle";
 const HTTP_PARSE_AND_LOCK_START_LINE_FINAL: &str = "final";
-const HTTP_BEGINNING_LENGTH_SIGNAL: &str = "beginningLen";
-const HTTP_MIDDLE_LENGTH_SIGNAL: &str = "middleLen";
-const HTTP_FINAL_LENGTH_SIGNAL: &str = "finalLen";
-const HTTP_BEGINNING_MAX_LENGTH: usize = 10;
-const HTTP_MIDDLE_MAX_LENGTH: usize = 150;
-const HTTP_FINAL_MAX_LENGTH: usize = 10;
+const HTTP_BEGINNING_LENGTH_SIGNAL: &str = "beginning_length";
+const HTTP_MIDDLE_LENGTH_SIGNAL: &str = "middle_length";
+const HTTP_FINAL_LENGTH_SIGNAL: &str = "final_length";
+
+const HTTP_BEGINNING_MAX_LENGTH: usize = 50;
+const HTTP_MIDDLE_MAX_LENGTH: usize = 200;
+const HTTP_FINAL_MAX_LENGTH: usize = 50;
+
 const HTTP_HEADER_SIGNAL_NAME: &str = "header";
 const HTTP_HEADER_SIGNAL_VALUE: &str = "value";
-const HTTP_HEADER_MAX_NAME_LENGTH: usize = 20;
-const HTTP_HEADER_MAX_VALUE_LENGTH: usize = 35;
+const HTTP_HEADER_MAX_NAME_LENGTH: usize = 50;
+const HTTP_HEADER_MAX_VALUE_LENGTH: usize = 100;
+
 const JSON_MASK_OBJECT_KEY_NAME: &str = "key";
 const JSON_MASK_OBJECT_KEYLEN_NAME: &str = "keyLen";
 const JSON_MAX_KEY_LENGTH: usize = 10;
@@ -145,7 +150,7 @@ impl Manifest {
       private_input: HashMap::from([
         (
           String::from(HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING),
-          json!(http_parse_beginning_padded),
+          json!(http_parse_beginning_padded.to_vec()),
         ),
         (String::from(HTTP_BEGINNING_LENGTH_SIGNAL), json!([self.request.method.len()])),
         // TODO: check how to enter correct url here
@@ -154,7 +159,7 @@ impl Manifest {
           json!(http_parse_middle_padded.to_vec()),
         ),
         (String::from(HTTP_MIDDLE_LENGTH_SIGNAL), json!([self.request.url.len()])),
-        (String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL), json!(http_parse_final_padded)),
+        (String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL), json!(http_parse_final_padded.to_vec())),
         (String::from(HTTP_FINAL_LENGTH_SIGNAL), json!([self.request.version.len()])),
       ]),
     });
@@ -173,8 +178,8 @@ impl Manifest {
       rom.push(InstructionConfig {
         name,
         private_input: HashMap::from([
-          (String::from(HTTP_HEADER_SIGNAL_NAME), json!(header_name_padded)),
-          (String::from(HTTP_HEADER_SIGNAL_VALUE), json!(header_value_padded)),
+          (String::from(HTTP_HEADER_SIGNAL_NAME), json!(header_name_padded.to_vec())),
+          (String::from(HTTP_HEADER_SIGNAL_VALUE), json!(header_value_padded.to_vec())),
         ]),
       });
     }
@@ -227,7 +232,7 @@ impl Manifest {
       private_input: HashMap::from([
         (
           String::from(HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING),
-          json!(http_parse_beginning_padded),
+          json!(http_parse_beginning_padded.to_vec()),
         ),
         (String::from(HTTP_BEGINNING_LENGTH_SIGNAL), json!([self.response.version.len()])),
         (
@@ -235,7 +240,7 @@ impl Manifest {
           json!(http_parse_middle_padded.to_vec()),
         ),
         (String::from(HTTP_MIDDLE_LENGTH_SIGNAL), json!([self.response.status.len()])),
-        (String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL), json!(http_parse_final_padded)),
+        (String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL), json!(http_parse_final_padded.to_vec())),
         (String::from(HTTP_FINAL_LENGTH_SIGNAL), json!([self.response.message.len()])),
       ]),
     });
@@ -253,8 +258,8 @@ impl Manifest {
       rom.push(InstructionConfig {
         name,
         private_input: HashMap::from([
-          (String::from(HTTP_HEADER_SIGNAL_NAME), json!(header_name_padded)),
-          (String::from(HTTP_HEADER_SIGNAL_VALUE), json!(header_value_padded)),
+          (String::from(HTTP_HEADER_SIGNAL_NAME), json!(header_name_padded.to_vec())),
+          (String::from(HTTP_HEADER_SIGNAL_VALUE), json!(header_value_padded.to_vec())),
         ]),
       });
     }
@@ -263,13 +268,6 @@ impl Manifest {
     rom_data.insert(String::from("HTTP_BODY_EXTRACT"), CircuitData { opcode: 3 });
     rom.push(InstructionConfig {
       name:          String::from("HTTP_BODY_EXTRACT"),
-      private_input: HashMap::new(),
-    });
-
-    // json parse
-    rom_data.insert(String::from("JSON_PARSE"), CircuitData { opcode: 4 });
-    rom.push(InstructionConfig {
-      name:          String::from("JSON_PARSE"),
       private_input: HashMap::new(),
     });
 
@@ -447,7 +445,7 @@ mod tests {
     let (rom_data, rom) =
       manifest.rom_from_response(AES_KEY.1, AES_IV.1, AES_AAD.1, plaintext_length);
 
-    // AES + parse http + headers + body mask + json parse + json mask (object + array) + extract
+    // AES + parse http + headers + body mask + json mask (object + array) + extract
     assert_eq!(
       rom_data.len(),
       1 + 1 + manifest.response.headers.len() + 1 + 1 + manifest.response.body.json.len() + 1
@@ -456,7 +454,7 @@ mod tests {
       rom_data.get(&String::from("JSON_PARSE")).unwrap().opcode,
       1 + manifest.response.headers.len() as u64 + 1 + 1
     );
-    // HTTP parse + headers + body mask + json parse + json keys + extract value
+    // HTTP parse + headers + body mask + json keys + extract value
     assert_eq!(
       rom_data.get(&String::from("EXTRACT_VALUE")).unwrap().opcode,
       (manifest.response.headers.len() + 1 + 1 + manifest.response.body.json.len() + 1) as u64
