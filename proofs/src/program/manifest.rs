@@ -159,7 +159,10 @@ impl Manifest {
           json!(http_parse_middle_padded.to_vec()),
         ),
         (String::from(HTTP_MIDDLE_LENGTH_SIGNAL), json!([self.request.url.len()])),
-        (String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL), json!(http_parse_final_padded.to_vec())),
+        (
+          String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL),
+          json!(http_parse_final_padded.to_vec()),
+        ),
         (String::from(HTTP_FINAL_LENGTH_SIGNAL), json!([self.request.version.len()])),
       ]),
     });
@@ -240,7 +243,10 @@ impl Manifest {
           json!(http_parse_middle_padded.to_vec()),
         ),
         (String::from(HTTP_MIDDLE_LENGTH_SIGNAL), json!([self.response.status.len()])),
-        (String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL), json!(http_parse_final_padded.to_vec())),
+        (
+          String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL),
+          json!(http_parse_final_padded.to_vec()),
+        ),
         (String::from(HTTP_FINAL_LENGTH_SIGNAL), json!([self.response.message.len()])),
       ]),
     });

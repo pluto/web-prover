@@ -154,7 +154,6 @@ async fn generate_program_data(
   let public_params = program::setup(&setup_data);
   debug!("Created `PublicParams`!");
 
-
   ProgramData::<Online, NotExpanded> {
     public_params,
     setup_data,
