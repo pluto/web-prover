@@ -39,10 +39,10 @@ pub enum ClientErrors {
   UrlParse(#[from] url::ParseError),
 
   #[error(transparent)]
-  ProverConfigBuilder(#[from] tlsn_prover::tls::ProverConfigBuilderError),
+  TlsnProverError(#[from] tlsn_prover::ProverError),
 
   #[error(transparent)]
-  Prover(#[from] tlsn_prover::tls::ProverError),
+  TranscriptCommitConfigBuilderError(#[from] tlsn_core::transcript::TranscriptCommitConfigBuilderError),
 
   #[error(transparent)]
   InvalidHeaderName(#[from] hyper::header::InvalidHeaderName),
@@ -54,10 +54,10 @@ pub enum ClientErrors {
   Base64Decode(#[from] base64::DecodeError),
 
   #[error(transparent)]
-  HttpProver(#[from] tlsn_prover::http::HttpProverError),
+  HttpProver(#[from] tlsn_formats::http::HttpCommitError),
 
   #[error(transparent)]
-  SubstringsProofBuilder(#[from] tlsn_core::proof::SubstringsProofBuilderError),
+  TlsnParser(#[from] tlsn_formats::ParseError),
 }
 
 #[cfg(target_arch = "wasm32")]

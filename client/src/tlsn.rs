@@ -1,39 +1,44 @@
 // logic common to wasm32 and native
-
-use std::time::Duration;
-
+use std::{clone, time::Duration};
 use http_body_util::BodyExt;
 use hyper::{body::Bytes, Request};
 use p256::pkcs8::DecodePublicKey;
 use serde::{Deserialize, Serialize};
-use tlsn_core::proof::SessionProof;
-pub use tlsn_core::proof::TlsProof;
-use tlsn_prover::tls::{state::Closed, Prover};
+use tlsn_core::{
+  presentation::{Presentation, PresentationOutput}, 
+  {attestation::Attestation, Secrets}, 
+  signing::VerifyingKey, 
+  CryptoProvider, 
+  request::RequestConfig,
+  transcript::TranscriptCommitConfig,
+};
+use tlsn_formats::http::{DefaultHttpCommitter, HttpCommit, HttpTranscript};
+use tlsn_prover::{state::Closed, Prover};
 use tracing::debug;
 
-use crate::errors;
+use crate::errors::{self, ClientErrors};
 
-pub async fn notarize(prover: Prover<Closed>) -> Result<TlsProof, errors::ClientErrors> {
-  // copied from https://github.com/tlsnotary/tlsn/blob/3554db83e17b2e5fc98293b397a2907b7f023496/tlsn/examples/simple/simple_prover.rs#L145C1-L169C2
+pub async fn notarize(prover: Prover<Closed>) -> Result<(Attestation, Secrets), errors::ClientErrors> {
+  // copied from https://github.com/tlsnotary/tlsn/blob/main/crates/examples/attestation/prove.rs
+  // Prepare for notarization.
   let mut prover = prover.start_notarize();
 
-  let sent_len = prover.sent_transcript().data().len();
-  let recv_len = prover.recv_transcript().data().len();
+  // Parse the HTTP transcript.
+  let transcript = HttpTranscript::parse(prover.transcript())?;
 
-  let builder = prover.commitment_builder();
-  let sent_commitment = builder.commit_sent(&(0..sent_len)).unwrap();
-  let recv_commitment = builder.commit_recv(&(0..recv_len)).unwrap();
+  // Commit to the transcript.
+  let mut builder = TranscriptCommitConfig::builder(prover.transcript());
 
-  let notarized_session = prover.finalize().await.unwrap();
+  DefaultHttpCommitter::default().commit_transcript(&mut builder, &transcript)?;
 
-  let mut proof_builder = notarized_session.data().build_substrings_proof();
+  prover.transcript_commit(builder.build()?);
 
-  proof_builder.reveal_by_id(sent_commitment).unwrap();
-  proof_builder.reveal_by_id(recv_commitment).unwrap();
+  // Request an attestation.
+  let config = RequestConfig::default();
 
-  let substrings_proof = proof_builder.build().unwrap();
+  let (attestation, secrets) = prover.finalize(&config).await?;
 
-  Ok(TlsProof { session: notarized_session.session_proof(), substrings: substrings_proof })
+  Ok((attestation, secrets))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -44,43 +49,43 @@ pub struct VerifyResult {
   pub recv:        String,
 }
 
-pub async fn verify(proof: TlsProof, notary_pubkey_str: &str) -> VerifyResult {
-  let TlsProof {
-    // The session proof establishes the identity of the server and the commitments
-    // to the TLS transcript.
-    session,
-    // The substrings proof proves select portions of the transcript, while redacting
-    // anything the Prover chose not to disclose.
-    substrings,
-  } = proof;
+pub async fn verify(proof: Presentation, notary_pubkey_str: &str) -> Result<PresentationOutput, ClientErrors> {
 
-  session.verify_with_default_cert_verifier(get_notary_pubkey(notary_pubkey_str)).unwrap();
+  let provider = CryptoProvider::default();
 
-  let SessionProof { header, session_info, .. } = session;
+  let VerifyingKey {
+      alg,
+      data: key_data,
+  } = proof.verifying_key();
 
-  let time = chrono::DateTime::UNIX_EPOCH + Duration::from_secs(header.time());
-
-  let (mut sent, mut recv) = substrings.verify(&header).unwrap();
-
-  sent.set_redacted(b'X');
-  recv.set_redacted(b'X');
-
-  debug!(
-    "Successfully verified that the bytes below came from a session with {:?} at {}.",
-    session_info.server_name, time
+  println!(
+      "Verifying presentation with {alg} key: {}\n\n**Ask yourself, do you trust this key?**\n",
+      hex::encode(key_data)
   );
-  debug!("Note that the bytes which the Prover chose not to disclose are shown as X.");
-  debug!("Bytes sent:");
-  debug!("{}", String::from_utf8(sent.data().to_vec()).unwrap());
-  debug!("Bytes received:");
-  debug!("{}", String::from_utf8(recv.data().to_vec()).unwrap());
 
-  VerifyResult {
-    server_name: String::from(session_info.server_name.as_str()),
-    time:        header.time(),
-    sent:        String::from_utf8(sent.data().to_vec()).unwrap(),
-    recv:        String::from_utf8(recv.data().to_vec()).unwrap(),
-  }
+  // Verify the presentation.
+  let pres = proof.verify(&provider).unwrap();
+
+  // The time at which the connection was started.
+  let time = chrono::DateTime::UNIX_EPOCH + Duration::from_secs(pres.connection_info.time);
+  let server_name = pres.server_name.as_ref().unwrap();
+  let mut partial_transcript = pres.transcript.clone().unwrap();
+  // Set the unauthenticated bytes so they are distinguishable.
+  partial_transcript.set_unauthed(b'X');
+  let sent = String::from_utf8_lossy(partial_transcript.sent_unsafe());
+  let recv = String::from_utf8_lossy(partial_transcript.received_unsafe());
+
+  println!("-------------------------------------------------------------------");
+  println!(
+      "Successfully verified that the data below came from a session with {server_name} at {time}.",
+  );
+  println!("Note that the data which the Prover chose not to disclose are shown as X.\n");
+  println!("Data sent:\n");
+  println!("{}\n", sent);
+  println!("Data received:\n");
+  println!("{}\n", recv);
+  println!("-------------------------------------------------------------------");
+  Ok(pres)
 }
 
 pub async fn send_request(

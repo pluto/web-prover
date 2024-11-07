@@ -12,13 +12,13 @@ pub mod errors;
 mod tls;
 
 use serde::Serialize;
-pub use tlsn_core::proof::TlsProof;
-use tlsn_prover::tls::ProverConfig;
+pub use tlsn_core::{attestation::Attestation, Secrets};
+use tlsn_prover::ProverConfig;
 use tracing::info;
 
 #[derive(Debug, Serialize)]
 pub enum Proof {
-  TLSN(TlsProof),
+  TLSN(Attestation, Secrets),
   Origo(Vec<u8>),
 }
 
@@ -33,13 +33,12 @@ pub async fn prover_inner(config: config::Config) -> Result<Proof, errors::Clien
 pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let root_store = crate::tls::tls_client_default_root_store();
 
-  let prover_config = ProverConfig::builder()
-    .id(config.session_id())
-    .root_cert_store(root_store)
-    .server_dns(config.target_host())
-    .max_transcript_size(config.max_sent_data.unwrap() + config.max_recv_data.unwrap())
-    .build()
-    .unwrap();
+  let prover_config = ProverConfig::builder().build().unwrap();
+    // .root_cert_store(root_store)
+    // .server_dns(config.target_host())
+    // .max_transcript_size(config.max_sent_data.unwrap() + config.max_recv_data.unwrap())
+    // .build()
+    // .unwrap();
 
   #[cfg(target_arch = "wasm32")]
   let prover = tlsn_wasm32::setup_connection(&mut config, prover_config).await;
@@ -51,8 +50,8 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, erro
     tlsn_native::setup_tcp_connection(&mut config, prover_config).await
   };
 
-  let p = tlsn::notarize(prover).await.unwrap();
-  Ok(Proof::TLSN(p))
+  let (a, s ) = tlsn::notarize(prover).await.unwrap();
+  Ok(Proof::TLSN(a, s))
 }
 
 pub async fn prover_inner_origo(config: config::Config) -> Result<Proof, errors::ClientErrors> {

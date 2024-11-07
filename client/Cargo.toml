@@ -72,6 +72,7 @@ rustls      ={ version="0.21", default-features=false }
 # TLSN
 tlsn-prover          ={ workspace=true }
 tlsn-core            ={ workspace=true }
+tlsn-formats         ={ workspace=true }
 async-tungstenite    ={ version="0.25.1", features=["async-std-runtime", "async-tls"] }
 ws_stream_tungstenite={ version="0.13.0", features=["tokio_io"] }
 clap                 ={ version="4.5.13", features=["derive"] }

@@ -87,7 +87,7 @@ dependencies = [
  "aes 0.7.5",
  "cipher 0.3.0",
  "ctr 0.7.0",
- "ghash",
+ "ghash 0.4.4",
  "subtle",
 ]
 
@@ -1336,6 +1336,7 @@ dependencies = [
  "tls-client-async",
  "tls-core",
  "tlsn-core",
+ "tlsn-formats",
  "tlsn-prover",
  "tlsn-tls-client",
  "tokio",
@@ -1454,7 +1455,7 @@ dependencies = [
 [[package]]
 name = "clmul"
 version = "0.1.0"
-source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=850636f#850636fae4b327d2dba3924c9fa7a8c4c9003ab1"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
 dependencies = [
  "bytemuck",
  "cfg-if",
@@ -2557,7 +2558,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1583cc1656d7839fd3732b80cf4f38850336cdb9b8ded1cd399ca62958de3c99"
 dependencies = [
  "opaque-debug",
- "polyval",
+ "polyval 0.5.3",
+]
+
+[[package]]
+name = "ghash"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0d8a4362ccb29cb0b265253fb0a2728f592895ee6854fd9bc13f2ffda266ff1"
+dependencies = [
+ "opaque-debug",
+ "polyval 0.6.2",
 ]
 
 [[package]]
@@ -2855,6 +2866,15 @@ name = "humantime"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
+
+[[package]]
+name = "hybrid-array"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45a9a965bb102c1c891fb017c09a05c965186b1265a207640f323ddd009f9deb"
+dependencies = [
+ "typenum",
+]
 
 [[package]]
 name = "hyper"
@@ -3340,7 +3360,7 @@ checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
 [[package]]
 name = "matrix-transpose"
 version = "0.1.0"
-source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=850636f#850636fae4b327d2dba3924c9fa7a8c4c9003ab1"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
 dependencies = [
  "thiserror",
 ]
@@ -3397,7 +3417,7 @@ dependencies = [
 [[package]]
 name = "mpz-circuits"
 version = "0.1.0"
-source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=850636f#850636fae4b327d2dba3924c9fa7a8c4c9003ab1"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
 dependencies = [
  "bincode",
  "itybity",
@@ -3414,7 +3434,7 @@ dependencies = [
 [[package]]
 name = "mpz-circuits-macros"
 version = "0.1.0"
-source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=850636f#850636fae4b327d2dba3924c9fa7a8c4c9003ab1"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3422,9 +3442,53 @@ dependencies = [
 ]
 
 [[package]]
+name = "mpz-cointoss"
+version = "0.1.0"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
+dependencies = [
+ "futures",
+ "mpz-cointoss-core",
+ "mpz-common",
+ "mpz-core",
+ "serio",
+ "thiserror",
+]
+
+[[package]]
+name = "mpz-cointoss-core"
+version = "0.1.0"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
+dependencies = [
+ "mpz-core",
+ "opaque-debug",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "mpz-common"
+version = "0.1.0"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
+dependencies = [
+ "async-trait",
+ "cfg-if",
+ "futures",
+ "mpz-core",
+ "pin-project-lite",
+ "pollster",
+ "rayon",
+ "scoped-futures",
+ "serde",
+ "serio",
+ "thiserror",
+ "tokio",
+ "uid-mux",
+]
+
+[[package]]
 name = "mpz-core"
 version = "0.1.0"
-source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=850636f#850636fae4b327d2dba3924c9fa7a8c4c9003ab1"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
 dependencies = [
  "aes 0.8.4",
  "bcs",
@@ -3446,9 +3510,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "mpz-fields"
+version = "0.1.0"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
+dependencies = [
+ "ark-ff 0.4.2",
+ "ark-secp256r1",
+ "ark-serialize 0.4.2",
+ "hybrid-array",
+ "itybity",
+ "mpz-core",
+ "num-bigint 0.4.6",
+ "opaque-debug",
+ "rand 0.8.5",
+ "serde",
+ "thiserror",
+ "typenum",
+]
+
+[[package]]
 name = "mpz-garble"
 version = "0.1.0"
-source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=850636f#850636fae4b327d2dba3924c9fa7a8c4c9003ab1"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
 dependencies = [
  "aes 0.8.4",
  "async-trait",
@@ -3458,6 +3541,7 @@ dependencies = [
  "futures-util",
  "itybity",
  "mpz-circuits",
+ "mpz-common",
  "mpz-core",
  "mpz-garble-core",
  "mpz-ot",
@@ -3466,16 +3550,17 @@ dependencies = [
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "rand_core 0.6.4",
- "rayon",
+ "serio",
  "thiserror",
- "tlsn-utils",
- "tlsn-utils-aio",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=6e0be94)",
+ "tlsn-utils-aio 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=6e0be94)",
+ "tracing",
 ]
 
 [[package]]
 name = "mpz-garble-core"
 version = "0.1.0"
-source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=850636f#850636fae4b327d2dba3924c9fa7a8c4c9003ab1"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
 dependencies = [
  "aes 0.8.4",
  "blake3",
@@ -3485,6 +3570,7 @@ dependencies = [
  "mpz-circuits",
  "mpz-core",
  "once_cell",
+ "opaque-debug",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "rand_core 0.6.4",
@@ -3494,35 +3580,66 @@ dependencies = [
 ]
 
 [[package]]
+name = "mpz-ole"
+version = "0.1.0"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
+dependencies = [
+ "async-trait",
+ "futures",
+ "itybity",
+ "mpz-common",
+ "mpz-core",
+ "mpz-fields",
+ "mpz-ole-core",
+ "mpz-ot",
+ "rand 0.8.5",
+ "serio",
+ "thiserror",
+]
+
+[[package]]
+name = "mpz-ole-core"
+version = "0.1.0"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
+dependencies = [
+ "hybrid-array",
+ "itybity",
+ "mpz-core",
+ "mpz-fields",
+ "mpz-ot-core",
+ "rand 0.8.5",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "mpz-ot"
 version = "0.1.0"
-source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=850636f#850636fae4b327d2dba3924c9fa7a8c4c9003ab1"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
 dependencies = [
- "aes 0.8.4",
  "async-trait",
  "cfg-if",
- "cipher 0.4.4",
  "enum-try-as-inner",
  "futures",
- "futures-util",
  "itybity",
+ "mpz-cointoss",
+ "mpz-common",
  "mpz-core",
  "mpz-ot-core",
  "opaque-debug",
- "prost 0.9.0",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "rand_core 0.6.4",
  "rayon",
- "serde",
+ "serio",
  "thiserror",
- "tlsn-utils-aio",
+ "tlsn-utils-aio 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=6e0be94)",
 ]
 
 [[package]]
 name = "mpz-ot-core"
 version = "0.1.0"
-source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=850636f#850636fae4b327d2dba3924c9fa7a8c4c9003ab1"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
 dependencies = [
  "aes 0.8.4",
  "blake3",
@@ -3544,39 +3661,31 @@ dependencies = [
  "rayon",
  "serde",
  "thiserror",
- "tlsn-utils",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=6e0be94)",
 ]
 
 [[package]]
 name = "mpz-share-conversion"
 version = "0.1.0"
-source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=850636f#850636fae4b327d2dba3924c9fa7a8c4c9003ab1"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
 dependencies = [
  "async-trait",
- "derive_builder 0.11.2",
- "futures",
- "mpz-core",
- "mpz-ot",
+ "mpz-common",
+ "mpz-fields",
+ "mpz-ole",
  "mpz-share-conversion-core",
  "rand 0.8.5",
- "rand_chacha 0.3.1",
- "serde",
+ "serio",
  "thiserror",
- "tlsn-utils-aio",
 ]
 
 [[package]]
 name = "mpz-share-conversion-core"
 version = "0.1.0"
-source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=850636f#850636fae4b327d2dba3924c9fa7a8c4c9003ab1"
+source = "git+https://github.com/privacy-scaling-explorations/mpz?rev=b8ae7ac#b8ae7acd4e0f306f0c23a9108dd5b802419e48fd"
 dependencies = [
- "ark-ff 0.4.2",
- "ark-secp256r1",
- "ark-serialize 0.4.2",
- "itybity",
  "mpz-core",
- "num-bigint 0.4.6",
- "opaque-debug",
+ "mpz-fields",
  "rand 0.8.5",
  "serde",
  "thiserror",
@@ -3691,7 +3800,7 @@ dependencies = [
  "nom",
  "nom-derive",
  "p256",
- "rs_merkle",
+ "rs_merkle 1.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustls 0.23.16",
  "rustls-acme",
  "rustls-pemfile 2.2.0",
@@ -3702,6 +3811,7 @@ dependencies = [
  "tls-backend",
  "tls-client",
  "tls-parser",
+ "tlsn-core",
  "tlsn-verifier",
  "tokio",
  "tokio-rustls 0.26.0",
@@ -4267,6 +4377,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "pollster"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22686f4785f02a4fcc856d3b3bb19bf6c8160d103f7a99cc258bddd0251dc7f2"
+
+[[package]]
 name = "polyval"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4275,7 +4391,19 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "opaque-debug",
- "universal-hash",
+ "universal-hash 0.4.0",
+]
+
+[[package]]
+name = "polyval"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d1fe60d06143b2430aa532c94cfe9e29783047f06c0d7fd359a9a51b729fa25"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "opaque-debug",
+ "universal-hash 0.5.1",
 ]
 
 [[package]]
@@ -4919,6 +5047,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rs_merkle"
+version = "1.4.2"
+source = "git+https://github.com/tlsnotary/rs-merkle.git?rev=85f3e82#85f3e827451e18c21f110068b4322fb99d2f0a8c"
+dependencies = [
+ "serde",
+ "sha2",
+]
+
+[[package]]
 name = "rstest"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5203,6 +5340,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "scoped-futures"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b24aae2d0636530f359e9d5ef0c04669d11c5e756699b27a6a6d845d8329091"
+dependencies = [
+ "pin-project-lite",
+]
+
+[[package]]
 name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5286,6 +5432,9 @@ name = "semver"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61697e0a1c7e512e84a621326239844a24d8207b4669b41bc18b32ea5cbf988b"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "semver-parser"
@@ -5402,6 +5551,24 @@ checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
 dependencies = [
  "base16ct",
  "serde",
+]
+
+[[package]]
+name = "serio"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a951fa5fd438df53f22a7d3ce50aebb4b224257f850d12134759ff0258bda51"
+dependencies = [
+ "bincode",
+ "bytes",
+ "futures-channel",
+ "futures-core",
+ "futures-io",
+ "futures-sink",
+ "futures-util",
+ "pin-project-lite",
+ "serde",
+ "tokio-util",
 ]
 
 [[package]]
@@ -5527,7 +5694,7 @@ dependencies = [
 [[package]]
 name = "spansy"
 version = "0.1.0"
-source = "git+https://github.com/tlsnotary/tlsn-utils?rev=51f313d#51f313d153f1b878e583e709d66a4661b40c2b6c"
+source = "git+https://github.com/tlsnotary/tlsn-utils?rev=e7b2db6#e7b2db6a0c0d0202694754efb77625ee43a14f5a"
 dependencies = [
  "bytes",
  "httparse",
@@ -5535,7 +5702,7 @@ dependencies = [
  "pest_derive",
  "serde",
  "thiserror",
- "tlsn-utils",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=e7b2db6)",
 ]
 
 [[package]]
@@ -5927,104 +6094,123 @@ dependencies = [
 
 [[package]]
 name = "tlsn-aead"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
  "async-trait",
  "derive_builder 0.12.0",
  "futures",
+ "mpz-common",
  "mpz-core",
  "mpz-garble",
+ "mpz-ot",
  "serde",
+ "serio",
  "thiserror",
  "tlsn-block-cipher",
  "tlsn-stream-cipher",
  "tlsn-universal-hash",
- "tlsn-utils-aio",
  "tracing",
 ]
 
 [[package]]
 name = "tlsn-block-cipher"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
  "async-trait",
  "derive_builder 0.12.0",
  "mpz-circuits",
  "mpz-garble",
  "thiserror",
- "tlsn-utils",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=e7b2db6)",
  "tracing",
 ]
 
 [[package]]
 name = "tlsn-common"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
+ "derive_builder 0.12.0",
  "futures",
- "tlsn-utils-aio",
+ "mpz-common",
+ "mpz-garble",
+ "mpz-ot",
+ "once_cell",
+ "semver 1.0.23",
+ "serde",
+ "serio",
+ "thiserror",
+ "tlsn-core",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=e7b2db6)",
+ "tracing",
  "uid-mux",
 ]
 
 [[package]]
 name = "tlsn-core"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
+ "bcs",
  "bimap",
- "bytes",
+ "blake3",
+ "derive_builder 0.12.0",
  "getrandom 0.2.15",
+ "k256",
  "mpz-circuits",
  "mpz-core",
  "mpz-garble-core",
  "opaque-debug",
  "p256",
+ "rand 0.8.5",
+ "rand_core 0.6.4",
  "ring 0.17.8",
- "rs_merkle",
+ "rs_merkle 1.4.2 (git+https://github.com/tlsnotary/rs-merkle.git?rev=85f3e82)",
  "serde",
+ "sha2",
  "thiserror",
+ "tiny-keccak",
  "tlsn-tls-core",
- "tlsn-utils",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=e7b2db6)",
  "web-time 0.2.4",
  "webpki-roots 0.26.6",
 ]
 
 [[package]]
 name = "tlsn-formats"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
  "bytes",
  "serde",
  "spansy",
  "thiserror",
  "tlsn-core",
- "tlsn-utils",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=e7b2db6)",
 ]
 
 [[package]]
 name = "tlsn-hmac-sha256"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
  "async-trait",
  "derive_builder 0.12.0",
- "enum-try-as-inner",
  "futures",
  "mpz-circuits",
+ "mpz-common",
  "mpz-garble",
  "thiserror",
  "tlsn-hmac-sha256-circuits",
- "tlsn-utils-aio",
  "tracing",
 ]
 
 [[package]]
 name = "tlsn-hmac-sha256-circuits"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
  "mpz-circuits",
  "tracing",
@@ -6032,74 +6218,65 @@ dependencies = [
 
 [[package]]
 name = "tlsn-key-exchange"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
  "async-trait",
  "derive_builder 0.12.0",
  "futures",
  "mpz-circuits",
+ "mpz-common",
+ "mpz-fields",
  "mpz-garble",
  "mpz-ot",
- "mpz-share-conversion-core",
- "p256",
- "serde",
- "thiserror",
- "tlsn-point-addition",
- "tlsn-utils-aio",
- "tracing",
-]
-
-[[package]]
-name = "tlsn-point-addition"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
-dependencies = [
- "async-trait",
- "mpz-core",
  "mpz-share-conversion",
- "mpz-share-conversion-core",
  "p256",
+ "rand 0.8.5",
+ "serde",
+ "serio",
  "thiserror",
  "tracing",
 ]
 
 [[package]]
 name = "tlsn-prover"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
  "bytes",
  "derive_builder 0.12.0",
  "futures",
  "getrandom 0.2.15",
+ "mpz-common",
  "mpz-core",
  "mpz-garble",
  "mpz-garble-core",
+ "mpz-ole",
  "mpz-ot",
  "mpz-share-conversion",
  "opaque-debug",
  "rand 0.8.5",
  "ring 0.17.8",
+ "serio",
  "thiserror",
  "tlsn-common",
  "tlsn-core",
- "tlsn-formats",
  "tlsn-tls-client",
  "tlsn-tls-client-async",
  "tlsn-tls-core",
  "tlsn-tls-mpc",
- "tlsn-utils",
- "tlsn-utils-aio",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=e7b2db6)",
+ "tlsn-utils-aio 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=e7b2db6)",
  "tracing",
+ "uid-mux",
  "web-time 0.2.4",
  "webpki-roots 0.26.6",
 ]
 
 [[package]]
 name = "tlsn-stream-cipher"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
  "aes 0.8.4",
  "async-trait",
@@ -6108,15 +6285,16 @@ dependencies = [
  "derive_builder 0.12.0",
  "mpz-circuits",
  "mpz-garble",
+ "opaque-debug",
  "thiserror",
- "tlsn-utils",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=e7b2db6)",
  "tracing",
 ]
 
 [[package]]
 name = "tlsn-tls-backend"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
  "async-trait",
  "futures",
@@ -6126,8 +6304,8 @@ dependencies = [
 
 [[package]]
 name = "tlsn-tls-client"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
  "aes-gcm",
  "async-trait",
@@ -6149,8 +6327,8 @@ dependencies = [
 
 [[package]]
 name = "tlsn-tls-client-async"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
  "bytes",
  "futures",
@@ -6162,8 +6340,8 @@ dependencies = [
 
 [[package]]
 name = "tlsn-tls-core"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
  "futures",
  "hmac",
@@ -6181,16 +6359,20 @@ dependencies = [
 
 [[package]]
 name = "tlsn-tls-mpc"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
  "async-trait",
  "derive_builder 0.12.0",
  "enum-try-as-inner",
  "futures",
  "ludi",
+ "mpz-common",
  "mpz-core",
+ "mpz-fields",
  "mpz-garble",
+ "mpz-ole",
+ "mpz-ot",
  "mpz-share-conversion",
  "p256",
  "rand 0.8.5",
@@ -6200,25 +6382,28 @@ dependencies = [
  "tlsn-block-cipher",
  "tlsn-hmac-sha256",
  "tlsn-key-exchange",
- "tlsn-point-addition",
  "tlsn-stream-cipher",
  "tlsn-tls-backend",
  "tlsn-tls-core",
  "tlsn-universal-hash",
- "tlsn-utils-aio",
+ "tlsn-utils-aio 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=e7b2db6)",
  "tracing",
+ "uid-mux",
 ]
 
 [[package]]
 name = "tlsn-universal-hash"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
  "async-trait",
  "derive_builder 0.12.0",
  "futures",
  "futures-util",
+ "ghash 0.5.1",
+ "mpz-common",
  "mpz-core",
+ "mpz-fields",
  "mpz-share-conversion",
  "mpz-share-conversion-core",
  "opaque-debug",
@@ -6229,7 +6414,15 @@ dependencies = [
 [[package]]
 name = "tlsn-utils"
 version = "0.1.0"
-source = "git+https://github.com/tlsnotary/tlsn-utils?rev=51f313d#51f313d153f1b878e583e709d66a4661b40c2b6c"
+source = "git+https://github.com/tlsnotary/tlsn-utils?rev=6e0be94#6e0be940d8c0f78d057b06af55363edbba8d007a"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "tlsn-utils"
+version = "0.1.0"
+source = "git+https://github.com/tlsnotary/tlsn-utils?rev=e7b2db6#e7b2db6a0c0d0202694754efb77625ee43a14f5a"
 dependencies = [
  "serde",
 ]
@@ -6237,7 +6430,27 @@ dependencies = [
 [[package]]
 name = "tlsn-utils-aio"
 version = "0.1.0"
-source = "git+https://github.com/tlsnotary/tlsn-utils?rev=51f313d#51f313d153f1b878e583e709d66a4661b40c2b6c"
+source = "git+https://github.com/tlsnotary/tlsn-utils?rev=6e0be94#6e0be940d8c0f78d057b06af55363edbba8d007a"
+dependencies = [
+ "async-std",
+ "async-trait",
+ "async-tungstenite 0.16.1",
+ "bytes",
+ "futures",
+ "futures-util",
+ "rayon",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tokio-serde",
+ "tokio-util",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
+name = "tlsn-utils-aio"
+version = "0.1.0"
+source = "git+https://github.com/tlsnotary/tlsn-utils?rev=e7b2db6#e7b2db6a0c0d0202694754efb77625ee43a14f5a"
 dependencies = [
  "async-std",
  "async-trait",
@@ -6256,26 +6469,32 @@ dependencies = [
 
 [[package]]
 name = "tlsn-verifier"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0-alpha.7"
+source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.7#4d5102b6e141ecb84b8a835604be1d285ae6eaa5"
 dependencies = [
  "derive_builder 0.12.0",
  "futures",
  "mpz-circuits",
+ "mpz-common",
  "mpz-core",
  "mpz-garble",
+ "mpz-ole",
  "mpz-ot",
  "mpz-share-conversion",
  "opaque-debug",
  "rand 0.8.5",
+ "serio",
  "signature",
  "thiserror",
  "tlsn-common",
  "tlsn-core",
  "tlsn-tls-core",
  "tlsn-tls-mpc",
- "tlsn-utils-aio",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=e7b2db6)",
+ "tlsn-utils-aio 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=e7b2db6)",
+ "tracing",
  "uid-mux",
+ "web-time 0.2.4",
 ]
 
 [[package]]
@@ -6703,12 +6922,17 @@ checksum = "2896d95c02a80c6d6a5d6e953d479f5ddf2dfdb6a244441010e373ac0fb88971"
 
 [[package]]
 name = "uid-mux"
-version = "0.1.0-alpha.4"
-source = "git+https://github.com/tlsnotary/tlsn.git?tag=v0.1.0-alpha.4#309c37fdecd719d8837ec617646a2d394ac3386f"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9d4729aa30204716bd4e06c10bd85b6243792a717145cf52c69659de2443e4e"
 dependencies = [
  "async-trait",
+ "blake3",
  "futures",
- "tlsn-utils-aio",
+ "hex",
+ "serio",
+ "tokio",
+ "tokio-util",
  "tracing",
  "yamux",
 ]
@@ -6777,6 +7001,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8326b2c654932e3e4f9196e69d08fdf7cfd718e1dc6f66b347e6024a0c961402"
 dependencies = [
  "generic-array 0.14.7",
+ "subtle",
+]
+
+[[package]]
+name = "universal-hash"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc1de2c688dc15305988b563c3854064043356019f97a4b46276fe734c4f07ea"
+dependencies = [
+ "crypto-common",
  "subtle",
 ]
 
@@ -7372,9 +7606,9 @@ dependencies = [
 
 [[package]]
 name = "yamux"
-version = "0.11.1"
+version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0875ad26dfbf0e7126d4a200747c78496aa3f0225d094a8c867b0e98bb19f9d7"
+checksum = "a31b5e376a8b012bee9c423acdbb835fc34d45001cfa3106236a624e4b738028"
 dependencies = [
  "futures",
  "log",
@@ -7383,6 +7617,7 @@ dependencies = [
  "pin-project",
  "rand 0.8.5",
  "static_assertions",
+ "web-time 1.1.0",
 ]
 
 [[package]]

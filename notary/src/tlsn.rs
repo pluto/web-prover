@@ -10,7 +10,8 @@ use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use p256::ecdsa::{Signature, SigningKey};
 use serde::Deserialize;
-use tlsn_verifier::tls::{Verifier, VerifierConfig};
+use tlsn_verifier::{Verifier, VerifierConfig};
+use tlsn_core::attestation::AttestationConfig;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::{debug, error, info};
@@ -70,14 +71,12 @@ pub async fn notary_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
   debug!(?session_id, "Starting notarization...");
 
   let mut config_builder = VerifierConfig::builder();
+  let attestation_config = AttestationConfig::builder().build().unwrap();
 
-  config_builder = config_builder
-    .id(session_id)
-    .max_transcript_size(max_sent_data.unwrap() + max_recv_data.unwrap()); // TODO unwrap, probably shouldn't be Option in the first place
 
   let config = config_builder.build()?;
 
-  Verifier::new(config).notarize::<_, Signature>(socket.compat(), signing_key).await?;
+  Verifier::new(config).notarize::<_>(socket.compat(), &attestation_config).await?;
 
   Ok(())
 }
