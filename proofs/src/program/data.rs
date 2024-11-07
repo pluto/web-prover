@@ -38,20 +38,18 @@ pub enum R1CSType {
   Raw(Vec<u8>),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum WitnessGeneratorType {
-  #[serde(rename = "wasm")]
-  Wasm { path: String, wtns_path: String },
-  #[serde(rename = "circom-witnesscalc")]
-  CircomWitnesscalc { path: String },
-  #[serde(rename = "browser")] // TODO: Can we merge this with Raw?
+  #[serde(rename = "browser")]
   Browser,
-  #[serde(rename = "mobile")]
-  Mobile { circuit: String },
+  #[serde(rename = "wasm")]
+  Wasm {
+    path:      String,
+    wtns_path: String,
+  },
+  Path(PathBuf),
   #[serde(skip)]
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
-  #[serde(skip)]
-  RustWitness(fn(&str) -> Vec<F<G1>>),
 }
 
 // Note, the below are typestates that prevent misuse of our current API.

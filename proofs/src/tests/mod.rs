@@ -9,7 +9,6 @@ use serde_json::json;
 use super::*;
 use crate::program::data::{FoldInput, NotExpanded};
 
-mod rustwitness;
 mod witnesscalc;
 
 const ROM: &[u64] = &[0, 1, 2, 0, 1, 2];

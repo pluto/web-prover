@@ -10,23 +10,17 @@ pub fn generate_witness_from_generator_type(
     WitnessGeneratorType::Browser => {
       panic!("browser type witness generation cannot be generated in process")
     },
-    WitnessGeneratorType::Mobile { circuit } => {
-      panic!("mobile type witgen not supported")
-    },
     WitnessGeneratorType::Wasm { path, wtns_path } =>
       generate_witness_from_wasm_file(input_json, &PathBuf::from(path), &PathBuf::from(wtns_path)),
-    WitnessGeneratorType::CircomWitnesscalc { path } =>
-      generate_witness_from_witnesscalc_file(input_json, &PathBuf::from(path)),
-
+    WitnessGeneratorType::Path(path) => generate_witness_from_witnesscalc_file(input_json, path),
     WitnessGeneratorType::Raw(graph_data) => generate_witness_from_graph(input_json, graph_data),
-    WitnessGeneratorType::RustWitness(f) => f(input_json),
   }
 }
 
 pub fn remap_inputs(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
   let circom_input: CircomInput = serde_json::from_str(input_json).unwrap();
-  let mut unfuckulated = vec![];
-  unfuckulated.push((
+  let mut remapped = vec![];
+  remapped.push((
     "step_in".to_string(),
     circom_input.step_in.into_iter().map(|s| BigInt::from_str(&s).unwrap()).collect(),
   ));
@@ -37,24 +31,9 @@ pub fn remap_inputs(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
       .iter()
       .map(|x| BigInt::from_str(&x.as_number().unwrap().to_string()).unwrap())
       .collect::<Vec<BigInt>>();
-    unfuckulated.push((k, val));
+    remapped.push((k, val));
   }
-  unfuckulated
-}
-
-#[cfg(all(target_os = "ios", target_arch = "aarch64"))]
-rust_witness::witness!(aesgcm);
-
-pub fn aes_gcm_fold_wrapper(input_json: &str) -> Vec<F<G1>> {
-  #[cfg(all(target_os = "ios", target_arch = "aarch64"))]
-  {
-    let r = aesgcm_witness(remap_inputs(input_json))
-      .into_iter()
-      .map(|bigint| F::<G1>::from_str_vartime(&bigint.to_string()).unwrap())
-      .collect();
-    return r;
-  }
-  panic!("rust-witness only supported on arm")
+  remapped
 }
 
 pub fn generate_witness_from_graph(
@@ -99,7 +78,17 @@ pub fn generate_witness_from_witnesscalc_file(
 }
 
 #[warn(missing_docs, clippy::missing_docs_in_private_items)]
-
+/// Generates a witness from a WASM file.
+///
+/// # Arguments
+///
+/// * `input_json` - A string slice that holds the input JSON.
+/// * `wasm_path` - A reference to the path of the WASM file.
+/// * `wtns_path` - A reference to the path of the witness file.
+///
+/// # Returns
+///
+/// A vector of field elements.
 pub fn generate_witness_from_wasm_file(
   input_json: &str,
   wasm_path: &PathBuf,
