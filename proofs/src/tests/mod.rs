@@ -137,7 +137,7 @@ const JSON_MASK_KEYLEN_DEPTH_4: (&str, [u8; 1]) = ("keyLen", [7]);
 const JSON_MASK_KEY_DEPTH_5: (&str, [u8; 10]) = ("key", [110, 97, 109, 101, 0, 0, 0, 0, 0, 0]); // "name"
 const JSON_MASK_KEYLEN_DEPTH_5: (&str, [u8; 1]) = ("keyLen", [4]);
 
-const TOTAL_BYTES_ACROSS_NIVC: usize = 512 * 2 + 4;
+const TOTAL_BYTES_ACROSS_NIVC: usize = 512 + 4;
 
 #[test]
 #[tracing_test::traced_test]
@@ -185,8 +185,8 @@ fn test_end_to_end_proofs() {
   let public_params = program::setup(&setup_data);
 
   // Dealloc the R1CSWithArity vec
-  let (_, aux_params) = public_params.into_parts();
-  let public_params = PublicParams::from_parts_unchecked(vec![], aux_params);
+  // let (_, aux_params) = public_params.into_parts();
+  // let public_params = PublicParams::from_parts_unchecked(vec![], aux_params);
 
   debug!("Creating ROM");
   let rom_data = HashMap::from([
