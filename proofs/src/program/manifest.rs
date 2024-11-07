@@ -459,7 +459,7 @@ mod tests {
     // HTTP parse + headers + body mask + json keys + extract value
     assert_eq!(
       rom_data.get(&String::from("EXTRACT_VALUE")).unwrap().opcode,
-      (manifest.response.headers.len() + 1 + 1 + manifest.response.body.json.len() + 1) as u64
+      (manifest.response.headers.len() + 1 + 1 + manifest.response.body.json.len()) as u64
     );
 
     assert_eq!(
