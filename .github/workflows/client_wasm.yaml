@@ -57,7 +57,7 @@ jobs:
 
       - name: Download prebuilt web-prover-circuits artifact
         run: |
-          cd proofs && make web-prover-circuits
+          cd proofs && make web-prover-circuits-512
 
       # TODO run automated tests?
       #      wasm-pack test --firefox

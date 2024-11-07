@@ -32,7 +32,7 @@ jobs:
 
     - name: Download prebuilt web-prover-circuits artifact
       run: |
-        cd proofs && make web-prover-circuits
+        cd proofs && make web-prover-circuits-512
 
     - name: Run tests
       run: |

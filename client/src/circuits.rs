@@ -1,6 +1,6 @@
 // Depends on the circuit input sizes
 pub const MAX_PLAINTEXT_BYTES: usize = 512;
-pub const TOTAL_BYTES_ACROSS_NIVC: usize = MAX_PLAINTEXT_BYTES * 2 + 4;
+pub const TOTAL_BYTES_ACROSS_NIVC: usize = MAX_PLAINTEXT_BYTES + 4;
 
 // Circuit 0
 pub const AES_GCM_R1CS: &[u8] =

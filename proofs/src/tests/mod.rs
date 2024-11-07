@@ -137,7 +137,7 @@ const JSON_MASK_KEYLEN_DEPTH_4: (&str, [u8; 1]) = ("keyLen", [7]);
 const JSON_MASK_KEY_DEPTH_5: (&str, [u8; 10]) = ("key", [110, 97, 109, 101, 0, 0, 0, 0, 0, 0]); // "name"
 const JSON_MASK_KEYLEN_DEPTH_5: (&str, [u8; 1]) = ("keyLen", [4]);
 
-const TOTAL_BYTES_ACROSS_NIVC: usize = 512 * 2 + 4;
+const TOTAL_BYTES_ACROSS_NIVC: usize = 512 + 4;
 
 #[test]
 #[tracing_test::traced_test]
@@ -185,8 +185,8 @@ fn test_end_to_end_proofs() {
   let public_params = program::setup(&setup_data);
 
   // Dealloc the R1CSWithArity vec
-  let (_, aux_params) = public_params.into_parts();
-  let public_params = PublicParams::from_parts_unchecked(vec![], aux_params);
+  // let (_, aux_params) = public_params.into_parts();
+  // let public_params = PublicParams::from_parts_unchecked(vec![], aux_params);
 
   debug!("Creating ROM");
   let rom_data = HashMap::from([
@@ -310,83 +310,66 @@ fn test_end_to_end_proofs() {
   assert_eq!(recursive_snark.zi_primary()[..res.len()], final_mem);
 }
 
-// #[test]
-// #[tracing_test::traced_test]
-// #[ignore]
-// fn test_offline_proofs() {
-//   let setup_data = SetupData {
-//     r1cs_types:              vec![
-//       R1CSType::Raw(AES_GCM_FOLD_R1CS.to_vec()),
-//       // R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-//       // R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
-//       // R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
-//       // R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
-//       // R1CSType::Raw(JSON_PARSE_R1CS.to_vec()),
-//       // R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-//       // R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-//       // R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
-//     ],
-//     witness_generator_types: vec![
-//       WitnessGeneratorType::Wasm {
-//         path:      String::from(
-//           "../proofs/web_proof_circuits/aes_gcm_fold/aes_gcm_fold_js/aes_gcm_fold.wasm",
-//         ),
-//         wtns_path: "witness.wtns".to_string(),
-//       },
-//       // WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
-//       // WitnessGeneratorType::Wasm {
-//       //   path:
-// String::from("../proofs/web_proof_circuits/aes_gcm/aes_gcm_js/aes_gcm.wasm"),       //
-// wtns_path: String::from("witness.wtns"),       // },
-//       // WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
-//       // WitnessGeneratorType::Wasm {
-//       //   path:      String::from(HTTP_PARSE_AND_LOCK_START_LINE_WASM),
-//       //   wtns_path: String::from("witness.wtns"),
-//       // },
-//       // WitnessGeneratorType::Wasm {
-//       //   path:      String::from(HTTP_LOCK_HEADER_WASM),
-//       //   wtns_path: String::from("witness.wtns"),
-//       // },
-//       // WitnessGeneratorType::Wasm {
-//       //   path:      String::from(HTTP_BODY_MASK_WASM),
-//       //   wtns_path: String::from("witness.wtns"),
-//       // },
-//       // WitnessGeneratorType::Wasm {
-//       //   path:      String::from(JSON_PARSE_WASM),
-//       //   wtns_path: String::from("witness.wtns"),
-//       // },
-//       // WitnessGeneratorType::Wasm {
-//       //   path:      String::from(JSON_MASK_OBJECT_WASM),
-//       //   wtns_path: String::from("witness.wtns"),
-//       // },
-//       // WitnessGeneratorType::Wasm {
-//       //   path:      String::from(JSON_MASK_ARRAY_WASM),
-//       //   wtns_path: String::from("witness.wtns"),
-//       // },
-//       // WitnessGeneratorType::Wasm {
-//       //   path:      String::from(EXTRACT_VALUE_WASM),
-//       //   wtns_path: String::from("witness.wtns"),
-//       // },
-//       // WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
-//       // WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
-//       // WitnessGeneratorType::Raw(JSON_PARSE_GRAPH.to_vec()),
-//       // WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
-//       // WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
-//       // WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
-//     ],
-//     max_rom_length:          10,
-//   };
-//   let public_params = program::setup(&setup_data);
+#[test]
+#[tracing_test::traced_test]
+#[ignore]
+fn test_offline_proofs() {
+  let setup_data = SetupData {
+    r1cs_types:              vec![
+      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
+      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+    ],
+    witness_generator_types: vec![
+      WitnessGeneratorType::Wasm {
+        path:      String::from("../proofs/web_proof_circuits/aes_gcm/aes_gcm_js/aes_gcm.wasm"),
+        wtns_path: String::from("witness.wtns"),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from(
+          "../proofs/web_proof_circuits/http_parse_and_lock_start_line/\
+           http_parse_and_lock_start_line_js/http_parse_and_lock_start_line.wasm",
+        ),
+        wtns_path: String::from("witness.wtns"),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from("../proofs"),
+        wtns_path: String::from("witness.wtns"),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from("../proofs"),
+        wtns_path: String::from("witness.wtns"),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from("../proofs"),
+        wtns_path: String::from("witness.wtns"),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from("../proofs"),
+        wtns_path: String::from("witness.wtns"),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from("../proofs"),
+        wtns_path: String::from("witness.wtns"),
+      },
+    ],
+    max_rom_length:          25,
+  };
+  let public_params = program::setup(&setup_data);
 
-//   let program_data = ProgramData::<Online, NotExpanded> {
-//     public_params,
-//     setup_data,
-//     rom_data: HashMap::new(),
-//     rom: vec![],
-//     initial_nivc_input: vec![],
-//     inputs: HashMap::new(),
-//     witnesses: vec![vec![F::<G1>::from(0)]],
-//   };
-//   program_data
-//     .into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup_no_aes.bin").unwrap());
-// } // #[test]// fn manifest(
+  let program_data = ProgramData::<Online, NotExpanded> {
+    public_params,
+    setup_data,
+    rom_data: HashMap::new(),
+    rom: vec![],
+    initial_nivc_input: vec![],
+    inputs: HashMap::new(),
+    witnesses: vec![vec![F::<G1>::from(0)]],
+  };
+  program_data
+    .into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup_aes.bin").unwrap());
+}
