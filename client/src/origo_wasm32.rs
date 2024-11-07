@@ -214,22 +214,6 @@ async fn generate_program_data(
       name:          String::from("EXTRACT_VALUE"),
       private_input: HashMap::new(),
     },
-    // InstructionConfig {
-    //   name:          String::from("HTTP_BODY_EXTRACT"),
-    //   private_input: HashMap::new(),
-    // },
-    // InstructionConfig { name: String::from("JSON_PARSE"), private_input: HashMap::new() },
-    // InstructionConfig {
-    //   name:          String::from("JSON_MASK_OBJECT_1"),
-    //   private_input: HashMap::from([
-    //     (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
-    //     (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
-    //   ]),
-    // },
-    // InstructionConfig {
-    //   name:          String::from("EXTRACT_VALUE"),
-    //   private_input: HashMap::new(),
-    // },
   ]);
 
   let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
@@ -239,10 +223,10 @@ async fn generate_program_data(
     )]),
   })]);
 
-  // let mut initial_input = vec![0; 50]; // default number of step_in.
-  // initial_input.extend(janky_plaintext_padding.iter());
-  // initial_input.resize(516, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
-  // let final_input: Vec<u64> = initial_input.into_iter().map(u64::from).collect();
+  let mut initial_input = vec![0; 50]; // default number of step_in.
+  initial_input.extend(janky_plaintext_padding.iter());
+  initial_input.resize(516, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
+  let final_input: Vec<u64> = initial_input.into_iter().map(u64::from).collect();
 
   // TODO: Load this from a file. Run this in preprocessing step.
   debug!("generating public params");

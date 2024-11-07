@@ -220,7 +220,6 @@ let proverConfig = {
   max_sent_data: 10000,
   max_recv_data: 10000,
   proving: {
-    // r1cs: r1cs,
     witnesses: witnesses,
     serialized_pp: pp,
     manifest: {
