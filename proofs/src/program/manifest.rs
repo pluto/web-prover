@@ -173,7 +173,7 @@ impl Manifest {
       let mut header_name_padded = [0u8; HTTP_HEADER_MAX_NAME_LENGTH];
       header_name_padded[..header_name.len()].copy_from_slice(header_name.as_bytes());
       // chore: vec here because serde doesn't support array > 32 in stable. Need const generics.
-      let mut header_value_padded = vec![0u8; HTTP_HEADER_MAX_VALUE_LENGTH];
+      let mut header_value_padded = [0u8; HTTP_HEADER_MAX_VALUE_LENGTH];
       header_value_padded[..header_value.len()].copy_from_slice(header_value.as_bytes());
 
       let name = format!("HTTP_LOCK_HEADER_{}", i + 1);
@@ -256,7 +256,7 @@ impl Manifest {
       // pad name and value with zeroes
       let mut header_name_padded = [0u8; HTTP_HEADER_MAX_NAME_LENGTH];
       header_name_padded[..header_name.len()].copy_from_slice(header_name.as_bytes());
-      let mut header_value_padded = vec![0u8; HTTP_HEADER_MAX_VALUE_LENGTH];
+      let mut header_value_padded = [0u8; HTTP_HEADER_MAX_VALUE_LENGTH];
       header_value_padded[..header_value.len()].copy_from_slice(header_value.as_bytes());
 
       let name = format!("HTTP_LOCK_HEADER_{}", i + 1);
@@ -284,7 +284,7 @@ impl Manifest {
           // pad json key
           let mut json_key_padded = [0u8; JSON_MAX_KEY_LENGTH];
           json_key_padded[..json_key.len()].copy_from_slice(json_key.as_bytes());
-          rom_data.insert(format!("JSON_MASK_OBJECT_{}", i + 1), CircuitData { opcode: 5 });
+          rom_data.insert(format!("JSON_MASK_OBJECT_{}", i + 1), CircuitData { opcode: 4 });
           rom.push(InstructionConfig {
             name:          format!("JSON_MASK_OBJECT_{}", i + 1),
             private_input: HashMap::from([
@@ -294,7 +294,7 @@ impl Manifest {
           });
         },
         Key::Num(index) => {
-          rom_data.insert(format!("JSON_MASK_ARRAY_{}", i + 1), CircuitData { opcode: 6 });
+          rom_data.insert(format!("JSON_MASK_ARRAY_{}", i + 1), CircuitData { opcode: 5 });
           rom.push(InstructionConfig {
             name:          format!("JSON_MASK_ARRAY_{}", i + 1),
             private_input: HashMap::from([(
@@ -307,7 +307,7 @@ impl Manifest {
     }
 
     // final extraction
-    rom_data.insert(String::from("EXTRACT_VALUE"), CircuitData { opcode: 7 });
+    rom_data.insert(String::from("EXTRACT_VALUE"), CircuitData { opcode: 6 });
     rom.push(InstructionConfig {
       name:          String::from("EXTRACT_VALUE"),
       private_input: HashMap::new(),
