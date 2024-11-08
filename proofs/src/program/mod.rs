@@ -1,7 +1,7 @@
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
 use client_side_prover::{
-  supernova::{get_circuit_shapes, NonUniformCircuit, RecursiveSNARK, StepCircuit},
+  supernova::{NonUniformCircuit, RecursiveSNARK, StepCircuit},
   traits::snark::default_ck_hint,
 };
 use data::Expanded;
@@ -131,7 +131,6 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
   let circuits = initialize_circuit_list(&program_data.setup_data); // TODO: AwK?
   let mut memory = Memory { rom: rom.clone(), circuits };
 
-  let aux_params = program_data.public_params.aux_params();
 
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
@@ -143,13 +142,6 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
     memory.circuits[op_code as usize].nivc_io = Some(next_public_input);
 
     let wit_type = memory.circuits[op_code as usize].witness_generator_type.clone();
-
-    // NOTE (Colin): Alloc only the used R1CSWithArity
-    // let mut temp_memory =
-    //   Memory { rom: vec![], circuits: vec![RomCircuit::default(); memory.circuits.len()] };
-    // temp_memory.circuits[op_code as usize] = memory.circuits[op_code as usize].clone();
-    // let temp_shapes = get_circuit_shapes(&temp_memory);
-    // let public_params = PublicParams::from_parts_unchecked(temp_shapes, aux_params.clone());
     let public_params = &program_data.public_params;
 
     memory.circuits[op_code as usize].circuit.witness = if wit_type == WitnessGeneratorType::Browser
@@ -171,7 +163,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
 
     let mut recursive_snark = recursive_snark_option.unwrap_or_else(|| {
       RecursiveSNARK::new(
-        &public_params,
+        public_params,
         &memory,
         &circuit_primary,
         &circuit_secondary,
@@ -182,13 +174,13 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
     });
 
     info!("Proving single step...");
-    recursive_snark.prove_step(&public_params, &circuit_primary, &circuit_secondary).unwrap();
+    recursive_snark.prove_step(public_params, &circuit_primary, &circuit_secondary).unwrap();
     info!("Done proving single step...");
 
     #[cfg(feature = "verify-steps")]
     {
       info!("Verifying single step...");
-      recursive_snark.verify(&public_params, &z0_primary, &z0_secondary).unwrap();
+      recursive_snark.verify(public_params, &z0_primary, &z0_secondary).unwrap();
       info!("Single step verification done");
     }
 
