@@ -2,8 +2,7 @@
 //! circuits. In theory, we don't need to do this for AES since that is handled elsewhere, so this
 //! is solely going to be for the HTTP and JSON elements of the chain.
 
-use neptune::{poseidon::PoseidonConstants, Poseidon};
-use num_bigint::{BigInt, ToBigInt};
+use ff::PrimeField;
 use serde_json::Value;
 
 use super::*;
@@ -69,15 +68,22 @@ pub fn compute_json_witness(masked_plaintext: &[u8], mask_at: JsonMaskType) -> V
     .collect::<Vec<u8>>()
 }
 
-pub fn compute_http_body_mask_witness(masked_plaintext: Vec<u8>) -> (Vec<u8>, BigInt) { todo!() }
+pub fn compute_http_body_mask_witness(_masked_plaintext: Vec<u8>) -> (Vec<u8>, F<G1>) { todo!() }
 
-pub fn poseidon_chainer(preimage: &[F<G1>]) -> F<G1> {
-  use generic_array::typenum::U2;
-  let constants = neptune::poseidon::PoseidonConstants::<F<G1>, U2>::new();
-  let mut poseidon = Poseidon::<F<G1>, U2>::new(&constants);
-  poseidon.set_preimage(preimage);
-  poseidon.hash()
-}
+// pub fn poseidon_chainer(preimage: &[F<G1>]) -> F<G1> {
+//   use generic_array::typenum::U2;
+//   let mut constants = neptune::poseidon::PoseidonConstants::<F<G1>,
+// U2>::new_with_strength_and_type(     Strength::Standard,
+//     neptune::hash_type::HashType::Sponge,
+//   );
+
+//   dbg!(&constants);
+//   constants.partial_rounds = 57;
+//   let mut poseidon = Poseidon::<F<G1>, U2>::new(&constants);
+//   poseidon.set_preimage(preimage);
+//   poseidon.elements[0] = F::<G1>::zero();
+//   poseidon.hash()
+// }
 
 pub fn bytepack(bytes: &[u8]) -> F<G1> {
   let mut output = F::<G1>::ZERO;
@@ -93,13 +99,25 @@ pub fn bytepack(bytes: &[u8]) -> F<G1> {
   }
   output
 }
+use light_poseidon::{Poseidon, PoseidonBytesHasher};
+pub fn poseidon_chainer(preimage: &[F<G1>]) -> F<G1> {
+  let mut poseidon = Poseidon::<ark_bn254::Fr>::new_circom(2).unwrap();
+
+  // Convert each field element to bytes and collect into a Vec
+  let byte_arrays: Vec<[u8; 32]> = preimage.iter().map(|x| x.to_bytes()).collect();
+
+  // Create slice of references to the bytes
+  let byte_slices: Vec<&[u8]> = byte_arrays.iter().map(|arr| arr.as_slice()).collect();
+
+  let hash: [u8; 32] = poseidon.hash_bytes_le(&byte_slices).unwrap();
+
+  //   F::<G1>::from_repr(hash)
+  //   todo!()
+  F::<G1>::from_repr(hash).unwrap()
+}
 
 #[cfg(test)]
 mod tests {
-  use std::collections::HashMap;
-
-  use serde_json::Value;
-  use tracing_subscriber::filter;
 
   use super::*;
 
@@ -120,8 +138,18 @@ mod tests {
 
   #[test]
   fn test_poseidon() {
-    let hash = poseidon_chainer(&[bytepack(&[0]), bytepack(&[0])]);
-    assert_eq!(hash, F::<G1>::from(0));
+    // let hash = poseidon_chainer(&[bytepack(&[0]), bytepack(&[0])]);
+    let hash = poseidon_chainer(&[F::<G1>::from(0), F::<G1>::from(0)]);
+    assert_eq!(hash.to_bytes(), [
+      100, 72, 182, 70, 132, 238, 57, 168, 35, 213, 254, 95, 213, 36, 49, 220, 129, 228, 129, 123,
+      242, 195, 234, 60, 171, 158, 35, 158, 251, 245, 152, 32
+    ]);
+
+    let hash = poseidon_chainer(&[F::<G1>::from(69), F::<G1>::from(420)]);
+    assert_eq!(hash.to_bytes(), [
+      10, 230, 247, 95, 9, 23, 36, 117, 25, 37, 98, 141, 178, 220, 241, 100, 187, 169, 126, 226,
+      80, 175, 17, 100, 232, 1, 29, 0, 165, 144, 139, 2,
+    ]);
   }
 
   const TEST_HTTP_BYTES: &[u8] = &[

@@ -242,7 +242,7 @@ source = "git+https://github.com/argumentcomputer/arecibo#3dea91fb6e6b6915a43873
 dependencies = [
  "abomonation",
  "abomonation_derive_ng",
- "bellpepper 0.4.1 (git+https://github.com/argumentcomputer/bellpepper?branch=dev)",
+ "bellpepper",
  "bellpepper-core",
  "bincode",
  "bitvec",
@@ -257,7 +257,7 @@ dependencies = [
  "grumpkin-msm",
  "halo2curves",
  "itertools 0.13.0",
- "neptune 13.0.0 (git+https://github.com/argumentcomputer/neptune?branch=dev)",
+ "neptune",
  "num-bigint 0.4.6",
  "num-integer",
  "num-traits",
@@ -901,17 +901,6 @@ dependencies = [
 [[package]]
 name = "bellpepper"
 version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ae286c2cb403324ab644c7cc68dceb25fe52ca9429908a726d7ed272c1edf7b"
-dependencies = [
- "bellpepper-core",
- "byteorder",
- "ff",
-]
-
-[[package]]
-name = "bellpepper"
-version = "0.4.1"
 source = "git+https://github.com/argumentcomputer/bellpepper?branch=dev#d0225bf6cb2bb9abaff28ea96a3497f9829815f8"
 dependencies = [
  "bellpepper-core",
@@ -1097,7 +1086,6 @@ checksum = "7a8a8ed6fefbeef4a8c7b460e4110e12c5e22a5b7cf32621aae6ad650c4dcf29"
 dependencies = [
  "blst",
  "byte-slice-cast",
- "ec-gpu",
  "ff",
  "group",
  "pairing",
@@ -1374,7 +1362,7 @@ name = "client-side-prover"
 version = "0.1.0"
 source = "git+https://github.com/pluto/client-side-prover?rev=316912f#316912f90ffb83456adc7a0112c4fd268016bb8d"
 dependencies = [
- "bellpepper 0.4.1 (git+https://github.com/argumentcomputer/bellpepper?branch=dev)",
+ "bellpepper",
  "bellpepper-core",
  "bincode",
  "bitvec",
@@ -1388,7 +1376,7 @@ dependencies = [
  "grumpkin-msm",
  "halo2curves",
  "itertools 0.13.0",
- "neptune 13.0.0 (git+https://github.com/argumentcomputer/neptune?branch=dev)",
+ "neptune",
  "num-bigint 0.4.6",
  "num-integer",
  "num-traits",
@@ -2106,12 +2094,6 @@ checksum = "442039f5147480ba31067cb00ada1adae6892028e40e45fc5de7b7df6dcc1b5f"
 dependencies = [
  "const-random",
 ]
-
-[[package]]
-name = "ec-gpu"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd63582de2b59ea1aa48d7c1941b5d87618d95484397521b3acdfa0e1e9f5e45"
 
 [[package]]
 name = "ecdsa"
@@ -3277,6 +3259,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "light-poseidon"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c9a85a9752c549ceb7578064b4ed891179d20acd85f27318573b64d2d7ee7ee"
+dependencies = [
+ "ark-bn254",
+ "ark-ff 0.4.2",
+ "num-bigint 0.4.6",
+ "thiserror",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3626,30 +3620,11 @@ dependencies = [
 [[package]]
 name = "neptune"
 version = "13.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06626c9ac04c894e9a23d061ba1309f28506cdc5fe64156d28a15fb57fc8e438"
-dependencies = [
- "bellpepper 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "bellpepper-core",
- "blake2s_simd",
- "blstrs",
- "byteorder",
- "ff",
- "generic-array 0.14.7",
- "log",
- "pasta_curves",
- "serde",
- "trait-set",
-]
-
-[[package]]
-name = "neptune"
-version = "13.0.0"
 source = "git+https://github.com/argumentcomputer/neptune?branch=dev#3df907eb871498a13f4f1629e0bc1687557e1358"
 dependencies = [
  "abomonation",
  "abomonation_derive_ng",
- "bellpepper 0.4.1 (git+https://github.com/argumentcomputer/bellpepper?branch=dev)",
+ "bellpepper",
  "bellpepper-core",
  "blake2s_simd",
  "blstrs",
@@ -4070,7 +4045,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3e57598f73cc7e1b2ac63c79c517b31a0877cd7c402cdcaa311b5208de7a095"
 dependencies = [
  "blake2b_simd",
- "ec-gpu",
  "ff",
  "group",
  "hex",
@@ -4442,6 +4416,7 @@ name = "proofs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ark-bn254",
  "bellpepper-core",
  "bincode",
  "byteorder",
@@ -4450,10 +4425,9 @@ dependencies = [
  "client-side-prover",
  "ff",
  "flate2",
- "generic-array 1.1.0",
  "halo2curves",
  "itertools 0.13.0",
- "neptune 13.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "light-poseidon",
  "num-bigint 0.4.6",
  "num-traits",
  "paste",
