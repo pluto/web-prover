@@ -46,13 +46,11 @@
 				"version": "HTTP/1.1",
 				"message": "OK",
 				"headers": {
-					"Content-Type": "application/json"
+					"Content-Type": "text/plain"
 				},
 				"body": {
 					"json": [
-						"data",
-						"items",
-						0
+						"hello"
 					],
 					"contains": "this_string_exists_in_body"
 				}
