@@ -25,6 +25,7 @@ pub mod errors;
 pub mod program;
 pub mod proof;
 #[cfg(test)] mod tests;
+pub mod witness;
 
 // pub type E1 = Bn256EngineKZG;
 pub type E1 = Bn256EngineIPA;
