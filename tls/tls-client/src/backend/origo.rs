@@ -13,7 +13,7 @@ use tls_parser::{TlsHandshakeType, TlsRecordType};
 pub struct DecryptTarget {
   pub aes_iv:     Vec<u8>,
   pub aes_key:    Vec<u8>,
-  pub ciphertext: String,
+  pub ciphertext: Vec<String>,
 }
 #[derive(Debug, Clone)]
 pub struct WitnessData {
@@ -94,19 +94,37 @@ impl OrigoConnection {
   /// TODO: Clean up the secret map keying.
   pub fn to_witness_data(&mut self) -> WitnessData {
     let req_key = RecordKey::new(Direction::Sent, ContentType::ApplicationData, 0, 0u8).to_string();
-    let resp_key =
-      RecordKey::new(Direction::Received, ContentType::ApplicationData, 1, 0u8).to_string();
+
+    // loop through all ciphertext chunks and append
+    let mut num_ciphertext_chunks = 1;
+    let mut ciphertext_chunks = vec![];
+
+    let mut resp_key =
+      RecordKey::new(Direction::Received, ContentType::ApplicationData, num_ciphertext_chunks, 0u8)
+        .to_string();
+
+    while let Some(record) = self.record_map.get(&resp_key) {
+      num_ciphertext_chunks += 1;
+      ciphertext_chunks.push(record.ciphertext.clone());
+      resp_key = RecordKey::new(
+        Direction::Received,
+        ContentType::ApplicationData,
+        num_ciphertext_chunks,
+        0u8,
+      )
+      .to_string();
+    }
 
     WitnessData {
       request:  DecryptTarget {
         aes_iv:     self.secret_map.get("Application:client_aes_iv").unwrap().to_vec(),
         aes_key:    self.secret_map.get("Application:client_aes_key").unwrap().to_vec(),
-        ciphertext: self.record_map.get(&req_key).unwrap().ciphertext.clone(),
+        ciphertext: vec![self.record_map.get(&req_key).unwrap().ciphertext.clone()],
       },
       response: DecryptTarget {
         aes_iv:     self.secret_map.get("Application:server_aes_iv").unwrap().to_vec(),
         aes_key:    self.secret_map.get("Application:server_aes_key").unwrap().to_vec(),
-        ciphertext: self.record_map.get(&resp_key).unwrap().ciphertext.clone(),
+        ciphertext: ciphertext_chunks,
       },
     }
   }
