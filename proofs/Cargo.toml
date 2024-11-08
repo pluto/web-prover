@@ -34,7 +34,7 @@ tracing-subscriber.workspace=true
 bincode="1.3"
 flate2 ="1.0"
 
-thiserror = "1.0"
+thiserror="1.0"
 
 # Poseidon hashing
 light-poseidon="0.2.0"
@@ -44,7 +44,7 @@ ark-bn254     ="=0.4.0"
 tracing-test="0.2.5"
 
 [build-dependencies]
-anyhow="1.0" 
+anyhow      ="1.0"
 rust-witness={ git="https://github.com/chancehudson/rust-witness" }
 paste       ="1.0"
 

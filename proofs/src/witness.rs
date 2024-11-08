@@ -178,10 +178,54 @@ pub fn data_hasher(preimage: &[u8]) -> F<G1> {
   hash_val
 }
 
+pub fn poseidon_chainer(preimage: &[F<G1>]) -> F<G1> {
+  use generic_array::typenum::U2;
+  let constants = neptune::poseidon::PoseidonConstants::<F<G1>, U2>::new();
+  let mut poseidon = Poseidon::<F<G1>, U2>::new(&constants);
+  poseidon.set_preimage(preimage);
+  poseidon.hash()
+}
+
+pub fn bytepack(bytes: &[u8]) -> F<G1> {
+  let mut output = F::<G1>::ZERO;
+  assert!(bytes.len() <= 16);
+  for (idx, byte) in bytes.iter().enumerate() {
+    let mut pow = F::<G1>::ONE;
+    output += F::<G1>::from(*byte as u64) * {
+      for _ in 0..(8 * idx) {
+        pow *= F::<G1>::from(2);
+      }
+      pow
+    };
+  }
+  output
+}
+
 #[cfg(test)]
 mod tests {
 
   use super::*;
+
+  #[test]
+  fn test_bytepack() {
+    let pack0 = bytepack(&[0, 0, 0]);
+    assert_eq!(pack0, F::<G1>::from(0));
+
+    let pack1 = bytepack(&[1, 0, 0]);
+    assert_eq!(pack1, F::<G1>::from(1));
+
+    let pack2 = bytepack(&[0, 1, 0]);
+    assert_eq!(pack2, F::<G1>::from(256));
+
+    let pack3 = bytepack(&[0, 0, 1]);
+    assert_eq!(pack3, F::<G1>::from(65536));
+  }
+
+  #[test]
+  fn test_poseidon() {
+    let hash = poseidon_chainer(&[bytepack(&[0]), bytepack(&[0])]);
+    assert_eq!(hash, F::<G1>::from(0));
+  }
 
   const TEST_HTTP_BYTES: &[u8] = &[
     72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101,
