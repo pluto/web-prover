@@ -36,6 +36,10 @@ flate2 ="1.0"
 
 thiserror = "1.0"
 
+# Poseidon hashing
+neptune      ="13.0"
+generic-array="1.1"
+
 [dev-dependencies]
 tracing-test="0.2.5"
 
