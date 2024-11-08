@@ -7,10 +7,9 @@ use proofs::{
   program::{
     self,
     data::{
-      CircuitData, Expanded, FoldInput, InstructionConfig, NotExpanded, Online, ProgramData,
-      R1CSType, SetupData, WitnessGeneratorType,
+      Expanded, FoldInput, NotExpanded, Online, ProgramData, R1CSType, SetupData,
+      WitnessGeneratorType,
     },
-    manifest,
   },
   F, G1,
 };
@@ -49,8 +48,16 @@ async fn generate_program_data(
 ) -> Result<ProgramData<Online, Expanded>, ClientErrors> {
   // ----------------------------------------------------------------------------------------------------------------------- //
   // - get AES key, IV -
-  debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
-  debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
+  debug!(
+    "request_key_as_string: {:?}, length: {}",
+    witness.request.aes_key,
+    witness.request.aes_key.len()
+  );
+  debug!(
+    "request_iv_as_string: {:?}, length: {}",
+    witness.request.aes_iv,
+    witness.request.aes_iv.len()
+  );
 
   let key: [u8; 16] = witness.request.aes_key[..16].try_into()?;
   let iv: [u8; 12] = witness.request.aes_iv[..12].try_into()?;
@@ -85,6 +92,50 @@ async fn generate_program_data(
   // accept-encoding: identity
   // connection: close
   // accept: */*
+  // - get AES key, IV, request ciphertext, request plaintext, and AAD -
+  debug!(
+    "response_key_as_string: {:?}, length: {}",
+    witness.response.aes_key,
+    witness.response.aes_key.len()
+  );
+  debug!(
+    "response_iv_as_string: {:?}, length: {}",
+    witness.response.aes_iv,
+    witness.response.aes_iv.len()
+  );
+
+  let mut response_pt = vec![];
+  let mut response_ct = vec![];
+  let response_key: [u8; 16] = witness.response.aes_key[..16].try_into().unwrap();
+  let response_iv: [u8; 12] = witness.response.aes_iv[..12].try_into().unwrap();
+  let response_dec =
+    Decrypter2::new(response_key, response_iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
+
+  for (i, ct_chunk) in witness.response.ciphertext.iter().enumerate() {
+    let ct_chunk = hex::decode(ct_chunk).unwrap();
+
+    //
+    let (plaintext, meta) = response_dec
+      .decrypt_tls13_aes(
+        &OpaqueMessage {
+          typ:     ContentType::ApplicationData,
+          version: ProtocolVersion::TLSv1_3,
+          payload: Payload::new(ct_chunk.clone()),
+        },
+        (i + 1) as u64,
+      )
+      .unwrap();
+
+    // push ciphertext
+    response_ct.extend(ct_chunk);
+
+    let pt = plaintext.payload.0.to_vec();
+    response_pt.extend(pt);
+    let aad = hex::decode(meta.additional_data.to_owned()).unwrap();
+    let mut padded_aad = vec![0; 16 - aad.len()];
+    padded_aad.extend(aad);
+  }
+  debug!("response plaintext: {:?}", response_pt);
   // ----------------------------------------------------------------------------------------------------------------------- //
 
   // TODO (Colin): ultimately we want to download the `AuxParams` here and deserialize to setup
@@ -92,7 +143,29 @@ async fn generate_program_data(
   // this next step
   // ----------------------------------------------------------------------------------------------------------------------- //
   // - create program setup (creating new `PublicParams` each time, for the moment) -
-  let setup_data = SetupData {
+  // let setup_data_512 = SetupData {
+  //   r1cs_types:              vec![
+  //     R1CSType::Raw(AES_GCM_512_R1CS.to_vec()),
+  //     R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_512_R1CS.to_vec()),
+  //     R1CSType::Raw(HTTP_LOCK_HEADER_512_R1CS.to_vec()),
+  //     R1CSType::Raw(HTTP_BODY_MASK_512_R1CS.to_vec()),
+  //     R1CSType::Raw(JSON_MASK_OBJECT_512_R1CS.to_vec()),
+  //     R1CSType::Raw(JSON_MASK_ARRAY_INDEX_512_R1CS.to_vec()),
+  //     R1CSType::Raw(EXTRACT_VALUE_512_R1CS.to_vec()),
+  //   ],
+  //   witness_generator_types: vec![
+  //     WitnessGeneratorType::Raw(AES_GCM_512_GRAPH.to_vec()),
+  //     WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_512_GRAPH.to_vec()),
+  //     WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_512_GRAPH.to_vec()),
+  //     WitnessGeneratorType::Raw(HTTP_BODY_MASK_512_GRAPH.to_vec()),
+  //     WitnessGeneratorType::Raw(JSON_MASK_OBJECT_512_GRAPH.to_vec()),
+  //     WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_512_GRAPH.to_vec()),
+  //     WitnessGeneratorType::Raw(EXTRACT_VALUE_512_GRAPH.to_vec()),
+  //   ],
+  //   max_rom_length:          JSON_MAX_ROM_LENGTH,
+  // };
+
+  let setup_data_1024 = SetupData {
     r1cs_types:              vec![
       R1CSType::Raw(AES_GCM_R1CS.to_vec()),
       R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
@@ -107,7 +180,7 @@ async fn generate_program_data(
       WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
     ],
-    max_rom_length:          JSON_MAX_ROM_LENGTH,
+    max_rom_length:          65,
   };
 
   // ----------------------------------------------------------------------------------------------------------------------- //
@@ -115,6 +188,7 @@ async fn generate_program_data(
   // ----------------------------------------------------------------------------------------------------------------------- //
   // - construct private inputs and program layout for AES proof for request -
   debug!("Padding plaintext and ciphertext to nearest 16...");
+  // TODO (Sambhav): padding should happen inside manifest
   let mut nearest_16_padded_plaintext = request_plaintext.clone();
   let mut nearest_16_padded_ciphertext = request_ciphertext.clone();
   let remainder = request_plaintext.len() % 16;
@@ -129,31 +203,61 @@ async fn generate_program_data(
     nearest_16_padded_ciphertext
   );
 
-  let (rom_data, rom, fold_input) = proving.manifest.unwrap().rom_from_request(
-    &key,
-    &iv,
-    &padded_aad,
-    &nearest_16_padded_plaintext,
-    &nearest_16_padded_plaintext,
-  );
+  let (request_rom_data, request_rom, request_fold_inputs) =
+    proving.manifest.unwrap().rom_from_request(
+      &key,
+      &iv,
+      &padded_aad,
+      &nearest_16_padded_plaintext,
+      &nearest_16_padded_plaintext,
+    );
+
+  // pad AES response ciphertext
+  let remainder = if response_pt.len() % 16 != 0 { 16 - response_pt.len() % 16 } else { 0 };
+  let mut response_nearest_16_padded_plaintext = response_pt.clone();
+  let mut response_nearest_16_padded_ciphertext = response_ct.clone();
+  response_nearest_16_padded_plaintext.extend(std::iter::repeat(0).take(remainder));
+  response_nearest_16_padded_ciphertext.extend(std::iter::repeat(0).take(remainder));
+
+  let (response_rom_data, response_rom, response_fold_inputs) =
+    proving.manifest.as_ref().unwrap().rom_from_response(
+      &response_key,
+      &response_iv,
+      &padded_aad, // TODO: use response's AAD
+      &response_nearest_16_padded_plaintext,
+      &response_nearest_16_padded_ciphertext,
+    );
   // ----------------------------------------------------------------------------------------------------------------------- //
 
   debug!("Setting up `PublicParams`... (this may take a moment)");
-  let public_params = program::setup(&setup_data);
+  // let public_params = program::setup(&setup_data_512);
+  // TODO: remove this duplicate params or use serialized params
+  let public_params2 = program::setup(&setup_data_1024);
   debug!("Created `PublicParams`!");
 
-  Ok(
-    ProgramData::<Online, NotExpanded> {
-      public_params,
-      setup_data,
-      rom,
-      rom_data,
-      initial_nivc_input: vec![proofs::F::<G1>::from(0)],
-      inputs: fold_input,
-      witnesses: vec![vec![F::<G1>::from(0)]],
-    }
-    .into_expanded()?,
-  )
+  // let request_program_data = ProgramData::<Online, NotExpanded> {
+  //   public_params,
+  //   setup_data: setup_data_512,
+  //   rom: request_rom,
+  //   rom_data: request_rom_data,
+  //   initial_nivc_input: vec![proofs::F::<G1>::from(0)],
+  //   inputs: request_fold_inputs,
+  //   witnesses: vec![vec![F::<G1>::from(0)]],
+  // }
+  // .into_expanded();
+
+  let response_program_data = ProgramData::<Online, NotExpanded> {
+    public_params:      public_params2,
+    setup_data:         setup_data_1024,
+    rom:                response_rom,
+    rom_data:           response_rom_data,
+    initial_nivc_input: vec![proofs::F::<G1>::from(0)],
+    inputs:             response_fold_inputs,
+    witnesses:          vec![vec![F::<G1>::from(0)]],
+  }
+  .into_expanded();
+
+  response_program_data
 }
 
 async fn proxy(
