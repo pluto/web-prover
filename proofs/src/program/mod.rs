@@ -131,7 +131,6 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
   let circuits = initialize_circuit_list(&program_data.setup_data); // TODO: AwK?
   let mut memory = Memory { rom: rom.clone(), circuits };
 
-
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
   for (idx, &op_code) in rom.iter().enumerate().take_while(|(_, &op_code)| op_code != u64::MAX) {
