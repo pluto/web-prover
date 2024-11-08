@@ -3,14 +3,68 @@
 //! is solely going to be for the HTTP and JSON elements of the chain.
 
 use num_bigint::{BigInt, ToBigInt};
+use serde_json::Value;
 
 pub enum JsonMaskType {
   Object(Vec<u8>),
   ArrayIndex(usize),
 }
 
-pub fn compute_json_witness(masked_plaintext: Vec<u8>, mask_at: JsonMaskType) -> (Vec<u8>, BigInt) {
-  todo!()
+pub fn compute_json_witness(masked_plaintext: &[u8], mask_at: JsonMaskType) -> Vec<u8> {
+  let json_bytes = masked_plaintext
+    .iter()
+    .filter(|&&x| !(x == 0 || x.is_ascii_whitespace()))
+    .copied()
+    .collect::<Vec<u8>>();
+  let json: Value = serde_json::from_slice(&json_bytes).unwrap();
+  let data = match mask_at {
+    JsonMaskType::Object(key) => json.get(String::from_utf8(key).unwrap()).unwrap(),
+    JsonMaskType::ArrayIndex(idx) => json.as_array().unwrap().get(idx).unwrap(),
+  };
+  let data_bytes = serde_json::to_string(&data).unwrap();
+  let data_bytes = data_bytes.as_bytes();
+
+  let filtered_data_bytes = data_bytes
+    .iter()
+    .filter(|&&x| !(x == 0 || x.is_ascii_whitespace()))
+    .copied()
+    .collect::<Vec<u8>>();
+  let mut start_idx: Option<usize> = None;
+  let mut end_idx: Option<usize> = None;
+  // Iterate through the original bytes and find the subobject
+  for (idx, byte) in masked_plaintext.iter().enumerate() {
+    // If we find that the byte we are at matches the first byte of our subobject, then we should
+    // see if this string matches
+    let mut filtered_body = masked_plaintext[idx..]
+      .iter()
+      .filter(|&&x| !(x == 0 || x.is_ascii_whitespace()))
+      .copied()
+      .collect::<Vec<u8>>();
+    filtered_body.truncate(filtered_data_bytes.len());
+    if filtered_data_bytes == filtered_body && filtered_data_bytes.first().unwrap() == byte {
+      start_idx = Some(idx);
+    }
+  }
+  for (idx, byte) in masked_plaintext.iter().enumerate() {
+    let mut filtered_body = masked_plaintext[..idx + 1]
+      .iter()
+      .filter(|&&x| !(x == 0 || x.is_ascii_whitespace()))
+      .copied()
+      .collect::<Vec<u8>>();
+    filtered_body.reverse();
+    filtered_body.truncate(filtered_data_bytes.len());
+    filtered_body.reverse();
+    if filtered_data_bytes == filtered_body && filtered_data_bytes.last().unwrap() == byte {
+      end_idx = Some(idx);
+    }
+  }
+  let start_idx = start_idx.unwrap();
+  let end_idx = end_idx.unwrap();
+  masked_plaintext
+    .iter()
+    .enumerate()
+    .map(|(i, &x)| if i >= start_idx && i <= end_idx { x } else { 0 })
+    .collect::<Vec<u8>>()
 }
 
 pub fn compute_http_body_mask_witness(masked_plaintext: Vec<u8>) -> (Vec<u8>, BigInt) { todo!() }
@@ -42,7 +96,7 @@ mod tests {
     32, 32, 32, 32, 32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125,
   ];
 
-  const TEST_HTTP_BODY: &[u8] = &[
+  const MASKED_HTTP: &[u8] = &[
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -58,18 +112,82 @@ mod tests {
     32, 32, 32, 32, 32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125,
   ];
 
-  const TEST_HTTP_SIZED: [u8; 188] = [
-    123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 34, 105, 116, 101, 109, 115, 34, 58, 32, 91, 13, 10,
-    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-    32, 32, 32, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34, 65, 114, 116, 105, 115, 116, 34,
-    44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 112, 114, 111, 102,
-    105, 108, 101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-    32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121, 108, 111, 114, 32, 83, 119, 105,
-    102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10,
-    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 93, 13,
-    10, 32, 32, 32, 125, 13, 10, 125,
+  const MASKED_KEY0_ARRAY: &[u8] = &[
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 34, 105, 116, 101, 109, 115, 34, 58, 32,
+    91, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32,
+    32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34, 65, 114, 116, 105,
+    115, 116, 34, 44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 112,
+    114, 111, 102, 105, 108, 101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+    32, 32, 32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121, 108, 111, 114, 32,
+    83, 119, 105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+    125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32,
+    32, 93, 13, 10, 32, 32, 32, 125, 0, 0, 0,
+  ];
+  const MASKED_KEY1_ARRAY: &[u8] = &[
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 91, 13, 10, 32, 32, 32,
+    32, 32, 32, 32, 32, 32, 32, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+    32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34, 65, 114, 116, 105, 115, 116, 34, 44, 13, 10,
+    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 112, 114, 111, 102, 105, 108,
+    101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+    34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121, 108, 111, 114, 32, 83, 119, 105, 102, 116,
+    34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32,
+    32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 93, 0, 0, 0, 0, 0,
+    0, 0, 0, 0,
+  ];
+  const MASKED_ARR0_ARRAY: &[u8] = &[
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34,
+    100, 97, 116, 97, 34, 58, 32, 34, 65, 114, 116, 105, 115, 116, 34, 44, 13, 10, 32, 32, 32, 32,
+    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 112, 114, 111, 102, 105, 108, 101, 34, 58, 32,
+    123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 110, 97, 109,
+    101, 34, 58, 32, 34, 84, 97, 121, 108, 111, 114, 32, 83, 119, 105, 102, 116, 34, 13, 10, 32,
+    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32,
+    32, 32, 32, 32, 32, 125, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  ];
+  const MASKED_KEY2_ARRAY: &[u8] = &[
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34,
+    110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121, 108, 111, 114, 32, 83, 119, 105, 102, 116, 34,
+    13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   ];
 
+  const MASKED_KEY3_ARRAY: &[u8] = &[
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    34, 84, 97, 121, 108, 111, 114, 32, 83, 119, 105, 102, 116, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0,
+  ];
+
+  const KEY0: &[u8] = "data".as_bytes();
+  const KEY1: &[u8] = "items".as_bytes();
+  const KEY2: &[u8] = "profile".as_bytes();
+  const KEY3: &[u8] = "name".as_bytes();
   // HTTP/1.1 200 OK
   // content-type: application/json; charset=utf-8
   // content-encoding: gzip
@@ -89,88 +207,21 @@ mod tests {
   // }
   #[test]
   fn test_compute_json_witness() {
-    let json_bytes = TEST_HTTP_BODY
-      .iter()
-      .skip_while(|&&x| x == 0 || x.is_ascii_whitespace())
-      .copied()
-      .collect::<Vec<u8>>();
-    let json: Value = serde_json::from_slice(&json_bytes).unwrap();
-    // dbg!(&json);
-    let data: &Value = json.get("data").unwrap();
-    // dbg!(&data);
-    let data_bytes = serde_json::to_string(&data).unwrap();
-    let data_bytes = data_bytes.as_bytes();
+    let masked_array = compute_json_witness(MASKED_HTTP, JsonMaskType::Object(KEY0.to_vec()));
+    assert_eq!(masked_array, MASKED_KEY0_ARRAY);
+  }
 
-    let filtered_data_bytes = data_bytes
-      .iter()
-      .filter(|&&x| !x == 0 || !x.is_ascii_whitespace())
-      .copied()
-      .collect::<Vec<u8>>();
-    dbg!(&filtered_data_bytes);
-    let mut start_idx: Option<usize> = None;
-    let mut end_idx: Option<usize> = None;
-    // Iterate through the original bytes and find the subobject
-    for (idx, byte) in TEST_HTTP_BODY.iter().enumerate() {
-      // If we find that the byte we are at matches the first byte of our subobject, then we should
-      // see if this string matches
-      let mut filtered_body = TEST_HTTP_BODY[idx..]
-        .iter()
-        .filter(|&&x| !x == 0 || !x.is_ascii_whitespace())
-        .copied()
-        .collect::<Vec<u8>>();
-      filtered_body.truncate(filtered_data_bytes.len());
-      //   if idx == 132 {
-      //     dbg!(&filtered_body);
-      //   }
-      if filtered_data_bytes == filtered_body && filtered_data_bytes.first().unwrap() == byte {
-        start_idx = Some(idx);
-      }
-    }
-    for (idx, byte) in TEST_HTTP_BODY.iter().enumerate() {
-      let mut filtered_body = TEST_HTTP_BODY[..idx + 1]
-        .iter()
-        .filter(|&&x| !x == 0 || !x.is_ascii_whitespace())
-        .copied()
-        .collect::<Vec<u8>>();
-      filtered_body.reverse();
-      filtered_body.truncate(filtered_data_bytes.len());
-      filtered_body.reverse();
-      if idx == 319 {
-        dbg!(&filtered_body);
-        dbg!(filtered_data_bytes.last());
-        dbg!(byte);
-      }
-
-      if filtered_data_bytes == filtered_body && filtered_data_bytes.last().unwrap() == byte {
-        end_idx = Some(idx);
-      }
-    }
-    dbg!(start_idx);
-    dbg!(end_idx);
-    let start_idx = start_idx.unwrap();
-    let end_idx = end_idx.unwrap();
-    let masked_array = TEST_HTTP_BODY
-      .iter()
-      .enumerate()
-      .map(|(i, &x)| if i >= start_idx && i <= end_idx { x } else { 0 })
-      .collect::<Vec<u8>>();
-    // dbg!(&TEST_HTTP_BODY[start_idx..end_idx]);
-    dbg!(masked_array);
+  #[test]
+  fn test_compute_json_masking_sequence() {
+    let masked_array = compute_json_witness(MASKED_HTTP, JsonMaskType::Object(KEY0.to_vec()));
+    assert_eq!(masked_array, MASKED_KEY0_ARRAY);
+    let masked_array = compute_json_witness(&masked_array, JsonMaskType::Object(KEY1.to_vec()));
+    assert_eq!(masked_array, MASKED_KEY1_ARRAY);
+    let masked_array = compute_json_witness(&masked_array, JsonMaskType::ArrayIndex(0));
+    assert_eq!(masked_array, MASKED_ARR0_ARRAY);
+    let masked_array = compute_json_witness(&masked_array, JsonMaskType::Object(KEY2.to_vec()));
+    assert_eq!(masked_array, MASKED_KEY2_ARRAY);
+    let masked_array = compute_json_witness(&masked_array, JsonMaskType::Object(KEY3.to_vec()));
+    assert_eq!(masked_array, MASKED_KEY3_ARRAY);
   }
 }
-
-const MASKED_ARRAY: [u8; 320] = [
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 34, 105, 116, 101, 109, 115, 34, 58, 32, 91,
-  13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32,
-  32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34, 65, 114, 116, 105, 115, 116,
-  34, 44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 112, 114, 111,
-  102, 105, 108, 101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-  32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121, 108, 111, 114, 32, 83, 119, 105,
-  102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10,
-  32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 93, 13, 10,
-  32, 32, 32, 125, 0, 0, 0,
-];
