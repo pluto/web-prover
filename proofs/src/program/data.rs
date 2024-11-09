@@ -123,18 +123,14 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
 
     // add fold input sliced to chunks and add to private input
     for (circuit_label, fold_inputs) in self.inputs.iter() {
-      if let Some(inputs) = instruction_usage.get(circuit_label) {
-        for (idx, input) in fold_inputs.split_values(inputs.len()).into_iter().enumerate() {
-          let input_idx = inputs.get(idx).ok_or_else(|| {
-            ProofError::Other(format!(
-              "Index {} not found in inputs for circuit label {}",
-              idx, circuit_label
-            ))
-          })?;
-          private_inputs[*input_idx].extend(input);
-        }
-      } else {
-        return Err(ProofError::Other(format!("Circuit label {} not found in rom", circuit_label)));
+      let inputs = match instruction_usage.get(circuit_label) {
+        Some(inputs) => inputs,
+        None =>
+          Err(ProofError::Other(format!("Circuit label '{}' not found in rom", circuit_label)))?,
+      };
+      let split_inputs = fold_inputs.split_values(inputs.len());
+      for (idx, input) in inputs.iter().zip(split_inputs) {
+        private_inputs[*idx].extend(input);
       }
     }
 

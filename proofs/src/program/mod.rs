@@ -152,24 +152,25 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
     let wit_type = memory.circuits[op_code as usize].witness_generator_type.clone();
     let public_params = &program_data.public_params;
 
-    memory.circuits[op_code as usize].circuit.witness = if wit_type == WitnessGeneratorType::Browser
-    {
-      // When running in browser, the witness is passed as input.
-      Some(program_data.witnesses[op_code as usize].clone())
-    } else {
-      let nivc_io = memory.circuits[op_code as usize]
-        .nivc_io
-        .as_ref()
-        .ok_or_else(|| ProofError::Other(format!("nivc_io not found for op_code {}", op_code)))?;
+    memory.circuits[op_code as usize].circuit.witness =
+      if wit_type == WitnessGeneratorType::Browser {
+        // When running in browser, the witness is passed as input.
+        Some(program_data.witnesses[op_code as usize].clone())
+      } else {
+        let arity = memory.circuits[op_code as usize].circuit.arity();
+        let nivc_io =
+          &memory.circuits[op_code as usize].nivc_io.as_ref().ok_or_else(|| {
+            ProofError::Other(format!("nivc_io not found for op_code {}", op_code))
+          })?[..arity];
 
-      let private_input =
-        memory.circuits[op_code as usize].private_input.as_ref().ok_or_else(|| {
-          ProofError::Other(format!("private_input not found for op_code {}", op_code))
-        })?;
-      let in_json = into_input_json(nivc_io, private_input)?;
-      let witness = generate_witness_from_generator_type(&in_json, &wit_type)?;
-      Some(witness)
-    };
+        let private_input =
+          memory.circuits[op_code as usize].private_input.as_ref().ok_or_else(|| {
+            ProofError::Other(format!("private_input not found for op_code {}", op_code))
+          })?;
+        let in_json = into_input_json(nivc_io, private_input)?;
+        let witness = generate_witness_from_generator_type(&in_json, &wit_type)?;
+        Some(witness)
+      };
 
     let circuit_primary = memory.primary_circuit(op_code as usize);
     let circuit_secondary = memory.secondary_circuit();
