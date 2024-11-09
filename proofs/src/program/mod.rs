@@ -1,13 +1,8 @@
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
-use circom::{
-  r1cs::R1CS,
-  witness::{aes_gcm_fold_wrapper, generate_witness_from_generator_type},
-};
+use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
 use client_side_prover::{
-  r1cs::R1CSShape,
-  supernova::{get_circuit_shapes, NonUniformCircuit, RecursiveSNARK, StepCircuit},
+  supernova::{NonUniformCircuit, RecursiveSNARK, StepCircuit},
   traits::snark::default_ck_hint,
-  R1CSWithArity,
 };
 use data::Expanded;
 use proof::Proof;
@@ -136,8 +131,6 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
   let circuits = initialize_circuit_list(&program_data.setup_data); // TODO: AwK?
   let mut memory = Memory { rom: rom.clone(), circuits };
 
-  let aux_params = program_data.public_params.aux_params();
-
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
   for (idx, &op_code) in rom.iter().enumerate().take_while(|(_, &op_code)| op_code != u64::MAX) {
@@ -148,50 +141,18 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
     memory.circuits[op_code as usize].nivc_io = Some(next_public_input);
 
     let wit_type = memory.circuits[op_code as usize].witness_generator_type.clone();
-    let (is_browser, is_mobile) = match wit_type.clone() {
-      WitnessGeneratorType::Browser => (true, false),
-      WitnessGeneratorType::Mobile { circuit } => (false, true),
-      _ => (false, false),
-    };
-
-    // NOTE (Colin): Alloc only the used R1CSWithArity
-    // let mut temp_memory =
-    //   Memory { rom: vec![], circuits: vec![RomCircuit::default(); memory.circuits.len()] };
-    // temp_memory.circuits[op_code as usize] = memory.circuits[op_code as usize].clone();
-    // let temp_shapes = get_circuit_shapes(&temp_memory);
-    // let public_params = PublicParams::from_parts_unchecked(temp_shapes, aux_params.clone());
     let public_params = &program_data.public_params;
 
-    memory.circuits[op_code as usize].circuit.witness = if is_browser {
+    memory.circuits[op_code as usize].circuit.witness = if wit_type == WitnessGeneratorType::Browser
+    {
       // When running in browser, the witness is passed as input.
-      Some(program_data.witnesses[idx].clone())
-    } else if is_mobile {
-      // TODO: Obviously this code is horrible. Migration to circom-witnesscalc
-      // will help. In the mean time, do the dirty to benchmark performance.
-      match wit_type.clone() {
-        WitnessGeneratorType::Mobile { circuit } => {
-          let r = if circuit == "aes-gcm-fold" {
-            let arity = memory.circuits[op_code as usize].circuit.arity().clone();
-            let in_json = into_input_json(
-              &memory.circuits[op_code as usize].nivc_io.as_ref().unwrap()[..arity],
-              memory.circuits[op_code as usize].private_input.as_ref().unwrap(),
-            );
-
-            Some(aes_gcm_fold_wrapper(&in_json))
-          } else {
-            panic!("Mobile only supports aes-gcm-fold")
-          };
-          r
-        },
-        _ => panic!("Mobile only supported"),
-      }
+      Some(program_data.witnesses[op_code as usize].clone())
     } else {
-      let arity = memory.circuits[op_code as usize].circuit.arity().clone();
+      let arity = memory.circuits[op_code as usize].circuit.arity();
       let in_json = into_input_json(
         &memory.circuits[op_code as usize].nivc_io.as_ref().unwrap()[..arity],
         memory.circuits[op_code as usize].private_input.as_ref().unwrap(),
       );
-
       let witness = generate_witness_from_generator_type(&in_json, &wit_type);
       Some(witness)
     };
@@ -201,7 +162,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
 
     let mut recursive_snark = recursive_snark_option.unwrap_or_else(|| {
       RecursiveSNARK::new(
-        &public_params,
+        public_params,
         &memory,
         &circuit_primary,
         &circuit_secondary,
@@ -212,13 +173,13 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
     });
 
     info!("Proving single step...");
-    recursive_snark.prove_step(&public_params, &circuit_primary, &circuit_secondary).unwrap();
+    recursive_snark.prove_step(public_params, &circuit_primary, &circuit_secondary).unwrap();
     info!("Done proving single step...");
 
     #[cfg(feature = "verify-steps")]
     {
       info!("Verifying single step...");
-      recursive_snark.verify(&public_params, &z0_primary, &z0_secondary).unwrap();
+      recursive_snark.verify(public_params, &z0_primary, &z0_secondary).unwrap();
       info!("Single step verification done");
     }
 

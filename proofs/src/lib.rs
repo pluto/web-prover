@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use circom::CircomCircuit;
 use client_side_prover::{
-  provider::{hyperkzg::EvaluationEngine, Bn256EngineIPA, Bn256EngineKZG, GrumpkinEngine},
+  provider::{Bn256EngineIPA, GrumpkinEngine},
   spartan::batched::BatchedRelaxedR1CSSNARK,
   supernova::{snark::CompressedSNARK, PublicParams, TrivialCircuit},
   traits::{Engine, Group},

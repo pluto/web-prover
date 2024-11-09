@@ -18,6 +18,7 @@ pub struct R1CS {
 }
 
 // NOTE (Colin): This is added so we can cache only the active circuits we are using.
+#[allow(clippy::derivable_impls)]
 impl Default for R1CS {
   fn default() -> Self {
     Self {
