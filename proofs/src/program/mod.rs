@@ -186,7 +186,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
     })?;
 
     info!("Proving single step...");
-    recursive_snark.prove_step(&public_params, &circuit_primary, &circuit_secondary)?;
+    recursive_snark.prove_step(public_params, &circuit_primary, &circuit_secondary)?;
     info!("Done proving single step...");
 
     #[cfg(feature = "verify-steps")]
