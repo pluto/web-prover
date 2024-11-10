@@ -1,17 +1,6 @@
-use std::{array::TryFromSliceError, string::FromUtf8Error};
+use std::array::TryFromSliceError;
 
-use hex::FromHexError;
-use reqwest::Error as ReqwestError;
-#[cfg(not(target_arch = "wasm32"))]
-use rustls::client::InvalidDnsNameError;
 use thiserror::Error;
-use tls_client2::{origo::OrigoConnection, BackendError, Error};
-use tls_core::dns::InvalidDnsNameError as vendored_InvalidDnsNameError;
-// use tlsn_core::commitment::builder::TranscriptCommitmentBuilderError; Cannot get this
-// because in current version it is private
-#[cfg(not(target_arch = "wasm32"))]
-use tokio_rustls::rustls;
-
 impl From<TryFromSliceError> for ClientErrors {
   fn from(err: TryFromSliceError) -> ClientErrors { ClientErrors::Other(err.to_string()) }
 }
@@ -23,10 +12,10 @@ pub enum ClientErrors {
   RustTls(#[from] rustls::Error),
 
   #[error(transparent)]
-  FromUtf8(#[from] FromUtf8Error),
+  FromUtf8(#[from] std::string::FromUtf8Error),
 
   #[error(transparent)]
-  Reqwest(#[from] ReqwestError),
+  Reqwest(#[from] reqwest::Error),
 
   #[error(transparent)]
   Io(#[from] std::io::Error),
@@ -83,20 +72,20 @@ pub enum ClientErrors {
   ProofError(#[from] proofs::errors::ProofError),
 
   #[error(transparent)]
-  HexDecode(#[from] FromHexError),
+  HexDecode(#[from] hex::FromHexError),
 
   #[error(transparent)]
-  BackendError(#[from] BackendError),
+  BackendError(#[from] tls_client2::BackendError),
 
   #[error(transparent)]
-  VendoredInvalidDnsNameError(#[from] vendored_InvalidDnsNameError),
+  VendoredInvalidDnsNameError(#[from] tls_core::dns::InvalidDnsNameError),
 
   #[cfg(not(target_arch = "wasm32"))]
   #[error(transparent)]
-  InvalidDnsNameError(#[from] InvalidDnsNameError),
+  InvalidDnsNameError(#[from] rustls::client::InvalidDnsNameError),
 
   #[error(transparent)]
-  Error(#[from] Error),
+  Error(#[from] tls_client2::Error),
 
   #[error("Other error: {0}")]
   Other(String),

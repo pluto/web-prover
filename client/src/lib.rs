@@ -57,7 +57,7 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, erro
   let prover = if config.websocket_proxy_url.is_some() {
     tlsn_native::setup_websocket_connection(&mut config, prover_config).await
   } else {
-    tlsn_native::setup_tcp_connection(&mut config, prover_config).await?
+    tlsn_native::setup_tcp_connection(&mut config, prover_config).await
   };
 
   let p = tlsn::notarize(prover).await?;

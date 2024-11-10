@@ -43,7 +43,7 @@ pub async fn sign(
 
   // TODO: Actually use this input in the proofs.
   let sign_response = response.bytes().await?.to_vec();
-  println!("\n{}\n\n", String::from_utf8(sign_response.clone())?);
+  debug!("\n{}\n\n", String::from_utf8(sign_response.clone())?);
 
   Ok(sign_response)
 }

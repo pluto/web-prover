@@ -169,7 +169,7 @@ async fn proxy(
   let client = tls_client2::ClientConnection::new(
     Arc::new(client_config),
     Box::new(tls_client2::RustCryptoBackend13::new(origo_conn.clone())),
-    tls_client2::ServerName::try_from(config.target_host()?.as_str())?,
+    tls_client2::ServerName::try_from(config.target_host()?.as_str()).unwrap(),
   )?;
 
   let client_notary_config = rustls::ClientConfig::builder()
@@ -226,9 +226,7 @@ async fn proxy(
   // TODO: What do with tls_fut? what do with tls_receiver?
   let (tls_sender, _tls_receiver) = oneshot::channel();
   let handled_tls_fut = async {
-    let result = tls_fut.await;
-    // Triggered when the server shuts the connection.
-    // debug!("tls_sender.send({:?})", result);
+    let result = tls_fut.await.unwrap();
     let _ = tls_sender.send(result);
   };
   tokio::spawn(handled_tls_fut);
@@ -242,7 +240,6 @@ async fn proxy(
   let connection_fut = connection.without_shutdown();
   let handled_connection_fut = async {
     let result = connection_fut.await;
-    // debug!("connection_sender.send({:?})", result);
     let _ = connection_sender.send(result);
   };
   tokio::spawn(handled_connection_fut);
