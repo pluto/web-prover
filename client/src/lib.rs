@@ -16,6 +16,8 @@ pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
 use tracing::info;
 
+use crate::errors::ClientErrors;
+
 #[derive(Debug, Serialize)]
 pub enum Proof {
   TLSN(TlsProof),
@@ -33,16 +35,23 @@ pub async fn prover_inner(config: config::Config) -> Result<Proof, errors::Clien
 pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let root_store = crate::tls::tls_client_default_root_store();
 
+  let max_sent_data = config
+    .max_sent_data
+    .ok_or_else(|| ClientErrors::Other("max_sent_data is missing".to_string()))?;
+  let max_recv_data = config
+    .max_recv_data
+    .ok_or_else(|| ClientErrors::Other("max_recv_data is missing".to_string()))?;
+
   let prover_config = ProverConfig::builder()
     .id(config.session_id())
     .root_cert_store(root_store)
-    .server_dns(config.target_host())
-    .max_transcript_size(config.max_sent_data.unwrap() + config.max_recv_data.unwrap())
+    .server_dns(config.target_host()?)
+    .max_transcript_size(max_sent_data + max_recv_data)
     .build()
-    .unwrap();
+    .map_err(|e| ClientErrors::Other(e.to_string()))?;
 
   #[cfg(target_arch = "wasm32")]
-  let prover = tlsn_wasm32::setup_connection(&mut config, prover_config).await;
+  let prover = tlsn_wasm32::setup_connection(&mut config, prover_config).await?;
 
   #[cfg(not(target_arch = "wasm32"))]
   let prover = if config.websocket_proxy_url.is_some() {
@@ -51,7 +60,7 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, erro
     tlsn_native::setup_tcp_connection(&mut config, prover_config).await
   };
 
-  let p = tlsn::notarize(prover).await.unwrap();
+  let p = tlsn::notarize(prover).await?;
   Ok(Proof::TLSN(p))
 }
 

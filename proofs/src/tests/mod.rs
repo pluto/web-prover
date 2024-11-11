@@ -182,11 +182,6 @@ fn test_end_to_end_proofs() {
   };
   debug!("Setting up `Memory`...");
   let public_params = program::setup(&setup_data);
-
-  // Dealloc the R1CSWithArity vec
-  // let (_, aux_params) = public_params.into_parts();
-  // let public_params = PublicParams::from_parts_unchecked(vec![], aux_params);
-
   debug!("Creating ROM");
   let rom_data = HashMap::from([
     (String::from("AES_GCM_1"), CircuitData { opcode: 0 }),
@@ -298,9 +293,12 @@ fn test_end_to_end_proofs() {
     inputs,
     witnesses: vec![],
   }
-  .into_expanded();
+  .into_expanded()
+  .unwrap();
+  debug!("program_data.inputs: {:?}, {:?}", program_data.inputs.len(), program_data.inputs[15]);
 
-  let recursive_snark = program::run(&program_data);
+  let recursive_snark = program::run(&program_data).unwrap();
+  // dbg!(recursive_snark.zi_primary());
 
   let res = "\"Taylor Swift\"";
   let final_mem =
@@ -369,6 +367,6 @@ fn test_offline_proofs() {
     inputs: HashMap::new(),
     witnesses: vec![vec![F::<G1>::from(0)]],
   };
-  program_data
+  let _ = program_data
     .into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup_aes.bin").unwrap());
 }

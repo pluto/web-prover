@@ -27,24 +27,23 @@ pub async fn sign(
     session_id.clone(),
   );
 
-  let client = reqwest::ClientBuilder::new().build().unwrap();
+  let client = reqwest::ClientBuilder::new().build()?;
 
   #[cfg(feature = "notary_ca_cert")]
   // TODO: recheck use of rustls backend
   let client = reqwest::ClientBuilder::new()
-    .add_root_certificate(
-      reqwest::tls::Certificate::from_der(&crate::tls::NOTARY_CA_CERT.to_vec()).unwrap(),
-    )
+    .add_root_certificate(reqwest::tls::Certificate::from_der(
+      &crate::tls::NOTARY_CA_CERT.to_vec(),
+    )?)
     .use_rustls_tls()
-    .build()
-    .unwrap();
+    .build()?;
 
-  let response = client.post(url).json(&sb).send().await.unwrap();
+  let response = client.post(url).json(&sb).send().await?;
   assert!(response.status() == hyper::StatusCode::OK);
 
   // TODO: Actually use this input in the proofs.
-  let sign_response = response.bytes().await.unwrap().to_vec();
-  println!("\n{}\n\n", String::from_utf8(sign_response.clone()).unwrap());
+  let sign_response = response.bytes().await?.to_vec();
+  debug!("\n{}\n\n", String::from_utf8(sign_response.clone())?);
 
   Ok(sign_response)
 }

@@ -94,7 +94,7 @@ pub fn setup(setup_data: &SetupData) -> PublicParams<E1> {
 
   // TODO: I don't think we want to have to call `initialize_circuit_list` more than once on setup
   // ever and it seems like it may get used more frequently.
-  let circuits = initialize_circuit_list(setup_data);
+  let circuits = initialize_circuit_list(setup_data).unwrap(); // TODO, change the type signature of trait to use arbitrary error types.
   let memory = Memory { circuits, rom: vec![0; setup_data.max_rom_length] }; // Note, `rom` here is not used in setup, only `circuits`
   let public_params = PublicParams::setup(&memory, &*default_ck_hint(), &*default_ck_hint());
 
@@ -104,15 +104,24 @@ pub fn setup(setup_data: &SetupData) -> PublicParams<E1> {
   public_params
 }
 
-pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
+pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNARK<E1>, ProofError> {
   info!("Starting SuperNova program...");
 
   // Resize the rom to be the `max_rom_length` committed to in the `SetupData`
   let mut rom = program_data
     .rom
     .iter()
-    .map(|opcode_config| program_data.rom_data.get(&opcode_config.name).unwrap().opcode)
-    .collect::<Vec<u64>>();
+    .map(|opcode_config| {
+      program_data
+        .rom_data
+        .get(&opcode_config.name)
+        .ok_or_else(|| {
+          ProofError::Other(format!("Opcode config '{}' not found in rom_data", opcode_config.name))
+        })
+        .map(|config| config.opcode)
+    })
+    .collect::<Result<Vec<u64>, ProofError>>()?;
+
   rom.resize(program_data.setup_data.max_rom_length, u64::MAX);
 
   // Get the public inputs needed for circuits
@@ -128,7 +137,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
 
   // TODO (Colin): We are basically creating a `R1CS` for each circuit here, then also creating
   // `R1CSWithArity` for the circuits in the `PublicParams`. Surely we don't need both?
-  let circuits = initialize_circuit_list(&program_data.setup_data); // TODO: AwK?
+  let circuits = initialize_circuit_list(&program_data.setup_data)?; // TODO: AwK?
   let mut memory = Memory { rom: rom.clone(), circuits };
 
   #[cfg(feature = "timing")]
@@ -143,19 +152,25 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
     let wit_type = memory.circuits[op_code as usize].witness_generator_type.clone();
     let public_params = &program_data.public_params;
 
-    memory.circuits[op_code as usize].circuit.witness = if wit_type == WitnessGeneratorType::Browser
-    {
-      // When running in browser, the witness is passed as input.
-      Some(program_data.witnesses[op_code as usize].clone())
-    } else {
-      let arity = memory.circuits[op_code as usize].circuit.arity();
-      let in_json = into_input_json(
-        &memory.circuits[op_code as usize].nivc_io.as_ref().unwrap()[..arity],
-        memory.circuits[op_code as usize].private_input.as_ref().unwrap(),
-      );
-      let witness = generate_witness_from_generator_type(&in_json, &wit_type);
-      Some(witness)
-    };
+    memory.circuits[op_code as usize].circuit.witness =
+      if wit_type == WitnessGeneratorType::Browser {
+        // When running in browser, the witness is passed as input.
+        Some(program_data.witnesses[op_code as usize].clone())
+      } else {
+        let arity = memory.circuits[op_code as usize].circuit.arity();
+        let nivc_io =
+          &memory.circuits[op_code as usize].nivc_io.as_ref().ok_or_else(|| {
+            ProofError::Other(format!("nivc_io not found for op_code {}", op_code))
+          })?[..arity];
+
+        let private_input =
+          memory.circuits[op_code as usize].private_input.as_ref().ok_or_else(|| {
+            ProofError::Other(format!("private_input not found for op_code {}", op_code))
+          })?;
+        let in_json = into_input_json(nivc_io, private_input)?;
+        let witness = generate_witness_from_generator_type(&in_json, &wit_type)?;
+        Some(witness)
+      };
 
     let circuit_primary = memory.primary_circuit(op_code as usize);
     let circuit_secondary = memory.secondary_circuit();
@@ -169,17 +184,16 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
         &z0_primary,
         &z0_secondary,
       )
-      .unwrap()
-    });
+    })?;
 
     info!("Proving single step...");
-    recursive_snark.prove_step(public_params, &circuit_primary, &circuit_secondary).unwrap();
+    recursive_snark.prove_step(public_params, &circuit_primary, &circuit_secondary)?;
     info!("Done proving single step...");
 
     #[cfg(feature = "verify-steps")]
     {
       info!("Verifying single step...");
-      recursive_snark.verify(public_params, &z0_primary, &z0_secondary).unwrap();
+      recursive_snark.verify(public_params, &z0_primary, &z0_secondary)?;
       info!("Single step verification done");
     }
 
@@ -187,45 +201,44 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> RecursiveSNARK<E1> {
     next_public_input = recursive_snark.zi_primary().clone();
     next_public_input.truncate(circuit_primary.arity());
 
-    recursive_snark_option = Some(recursive_snark);
+    recursive_snark_option = Some(Ok(recursive_snark));
   }
   // Note, this unwrap cannot fail
   let recursive_snark = recursive_snark_option.unwrap();
   #[cfg(feature = "timing")]
   trace!("Recursive loop of `program::run()` elapsed: {:?}", time.elapsed());
 
-  recursive_snark
+  Ok(recursive_snark?)
 }
 
 pub fn compress_proof(
   recursive_snark: &RecursiveSNARK<E1>,
   public_params: &PublicParams<E1>,
-) -> Proof<CompressedSNARK<E1, S1, S2>> {
+) -> Result<Proof<CompressedSNARK<E1, S1, S2>>, ProofError> {
   debug!("Generating `CompressedSNARK`");
-  let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(public_params).unwrap();
+  let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(public_params)?;
 
   // Optionally time the `CompressedSNARK` creation
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
 
-  let proof =
-    Proof(CompressedSNARK::<E1, S1, S2>::prove(public_params, &pk, recursive_snark).unwrap());
+  let proof = Proof(CompressedSNARK::<E1, S1, S2>::prove(public_params, &pk, recursive_snark)?);
   debug!("`CompressedSNARK::prove completed!");
 
   #[cfg(feature = "timing")]
   trace!("`CompressedSNARK::prove` of `program::run()` elapsed: {:?}", time.elapsed());
 
-  proof
+  Ok(proof)
 }
 
 // TODO: May want to rethink this slightly as we also store the R1CS data inside the PP. Avoid
 // doubling up if possible (maybe need to use refs)
-pub fn initialize_circuit_list(setup_data: &SetupData) -> Vec<RomCircuit> {
+pub fn initialize_circuit_list(setup_data: &SetupData) -> Result<Vec<RomCircuit>, ProofError> {
   let mut circuits = vec![];
   for (circuit_index, (r1cs_type, witness_generator_type)) in
     setup_data.r1cs_types.iter().zip(setup_data.witness_generator_types.iter()).enumerate()
   {
-    let circuit = circom::CircomCircuit { r1cs: R1CS::from(r1cs_type), witness: None };
+    let circuit = circom::CircomCircuit { r1cs: R1CS::try_from(r1cs_type)?, witness: None };
     let rom_circuit = RomCircuit {
       circuit,
       circuit_index,
@@ -237,5 +250,5 @@ pub fn initialize_circuit_list(setup_data: &SetupData) -> Vec<RomCircuit> {
 
     circuits.push(rom_circuit);
   }
-  circuits
+  Ok(circuits)
 }

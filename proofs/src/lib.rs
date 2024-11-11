@@ -15,11 +15,13 @@ use serde_json::Value;
 #[cfg(feature = "timing")] use tracing::trace;
 use tracing::{debug, error, info};
 
-use crate::program::data::{
-  Expanded, Online, ProgramData, R1CSType, SetupData, WitnessGeneratorType,
+use crate::{
+  errors::ProofError,
+  program::data::{Expanded, Online, ProgramData, R1CSType, SetupData, WitnessGeneratorType},
 };
 
 pub mod circom;
+pub mod errors;
 pub mod program;
 pub mod proof;
 #[cfg(test)] mod tests;
@@ -37,10 +39,31 @@ pub type S2 = BatchedRelaxedR1CSSNARK<E2, EE2>;
 
 pub type F<G> = <G as Group>::Scalar;
 
-pub fn compute_web_proof(program_data: &ProgramData<Online, Expanded>) -> Vec<u8> {
-  let recursive_snark = program::run(program_data);
+/// Computes a web proof from the given program data.
+///
+/// This function runs the program using the provided `program_data`, generates a recursive SNARK,
+/// compresses the proof, and serializes it into a compressed format.
+///
+/// # Arguments
+///
+/// * `program_data` - A reference to the `ProgramData` containing the setup and public parameters.
+///
+/// # Returns
+///
+/// A `Result` containing a vector of bytes representing the serialized and compressed proof,
+/// or a `ProofError` if an error occurs during the computation.
+///
+/// # Errors
+///
+/// This function will return a `ProofError` if:
+/// - The program fails to run with the provided `program_data`.
+/// - The proof compression fails.
+pub fn compute_web_proof(
+  program_data: &ProgramData<Online, Expanded>,
+) -> Result<Vec<u8>, ProofError> {
+  let recursive_snark = program::run(program_data)?;
   // TODO: Unecessary 2x generation of pk,vk, but it is cheap. Refactor later if need be!
-  let proof = program::compress_proof(&recursive_snark, &program_data.public_params);
+  let proof = program::compress_proof(&recursive_snark, &program_data.public_params)?;
   let serialized_proof = proof.serialize_and_compress();
-  serialized_proof.0
+  Ok(serialized_proof.0)
 }

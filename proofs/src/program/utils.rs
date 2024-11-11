@@ -52,13 +52,19 @@ pub fn next_rom_index_and_pc<CS: ConstraintSystem<F<G1>>>(
 
   // Allocate the next pc without checking.
   // The next iteration will check whether the next pc is valid.
-  let pc_next = AllocatedNum::alloc_infallible(cs.namespace(|| "next pc"), || {
-    allocated_rom
+  let pc_next = AllocatedNum::alloc(cs.namespace(|| "next pc"), || {
+    let next_value = allocated_rom
       .get(next_rom_index)
       .and_then(|v| v.get_value())
-      .and_then(|value| if value == F::<G1>::from(u64::MAX) { None } else { Some(value) })
-      .unwrap_or_else(|| allocated_rom.get(current_rom_index).unwrap().get_value().unwrap())
-  });
+      .and_then(|value| if value == F::<G1>::from(u64::MAX) { None } else { Some(value) });
+
+    let current_value = allocated_rom
+      .get(current_rom_index)
+      .and_then(|v| v.get_value())
+      .ok_or_else(|| SynthesisError::AssignmentMissing)?;
+
+    Ok(next_value.unwrap_or(current_value))
+  })?;
 
   Ok((rom_index_next, pc_next))
 }
@@ -112,31 +118,43 @@ pub fn get_selector_vec_from_index<CS: ConstraintSystem<F<G1>>>(
   Ok(selector)
 }
 
-pub fn into_input_json(public_input: &[F<G1>], private_input: &HashMap<String, Value>) -> String {
+pub fn into_input_json(
+  public_input: &[F<G1>],
+  private_input: &HashMap<String, Value>,
+) -> Result<String, ProofError> {
   let decimal_stringified_input: Vec<String> = public_input
     .iter()
     .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
     .collect();
 
   let input = CircomInput { step_in: decimal_stringified_input, extra: private_input.clone() };
-  serde_json::to_string(&input).unwrap()
+  Ok(serde_json::to_string(&input)?)
 }
 
-pub fn remap_inputs(input_json: &str) -> Vec<(String, Vec<BigInt>)> {
-  let circom_input: CircomInput = serde_json::from_str(input_json).unwrap();
+pub fn remap_inputs(input_json: &str) -> Result<Vec<(String, Vec<BigInt>)>, ProofError> {
+  let circom_input: CircomInput = serde_json::from_str(input_json)?;
   let mut remapped = vec![];
-  remapped.push((
-    "step_in".to_string(),
-    circom_input.step_in.into_iter().map(|s| BigInt::from_str(&s).unwrap()).collect(),
-  ));
+
+  let step_in_values: Result<Vec<BigInt>, _> = circom_input
+    .step_in
+    .into_iter()
+    .map(|s| BigInt::from_str(&s).map_err(ProofError::from))
+    .collect();
+  remapped.push(("step_in".to_string(), step_in_values?));
+
   for (k, v) in circom_input.extra {
     let val = v
       .as_array()
-      .unwrap()
+      .ok_or_else(|| ProofError::Other(format!("Expected array for key {}", k)))?
       .iter()
-      .map(|x| BigInt::from_str(&x.as_number().unwrap().to_string()).unwrap())
-      .collect::<Vec<BigInt>>();
+      .map(|x| {
+        x.as_str()
+          .ok_or_else(|| ProofError::Other(format!("Expected string for key {}", k)))
+          .and_then(|s| BigInt::from_str(s).map_err(ProofError::from))
+      })
+      .collect::<Result<Vec<BigInt>, ProofError>>()?;
     remapped.push((k, val));
   }
-  remapped
+
+  Ok(remapped)
 }

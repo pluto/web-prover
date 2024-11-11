@@ -7,13 +7,11 @@ use std::{
   process::Command,
 };
 
-use anyhow::Result;
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, LinearCombination, SynthesisError};
 use byteorder::{LittleEndian, ReadBytesExt};
 use ff::PrimeField;
 use r1cs::R1CS;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use super::*;
 

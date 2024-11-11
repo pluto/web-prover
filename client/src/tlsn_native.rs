@@ -6,7 +6,7 @@ use rustls::ClientConfig;
 use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
 use tokio_rustls::TlsConnector;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
-use tracing::debug; // needed for notary_ca_cert feature below
+use tracing::debug;
 
 use crate::{config::Config, tlsn::send_request};
 
@@ -77,7 +77,9 @@ pub async fn setup_tcp_connection(
   let prover = Prover::new(prover_config).setup(notary_tls_socket.compat()).await.unwrap();
 
   let client_socket =
-    tokio::net::TcpStream::connect((config.target_host(), config.target_port())).await.unwrap();
+    tokio::net::TcpStream::connect((config.target_host().unwrap(), config.target_port().unwrap()))
+      .await
+      .unwrap();
 
   let (mpc_tls_connection, prover_fut) = prover.connect(client_socket.compat()).await.unwrap();
 
@@ -90,7 +92,7 @@ pub async fn setup_tcp_connection(
 
   let connection_task = tokio::spawn(connection.without_shutdown());
 
-  send_request(request_sender, config.to_request()).await;
+  send_request(request_sender, config.to_request().unwrap()).await;
 
   let client_socket = connection_task.await.unwrap().unwrap().io.into_inner();
 

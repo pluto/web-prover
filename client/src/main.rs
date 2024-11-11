@@ -1,6 +1,5 @@
-use anyhow::Result;
 use clap::Parser;
-use client::config::Config;
+use client::{config::Config, errors::ClientErrors};
 use tracing::Level;
 
 #[derive(Parser)]
@@ -15,7 +14,7 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> Result<(), ClientErrors> {
   let args = Args::parse();
 
   let log_level = match args.log_level.to_lowercase().as_str() {
@@ -31,7 +30,7 @@ async fn main() -> Result<()> {
   let config_json = std::fs::read_to_string(args.config)?;
   let config: Config = serde_json::from_str(&config_json)?;
 
-  let proof = client::prover_inner(config).await.unwrap();
+  let proof = client::prover_inner(config).await?;
   let proof_json = serde_json::to_string_pretty(&proof)?;
   println!("Proving Successful: proof_len={:?}", proof_json.len());
   Ok(())

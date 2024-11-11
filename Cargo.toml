@@ -30,10 +30,6 @@ edition="2021"
 name="mock_server"
 path="bin/mock_server.rs"
 
-# Can use something like this for e2e testing of the workspace
-# https://doc.rust-lang.org/cargo/reference/manifest.html
-# [[test]]
-
 [dependencies]
 # Dependancies for the binaries
 tokio            ={ version="1.39.0", features=["full"] }
@@ -50,10 +46,9 @@ tokio-tungstenite="0.23.0"
 serde            ={ version="1.0.204", features=["derive"] }
 serde_json       ="1.0.120"
 
-# [profile.release]
-# lto = true
-# codegen-units = 1
-# panic = "abort"
+[profile.release]
+opt-level = 2
+lto = true
 
 # TODO how to get symbols for debugging (stack trace) into wasm module in --release mode?
 # [profile.release]
