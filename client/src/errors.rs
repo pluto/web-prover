@@ -91,7 +91,7 @@ pub enum ClientErrors {
   Other(String),
 
   #[error(transparent)]
-  Cancled(#[from] futures::channel::oneshot::Canceled),
+  Canceled(#[from] futures::channel::oneshot::Canceled),
 }
 
 #[cfg(target_arch = "wasm32")]
