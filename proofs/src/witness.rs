@@ -81,7 +81,7 @@ pub fn compute_http_witness(plaintext: &[u8], mask_at: HttpMaskType) -> Vec<u8> 
       for i in 1..plaintext.len().saturating_sub(1) {
         if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
           // Copy bytes from start to the end of CRLF
-          result[..=i - 1].copy_from_slice(&plaintext[..=i - 1]);
+          result[..=i + 1].copy_from_slice(&plaintext[..=i + 1]);
           break;
         }
       }
@@ -102,8 +102,8 @@ pub fn compute_http_witness(plaintext: &[u8], mask_at: HttpMaskType) -> Vec<u8> 
       for i in start_pos..plaintext.len().saturating_sub(1) {
         if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
           if current_header == idx {
-            // Copy the header line (excluding CRLF)
-            result[start_pos..=i - 1].copy_from_slice(&plaintext[start_pos..=i - 1]);
+            // Copy the header line (including CRLF)
+            result[start_pos..=i + 1].copy_from_slice(&plaintext[start_pos..=i + 1]);
             break;
           }
 
@@ -164,9 +164,18 @@ pub fn poseidon_chainer(preimage: &[F<G1>]) -> F<G1> {
 
   let hash: [u8; 32] = poseidon.hash_bytes_le(&byte_slices).unwrap();
 
-  //   F::<G1>::from_repr(hash)
-  //   todo!()
   F::<G1>::from_repr(hash).unwrap()
+}
+
+pub fn data_hasher(preimage: &[u8]) -> F<G1> {
+  assert_eq!(preimage.len() % 16, 0);
+
+  let packed_inputs = preimage.chunks(16).map(|chunk| bytepack(chunk)).collect::<Vec<F<G1>>>();
+  let mut hash_val = F::<G1>::ZERO;
+  for packed_input in packed_inputs {
+    hash_val = poseidon_chainer(&[hash_val, packed_input]);
+  }
+  hash_val
 }
 
 #[cfg(test)]
@@ -193,7 +202,7 @@ mod tests {
   ];
 
   const TEST_HTTP_START_LINE: &[u8] = &[
-    72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -203,13 +212,13 @@ mod tests {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0,
   ];
 
   const TEST_HTTP_HEADER_0: &[u8] = &[
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99, 111, 110, 116, 101, 110, 116, 45, 116,
     121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106, 115, 111,
-    110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 0, 0, 0, 0, 0, 0, 0,
+    110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13, 10, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -224,7 +233,7 @@ mod tests {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     99, 111, 110, 116, 101, 110, 116, 45, 101, 110, 99, 111, 100, 105, 110, 103, 58, 32, 103, 122,
-    105, 112, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    105, 112, 13, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -287,6 +296,12 @@ mod tests {
       10, 230, 247, 95, 9, 23, 36, 117, 25, 37, 98, 141, 178, 220, 241, 100, 187, 169, 126, 226,
       80, 175, 17, 100, 232, 1, 29, 0, 165, 144, 139, 2,
     ]);
+  }
+
+  #[test]
+  fn test_data_hasher() {
+    let hash = data_hasher(TEST_HTTP_BYTES);
+    dbg!(hash);
   }
 
   const TEST_HTTP_BODY: &[u8] = &[
