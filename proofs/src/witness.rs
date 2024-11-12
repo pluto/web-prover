@@ -68,22 +68,75 @@ pub fn compute_json_witness(masked_plaintext: &[u8], mask_at: JsonMaskType) -> V
     .collect::<Vec<u8>>()
 }
 
-pub fn compute_http_body_mask_witness(_masked_plaintext: Vec<u8>) -> (Vec<u8>, F<G1>) { todo!() }
+pub enum HttpMaskType {
+  StartLine,
+  Header(usize),
+  Body,
+}
+pub fn compute_http_witness(plaintext: &[u8], mask_at: HttpMaskType) -> Vec<u8> {
+  let mut result = vec![0u8; plaintext.len()];
+  match mask_at {
+    HttpMaskType::StartLine => {
+      // Find the first CRLF sequence
+      for i in 1..plaintext.len().saturating_sub(1) {
+        if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
+          // Copy bytes from start to the end of CRLF
+          result[..=i - 1].copy_from_slice(&plaintext[..=i - 1]);
+          break;
+        }
+      }
+    },
+    HttpMaskType::Header(idx) => {
+      let mut current_header = 0;
+      let mut start_pos = 0;
 
-// pub fn poseidon_chainer(preimage: &[F<G1>]) -> F<G1> {
-//   use generic_array::typenum::U2;
-//   let mut constants = neptune::poseidon::PoseidonConstants::<F<G1>,
-// U2>::new_with_strength_and_type(     Strength::Standard,
-//     neptune::hash_type::HashType::Sponge,
-//   );
+      // Skip the start line
+      for i in 1..plaintext.len().saturating_sub(1) {
+        if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
+          start_pos = i + 2;
+          break;
+        }
+      }
 
-//   dbg!(&constants);
-//   constants.partial_rounds = 57;
-//   let mut poseidon = Poseidon::<F<G1>, U2>::new(&constants);
-//   poseidon.set_preimage(preimage);
-//   poseidon.elements[0] = F::<G1>::zero();
-//   poseidon.hash()
-// }
+      // Find the specified header
+      for i in start_pos..plaintext.len().saturating_sub(1) {
+        if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
+          if current_header == idx {
+            // Copy the header line (excluding CRLF)
+            result[start_pos..=i - 1].copy_from_slice(&plaintext[start_pos..=i - 1]);
+            break;
+          }
+
+          // Check for end of headers (double CRLF)
+          if i + 3 < plaintext.len() && plaintext[i + 2] == b'\r' && plaintext[i + 3] == b'\n' {
+            break;
+          }
+
+          current_header += 1;
+          start_pos = i + 2;
+        }
+      }
+    },
+    HttpMaskType::Body => {
+      // Find double CRLF that marks start of body
+      for i in 1..plaintext.len().saturating_sub(3) {
+        if plaintext[i] == b'\r'
+          && plaintext[i + 1] == b'\n'
+          && plaintext[i + 2] == b'\r'
+          && plaintext[i + 3] == b'\n'
+        {
+          // Copy everything after the double CRLF
+          let body_start = i + 4;
+          if body_start < plaintext.len() {
+            result[body_start..].copy_from_slice(&plaintext[body_start..]);
+          }
+          break;
+        }
+      }
+    },
+  }
+  result
+}
 
 pub fn bytepack(bytes: &[u8]) -> F<G1> {
   let mut output = F::<G1>::ZERO;
@@ -121,6 +174,90 @@ mod tests {
 
   use super::*;
 
+  const TEST_HTTP_BYTES: &[u8] = &[
+    72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101,
+    110, 116, 45, 116, 121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110,
+    47, 106, 115, 111, 110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13,
+    10, 99, 111, 110, 116, 101, 110, 116, 45, 101, 110, 99, 111, 100, 105, 110, 103, 58, 32, 103,
+    122, 105, 112, 13, 10, 84, 114, 97, 110, 115, 102, 101, 114, 45, 69, 110, 99, 111, 100, 105,
+    110, 103, 58, 32, 99, 104, 117, 110, 107, 101, 100, 13, 10, 13, 10, 123, 13, 10, 32, 32, 32,
+    34, 100, 97, 116, 97, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 34, 105, 116, 101,
+    109, 115, 34, 58, 32, 91, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 123, 13, 10, 32,
+    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34,
+    65, 114, 116, 105, 115, 116, 34, 44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+    32, 32, 32, 34, 112, 114, 111, 102, 105, 108, 101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32,
+    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121,
+    108, 111, 114, 32, 83, 119, 105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+    32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32,
+    32, 32, 32, 32, 32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125,
+  ];
+
+  const TEST_HTTP_START_LINE: &[u8] = &[
+    72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+  ];
+
+  const TEST_HTTP_HEADER_0: &[u8] = &[
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99, 111, 110, 116, 101, 110, 116, 45, 116,
+    121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106, 115, 111,
+    110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  ];
+
+  const TEST_HTTP_HEADER_1: &[u8] = &[
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    99, 111, 110, 116, 101, 110, 116, 45, 101, 110, 99, 111, 100, 105, 110, 103, 58, 32, 103, 122,
+    105, 112, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  ];
+
+  #[test]
+  fn test_compute_http_witness_start_line() {
+    let bytes = compute_http_witness(TEST_HTTP_BYTES, HttpMaskType::StartLine);
+    assert_eq!(bytes, TEST_HTTP_START_LINE);
+  }
+
+  #[test]
+  fn test_compute_http_witness_header_0() {
+    let bytes = compute_http_witness(TEST_HTTP_BYTES, HttpMaskType::Header(0));
+    assert_eq!(bytes, TEST_HTTP_HEADER_0);
+  }
+
+  #[test]
+  fn test_compute_http_witness_header_1() {
+    let bytes = compute_http_witness(TEST_HTTP_BYTES, HttpMaskType::Header(1));
+    assert_eq!(bytes, TEST_HTTP_HEADER_1);
+  }
+
+  #[test]
+  fn test_compute_http_witness_body() {
+    let bytes = compute_http_witness(TEST_HTTP_BYTES, HttpMaskType::Body);
+    assert_eq!(bytes, TEST_HTTP_BODY);
+  }
+
   #[test]
   fn test_bytepack() {
     let pack0 = bytepack(&[0, 0, 0]);
@@ -152,29 +289,11 @@ mod tests {
     ]);
   }
 
-  const TEST_HTTP_BYTES: &[u8] = &[
-    72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101,
-    110, 116, 45, 116, 121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110,
-    47, 106, 115, 111, 110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13,
-    10, 99, 111, 110, 116, 101, 110, 116, 45, 101, 110, 99, 111, 100, 105, 110, 103, 58, 32, 103,
-    122, 105, 112, 13, 10, 84, 114, 97, 110, 115, 102, 101, 114, 45, 69, 110, 99, 111, 100, 105,
-    110, 103, 58, 32, 99, 104, 117, 110, 107, 101, 100, 13, 10, 13, 10, 123, 13, 10, 32, 32, 32,
-    34, 100, 97, 116, 97, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 34, 105, 116, 101,
-    109, 115, 34, 58, 32, 91, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 123, 13, 10, 32,
-    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34,
-    65, 114, 116, 105, 115, 116, 34, 44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-    32, 32, 32, 34, 112, 114, 111, 102, 105, 108, 101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32,
-    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121,
-    108, 111, 114, 32, 83, 119, 105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-    32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32,
-    32, 32, 32, 32, 32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125,
-  ];
-
-  const MASKED_HTTP: &[u8] = &[
+  const TEST_HTTP_BODY: &[u8] = &[
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 123, 13, 10, 32, 32, 32, 34,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 123, 13, 10, 32, 32, 32, 34,
     100, 97, 116, 97, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 34, 105, 116, 101, 109,
     115, 34, 58, 32, 91, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 123, 13, 10, 32, 32,
     32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34, 65,
@@ -281,13 +400,13 @@ mod tests {
   // }
   #[test]
   fn test_compute_json_witness() {
-    let masked_array = compute_json_witness(MASKED_HTTP, JsonMaskType::Object(KEY0.to_vec()));
+    let masked_array = compute_json_witness(TEST_HTTP_BODY, JsonMaskType::Object(KEY0.to_vec()));
     assert_eq!(masked_array, MASKED_KEY0_ARRAY);
   }
 
   #[test]
   fn test_compute_json_masking_sequence() {
-    let masked_array = compute_json_witness(MASKED_HTTP, JsonMaskType::Object(KEY0.to_vec()));
+    let masked_array = compute_json_witness(TEST_HTTP_BODY, JsonMaskType::Object(KEY0.to_vec()));
     assert_eq!(masked_array, MASKED_KEY0_ARRAY);
     let masked_array = compute_json_witness(&masked_array, JsonMaskType::Object(KEY1.to_vec()));
     assert_eq!(masked_array, MASKED_KEY1_ARRAY);
