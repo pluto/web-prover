@@ -129,9 +129,10 @@ pub fn into_input_json(
 
   let input = CircomInput { step_in: decimal_stringified_input, extra: private_input.clone() };
   let input_str = serde_json::to_string(&input)?;
+  Ok(input_str)
   // TODO (Sambhav): change this conversion of string back and forth
-  let mapped_inputs = remap_inputs(&input_str)?;
-  Ok(serde_json::to_string(&mapped_inputs)?)
+  // let mapped_inputs = remap_inputs(&input_str)?;
+  // Ok(serde_json::to_string(&mapped_inputs)?)
 }
 
 pub fn remap_inputs(input_json: &str) -> Result<HashMap<String, Vec<String>>, ProofError> {
@@ -141,7 +142,9 @@ pub fn remap_inputs(input_json: &str) -> Result<HashMap<String, Vec<String>>, Pr
   let step_in_values: Vec<String> = circom_input
     .step_in
     .iter()
-    .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.clone().into_bytes()).to_str_radix(10))
+    .map(|x| {
+      BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.clone().into_bytes()).to_str_radix(10)
+    })
     .collect();
   remapped.insert("step_in".to_string(), step_in_values);
 
@@ -152,8 +155,12 @@ pub fn remap_inputs(input_json: &str) -> Result<HashMap<String, Vec<String>>, Pr
       .iter()
       .map(|x| {
         let x = match x {
-          Value::String(num) => BigInt::from_bytes_le(num_bigint::Sign::Plus, &num.clone().into_bytes()).to_str_radix(10),
-          Value::Number(num) => BigInt::from_bytes_le(num_bigint::Sign::Plus, &num.as_u64().unwrap().to_le_bytes()).to_str_radix(10),
+          Value::String(num) =>
+            BigInt::from_bytes_le(num_bigint::Sign::Plus, &num.clone().into_bytes())
+              .to_str_radix(10),
+          Value::Number(num) =>
+            BigInt::from_bytes_le(num_bigint::Sign::Plus, &num.as_u64().unwrap().to_le_bytes())
+              .to_str_radix(10),
           _ => return Err(ProofError::Other(format!("Expect string or number, got: {:?}", x))),
         };
         Ok(x)
