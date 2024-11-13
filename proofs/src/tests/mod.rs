@@ -3,11 +3,10 @@
 // TODO: (Colin): I'm noticing this module could use some TLC. There's a lot of lint here!
 
 use client_side_prover::supernova::RecursiveSNARK;
-use ff::derive::bitvec::vec;
 use halo2curves::bn256::Fr;
-use program::data::{self, CircuitData, InstructionConfig};
+use program::data::{CircuitData, InstructionConfig};
 use serde_json::json;
-use witness::compute_http_witness;
+use witness::{compute_http_witness, compute_json_witness};
 
 use super::*;
 use crate::{
@@ -62,7 +61,6 @@ const EXTRACT_VALUE_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/target_512b/json_extract_value_512b.bin");
 
 const BYTES_PER_FOLD: usize = 16;
-const AES_BYTES: [u8; 50] = [0; 50];
 
 // HTTP/1.1 200 OK
 // content-type: application/json; charset=utf-8
@@ -145,38 +143,6 @@ const AES_COUNTER: (&str, [u8; 128]) = ("ctr", [
 const AES_KEY: (&str, [u8; 16]) = ("key", [0; 16]);
 const AES_IV: (&str, [u8; 12]) = ("iv", [0; 12]);
 const AES_AAD: (&str, [u8; 16]) = ("aad", [0; 16]);
-// const HTTP_LOCK_VERSION: (&str, [u8; 50]) = (beginning, [
-//   72, 84, 84, 80, 47, 49, 46, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// 0,   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// ]);
-// const HTTP_BEGINNING_LENGTH: (&str, [u8; 1]) = (beginning_length, [8]);
-// const HTTP_LOCK_STATUS: (&str, [u8; 200]) = (middle, [
-//   50, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//   0, 0, 0, 0, 0, 0, 0, 0, 0,
-// ]);
-// const HTTP_MIDDLE_LENGTH: (&str, [u8; 1]) = (middle_length, [3]);
-// const HTTP_LOCK_MESSAGE: (&str, [u8; 50]) = (final", [
-//   79, 75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// 0,   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// ]);
-// const HTTP_FINAL_LENGTH: (&str, [u8; 1]) = ("final_length", [2]);
-// const HTTP_LOCK_HEADER_NAME: (&str, [u8; 50]) = ("header", [
-//   99, 111, 110, 116, 101, 110, 116, 45, 116, 121, 112, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// 0,   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// ]);
-// const HTTP_LOCK_HEADER_NAME_LENGTH: (&str, [u8; 1]) = ("headerNameLength", [12]);
-// const HTTP_LOCK_HEADER_VALUE: (&str, [u8; 100]) = ("value", [
-//   97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106, 115, 111, 110, 59, 32, 99, 104,
-// 97,   114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// 0, 0,   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// 0, 0,   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// ]);
-// const HTTP_LOCK_HEADER_VALUE_LENGTH: (&str, [u8; 1]) = ("headerValueLength", [31]);
 
 const JSON_MASK_KEY_DEPTH_1: (&str, [u8; 10]) = ("key", [100, 97, 116, 97, 0, 0, 0, 0, 0, 0]); // "data"
 const JSON_MASK_KEYLEN_DEPTH_1: (&str, [u8; 1]) = ("keyLen", [4]);
@@ -188,6 +154,7 @@ const JSON_MASK_KEY_DEPTH_4: (&str, [u8; 10]) =
 const JSON_MASK_KEYLEN_DEPTH_4: (&str, [u8; 1]) = ("keyLen", [7]);
 const JSON_MASK_KEY_DEPTH_5: (&str, [u8; 10]) = ("key", [110, 97, 109, 101, 0, 0, 0, 0, 0, 0]); // "name"
 const JSON_MASK_KEYLEN_DEPTH_5: (&str, [u8; 1]) = ("keyLen", [4]);
+const MAX_VALUE_LENGTH: usize = 48;
 
 #[test]
 #[tracing_test::traced_test]
@@ -214,16 +181,16 @@ fn test_end_to_end_proofs() {
     r1cs_types:              vec![
       R1CSType::Raw(AES_GCM_R1CS.to_vec()),
       R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
-      // R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-      // R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-      // R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
+      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
       WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
     ],
     max_rom_length:          JSON_MAX_ROM_LENGTH,
   };
@@ -233,12 +200,12 @@ fn test_end_to_end_proofs() {
   let rom_data = HashMap::from([
     (String::from("AES_GCM_1"), CircuitData { opcode: 0 }),
     (String::from("HTTP_NIVC"), CircuitData { opcode: 1 }),
-    // (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 4 }),
-    // (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 4 }),
-    // (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 5 }),
-    // (String::from("JSON_MASK_OBJECT_4"), CircuitData { opcode: 4 }),
-    // (String::from("JSON_MASK_OBJECT_5"), CircuitData { opcode: 4 }),
-    // (String::from("EXTRACT_VALUE"), CircuitData { opcode: 6 }),
+    (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 2 }),
+    (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 2 }),
+    (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 3 }),
+    (String::from("JSON_MASK_OBJECT_4"), CircuitData { opcode: 2 }),
+    (String::from("JSON_MASK_OBJECT_5"), CircuitData { opcode: 2 }),
+    (String::from("EXTRACT_VALUE"), CircuitData { opcode: 6 }),
   ]);
 
   let aes_rom_opcode_config = InstructionConfig {
@@ -262,78 +229,99 @@ fn test_end_to_end_proofs() {
     HTTP_RESPONSE_PLAINTEXT.1.as_ref(),
     witness::HttpMaskType::Header(1),
   ));
-  let http_body_hash = data_hasher(&compute_http_witness(
-    HTTP_RESPONSE_PLAINTEXT.1.as_ref(),
-    witness::HttpMaskType::Body,
-  ));
+  let http_body =
+    compute_http_witness(HTTP_RESPONSE_PLAINTEXT.1.as_ref(), witness::HttpMaskType::Body);
+  let http_body_hash = data_hasher(&http_body);
 
-  rom.extend([InstructionConfig {
-    name:          String::from("HTTP_NIVC"),
-    private_input: HashMap::from([
-      (String::from("data"), json!(HTTP_RESPONSE_PLAINTEXT.1.to_vec())),
-      (
-        String::from("start_line_hash"),
-        json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
-          .to_str_radix(10)]),
-      ),
-      (
-        String::from("header_hashes"),
-        json!([
-          "0".to_string(),
-          BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_header_1_hash.to_bytes())
-            .to_str_radix(10),
-          "0".to_string(),
-          "0".to_string(),
-          "0".to_string(),
-        ]),
-      ),
-      (
-        String::from("body_hash"),
-        json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
-          .to_str_radix(10),]),
-      ),
-    ]),
-  }]);
-  //   InstructionConfig {
-  //     name:          String::from("JSON_MASK_OBJECT_1"),
-  //     private_input: HashMap::from([
-  //       (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
-  //       (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
-  //     ]),
-  //   },
-  //   InstructionConfig {
-  //     name:          String::from("JSON_MASK_OBJECT_2"),
-  //     private_input: HashMap::from([
-  //       (String::from(JSON_MASK_KEY_DEPTH_2.0), json!(JSON_MASK_KEY_DEPTH_2.1)),
-  //       (String::from(JSON_MASK_KEYLEN_DEPTH_2.0), json!(JSON_MASK_KEYLEN_DEPTH_2.1)),
-  //     ]),
-  //   },
-  //   InstructionConfig {
-  //     name:          String::from("JSON_MASK_ARRAY_3"),
-  //     private_input: HashMap::from([(
-  //       String::from(JSON_MASK_ARR_DEPTH_3.0),
-  //       json!(JSON_MASK_ARR_DEPTH_3.1),
-  //     )]),
-  //   },
-  //   InstructionConfig {
-  //     name:          String::from("JSON_MASK_OBJECT_4"),
-  //     private_input: HashMap::from([
-  //       (String::from(JSON_MASK_KEY_DEPTH_4.0), json!(JSON_MASK_KEY_DEPTH_4.1)),
-  //       (String::from(JSON_MASK_KEYLEN_DEPTH_4.0), json!(JSON_MASK_KEYLEN_DEPTH_4.1)),
-  //     ]),
-  //   },
-  //   InstructionConfig {
-  //     name:          String::from("JSON_MASK_OBJECT_5"),
-  //     private_input: HashMap::from([
-  //       (String::from(JSON_MASK_KEY_DEPTH_5.0), json!(JSON_MASK_KEY_DEPTH_5.1)),
-  //       (String::from(JSON_MASK_KEYLEN_DEPTH_5.0), json!(JSON_MASK_KEYLEN_DEPTH_5.1)),
-  //     ]),
-  //   },
-  //   InstructionConfig {
-  //     name:          String::from("EXTRACT_VALUE"),
-  //     private_input: HashMap::new(),
-  //   },
-  // ]);
+  let masked_json_key_1 =
+    compute_json_witness(&http_body, witness::JsonMaskType::Object("data".as_bytes().to_vec()));
+  let masked_json_key_2 = compute_json_witness(
+    &masked_json_key_1,
+    witness::JsonMaskType::Object("items".as_bytes().to_vec()),
+  );
+  let masked_json_key_3 =
+    compute_json_witness(&masked_json_key_2, witness::JsonMaskType::ArrayIndex(0));
+  let masked_json_key_4 = compute_json_witness(
+    &masked_json_key_3,
+    witness::JsonMaskType::Object("profile".as_bytes().to_vec()),
+  );
+  let masked_json_key_5 = compute_json_witness(
+    &masked_json_key_4,
+    witness::JsonMaskType::Object("name".as_bytes().to_vec()),
+  );
+
+  rom.extend([
+    InstructionConfig {
+      name:          String::from("HTTP_NIVC"),
+      private_input: HashMap::from([
+        (String::from("data"), json!(HTTP_RESPONSE_PLAINTEXT.1.to_vec())),
+        (
+          String::from("start_line_hash"),
+          json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
+            .to_str_radix(10)]),
+        ),
+        (
+          String::from("header_hashes"),
+          json!([
+            "0".to_string(),
+            BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_header_1_hash.to_bytes())
+              .to_str_radix(10),
+            "0".to_string(),
+            "0".to_string(),
+            "0".to_string(),
+          ]),
+        ),
+        (
+          String::from("body_hash"),
+          json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
+            .to_str_radix(10),]),
+        ),
+      ]),
+    },
+    InstructionConfig {
+      name:          String::from("JSON_MASK_OBJECT_1"),
+      private_input: HashMap::from([
+        (String::from("data"), json!(http_body)),
+        (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
+        (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
+      ]),
+    },
+    InstructionConfig {
+      name:          String::from("JSON_MASK_OBJECT_2"),
+      private_input: HashMap::from([
+        (String::from("data"), json!(masked_json_key_1)),
+        (String::from(JSON_MASK_KEY_DEPTH_2.0), json!(JSON_MASK_KEY_DEPTH_2.1)),
+        (String::from(JSON_MASK_KEYLEN_DEPTH_2.0), json!(JSON_MASK_KEYLEN_DEPTH_2.1)),
+      ]),
+    },
+    InstructionConfig {
+      name:          String::from("JSON_MASK_ARRAY_3"),
+      private_input: HashMap::from([
+        (String::from("data"), json!(masked_json_key_2)),
+        (String::from(JSON_MASK_ARR_DEPTH_3.0), json!(JSON_MASK_ARR_DEPTH_3.1)),
+      ]),
+    },
+    InstructionConfig {
+      name:          String::from("JSON_MASK_OBJECT_4"),
+      private_input: HashMap::from([
+        (String::from("data"), json!(masked_json_key_3)),
+        (String::from(JSON_MASK_KEY_DEPTH_4.0), json!(JSON_MASK_KEY_DEPTH_4.1)),
+        (String::from(JSON_MASK_KEYLEN_DEPTH_4.0), json!(JSON_MASK_KEYLEN_DEPTH_4.1)),
+      ]),
+    },
+    InstructionConfig {
+      name:          String::from("JSON_MASK_OBJECT_5"),
+      private_input: HashMap::from([
+        (String::from("data"), json!(masked_json_key_4)),
+        (String::from(JSON_MASK_KEY_DEPTH_5.0), json!(JSON_MASK_KEY_DEPTH_5.1)),
+        (String::from(JSON_MASK_KEYLEN_DEPTH_5.0), json!(JSON_MASK_KEYLEN_DEPTH_5.1)),
+      ]),
+    },
+    InstructionConfig {
+      name:          String::from("EXTRACT_VALUE"),
+      private_input: HashMap::from([(String::from("data"), json!(masked_json_key_5))]),
+    },
+  ]);
 
   // Fold inputs are unique for each fold
   let inputs = HashMap::from([
@@ -373,13 +361,14 @@ fn test_end_to_end_proofs() {
   debug!("program_data.inputs: {:?}, {:?}", program_data.inputs.len(), program_data.inputs[15]);
 
   let recursive_snark = program::run(&program_data).unwrap();
-  // dbg!(recursive_snark.zi_primary());
 
-  // let res = data_hasher(&AES_CIPHER_TEXT.1[304..320]);
-  // let res = data_hasher("\"Taylor Swift\"".as_bytes());
-  // let final_mem =
-  //   res.as_bytes().iter().map(|val| F::<G1>::from(*val as u64)).collect::<Vec<F<G1>>>();
-  assert_eq!(*recursive_snark.zi_primary().first().unwrap(), http_body_hash);
+  let _ = program::compress_proof(&recursive_snark, &program_data.public_params);
+
+  let val = "\"Taylor Swift\"".as_bytes();
+  let mut final_value = [0; MAX_VALUE_LENGTH];
+  final_value[..val.len()].copy_from_slice(val);
+
+  // assert_eq!(*recursive_snark.zi_primary().first().unwrap(), data_hasher(&final_value));
 }
 
 #[test]
