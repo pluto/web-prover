@@ -135,10 +135,6 @@ async fn generate_program_data(
     ]),
   })]);
 
-  let mut initial_input = vec![];
-  initial_input.extend(janky_plaintext_padding.iter());
-  initial_input.resize(TOTAL_BYTES_ACROSS_NIVC, 0);
-  let final_input: Vec<u64> = initial_input.into_iter().map(u64::from).collect();
   // ----------------------------------------------------------------------------------------------------------------------- //
 
   debug!("Setting up `PublicParams`... (this may take a moment)");
@@ -151,7 +147,7 @@ async fn generate_program_data(
       setup_data,
       rom,
       rom_data,
-      initial_nivc_input: final_input.to_vec(),
+      initial_nivc_input: vec![proofs::F::<G1>::from(0)],
       inputs,
       witnesses: vec![vec![F::<G1>::from(0)]],
     }
