@@ -64,7 +64,6 @@ const EXTRACT_VALUE_GRAPH: &[u8] =
 const BYTES_PER_FOLD: usize = 16;
 const AES_BYTES: [u8; 50] = [0; 50];
 
-
 // HTTP/1.1 200 OK
 // content-type: application/json; charset=utf-8
 // content-encoding: gzip
@@ -190,8 +189,6 @@ const JSON_MASK_KEYLEN_DEPTH_4: (&str, [u8; 1]) = ("keyLen", [7]);
 const JSON_MASK_KEY_DEPTH_5: (&str, [u8; 10]) = ("key", [110, 97, 109, 101, 0, 0, 0, 0, 0, 0]); // "name"
 const JSON_MASK_KEYLEN_DEPTH_5: (&str, [u8; 1]) = ("keyLen", [4]);
 
-const TOTAL_BYTES_ACROSS_NIVC: usize = 512 + 4;
-
 #[test]
 #[tracing_test::traced_test]
 fn test_end_to_end_proofs() {
@@ -222,20 +219,11 @@ fn test_end_to_end_proofs() {
       // R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      // WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
-      WitnessGeneratorType::Wasm {
-        path:      "web_proof_circuits/target_512b/aes_gctr_nivc_512b_js/aes_gctr_nivc_512b.wasm"
-          .to_string(),
-        wtns_path: String::from("aes.wtns"),
-      },
+      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
       // WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
       // WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
       // WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
-      WitnessGeneratorType::Wasm {
-        path:      "web_proof_circuits/target_512b/http_nivc_512b_js/http_nivc_512b.wasm"
-          .to_string(),
-        wtns_path: String::from("http.wtns"),
-      },
     ],
     max_rom_length:          JSON_MAX_ROM_LENGTH,
   };
@@ -283,9 +271,27 @@ fn test_end_to_end_proofs() {
     name:          String::from("HTTP_NIVC"),
     private_input: HashMap::from([
       (String::from("data"), json!(HTTP_RESPONSE_PLAINTEXT.1.to_vec())),
-      (String::from("start_line_hash"), json!(http_start_line_hash)),
-      (String::from("header_hashes"), json!([0, http_header_1_hash, 0, 0, 0])),
-      (String::from("body_hash"), json!(http_body_hash)),
+      (
+        String::from("start_line_hash"),
+        json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
+          .to_str_radix(10)]),
+      ),
+      (
+        String::from("header_hashes"),
+        json!([
+          "0".to_string(),
+          BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_header_1_hash.to_bytes())
+            .to_str_radix(10),
+          "0".to_string(),
+          "0".to_string(),
+          "0".to_string(),
+        ]),
+      ),
+      (
+        String::from("body_hash"),
+        json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
+          .to_str_radix(10),]),
+      ),
     ]),
   }]);
   //   InstructionConfig {
@@ -373,10 +379,7 @@ fn test_end_to_end_proofs() {
   // let res = data_hasher("\"Taylor Swift\"".as_bytes());
   // let final_mem =
   //   res.as_bytes().iter().map(|val| F::<G1>::from(*val as u64)).collect::<Vec<F<G1>>>();
-  assert_eq!(
-    *recursive_snark.zi_primary().first().unwrap(),
-    http_body_hash
-  );
+  assert_eq!(*recursive_snark.zi_primary().first().unwrap(), http_body_hash);
 }
 
 #[test]
