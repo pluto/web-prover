@@ -28,7 +28,7 @@ use crate::{
   circuits::*, config, config::ProvingData, errors, errors::ClientErrors, origo::SignBody, Proof,
 };
 
-const JSON_MAX_ROM_LENGTH: usize = 35;
+const JSON_MAX_ROM_LENGTH: usize = 40;
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
@@ -81,18 +81,20 @@ async fn generate_program_data(
   let setup_data = SetupData {
     r1cs_types:              vec![
       R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
+      // R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
+      // R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
+      // R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
       WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
@@ -109,25 +111,28 @@ async fn generate_program_data(
   private_input.insert("iv".to_string(), serde_json::to_value(&iv)?);
 
   // TODO: Is padding the approach we want or change to support variable length?
-  let janky_padding = if pt.len() % 16 != 0 { 16 - pt.len() % 16 } else { 0 };
+  // let janky_padding = if pt.len() % 16 != 0 { 16 - pt.len() % 16 } else { 0 };
+  let janky_padding = pt.len().next_power_of_two() - pt.len();
   let mut janky_plaintext_padding = vec![0; janky_padding];
   let rom_len = (pt.len() + janky_padding) / 16;
   janky_plaintext_padding.extend(pt);
 
-  let (rom_data, rom) = proving.manifest.unwrap().rom_from_request(
-    &key,
-    &iv,
-    &padded_aad,
-    janky_plaintext_padding.len(),
-  );
+  let (rom_data, rom) = proving.manifest.unwrap().rom_from_request(&key, &iv, &padded_aad, 512);
   let aes_instr = String::from("AES_GCM_1");
 
   // TODO (Sambhav): update fold input from manifest
   let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
-    value: HashMap::from([(
-      String::from("plainText"),
-      janky_plaintext_padding.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-    )]),
+    value: HashMap::from([
+      (
+        String::from("plainText"),
+        janky_plaintext_padding.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
+      ),
+      (String::from("cipherText"), ct.iter().map(|val| json!(val)).collect::<Vec<Value>>()),
+      (
+        String::from(AES_COUNTER.0),
+        AES_COUNTER.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
+      ),
+    ]),
   })]);
 
   let mut initial_input = vec![];
