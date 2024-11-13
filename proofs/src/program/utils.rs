@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use bellpepper_core::{
   boolean::{AllocatedBit, Boolean},
   LinearCombination,
