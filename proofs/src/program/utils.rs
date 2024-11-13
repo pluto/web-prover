@@ -134,16 +134,16 @@ pub fn into_input_json(
   Ok(serde_json::to_string(&mapped_inputs)?)
 }
 
-pub fn remap_inputs(input_json: &str) -> Result<Vec<(String, Vec<BigInt>)>, ProofError> {
+pub fn remap_inputs(input_json: &str) -> Result<HashMap<String, Vec<String>>, ProofError> {
   let circom_input: CircomInput = serde_json::from_str(input_json)?;
-  let mut remapped = vec![];
+  let mut remapped = HashMap::new();
 
-  let step_in_values: Result<Vec<BigInt>, _> = circom_input
+  let step_in_values: Vec<String> = circom_input
     .step_in
-    .into_iter()
-    .map(|s| BigInt::from_str(&s).map_err(ProofError::from))
+    .iter()
+    .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.clone().into_bytes()).to_str_radix(10))
     .collect();
-  remapped.push(("step_in".to_string(), step_in_values?));
+  remapped.insert("step_in".to_string(), step_in_values);
 
   for (k, v) in circom_input.extra {
     let val = v
@@ -152,19 +152,15 @@ pub fn remap_inputs(input_json: &str) -> Result<Vec<(String, Vec<BigInt>)>, Proo
       .iter()
       .map(|x| {
         let x = match x {
-          Value::String(num) => BigInt::from_str(num).map_err(ProofError::from),
-          Value::Number(num) => Ok(BigInt::from(num.as_u64().unwrap())),
-          _ => Err(ProofError::Other(format!("Expect string or number, got: {:?}", x))),
+          Value::String(num) => BigInt::from_bytes_le(num_bigint::Sign::Plus, &num.clone().into_bytes()).to_str_radix(10),
+          Value::Number(num) => BigInt::from_bytes_le(num_bigint::Sign::Plus, &num.as_u64().unwrap().to_le_bytes()).to_str_radix(10),
+          _ => return Err(ProofError::Other(format!("Expect string or number, got: {:?}", x))),
         };
-        // dbg!(&x);
-        x
-        // x.as_str()
-        //   .ok_or_else(|| ProofError::Other(format!("Expected string for key {}", k)))
-        //   .and_then(|s| BigInt::from_str(s).map_err(ProofError::from))
+        Ok(x)
       })
-      .collect::<Result<Vec<BigInt>, ProofError>>()?;
+      .collect::<Result<Vec<String>, ProofError>>()?;
     dbg!(&k, &val);
-    remapped.push((k, val));
+    remapped.insert(k, val);
   }
 
   Ok(remapped)

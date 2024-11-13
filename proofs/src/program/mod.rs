@@ -167,6 +167,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
             ProofError::Other(format!("private_input not found for op_code {}", op_code))
           })?;
         let in_json = into_input_json(nivc_io, private_input)?;
+        dbg!(&in_json);
         let witness = generate_witness_from_generator_type(&in_json, &wit_type)?;
         Some(witness)
       };
