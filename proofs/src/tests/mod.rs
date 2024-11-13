@@ -368,7 +368,7 @@ fn test_end_to_end_proofs() {
   let mut final_value = [0; MAX_VALUE_LENGTH];
   final_value[..val.len()].copy_from_slice(val);
 
-  // assert_eq!(*recursive_snark.zi_primary().first().unwrap(), data_hasher(&final_value));
+  assert_eq!(*recursive_snark.zi_primary().first().unwrap(), data_hasher(&final_value));
 }
 
 #[test]

@@ -12,7 +12,6 @@ use ff::Field;
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-#[cfg(feature = "timing")] use tracing::trace;
 use tracing::{debug, error, info};
 
 use crate::{
