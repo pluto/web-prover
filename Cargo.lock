@@ -3259,6 +3259,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "light-poseidon"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c9a85a9752c549ceb7578064b4ed891179d20acd85f27318573b64d2d7ee7ee"
+dependencies = [
+ "ark-bn254",
+ "ark-ff 0.4.2",
+ "num-bigint 0.4.6",
+ "thiserror",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4404,6 +4416,7 @@ name = "proofs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ark-bn254",
  "bellpepper-core",
  "bincode",
  "byteorder",
@@ -4414,6 +4427,7 @@ dependencies = [
  "flate2",
  "halo2curves",
  "itertools 0.13.0",
+ "light-poseidon",
  "num-bigint 0.4.6",
  "num-traits",
  "paste",

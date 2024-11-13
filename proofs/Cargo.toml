@@ -36,6 +36,10 @@ flate2 ="1.0"
 
 thiserror = "1.0"
 
+# Poseidon hashing
+light-poseidon="0.2.0"
+ark-bn254     ="=0.4.0"
+
 [dev-dependencies]
 tracing-test="0.2.5"
 
