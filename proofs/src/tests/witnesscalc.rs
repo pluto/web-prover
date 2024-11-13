@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use halo2curves::bn256::Fr;
 use program::data::Expanded;
 use serde_json::json;
 
@@ -66,7 +67,7 @@ fn run_entry(
     setup_data,
     rom_data,
     rom,
-    initial_nivc_input: INIT_PUBLIC_INPUT.to_vec(),
+    initial_nivc_input: vec![Fr::from(1), Fr::from(2)],
     inputs: HashMap::new(),
     witnesses: vec![],
   }
@@ -127,11 +128,11 @@ fn test_run_serialized_verify() {
 
   // Extend the initial state input with the ROM (happens internally inside of `program::run`, so
   // we do it out here just for the test)
-  let mut z0_primary = INIT_PUBLIC_INPUT.to_vec();
-  z0_primary.push(0);
-  let mut rom = ROM.to_vec();
-  rom.resize(MAX_ROM_LENGTH, u64::MAX);
-  z0_primary.extend(rom.iter());
+  let mut z0_primary = vec![Fr::ONE, Fr::from(2)];
+  z0_primary.push(Fr::zero());
+  let mut rom = [Fr::ZERO, Fr::ONE, Fr::from(2), Fr::ZERO, Fr::ONE, Fr::from(2)];
+  // rom.resize(MAX_ROM_LENGTH, u64::MAX);
+  z0_primary.extend_from_slice(&rom);
 
   // Check that it verifies with offlined `PublicParams` regenerated pkey vkey
   let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
