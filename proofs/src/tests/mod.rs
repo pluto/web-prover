@@ -28,7 +28,7 @@ const MAX_ROM_LENGTH: usize = 10;
 
 // -----------------------------------------------------------------------------------------------
 // JSON Proof Material
-const JSON_MAX_ROM_LENGTH: usize = 35;
+const JSON_MAX_ROM_LENGTH: usize = 40;
 
 // Circuit 0
 const AES_GCM_R1CS: &[u8] =
@@ -205,7 +205,7 @@ fn test_end_to_end_proofs() {
     (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 3 }),
     (String::from("JSON_MASK_OBJECT_4"), CircuitData { opcode: 2 }),
     (String::from("JSON_MASK_OBJECT_5"), CircuitData { opcode: 2 }),
-    (String::from("EXTRACT_VALUE"), CircuitData { opcode: 6 }),
+    (String::from("EXTRACT_VALUE"), CircuitData { opcode: 4 }),
   ]);
 
   let aes_rom_opcode_config = InstructionConfig {
