@@ -128,7 +128,10 @@ pub fn into_input_json(
     .collect();
 
   let input = CircomInput { step_in: decimal_stringified_input, extra: private_input.clone() };
-  Ok(serde_json::to_string(&input)?)
+  let input_str = serde_json::to_string(&input)?;
+  // TODO (Sambhav): change this conversion of string back and forth
+  let mapped_inputs = remap_inputs(&input_str)?;
+  Ok(serde_json::to_string(&mapped_inputs)?)
 }
 
 pub fn remap_inputs(input_json: &str) -> Result<Vec<(String, Vec<BigInt>)>, ProofError> {
@@ -148,11 +151,19 @@ pub fn remap_inputs(input_json: &str) -> Result<Vec<(String, Vec<BigInt>)>, Proo
       .ok_or_else(|| ProofError::Other(format!("Expected array for key {}", k)))?
       .iter()
       .map(|x| {
-        x.as_str()
-          .ok_or_else(|| ProofError::Other(format!("Expected string for key {}", k)))
-          .and_then(|s| BigInt::from_str(s).map_err(ProofError::from))
+        let x = match x {
+          Value::String(num) => BigInt::from_str(num).map_err(ProofError::from),
+          Value::Number(num) => Ok(BigInt::from(num.as_u64().unwrap())),
+          _ => Err(ProofError::Other(format!("Expect string or number, got: {:?}", x))),
+        };
+        // dbg!(&x);
+        x
+        // x.as_str()
+        //   .ok_or_else(|| ProofError::Other(format!("Expected string for key {}", k)))
+        //   .and_then(|s| BigInt::from_str(s).map_err(ProofError::from))
       })
       .collect::<Result<Vec<BigInt>, ProofError>>()?;
+    dbg!(&k, &val);
     remapped.push((k, val));
   }
 

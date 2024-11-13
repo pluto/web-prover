@@ -5,6 +5,7 @@
 use client_side_prover::supernova::RecursiveSNARK;
 use program::data::{self, CircuitData, InstructionConfig};
 use serde_json::json;
+use witness::compute_http_witness;
 
 use super::*;
 use crate::{
@@ -177,17 +178,22 @@ fn test_end_to_end_proofs() {
   let setup_data = SetupData {
     r1cs_types:              vec![
       R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      // R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
-
+      R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
       // R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
       // R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
       // R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
+      WitnessGeneratorType::Wasm {
+        path:      "web_proof_circuits/target_512b/aes_gctr_nivc_512b_js/aes_gctr_nivc_512b.wasm"
+          .to_string(),
+        wtns_path: String::from("aes.wtns"),
+      },
       // WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
       // WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
       // WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
     ],
     max_rom_length:          JSON_MAX_ROM_LENGTH,
   };
@@ -196,9 +202,7 @@ fn test_end_to_end_proofs() {
   debug!("Creating ROM");
   let rom_data = HashMap::from([
     (String::from("AES_GCM_1"), CircuitData { opcode: 0 }),
-    // (String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 1 }),
-    // (String::from("HTTP_LOCK_HEADER_1"), CircuitData { opcode: 2 }),
-    // (String::from("HTTP_BODY_MASK"), CircuitData { opcode: 3 }),
+    (String::from("HTTP_NIVC"), CircuitData { opcode: 1 }),
     // (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 4 }),
     // (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 4 }),
     // (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 5 }),
@@ -217,11 +221,30 @@ fn test_end_to_end_proofs() {
   };
 
   debug!("Creating `private_inputs`...");
+
   let mut rom = vec![aes_rom_opcode_config; HTTP_RESPONSE_PLAINTEXT.1.len() / BYTES_PER_FOLD];
+
+  let http_start_line_hash = data_hasher(&compute_http_witness(
+    HTTP_RESPONSE_PLAINTEXT.1.as_ref(),
+    witness::HttpMaskType::StartLine,
+  ));
+  let http_header_1_hash = data_hasher(&compute_http_witness(
+    HTTP_RESPONSE_PLAINTEXT.1.as_ref(),
+    witness::HttpMaskType::Header(1),
+  ));
+  let http_body_hash = data_hasher(&compute_http_witness(
+    HTTP_RESPONSE_PLAINTEXT.1.as_ref(),
+    witness::HttpMaskType::Body,
+  ));
   // rom.extend([
   //   InstructionConfig {
-  //     name:          String::from("HTTP_NIVC_1"),
-  //     private_input: HashMap::new(),
+  //     name:          String::from("HTTP_NIVC"),
+  //     private_input: HashMap::from([
+  //       (String::from("data"), json!(HTTP_RESPONSE_PLAINTEXT.1.to_vec())),
+  //       (String::from("start_line_hash"), json!(http_start_line_hash)),
+  //       (String::from("header_hashes"), json!([0, http_header_1_hash, 0, 0, 0])),
+  //       (String::from("body_hash"), json!(http_body_hash)),
+  //     ]),
   //   },
   //   InstructionConfig {
   //     name:          String::from("JSON_MASK_OBJECT_1"),
@@ -283,16 +306,9 @@ fn test_end_to_end_proofs() {
         ),
       ]),
     }),
-    // HTTP_NIVC_1 Inputs
-    // (String::from("HTTP_NIVC_1"), FoldInput {
-    //   value: HashMap::from([(
-    //     String::from(HTTP_RESPONSE_PLAINTEXT.0),
-    //     HTTP_RESPONSE_PLAINTEXT.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-    //   )]),
-    // }),
   ]);
 
-  let mut initial_nivc_input = vec![data_hasher(&HTTP_RESPONSE_PLAINTEXT.1)];
+  let initial_nivc_input = vec![data_hasher(&HTTP_RESPONSE_PLAINTEXT.1)];
   // let initial_nivc_input = initial_nivc_input.into_iter().map(u64::from).collect();
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
@@ -310,12 +326,12 @@ fn test_end_to_end_proofs() {
   let recursive_snark = program::run(&program_data).unwrap();
   // dbg!(recursive_snark.zi_primary());
 
-  let res = data_hasher(&AES_CIPHER_TEXT.1[304..320]);
+  // let res = data_hasher(&AES_CIPHER_TEXT.1[304..320]);
   // let res = data_hasher("\"Taylor Swift\"".as_bytes());
   // let final_mem =
   //   res.as_bytes().iter().map(|val| F::<G1>::from(*val as u64)).collect::<Vec<F<G1>>>();
 
-  assert_eq!(*recursive_snark.zi_primary().first().unwrap(), res); //
+  assert_eq!(*recursive_snark.zi_primary().first().unwrap(), http_body_hash); //
 }
 
 #[test]
