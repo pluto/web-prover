@@ -178,45 +178,51 @@ pub fn data_hasher(preimage: &[u8]) -> F<G1> {
   hash_val
 }
 
+use generic_array::typenum::U2;
 use neptune::{
-  hash_type::HashType, poseidon::PoseidonConstants, Poseidon as PoseidonNeptune, Strength,
+  hash_type::HashType,
+  poseidon::{self, PoseidonConstants},
+  Poseidon as PoseidonNeptune, Strength,
 };
 
-pub struct CircomPoseidon<'a> {
-  poseidon: PoseidonNeptune<'a, F<G1>>,
-}
+pub fn poseidon_chainer_neptune(preimage: &[F<G1>]) -> F<G1> {
+  let width = 3;
+  let full_rounds = 8;
+  let partial_rounds = 57;
 
-impl<'a> CircomPoseidon<'a> {
-  pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-    // width: usize
-    // let partial_round_selection = [56, 57, 56, 60, 60, 63, 64, 63, 60, 66, 60, 65, 70, 60, 64,
-    // 68]; let partial_rounds = partial_round_selection[width - 2];
-    let full_rounds = 8;
-    let constants = PoseidonConstants::new_from_parameters(
-      2,
-      vec![vec![]],
-      vec![],
-      full_rounds,
-      56,
-      HashType::Sponge,
-      Strength::Standard,
-    );
+  let total_constants = width * (full_rounds + partial_rounds);
+  let mut round_constants = Vec::with_capacity(total_constants);
 
-    Ok(Self { poseidon: PoseidonNeptune::new(&constants) })
+  let constants = &*constants::POSEIDON_CONSTANTS;
+  let matrix = &*constants::POSEIDON_MATRIX;
+
+  // Instead of padding with zeros, cycle through constants
+  for i in 0..total_constants {
+    round_constants.push(constants[i % constants.len()]);
   }
 
-  pub fn hash(&mut self, preimage: &[F<G1>]) -> Result<F<G1>, Box<dyn std::error::Error>> {
-    self.poseidon.set_preimage(preimage);
-    let hash = self.poseidon.hash();
-    Ok(hash)
-  }
+  let constants = PoseidonConstants::new_from_parameters(
+    width,
+    matrix.clone(),
+    round_constants,
+    full_rounds,
+    partial_rounds,
+    HashType::Sponge,
+    Strength::Standard,
+  );
+
+  let mut poseidon = PoseidonNeptune::<F<G1>, U2>::new(&constants); // Changed to U3 for width=3
+  dbg!(poseidon.elements);
+  poseidon.set_preimage(preimage);
+  dbg!(poseidon.elements);
+  poseidon.hash()
 }
 
 // Updated chainer function
-pub fn poseidon_chainer_neptune(preimage: &[F<G1>]) -> Result<F<G1>, Box<dyn std::error::Error>> {
-  let mut poseidon = CircomPoseidon::new()?;
-  poseidon.hash(preimage)
-}
+// pub fn poseidon_chainer_neptune(preimage: &[F<G1>]) -> Result<F<G1>, Box<dyn std::error::Error>>
+// {   let mut poseidon = CircomPoseidon::new()?;
+//   poseidon.hash(preimage)
+// }
 
 #[cfg(test)]
 mod tests {
@@ -332,6 +338,22 @@ mod tests {
     ]);
 
     let hash = poseidon_chainer(&[F::<G1>::from(69), F::<G1>::from(420)]);
+    assert_eq!(hash.to_bytes(), [
+      10, 230, 247, 95, 9, 23, 36, 117, 25, 37, 98, 141, 178, 220, 241, 100, 187, 169, 126, 226,
+      80, 175, 17, 100, 232, 1, 29, 0, 165, 144, 139, 2,
+    ]);
+  }
+
+  #[test]
+  fn test_poseidon_neptune() {
+    // let hash = poseidon_chainer(&[bytepack(&[0]), bytepack(&[0])]);
+    let hash = poseidon_chainer_neptune(&[F::<G1>::from(0), F::<G1>::from(0)]);
+    assert_eq!(hash.to_bytes(), [
+      100, 72, 182, 70, 132, 238, 57, 168, 35, 213, 254, 95, 213, 36, 49, 220, 129, 228, 129, 123,
+      242, 195, 234, 60, 171, 158, 35, 158, 251, 245, 152, 32
+    ]);
+
+    let hash = poseidon_chainer_neptune(&[F::<G1>::from(69), F::<G1>::from(420)]);
     assert_eq!(hash.to_bytes(), [
       10, 230, 247, 95, 9, 23, 36, 117, 25, 37, 98, 141, 178, 220, 241, 100, 187, 169, 126, 226,
       80, 175, 17, 100, 232, 1, 29, 0, 165, 144, 139, 2,
