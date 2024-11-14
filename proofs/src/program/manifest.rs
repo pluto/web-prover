@@ -19,10 +19,14 @@
 
 use std::collections::HashMap;
 
+use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::program::data::{CircuitData, InstructionConfig};
+use crate::{
+  program::data::{CircuitData, InstructionConfig},
+  witness::{compute_http_header_witness, compute_http_witness, data_hasher},
+};
 
 /// JSON key required to extract particular value from response
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -112,6 +116,7 @@ impl Manifest {
     aes_key: &[u8],
     aes_iv: &[u8],
     aes_aad: &[u8],
+    plaintext: &[u8],
     plaintext_len: usize,
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>) {
     assert_eq!(plaintext_len % AES_INPUT_LENGTH, 0);
@@ -134,58 +139,38 @@ impl Manifest {
 
     // TODO(Sambhav): find a better way to prevent this code duplication for request and response
     // pad http parse circuit input signals
-    let mut http_parse_beginning_padded = [0u8; HTTP_BEGINNING_MAX_LENGTH];
-    http_parse_beginning_padded[..self.request.method.len()]
-      .copy_from_slice(self.request.method.as_bytes());
-    let mut http_parse_middle_padded = [0u8; HTTP_MIDDLE_MAX_LENGTH];
-    http_parse_middle_padded[..self.request.url.len()].copy_from_slice(self.request.url.as_bytes());
-    let mut http_parse_final_padded = [0u8; HTTP_FINAL_MAX_LENGTH];
-    http_parse_final_padded[..self.request.version.len()]
-      .copy_from_slice(self.request.version.as_bytes());
+    let http_start_line_hash =
+      data_hasher(&compute_http_witness(plaintext, crate::witness::HttpMaskType::StartLine));
+    let mut http_header_hashes = vec!["0".to_string(); 5];
+    for header_name in self.request.headers.keys() {
+      let (index, masked_header) = compute_http_header_witness(plaintext, header_name.as_bytes());
+      http_header_hashes[index - 1] =
+        BigInt::from_bytes_le(num_bigint::Sign::Plus, &data_hasher(&masked_header).to_bytes())
+          .to_str_radix(10);
+    }
+
+    let http_body = compute_http_witness(plaintext, crate::witness::HttpMaskType::Body);
+    let http_body_hash = data_hasher(&http_body);
 
     // initialise rom data and rom
-    rom_data.insert(String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 1 });
+    rom_data.insert(String::from("HTTP_NIVC"), CircuitData { opcode: 1 });
     rom.push(InstructionConfig {
-      name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
+      name:          String::from("HTTP_NIVC"),
       private_input: HashMap::from([
+        (String::from("data"), json!(plaintext.to_vec())),
         (
-          String::from(HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING),
-          json!(http_parse_beginning_padded.to_vec()),
+          String::from("start_line_hash"),
+          json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
+            .to_str_radix(10)]),
         ),
-        (String::from(HTTP_BEGINNING_LENGTH_SIGNAL), json!([self.request.method.len()])),
-        // TODO: check how to enter correct url here
+        (String::from("header_hashes"), json!(http_header_hashes)),
         (
-          String::from(HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE),
-          json!(http_parse_middle_padded.to_vec()),
+          String::from("body_hash"),
+          json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
+            .to_str_radix(10),]),
         ),
-        (String::from(HTTP_MIDDLE_LENGTH_SIGNAL), json!([self.request.url.len()])),
-        (
-          String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL),
-          json!(http_parse_final_padded.to_vec()),
-        ),
-        (String::from(HTTP_FINAL_LENGTH_SIGNAL), json!([self.request.version.len()])),
       ]),
     });
-
-    // headers
-    for (i, (header_name, header_value)) in self.request.headers.iter().enumerate() {
-      // pad name and value with zeroes
-      let mut header_name_padded = [0u8; HTTP_HEADER_MAX_NAME_LENGTH];
-      header_name_padded[..header_name.len()].copy_from_slice(header_name.as_bytes());
-      // chore: vec here because serde doesn't support array > 32 in stable. Need const generics.
-      let mut header_value_padded = [0u8; HTTP_HEADER_MAX_VALUE_LENGTH];
-      header_value_padded[..header_value.len()].copy_from_slice(header_value.as_bytes());
-
-      let name = format!("HTTP_LOCK_HEADER_{}", i + 1);
-      rom_data.insert(name.clone(), CircuitData { opcode: 2 });
-      rom.push(InstructionConfig {
-        name,
-        private_input: HashMap::from([
-          (String::from(HTTP_HEADER_SIGNAL_NAME), json!(header_name_padded.to_vec())),
-          (String::from(HTTP_HEADER_SIGNAL_VALUE), json!(header_value_padded.to_vec())),
-        ]),
-      });
-    }
 
     (rom_data, rom)
   }
@@ -325,6 +310,12 @@ mod tests {
     ("key", [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49]);
   const AES_IV: (&str, [u8; 12]) = ("iv", [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49]);
   const AES_AAD: (&str, [u8; 16]) = ("aad", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  const TEST_MANIFEST_REQUEST: &str = r#"GET https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json HTTP/1.1
+host: gist.githubusercontent.com
+accept-encoding: identity
+connection: close
+accept: */*
+"#;
   const TEST_MANIFEST: &str = r#"
   {
       "manifestVersion": "1",
@@ -335,10 +326,10 @@ mod tests {
       "request": {
           "method": "GET",
           "version": "HTTP/1.1",
-          "url": "https://api.reddit.com/users/<userId>?query=foo",
+          "url": "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json",
           "headers": {
-              "Content-Type": "application/json",
-              "Authentication": "Bearer <% token %>"
+              "host": "gist.githubusercontent.com",
+              "connection": "close"
           },
           "body": {
               "userId": "<% userId %>"
@@ -383,8 +374,13 @@ mod tests {
     let plaintext_len = 16;
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
-    let (rom_data, rom) =
-      manifest.rom_from_request(&AES_KEY.1, &AES_IV.1, &AES_AAD.1, plaintext_len);
+    let (rom_data, rom) = manifest.rom_from_request(
+      &AES_KEY.1,
+      &AES_IV.1,
+      &AES_AAD.1,
+      TEST_MANIFEST_REQUEST.as_bytes(),
+      plaintext_len,
+    );
 
     // AES + HTTP parse + HTTP headers length
     assert_eq!(rom_data.len(), 1 + 1 + manifest.request.headers.len());
