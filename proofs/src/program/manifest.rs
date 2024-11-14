@@ -25,7 +25,7 @@ use serde_json::json;
 
 use crate::{
   program::data::{CircuitData, InstructionConfig},
-  witness::{compute_http_header_witness, compute_http_witness, data_hasher},
+  witness::{compute_http_header_witness, compute_http_witness, compute_json_witness, data_hasher},
 };
 
 /// JSON key required to extract particular value from response
@@ -138,13 +138,13 @@ impl Manifest {
     let mut rom = vec![aes_rom_opcode_config; plaintext_len / AES_INPUT_LENGTH];
 
     // TODO(Sambhav): find a better way to prevent this code duplication for request and response
-    // pad http parse circuit input signals
+    // compute hashes http start line and headers signals
     let http_start_line_hash =
       data_hasher(&compute_http_witness(plaintext, crate::witness::HttpMaskType::StartLine));
     let mut http_header_hashes = vec!["0".to_string(); 5];
     for header_name in self.request.headers.keys() {
       let (index, masked_header) = compute_http_header_witness(plaintext, header_name.as_bytes());
-      http_header_hashes[index - 1] =
+      http_header_hashes[index] =
         BigInt::from_bytes_le(num_bigint::Sign::Plus, &data_hasher(&masked_header).to_bytes())
           .to_str_radix(10);
     }
@@ -181,6 +181,7 @@ impl Manifest {
     aes_key: [u8; 16],
     aes_iv: [u8; 12],
     aes_aad: [u8; 16],
+    plaintext: &[u8],
     plaintext_len: usize,
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>) {
     assert_eq!(plaintext_len % AES_INPUT_LENGTH, 0);
@@ -202,100 +203,81 @@ impl Manifest {
     };
     let mut rom = vec![aes_rom_opcode_config; plaintext_len / AES_INPUT_LENGTH];
 
-    // pad http parse circuit input signals
-    let mut http_parse_beginning_padded = [0u8; HTTP_BEGINNING_MAX_LENGTH];
-    http_parse_beginning_padded[..self.response.version.len()]
-      .copy_from_slice(self.request.version.as_bytes());
-    let mut http_parse_middle_padded = [0u8; HTTP_MIDDLE_MAX_LENGTH];
-    http_parse_middle_padded[..self.response.status.len()]
-      .copy_from_slice(self.response.status.as_bytes());
-    let mut http_parse_final_padded = [0u8; HTTP_FINAL_MAX_LENGTH];
-    http_parse_final_padded[..self.response.message.len()]
-      .copy_from_slice(self.response.message.as_bytes());
+    // compute hashes http start line and headers signals
+    let http_start_line_hash =
+      data_hasher(&compute_http_witness(plaintext, crate::witness::HttpMaskType::StartLine));
+    let mut http_header_hashes = vec!["0".to_string(); 5];
+    for header_name in self.request.headers.keys() {
+      let (index, masked_header) = compute_http_header_witness(plaintext, header_name.as_bytes());
+      http_header_hashes[index] =
+        BigInt::from_bytes_le(num_bigint::Sign::Plus, &data_hasher(&masked_header).to_bytes())
+          .to_str_radix(10);
+    }
+    let http_body = compute_http_witness(plaintext, crate::witness::HttpMaskType::Body);
+    let http_body_hash = data_hasher(&http_body);
 
     // http parse
-    rom_data.insert(String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 1 });
+    rom_data.insert(String::from("HTTP_NIVC"), CircuitData { opcode: 1 });
     rom.push(InstructionConfig {
-      name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
+      name:          String::from("HTTP_NIVC"),
       private_input: HashMap::from([
+        (String::from("data"), json!(plaintext.to_vec())),
         (
-          String::from(HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING),
-          json!(http_parse_beginning_padded.to_vec()),
+          String::from("start_line_hash"),
+          json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
+            .to_str_radix(10)]),
         ),
-        (String::from(HTTP_BEGINNING_LENGTH_SIGNAL), json!([self.response.version.len()])),
+        (String::from("header_hashes"), json!(http_header_hashes)),
         (
-          String::from(HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE),
-          json!(http_parse_middle_padded.to_vec()),
+          String::from("body_hash"),
+          json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
+            .to_str_radix(10),]),
         ),
-        (String::from(HTTP_MIDDLE_LENGTH_SIGNAL), json!([self.response.status.len()])),
-        (
-          String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL),
-          json!(http_parse_final_padded.to_vec()),
-        ),
-        (String::from(HTTP_FINAL_LENGTH_SIGNAL), json!([self.response.message.len()])),
       ]),
     });
 
-    // headers
-    for (i, (header_name, header_value)) in self.response.headers.iter().enumerate() {
-      // pad name and value with zeroes
-      let mut header_name_padded = [0u8; HTTP_HEADER_MAX_NAME_LENGTH];
-      header_name_padded[..header_name.len()].copy_from_slice(header_name.as_bytes());
-      let mut header_value_padded = [0u8; HTTP_HEADER_MAX_VALUE_LENGTH];
-      header_value_padded[..header_value.len()].copy_from_slice(header_value.as_bytes());
-
-      let name = format!("HTTP_LOCK_HEADER_{}", i + 1);
-      rom_data.insert(name.clone(), CircuitData { opcode: 2 });
-      rom.push(InstructionConfig {
-        name,
-        private_input: HashMap::from([
-          (String::from(HTTP_HEADER_SIGNAL_NAME), json!(header_name_padded.to_vec())),
-          (String::from(HTTP_HEADER_SIGNAL_VALUE), json!(header_value_padded.to_vec())),
-        ]),
-      });
-    }
-
-    // http body
-    rom_data.insert(String::from("HTTP_BODY_EXTRACT"), CircuitData { opcode: 3 });
-    rom.push(InstructionConfig {
-      name:          String::from("HTTP_BODY_EXTRACT"),
-      private_input: HashMap::new(),
-    });
-
     // json keys
+    let mut masked_body = http_body;
     for (i, key) in self.response.body.json.iter().enumerate() {
       match key {
         Key::String(json_key) => {
           // pad json key
           let mut json_key_padded = [0u8; JSON_MAX_KEY_LENGTH];
           json_key_padded[..json_key.len()].copy_from_slice(json_key.as_bytes());
-          rom_data.insert(format!("JSON_MASK_OBJECT_{}", i + 1), CircuitData { opcode: 4 });
+          rom_data.insert(format!("JSON_MASK_OBJECT_{}", i + 1), CircuitData { opcode: 2 });
           rom.push(InstructionConfig {
             name:          format!("JSON_MASK_OBJECT_{}", i + 1),
             private_input: HashMap::from([
+              (String::from("data"), json!(masked_body)),
               (String::from(JSON_MASK_OBJECT_KEY_NAME), json!(json_key_padded)),
               (String::from(JSON_MASK_OBJECT_KEYLEN_NAME), json!([json_key.len()])),
             ]),
           });
+          masked_body = compute_json_witness(
+            &masked_body,
+            crate::witness::JsonMaskType::Object(json_key.as_bytes().to_vec()),
+          );
         },
         Key::Num(index) => {
-          rom_data.insert(format!("JSON_MASK_ARRAY_{}", i + 1), CircuitData { opcode: 5 });
+          rom_data.insert(format!("JSON_MASK_ARRAY_{}", i + 1), CircuitData { opcode: 3 });
           rom.push(InstructionConfig {
             name:          format!("JSON_MASK_ARRAY_{}", i + 1),
-            private_input: HashMap::from([(
-              String::from(JSON_MASK_ARRAY_SIGNAL_NAME),
-              json!([index]),
-            )]),
+            private_input: HashMap::from([
+              (String::from("data"), json!(masked_body)),
+              (String::from(JSON_MASK_ARRAY_SIGNAL_NAME), json!([index])),
+            ]),
           });
+          masked_body =
+            compute_json_witness(&masked_body, crate::witness::JsonMaskType::ArrayIndex(*index))
         },
       }
     }
 
     // final extraction
-    rom_data.insert(String::from("EXTRACT_VALUE"), CircuitData { opcode: 6 });
+    rom_data.insert(String::from("EXTRACT_VALUE"), CircuitData { opcode: 4 });
     rom.push(InstructionConfig {
       name:          String::from("EXTRACT_VALUE"),
-      private_input: HashMap::new(),
+      private_input: HashMap::from([(String::from("data"), json!(masked_body))]),
     });
 
     (rom_data, rom)
@@ -310,12 +292,37 @@ mod tests {
     ("key", [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49]);
   const AES_IV: (&str, [u8; 12]) = ("iv", [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49]);
   const AES_AAD: (&str, [u8; 16]) = ("aad", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-  const TEST_MANIFEST_REQUEST: &str = r#"GET https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json HTTP/1.1
-host: gist.githubusercontent.com
-accept-encoding: identity
-connection: close
-accept: */*
-"#;
+  const TEST_MANIFEST_REQUEST: &[u8] = &[
+    71, 69, 84, 32, 104, 116, 116, 112, 115, 58, 47, 47, 103, 105, 115, 116, 46, 103, 105, 116,
+    104, 117, 98, 117, 115, 101, 114, 99, 111, 110, 116, 101, 110, 116, 46, 99, 111, 109, 47, 109,
+    97, 116, 116, 101, 115, 47, 50, 51, 101, 54, 52, 102, 97, 97, 100, 98, 53, 102, 100, 52, 98,
+    53, 49, 49, 50, 102, 51, 55, 57, 57, 48, 51, 100, 50, 53, 55, 50, 101, 47, 114, 97, 119, 47,
+    55, 52, 101, 53, 49, 55, 97, 54, 48, 99, 50, 49, 97, 53, 99, 49, 49, 100, 57, 52, 102, 101, 99,
+    56, 98, 53, 55, 50, 102, 54, 56, 97, 100, 100, 102, 97, 100, 101, 51, 57, 47, 101, 120, 97,
+    109, 112, 108, 101, 46, 106, 115, 111, 110, 32, 72, 84, 84, 80, 47, 49, 46, 49, 13, 10, 104,
+    111, 115, 116, 58, 32, 103, 105, 115, 116, 46, 103, 105, 116, 104, 117, 98, 117, 115, 101, 114,
+    99, 111, 110, 116, 101, 110, 116, 46, 99, 111, 109, 13, 10, 97, 99, 99, 101, 112, 116, 45, 101,
+    110, 99, 111, 100, 105, 110, 103, 58, 32, 105, 100, 101, 110, 116, 105, 116, 121, 13, 10, 99,
+    111, 110, 110, 101, 99, 116, 105, 111, 110, 58, 32, 99, 108, 111, 115, 101, 13, 10, 97, 99, 99,
+    101, 112, 116, 58, 32, 42, 47, 42, 0, 0,
+  ];
+  const TEST_MANIFEST_RESPONSE: &[u8] = &[
+    72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101,
+    110, 116, 45, 116, 121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110,
+    47, 106, 115, 111, 110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13,
+    10, 99, 111, 110, 116, 101, 110, 116, 45, 101, 110, 99, 111, 100, 105, 110, 103, 58, 32, 103,
+    122, 105, 112, 13, 10, 84, 114, 97, 110, 115, 102, 101, 114, 45, 69, 110, 99, 111, 100, 105,
+    110, 103, 58, 32, 99, 104, 117, 110, 107, 101, 100, 13, 10, 13, 10, 123, 13, 10, 32, 32, 32,
+    34, 100, 97, 116, 97, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 34, 105, 116, 101,
+    109, 115, 34, 58, 32, 91, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 123, 13, 10, 32,
+    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34,
+    65, 114, 116, 105, 115, 116, 34, 44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+    32, 32, 32, 34, 112, 114, 111, 102, 105, 108, 101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32,
+    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121,
+    108, 111, 114, 32, 83, 119, 105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+    32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32,
+    32, 32, 32, 32, 32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125,
+  ];
   const TEST_MANIFEST: &str = r#"
   {
       "manifestVersion": "1",
@@ -371,137 +378,69 @@ accept: */*
 
   #[test]
   fn generate_rom_from_request() {
-    let plaintext_len = 16;
+    let plaintext_len = 256;
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
     let (rom_data, rom) = manifest.rom_from_request(
       &AES_KEY.1,
       &AES_IV.1,
       &AES_AAD.1,
-      TEST_MANIFEST_REQUEST.as_bytes(),
+      TEST_MANIFEST_REQUEST,
       plaintext_len,
     );
 
     // AES + HTTP parse + HTTP headers length
-    assert_eq!(rom_data.len(), 1 + 1 + manifest.request.headers.len());
-    assert_eq!(rom_data.get(&String::from("HTTP_PARSE_AND_LOCK_START_LINE")).unwrap().opcode, 1);
+    assert_eq!(rom_data.len(), 2);
+    assert_eq!(rom_data.get(&String::from("HTTP_NIVC")).unwrap().opcode, 1);
 
     // should contain http parse and http headers
-    assert_eq!(rom.len(), plaintext_len / AES_INPUT_LENGTH + 1 + manifest.request.headers.len());
+    assert_eq!(rom.len(), plaintext_len / AES_INPUT_LENGTH + 1);
 
     // assert http parse inputs
     let http_instruction_len = plaintext_len / AES_INPUT_LENGTH;
-    let mut padded_request_method = [0u8; HTTP_BEGINNING_MAX_LENGTH];
-    padded_request_method[..manifest.request.method.len()]
-      .copy_from_slice(manifest.request.method.as_bytes());
-    let mut padded_request_url = [0u8; HTTP_MIDDLE_MAX_LENGTH];
-    padded_request_url[..manifest.request.url.len()]
-      .copy_from_slice(manifest.request.url.as_bytes());
-    let mut padded_request_version = [0u8; HTTP_FINAL_MAX_LENGTH];
-    padded_request_version[..manifest.request.version.len()]
-      .copy_from_slice(manifest.request.version.as_bytes());
-    assert_eq!(
-      rom[http_instruction_len]
-        .private_input
-        .get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING)),
-      Some(&json!(padded_request_method.to_vec())),
-    );
-    assert_eq!(
-      rom[http_instruction_len].private_input.get(&String::from(HTTP_BEGINNING_LENGTH_SIGNAL)),
-      Some(&json!([manifest.request.method.len()]))
-    );
-    assert_eq!(
-      rom[http_instruction_len]
-        .private_input
-        .get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE)),
-      Some(&json!(padded_request_url.to_vec()))
-    );
-    assert_eq!(
-      rom[http_instruction_len].private_input.get(&String::from(HTTP_MIDDLE_LENGTH_SIGNAL)),
-      Some(&json!([manifest.request.url.len()]))
-    );
-    assert_eq!(
-      rom[http_instruction_len]
-        .private_input
-        .get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL)),
-      Some(&json!(padded_request_version.to_vec()))
-    );
-    assert_eq!(
-      rom[http_instruction_len].private_input.get(&String::from(HTTP_FINAL_LENGTH_SIGNAL)),
-      Some(&json!([manifest.request.version.len()]))
-    );
-
-    // assert final circuit
-    assert_eq!(
-      rom[rom.len() - 1].name,
-      format!("HTTP_LOCK_HEADER_{}", manifest.request.headers.len())
-    );
+    assert_eq!(rom[http_instruction_len].name, String::from("HTTP_NIVC"));
+    assert!(rom[http_instruction_len].private_input.contains_key("start_line_hash"));
+    assert!(rom[http_instruction_len].private_input.contains_key("header_hashes"));
+    assert!(rom[http_instruction_len].private_input.contains_key("body_hash"));
   }
 
   #[test]
   fn generate_rom_from_response() {
-    let plaintext_length = 160;
+    let plaintext_length = 512;
 
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
-    let (rom_data, rom) =
-      manifest.rom_from_response(AES_KEY.1, AES_IV.1, AES_AAD.1, plaintext_length);
-
-    // AES + parse http + headers + body mask + json mask (object + array) + extract
-    assert_eq!(
-      rom_data.len(),
-      1 + 1 + manifest.response.headers.len() + 1 + manifest.response.body.json.len() + 1
+    let (rom_data, rom) = manifest.rom_from_response(
+      AES_KEY.1,
+      AES_IV.1,
+      AES_AAD.1,
+      TEST_MANIFEST_RESPONSE,
+      plaintext_length,
     );
-    // HTTP parse + headers + body mask + json keys + extract value
+
+    // AES + http + json mask (object + array) + extract
+    assert_eq!(rom_data.len(), 1 + 1 + manifest.response.body.json.len() + 1);
+    // HTTP + json keys + extract value
     assert_eq!(
       rom_data.get(&String::from("EXTRACT_VALUE")).unwrap().opcode,
-      (manifest.response.headers.len() + 1 + 1 + manifest.response.body.json.len()) as u64
+      (1 + manifest.response.body.json.len()) as u64
     );
 
     assert_eq!(
       rom.len(),
-      plaintext_length / AES_INPUT_LENGTH
-        + 1
-        + manifest.response.headers.len()
-        + 1
-        + manifest.response.body.json.len()
-        + 1
+      plaintext_length / AES_INPUT_LENGTH + 1 + manifest.response.body.json.len() + 1
     );
 
     // assert http parse inputs
     let http_instruction_len = plaintext_length / AES_INPUT_LENGTH;
 
-    let mut padded_response_version = [0u8; HTTP_BEGINNING_MAX_LENGTH];
-    padded_response_version[..manifest.response.version.len()]
-      .copy_from_slice(manifest.response.version.as_bytes());
-    let mut padded_response_status = [0u8; HTTP_MIDDLE_MAX_LENGTH];
-    padded_response_status[..manifest.response.status.len()]
-      .copy_from_slice(manifest.response.status.as_bytes());
-    let mut padded_response_message = [0u8; HTTP_FINAL_MAX_LENGTH];
-    padded_response_message[..manifest.response.message.len()]
-      .copy_from_slice(manifest.response.message.as_bytes());
-
-    assert_eq!(
-      rom[http_instruction_len]
-        .private_input
-        .get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING)),
-      Some(&json!(padded_response_version.to_vec()))
-    );
-    assert_eq!(
-      rom[http_instruction_len]
-        .private_input
-        .get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE)),
-      Some(&json!(padded_response_status.to_vec()))
-    );
-    assert_eq!(
-      rom[http_instruction_len]
-        .private_input
-        .get(&String::from(HTTP_PARSE_AND_LOCK_START_LINE_FINAL)),
-      Some(&json!(padded_response_message.to_vec()))
-    );
+    assert_eq!(rom[http_instruction_len].name, String::from("HTTP_NIVC"));
+    assert!(rom[http_instruction_len].private_input.contains_key("start_line_hash"));
+    assert!(rom[http_instruction_len].private_input.contains_key("header_hashes"));
+    assert!(rom[http_instruction_len].private_input.contains_key("body_hash"));
 
     // check final circuit is extract
     assert_eq!(rom[rom.len() - 1].name, String::from("EXTRACT_VALUE"));
-    assert_eq!(rom[rom.len() - 1].private_input, HashMap::new());
+    assert!(rom[rom.len() - 1].private_input.contains_key("data"));
   }
 }
