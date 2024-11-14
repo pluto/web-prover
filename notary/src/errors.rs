@@ -35,6 +35,15 @@ impl IntoResponse for ProxyError {
   }
 }
 
+#[derive(Debug, Error)]
+pub enum TeeError {}
+
+impl IntoResponse for TeeError {
+  fn into_response(self) -> Response {
+    (StatusCode::INTERNAL_SERVER_ERROR, "Something wrong happened.").into_response()
+  }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum NotaryServerError {
   #[error(transparent)]

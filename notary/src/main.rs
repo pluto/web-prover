@@ -33,8 +33,10 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 mod axum_websocket;
 mod config;
 mod errors;
+mod manifest;
 mod origo;
 mod tcp;
+mod tee;
 mod tlsn;
 mod websocket_proxy;
 
@@ -45,10 +47,18 @@ struct SharedState {
   tlsn_max_sent_data: usize,
   tlsn_max_recv_data: usize,
   origo_sessions:     Arc<Mutex<HashMap<String, OrigoSession>>>,
+  tee_sessions:       Arc<Mutex<HashMap<String, TeeSession>>>,
 }
 
 #[derive(Debug, Clone)]
 struct OrigoSession {
+  request:    Vec<u8>,
+  _timestamp: SystemTime,
+}
+
+#[derive(Debug, Clone)]
+struct TeeSession {
+  manifest:   manifest::Manifest,
   request:    Vec<u8>,
   _timestamp: SystemTime,
 }
@@ -73,6 +83,7 @@ async fn main() {
     tlsn_max_sent_data: c.tlsn_max_sent_data,
     tlsn_max_recv_data: c.tlsn_max_recv_data,
     origo_sessions:     Default::default(),
+    tee_sessions:       Default::default(),
   });
 
   let router = Router::new()
@@ -81,6 +92,7 @@ async fn main() {
     .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
     .route("/v1/origo", get(origo::proxy))
     .route("/v1/origo/sign", post(origo::sign))
+    .route("/v1/tee/session", post(tee::new_session))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
 
