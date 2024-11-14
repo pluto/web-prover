@@ -18,6 +18,7 @@ use crate::errors::ClientErrors;
 pub enum NotaryMode {
   Origo,
   TLSN,
+  TEE,
 }
 
 #[derive(Deserialize, Clone, Debug)]

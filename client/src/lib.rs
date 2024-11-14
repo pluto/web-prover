@@ -6,6 +6,10 @@ pub mod origo;
 #[cfg(not(target_arch = "wasm32"))] mod origo_native;
 #[cfg(target_arch = "wasm32")] mod origo_wasm32;
 
+pub mod tee;
+#[cfg(not(target_arch = "wasm32"))] mod tee_native;
+#[cfg(target_arch = "wasm32")] mod tee_wasm32;
+
 mod circuits;
 pub mod config;
 pub mod errors;
@@ -22,6 +26,7 @@ use crate::errors::ClientErrors;
 pub enum Proof {
   TLSN(TlsProof),
   Origo(Vec<u8>),
+  Tee(Vec<u8>),
 }
 
 pub async fn prover_inner(config: config::Config) -> Result<Proof, errors::ClientErrors> {
@@ -29,6 +34,7 @@ pub async fn prover_inner(config: config::Config) -> Result<Proof, errors::Clien
   match config.mode {
     config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
     config::NotaryMode::Origo => prover_inner_origo(config).await,
+    config::NotaryMode::TEE => prover_inner_tee(config).await,
   }
 }
 
@@ -70,4 +76,12 @@ pub async fn prover_inner_origo(config: config::Config) -> Result<Proof, errors:
 
   #[cfg(not(target_arch = "wasm32"))]
   return origo_native::proxy_and_sign(config).await;
+}
+
+pub async fn prover_inner_tee(config: config::Config) -> Result<Proof, errors::ClientErrors> {
+  #[cfg(target_arch = "wasm32")]
+  return tee_wasm32::proxy_and_attest(config).await;
+
+  #[cfg(not(target_arch = "wasm32"))]
+  return tee_native::proxy_and_attest(config).await;
 }
