@@ -1315,6 +1315,7 @@ dependencies = [
  "hyper 1.5.0",
  "hyper-util",
  "js-sys",
+ "num-bigint 0.4.6",
  "p256",
  "parking_lot",
  "pin-project-lite",

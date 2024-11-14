@@ -28,8 +28,6 @@ use crate::{
   circuits::*, config, config::ProvingData, errors, errors::ClientErrors, origo::SignBody, Proof,
 };
 
-const JSON_MAX_ROM_LENGTH: usize = 40;
-
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
   let (sb, witness) = proxy(config.clone(), session_id.clone()).await?;
@@ -112,15 +110,10 @@ async fn generate_program_data(
 
   // ----------------------------------------------------------------------------------------------------------------------- //
   // - construct private inputs and program layout for AES proof for request -
-  let mut private_input = HashMap::new();
-  private_input.insert("key".to_string(), serde_json::to_value(&key)?);
-  private_input.insert("iv".to_string(), serde_json::to_value(&iv)?);
-
   // TODO: Is padding the approach we want or change to support variable length?
   // TODO (autoparallel): For now I am padding to 512b due to our circuits. THIS IS HARD CODED AND
   // NOT THE RIGHT WAY TO DO IT. PLEASE CHANGE THIS.
   let padding = request_plaintext.len().next_power_of_two() * 2 - request_plaintext.len();
-
   let mut padded_request_plaintext = request_plaintext.clone();
   padded_request_plaintext.extend(vec![0; padding]);
 
@@ -130,7 +123,7 @@ async fn generate_program_data(
     request_ciphertext[..request_plaintext.len()].to_vec().clone();
   padded_request_ciphertext.extend(vec![0; padding]);
 
-  let rom_len = padded_request_plaintext.len() / 16;
+  let rom_len = padded_request_plaintext.len() / AES_CHUNK_LENGTH;
 
   let (rom_data, rom) = proving.manifest.unwrap().rom_from_request(
     &key,

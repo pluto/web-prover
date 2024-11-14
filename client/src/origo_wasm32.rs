@@ -7,6 +7,7 @@ use std::{
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::{body::Bytes, Request, StatusCode};
+use num_bigint::BigInt;
 use proofs::{
   circom::witness::load_witness_from_bin_reader,
   program::{
@@ -16,6 +17,8 @@ use proofs::{
       ProgramData, R1CSType, SetupData, WitnessGeneratorType,
     },
   },
+  witness::{compute_http_header_witness, compute_http_witness, compute_json_witness, data_hasher},
+  G1,
 };
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -32,38 +35,6 @@ use ws_stream_wasm::WsMeta;
 
 use crate::{circuits::*, config, config::ProvingData, errors, origo::SignBody, Proof};
 
-const HTTP_LOCK_VERSION: (&str, [u8; 50]) = ("beginning", [
-  72, 84, 84, 80, 47, 49, 46, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-]);
-const HTTP_BEGINNING_LENGTH: (&str, [u8; 1]) = ("beginning_length", [8]);
-const HTTP_LOCK_STATUS: (&str, [u8; 200]) = ("middle", [
-  50, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0,
-]);
-const HTTP_MIDDLE_LENGTH: (&str, [u8; 1]) = ("middle_length", [3]);
-const HTTP_LOCK_MESSAGE: (&str, [u8; 50]) = ("final", [
-  79, 75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-]);
-const HTTP_FINAL_LENGTH: (&str, [u8; 1]) = ("final_length", [2]);
-const HTTP_LOCK_HEADER_NAME: (&str, [u8; 50]) = ("header", [
-  99, 111, 110, 116, 101, 110, 116, 45, 116, 121, 112, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-]);
-const HTTP_LOCK_HEADER_NAME_LENGTH: (&str, [u8; 1]) = ("headerNameLength", [12]);
-const HTTP_LOCK_HEADER_VALUE: (&str, [u8; 100]) = ("value", [
-  97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106, 115, 111, 110, 59, 32, 99, 104, 97,
-  114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-]);
-const HTTP_LOCK_HEADER_VALUE_LENGTH: (&str, [u8; 1]) = ("headerValueLength", [31]);
 const JSON_MASK_KEY_DEPTH_1: (&str, [u8; 10]) = ("key", [100, 97, 116, 97, 0, 0, 0, 0, 0, 0]); // "data"
 const JSON_MASK_KEYLEN_DEPTH_1: (&str, [u8; 1]) = ("keyLen", [4]);
 
@@ -95,38 +66,28 @@ async fn generate_program_data(
   debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
   debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
 
-  let key: &[u8] = &witness.request.aes_key;
-  let iv: &[u8] = &witness.request.aes_iv;
+  let key: [u8; 16] = witness.request.aes_key[..16].try_into()?;
+  let iv: [u8; 12] = witness.request.aes_iv[..12].try_into()?;
 
-  let mut private_input = HashMap::new();
+  // Get the request ciphertext, request plaintext, and AAD
+  let request_ciphertext = hex::decode(witness.request.ciphertext.as_bytes())?;
 
-  let ct: &[u8] = witness.request.ciphertext.as_bytes();
-  let sized_key: [u8; 16] = key[..16].try_into()?;
-  let sized_iv: [u8; 12] = iv[..12].try_into()?;
-
-  private_input.insert("key".to_string(), serde_json::to_value(&sized_key)?);
-  private_input.insert("iv".to_string(), serde_json::to_value(&sized_iv)?);
-
-  let dec = Decrypter2::new(sized_key, sized_iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
-  let (plaintext, meta) = dec.decrypt_tls13_aes(
+  let request_decrypter = Decrypter2::new(key, iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
+  let (plaintext, meta) = request_decrypter.decrypt_tls13_aes(
     &OpaqueMessage {
       typ:     ContentType::ApplicationData,
       version: ProtocolVersion::TLSv1_3,
-      payload: Payload::new(hex::decode(ct)?),
+      payload: Payload::new(request_ciphertext.clone()), /* TODO (autoparallel): old way didn't
+                                                          * introduce a clone */
     },
     0,
   )?;
-  let pt = plaintext.payload.0.to_vec();
+
   let aad = hex::decode(meta.additional_data.to_owned())?;
   let mut padded_aad = vec![0; 16 - aad.len()];
   padded_aad.extend(aad);
 
-  // TODO: Is padding the approach we want or change to support variable length?
-  // let pt = AES_PLAINTEXT.1.to_vec();
-  let janky_padding = if pt.len() % 16 != 0 { 16 - pt.len() % 16 } else { 0 };
-  let mut janky_plaintext_padding = vec![0; janky_padding];
-  let rom_len = (pt.len() + janky_padding) / 16;
-  janky_plaintext_padding.extend(pt);
+  let request_plaintext = plaintext.payload.0.to_vec();
 
   let mut witnesses = Vec::new();
   for w in proving.witnesses {
@@ -136,97 +97,105 @@ async fn generate_program_data(
   let setup_data = SetupData {
     r1cs_types:              vec![
       R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      WitnessGeneratorType::Browser,
-      WitnessGeneratorType::Browser,
-      WitnessGeneratorType::Browser,
-      WitnessGeneratorType::Browser,
-      WitnessGeneratorType::Browser,
-      WitnessGeneratorType::Browser,
-      WitnessGeneratorType::Browser,
+      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
     ],
-    max_rom_length:          25,
+    max_rom_length:          JSON_MAX_ROM_LENGTH,
   };
+
+  // TODO: Is padding the approach we want or change to support variable length?
+  let padding = request_plaintext.len().next_power_of_two() * 2 - request_plaintext.len();
+  let mut padded_request_plaintext = request_plaintext.clone();
+  padded_request_plaintext.extend(vec![0; padding]);
+
+  // NOTE (autoparallel): This removes the 16 + 1 extra bytes for authtag and tls inner content
+  // type, then pads with 0.
+  let mut padded_request_ciphertext =
+    request_ciphertext[..request_plaintext.len()].to_vec().clone();
+  padded_request_ciphertext.extend(vec![0; padding]);
 
   let aes_instr = String::from("AES_GCM_1");
   let rom_data = HashMap::from([
     (aes_instr.clone(), CircuitData { opcode: 0 }),
-    (String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 1 }),
-    (String::from("HTTP_LOCK_HEADER_1"), CircuitData { opcode: 2 }),
-    (String::from("HTTP_BODY_MASK"), CircuitData { opcode: 3 }),
-    (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 4 }),
-    (String::from("JSON_MASK_ARRAY_INDEX"), CircuitData { opcode: 5 }),
-    (String::from("EXTRACT_VALUE"), CircuitData { opcode: 6 }),
+    (String::from("HTTP_NIVC"), CircuitData { opcode: 1 }),
+    (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 2 }),
+    (String::from("JSON_MASK_ARRAY_INDEX"), CircuitData { opcode: 3 }),
+    (String::from("EXTRACT_VALUE"), CircuitData { opcode: 4 }),
   ]);
 
   let aes_rom_opcode_config = InstructionConfig {
     name:          aes_instr.clone(),
     private_input: HashMap::from([
-      (String::from("key"), json!(sized_key)),
-      (String::from("iv"), json!(sized_iv)),
+      (String::from("key"), json!(key)),
+      (String::from("iv"), json!(iv)),
       (String::from("aad"), json!(padded_aad)),
     ]),
   };
 
-  let mut rom = vec![aes_rom_opcode_config; rom_len];
-  rom.extend([
-    InstructionConfig {
-      name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
-      private_input: HashMap::from([
-        (String::from(HTTP_LOCK_VERSION.0), json!(HTTP_LOCK_VERSION.1.to_vec())),
-        (String::from(HTTP_BEGINNING_LENGTH.0), json!(HTTP_BEGINNING_LENGTH.1)),
-        (String::from(HTTP_LOCK_STATUS.0), json!(HTTP_LOCK_STATUS.1.to_vec())),
-        (String::from(HTTP_MIDDLE_LENGTH.0), json!(HTTP_MIDDLE_LENGTH.1)),
-        (String::from(HTTP_LOCK_MESSAGE.0), json!(HTTP_LOCK_MESSAGE.1.to_vec())),
-        (String::from(HTTP_FINAL_LENGTH.0), json!(HTTP_FINAL_LENGTH.1)),
-      ]),
-    },
-    InstructionConfig {
-      name:          String::from("HTTP_LOCK_HEADER_1"),
-      private_input: HashMap::from([
-        (String::from(HTTP_LOCK_HEADER_NAME_LENGTH.0), json!(HTTP_LOCK_HEADER_NAME_LENGTH.1)),
-        (String::from(HTTP_LOCK_HEADER_NAME.0), json!(HTTP_LOCK_HEADER_NAME.1.to_vec())),
-        (String::from(HTTP_LOCK_HEADER_VALUE_LENGTH.0), json!(HTTP_LOCK_HEADER_VALUE_LENGTH.1)),
-        (String::from(HTTP_LOCK_HEADER_VALUE.0), json!(HTTP_LOCK_HEADER_VALUE.1.to_vec())),
-      ]),
-    },
-    InstructionConfig {
-      name:          String::from("HTTP_BODY_MASK"),
-      private_input: HashMap::new(),
-    },
-    InstructionConfig {
-      name:          String::from("JSON_MASK_OBJECT_1"),
-      private_input: HashMap::from([
-        (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
-        (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
-      ]),
-    },
-    InstructionConfig {
-      name:          String::from("EXTRACT_VALUE"),
-      private_input: HashMap::new(),
-    },
-  ]);
+  // compute hashes http start line and headers signals
+  let http_start_line_hash = data_hasher(&compute_http_witness(
+    &padded_request_plaintext,
+    proofs::witness::HttpMaskType::StartLine,
+  ));
+  let mut http_header_hashes = vec!["0".to_string(); 5];
+  for header_name in proving.manifest.unwrap().request.headers.keys() {
+    let (index, masked_header) =
+      compute_http_header_witness(&padded_request_plaintext, header_name.as_bytes());
+    http_header_hashes[index] =
+      BigInt::from_bytes_le(num_bigint::Sign::Plus, &data_hasher(&masked_header).to_bytes())
+        .to_str_radix(10);
+  }
 
+  let http_body =
+    compute_http_witness(&padded_request_plaintext, proofs::witness::HttpMaskType::Body);
+  let http_body_hash = data_hasher(&http_body);
+
+  let mut rom = vec![aes_rom_opcode_config; padded_request_plaintext.len() / AES_CHUNK_LENGTH];
+  rom.extend([InstructionConfig {
+    name:          String::from("HTTP_NIVC"),
+    private_input: HashMap::from([
+      (String::from("data"), json!(padded_request_plaintext)),
+      (
+        String::from("start_line_hash"),
+        json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
+          .to_str_radix(10)]),
+      ),
+      (String::from("header_hashes"), json!(http_header_hashes)),
+      (
+        String::from("body_hash"),
+        json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
+          .to_str_radix(10),]),
+      ),
+    ]),
+  }]);
+
+  // TODO (Sambhav): update fold input from manifest
   let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
-    value: HashMap::from([(
-      String::from("plainText"),
-      janky_plaintext_padding.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-    )]),
+    value: HashMap::from([
+      (
+        String::from("plainText"),
+        padded_request_plaintext.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
+      ),
+      (
+        String::from("cipherText"),
+        padded_request_ciphertext.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
+      ),
+      (
+        String::from(AES_COUNTER.0),
+        AES_COUNTER.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
+      ),
+    ]),
   })]);
 
-  let mut initial_input = vec![0; 50]; // default number of step_in.
-  initial_input.extend(janky_plaintext_padding.iter());
-  initial_input.resize(516, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
-  let final_input: Vec<u64> = initial_input.into_iter().map(u64::from).collect();
-
-  // TODO: Load this from a file. Run this in preprocessing step.
   debug!("generating public params");
   // let public_params = program::setup(&setup_data);
 
@@ -235,7 +204,7 @@ async fn generate_program_data(
     setup_data,
     rom,
     rom_data,
-    initial_nivc_input: vec![0; 516],
+    initial_nivc_input: vec![proofs::F::<G1>::from(0)],
     inputs,
     witnesses,
   }

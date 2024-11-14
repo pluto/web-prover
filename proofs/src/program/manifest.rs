@@ -63,13 +63,13 @@ pub struct Response {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Request {
   /// HTTP method (GET or POST)
-  method:  String,
+  method:      String,
   /// HTTP request URL
-  url:     String,
+  url:         String,
   /// HTTP version
-  version: String,
+  version:     String,
   /// Request headers to lock
-  headers: HashMap<String, String>,
+  pub headers: HashMap<String, String>,
 }
 
 /// Manifest containing [`Request`] and [`Response`]

@@ -408,16 +408,8 @@ fn test_offline_proofs() {
         path:      String::from("../proofs"),
         wtns_path: String::from("witness.wtns"),
       },
-      WitnessGeneratorType::Wasm {
-        path:      String::from("../proofs"),
-        wtns_path: String::from("witness.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from("../proofs"),
-        wtns_path: String::from("witness.wtns"),
-      },
     ],
-    max_rom_length:          25,
+    max_rom_length:          JSON_MAX_ROM_LENGTH,
   };
   let public_params = program::setup(&setup_data);
 
