@@ -86,23 +86,12 @@ const AES_KEY_SIGNAL: &str = "key";
 const AES_IV_SIGNAL: &str = "iv";
 const AES_AAD_SIGNAL: &str = "aad";
 
-// Parse and Lock
-const HTTP_PARSE_AND_LOCK_START_LINE_BEGINNING: &str = "beginning";
-const HTTP_PARSE_AND_LOCK_START_LINE_MIDDLE: &str = "middle";
-const HTTP_PARSE_AND_LOCK_START_LINE_FINAL: &str = "final";
-const HTTP_BEGINNING_LENGTH_SIGNAL: &str = "beginning_length";
-const HTTP_MIDDLE_LENGTH_SIGNAL: &str = "middle_length";
-const HTTP_FINAL_LENGTH_SIGNAL: &str = "final_length";
+// HTTP
 
-const HTTP_BEGINNING_MAX_LENGTH: usize = 50;
-const HTTP_MIDDLE_MAX_LENGTH: usize = 200;
-const HTTP_FINAL_MAX_LENGTH: usize = 50;
-
-const HTTP_HEADER_SIGNAL_NAME: &str = "header";
-const HTTP_HEADER_SIGNAL_VALUE: &str = "value";
-const HTTP_HEADER_MAX_NAME_LENGTH: usize = 50;
-const HTTP_HEADER_MAX_VALUE_LENGTH: usize = 100;
-
+const DATA_SIGNAL_NAME: &str = "data";
+const HTTP_START_LINE_HASH_SIGNAL_NAME: &str = "start_line_hash";
+const HTTP_HEADER_HASHES_SIGNAL_NAME: &str = "header_hashes";
+const HTTP_BODY_HASH_SIGNAL_NAME: &str = "body_hash";
 const JSON_MASK_OBJECT_KEY_NAME: &str = "key";
 const JSON_MASK_OBJECT_KEYLEN_NAME: &str = "keyLen";
 const JSON_MAX_KEY_LENGTH: usize = 10;
@@ -120,10 +109,6 @@ impl Manifest {
     plaintext_len: usize,
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>) {
     assert_eq!(plaintext_len % AES_INPUT_LENGTH, 0);
-    // TODO (Sambhav): convert this to nice crate errors
-    assert!(self.request.method.len() <= HTTP_BEGINNING_MAX_LENGTH);
-    assert!(self.request.url.len() <= HTTP_MIDDLE_MAX_LENGTH);
-    assert!(self.request.version.len() <= HTTP_FINAL_MAX_LENGTH);
 
     let aes_instr = String::from("AES_GCM_1");
     let mut rom_data = HashMap::from([(aes_instr.clone(), CircuitData { opcode: 0 })]);
@@ -157,15 +142,15 @@ impl Manifest {
     rom.push(InstructionConfig {
       name:          String::from("HTTP_NIVC"),
       private_input: HashMap::from([
-        (String::from("data"), json!(plaintext.to_vec())),
+        (String::from(DATA_SIGNAL_NAME), json!(plaintext.to_vec())),
         (
-          String::from("start_line_hash"),
+          String::from(HTTP_START_LINE_HASH_SIGNAL_NAME),
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
             .to_str_radix(10)]),
         ),
-        (String::from("header_hashes"), json!(http_header_hashes)),
+        (String::from(HTTP_HEADER_HASHES_SIGNAL_NAME), json!(http_header_hashes)),
         (
-          String::from("body_hash"),
+          String::from(HTTP_BODY_HASH_SIGNAL_NAME),
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
             .to_str_radix(10),]),
         ),
@@ -185,11 +170,6 @@ impl Manifest {
     plaintext_len: usize,
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>) {
     assert_eq!(plaintext_len % AES_INPUT_LENGTH, 0);
-
-    // TODO (Sambhav): convert this to nice crate errors
-    assert!(self.response.version.len() <= HTTP_BEGINNING_MAX_LENGTH);
-    assert!(self.response.status.len() <= HTTP_MIDDLE_MAX_LENGTH);
-    assert!(self.response.message.len() <= HTTP_FINAL_MAX_LENGTH);
 
     let aes_instr = String::from("AES_GCM_1");
     let mut rom_data = HashMap::from([(aes_instr.clone(), CircuitData { opcode: 0 })]);
@@ -221,15 +201,15 @@ impl Manifest {
     rom.push(InstructionConfig {
       name:          String::from("HTTP_NIVC"),
       private_input: HashMap::from([
-        (String::from("data"), json!(plaintext.to_vec())),
+        (String::from(DATA_SIGNAL_NAME), json!(plaintext.to_vec())),
         (
-          String::from("start_line_hash"),
+          String::from(HTTP_START_LINE_HASH_SIGNAL_NAME),
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
             .to_str_radix(10)]),
         ),
-        (String::from("header_hashes"), json!(http_header_hashes)),
+        (String::from(HTTP_HEADER_HASHES_SIGNAL_NAME), json!(http_header_hashes)),
         (
-          String::from("body_hash"),
+          String::from(HTTP_BODY_HASH_SIGNAL_NAME),
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
             .to_str_radix(10),]),
         ),
@@ -277,7 +257,7 @@ impl Manifest {
     rom_data.insert(String::from("EXTRACT_VALUE"), CircuitData { opcode: 4 });
     rom.push(InstructionConfig {
       name:          String::from("EXTRACT_VALUE"),
-      private_input: HashMap::from([(String::from("data"), json!(masked_body))]),
+      private_input: HashMap::from([(String::from(DATA_SIGNAL_NAME), json!(masked_body))]),
     });
 
     (rom_data, rom)
