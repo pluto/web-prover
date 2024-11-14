@@ -21,6 +21,7 @@ use crate::{
 };
 
 pub mod circom;
+mod constants;
 pub mod errors;
 pub mod program;
 pub mod proof;

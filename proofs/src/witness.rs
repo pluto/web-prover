@@ -178,6 +178,46 @@ pub fn data_hasher(preimage: &[u8]) -> F<G1> {
   hash_val
 }
 
+use neptune::{
+  hash_type::HashType, poseidon::PoseidonConstants, Poseidon as PoseidonNeptune, Strength,
+};
+
+pub struct CircomPoseidon<'a> {
+  poseidon: PoseidonNeptune<'a, F<G1>>,
+}
+
+impl<'a> CircomPoseidon<'a> {
+  pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
+    // width: usize
+    // let partial_round_selection = [56, 57, 56, 60, 60, 63, 64, 63, 60, 66, 60, 65, 70, 60, 64,
+    // 68]; let partial_rounds = partial_round_selection[width - 2];
+    let full_rounds = 8;
+    let constants = PoseidonConstants::new_from_parameters(
+      2,
+      vec![vec![]],
+      vec![],
+      full_rounds,
+      56,
+      HashType::Sponge,
+      Strength::Standard,
+    );
+
+    Ok(Self { poseidon: PoseidonNeptune::new(&constants) })
+  }
+
+  pub fn hash(&mut self, preimage: &[F<G1>]) -> Result<F<G1>, Box<dyn std::error::Error>> {
+    self.poseidon.set_preimage(preimage);
+    let hash = self.poseidon.hash();
+    Ok(hash)
+  }
+}
+
+// Updated chainer function
+pub fn poseidon_chainer_neptune(preimage: &[F<G1>]) -> Result<F<G1>, Box<dyn std::error::Error>> {
+  let mut poseidon = CircomPoseidon::new()?;
+  poseidon.hash(preimage)
+}
+
 #[cfg(test)]
 mod tests {
 
