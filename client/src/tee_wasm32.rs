@@ -1,6 +1,10 @@
 use crate::{config, errors, Proof};
 
-pub async fn proxy_and_attest(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {}
+pub async fn proxy_and_attest(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
+  // call new_session
+  // proxy
+  // get attestation
+}
 
 async fn proxy(
   config: config::Config,
