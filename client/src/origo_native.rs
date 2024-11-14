@@ -117,9 +117,6 @@ async fn generate_program_data(
   private_input.insert("iv".to_string(), serde_json::to_value(&iv)?);
 
   // TODO: Is padding the approach we want or change to support variable length?
-  // let padding = if pt.len() % 16 != 0 { 16 - pt.len() % 16 } else { 0 };
-  // let padding = request_plaintext.len().next_power_of_two() - request_plaintext.len();
-
   // TODO (autoparallel): For now I am padding to 512b due to our circuits. THIS IS HARD CODED AND
   // NOT THE RIGHT WAY TO DO IT. PLEASE CHANGE THIS.
   let padding = request_plaintext.len().next_power_of_two() * 2 - request_plaintext.len();
@@ -135,7 +132,13 @@ async fn generate_program_data(
 
   let rom_len = padded_request_plaintext.len() / 16;
 
-  let (rom_data, rom) = proving.manifest.unwrap().rom_from_request(&key, &iv, &padded_aad, 512);
+  let (rom_data, rom) = proving.manifest.unwrap().rom_from_request(
+    &key,
+    &iv,
+    &padded_aad,
+    &padded_request_plaintext,
+    512,
+  );
   let aes_instr = String::from("AES_GCM_1");
 
   // TODO (Sambhav): update fold input from manifest
