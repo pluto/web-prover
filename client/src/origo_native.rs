@@ -113,7 +113,7 @@ async fn generate_program_data(
   // TODO: Is padding the approach we want or change to support variable length?
   // TODO (autoparallel): For now I am padding to 512b due to our circuits. THIS IS HARD CODED AND
   // NOT THE RIGHT WAY TO DO IT. PLEASE CHANGE THIS.
-  let padding = request_plaintext.len().next_power_of_two() * 2 - request_plaintext.len();
+  let padding = 512 - request_plaintext.len();
   let mut padded_request_plaintext = request_plaintext.clone();
   padded_request_plaintext.extend(vec![0; padding]);
 
