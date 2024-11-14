@@ -99,11 +99,12 @@ pub fn compute_http_witness(plaintext: &[u8], mask_at: HttpMaskType) -> Vec<u8> 
       }
 
       // Find the specified header
+      let mut header_start_pos = start_pos;
       for i in start_pos..plaintext.len().saturating_sub(1) {
         if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
           if current_header == idx {
             // Copy the header line (including CRLF)
-            result[start_pos..=i + 1].copy_from_slice(&plaintext[start_pos..=i + 1]);
+            result[header_start_pos..=i + 1].copy_from_slice(&plaintext[header_start_pos..=i + 1]);
             break;
           }
 
@@ -113,7 +114,7 @@ pub fn compute_http_witness(plaintext: &[u8], mask_at: HttpMaskType) -> Vec<u8> 
           }
 
           current_header += 1;
-          start_pos = i + 2;
+          header_start_pos = i + 2;
         }
       }
     },
@@ -136,6 +137,49 @@ pub fn compute_http_witness(plaintext: &[u8], mask_at: HttpMaskType) -> Vec<u8> 
     },
   }
   result
+}
+
+pub fn compute_http_header_witness(plaintext: &[u8], name: &[u8]) -> (usize, Vec<u8>) {
+  let mut result = vec![0u8; plaintext.len()];
+
+  let mut current_header = 0;
+  let mut current_header_name = vec![];
+  let mut start_pos = 0;
+
+  // Skip the start line
+  for i in 1..plaintext.len().saturating_sub(1) {
+    if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
+      start_pos = i + 2;
+      break;
+    }
+  }
+
+  // Find the specified header
+  let mut header_start_pos = start_pos;
+  for i in start_pos..plaintext.len().saturating_sub(1) {
+    // find header name
+    if plaintext[i] == b':' {
+      current_header_name = plaintext[header_start_pos..i].to_vec();
+    }
+    // find next header line
+    if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
+      if current_header_name == name {
+        // Copy the header line (including CRLF)
+        result[header_start_pos..=i + 1].copy_from_slice(&plaintext[header_start_pos..=i + 1]);
+        break;
+      }
+
+      // Check for end of headers (double CRLF)
+      if i + 3 < plaintext.len() && plaintext[i + 2] == b'\r' && plaintext[i + 3] == b'\n' {
+        break;
+      }
+
+      current_header += 1;
+      header_start_pos = i + 2;
+    }
+  }
+
+  (current_header, result)
 }
 
 pub fn bytepack(bytes: &[u8]) -> F<G1> {
@@ -170,7 +214,7 @@ pub fn poseidon_chainer(preimage: &[F<G1>]) -> F<G1> {
 pub fn data_hasher(preimage: &[u8]) -> F<G1> {
   assert_eq!(preimage.len() % 16, 0);
 
-  let packed_inputs = preimage.chunks(16).map(|chunk| bytepack(chunk)).collect::<Vec<F<G1>>>();
+  let packed_inputs = preimage.chunks(16).map(bytepack).collect::<Vec<F<G1>>>();
   let mut hash_val = F::<G1>::ZERO;
   for packed_input in packed_inputs {
     hash_val = poseidon_chainer(&[hash_val, packed_input]);
@@ -353,6 +397,22 @@ mod tests {
   fn test_compute_http_witness_body() {
     let bytes = compute_http_witness(TEST_HTTP_BYTES, HttpMaskType::Body);
     assert_eq!(bytes, TEST_HTTP_BODY);
+  }
+
+  #[test]
+  fn test_compute_http_witness_name() {
+    let (index, bytes_from_name) =
+      compute_http_header_witness(TEST_HTTP_BYTES, "Transfer-Encoding".as_bytes());
+    let bytes_from_index = compute_http_witness(TEST_HTTP_BYTES, HttpMaskType::Header(2));
+    assert_eq!(bytes_from_index, bytes_from_name);
+    assert_eq!(index, 2);
+  }
+
+  #[test]
+  fn test_compute_http_witness_name_not_present() {
+    let (_, bytes_from_name) =
+      compute_http_header_witness(TEST_HTTP_BYTES, "pluto-rocks".as_bytes());
+    assert_eq!(bytes_from_name, vec![0; TEST_HTTP_BYTES.len()]);
   }
 
   #[test]
