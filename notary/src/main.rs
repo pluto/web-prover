@@ -93,6 +93,8 @@ async fn main() {
     .route("/v1/origo", get(origo::proxy))
     .route("/v1/origo/sign", post(origo::sign))
     .route("/v1/tee/session", post(tee::new_session))
+    .route("/v1/tee/proxy", get(tee::proxy))
+    .route("/v1/tee/attestation", post(tee::attestation))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
 
