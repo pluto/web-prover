@@ -65,3 +65,41 @@ pub fn setup_tracing(logging_filter: &str) {
   tracing_subscriber::registry().with(filter_layer).with(fmt_layer).with(perf_layer).init(); // Install these as subscribers to tracing events
   debug!("Logging set up")
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct WitnessInput {
+  pub key:        [u8; 16],
+  pub iv:         [u8; 12],
+  pub aad:        [u8; 16],
+  #[serde(with = "serde_bytes")]
+  pub plaintext:  Vec<u8>,
+  #[serde(with = "serde_bytes")]
+  pub ciphertext: Vec<u8>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WitnessOutput {
+  #[serde(with = "serde_bytes")]
+  pub data: Vec<u8>,
+}
+
+#[wasm_bindgen]
+extern "C" {
+  #[wasm_bindgen(js_namespace = witness, js_name = createWitness)]
+  fn create_witness_js(input: &JsValue) -> Promise;
+}
+
+#[wasm_bindgen]
+pub async fn create_witness(input: &WitnessInput) -> Result<WitnessOutput, JsValue> {
+  // Convert the Rust WitnessInput to a JsValue
+  let js_input = serde_wasm_bindgen::to_value(input)?;
+
+  // Call JavaScript function and await the Promise
+  let mut js_result = create_witness_js(&js_input).await?;
+
+  // Convert the JavaScript result to Rust WitnessOutput
+  let witness_output: WitnessOutput = serde_wasm_bindgen::from_value(js_result)?;
+
+  debug!("js witnes output: {:?}", witness_output);
+  Ok(witness_output)
+}

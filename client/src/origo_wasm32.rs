@@ -5,6 +5,7 @@ use std::{
   sync::Arc,
 };
 
+use client_wasm::{create_witness, WitnessInput};
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::{body::Bytes, Request, StatusCode};
 use num_bigint::BigInt;
@@ -31,6 +32,7 @@ use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::O
 use tracing::debug;
 use url::Url;
 use wasm_bindgen_futures::spawn_local;
+use web_time::Instant;
 use ws_stream_wasm::WsMeta;
 
 use crate::{circuits::*, config, config::ProvingData, errors, origo::SignBody, Proof};
@@ -44,18 +46,23 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
 
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
 
+  let mut now = Instant::now();
   debug!("generating NIVC program data!");
   let program_data = generate_program_data(&witness, config.proving).await?;
 
-  debug!("starting proof generation!");
+  debug!("generated program data!: {:?}", now.elapsed());
+  now = Instant::now();
   let program_output = program::run(&program_data)?;
 
-  debug!("compressing proof!");
+  debug!("program run complete!: {:?}", now.elapsed());
+  now = Instant::now();
   let compressed_verifier = program::compress_proof(&program_output, &program_data.public_params)?;
 
-  debug!("running compressed verifier!");
+  debug!("compress proof complete!: {:?}", now.elapsed());
+  now = Instant::now();
   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
 
+  debug!("proof serialization complete!: {:?}", now.elapsed());
   Ok(crate::Proof::Origo(serialized_compressed_verifier.0))
 }
 
@@ -130,6 +137,15 @@ async fn generate_program_data(
 
   debug!("plaintext: {:?}", padded_request_plaintext);
   debug!("ciphertext: {:?}", padded_request_ciphertext);
+
+  let witness_input = WitnessInput {
+    key,
+    iv,
+    aad: padded_aad,
+    plaintext: padded_request_plaintext,
+    ciphertext: padded_request_ciphertext,
+  };
+  let witness_output = create_witness(witness_input).unwrap();
 
   let aes_instr = String::from("AES_GCM_1");
   let rom_data = HashMap::from([

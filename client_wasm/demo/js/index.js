@@ -3,6 +3,7 @@ import init, {
   initThreadPool,
 } from "../pkg/client_wasm.js";
 import { poseidon2 } from "poseidon-lite";
+import "./witness.js";
 
 const numConcurrency = navigator.hardwareConcurrency;
 
