@@ -22,9 +22,6 @@ tls-client-async2={ path="../tls/tls-client-async", package="tls-client-async", 
 ] }
 tls-core={ path="../tls/tls-core", package="tls-core" }
 proofs={ path="../proofs", package="proofs" }
-arecibo={ git="https://github.com/argumentcomputer/arecibo", default-features=false, features=[
-  "portable",
-] }
 
 webpki-roots="0.26.1"
 pki-types   ={ package="rustls-pki-types", version="1.7" }
