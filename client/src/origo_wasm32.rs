@@ -103,11 +103,16 @@ async fn generate_program_data(
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
+      WitnessGeneratorType::Browser,
+      WitnessGeneratorType::Browser,
+      WitnessGeneratorType::Browser,
+      WitnessGeneratorType::Browser,
+      WitnessGeneratorType::Browser,
     ],
     max_rom_length:          JSON_MAX_ROM_LENGTH,
   };
@@ -122,6 +127,9 @@ async fn generate_program_data(
   let mut padded_request_ciphertext =
     request_ciphertext[..request_plaintext.len()].to_vec().clone();
   padded_request_ciphertext.extend(vec![0; padding]);
+
+  debug!("plaintext: {:?}", padded_request_plaintext);
+  debug!("ciphertext: {:?}", padded_request_ciphertext);
 
   let aes_instr = String::from("AES_GCM_1");
   let rom_data = HashMap::from([

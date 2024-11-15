@@ -77,11 +77,11 @@ function DataHasher(input) {
     }
 
     // Compute next hash using previous hash and packed input, but if packed input is zero, don't hash it.
-    if (packedInput == BigInt(0)) {
-      hashes.push(hashes[i]);
-    } else {
-      hashes.push(poseidon2([hashes[i], packedInput]));
-    }
+    // if (packedInput == BigInt(0)) {
+    // hashes.push(hashes[i]);
+    // } else {
+    hashes.push(poseidon2([hashes[i], packedInput]));
+    // }
   }
 
   // Return the last hash
@@ -106,40 +106,40 @@ const generateWitnessBytes = async function (circuits, inputs) {
     witnesses.push({
       val: wtns.data
     });
-    console.log(wtns.data);
+    inputs[0]["step_in"] = DataHasher(plaintext.slice(0, (i + 1) * 16));
   };
 
-  // HTTP lock start line
-  console.log("HTTP lock start line");
+  // HTTP
+  console.log(http_start_line.length)
+  let http_start_line_padded = http_start_line.concat(Array(Math.max(0, 512 - http_start_line.length)).fill(0));
+  let http_header_0_padded = http_header_0.concat(Array(Math.max(0, 512 - http_header_0.length)).fill(0));
+  let http_header_1_padded = http_header_1.concat(Array(Math.max(0, 512 - http_header_1.length)).fill(0));
+  let http_body_padded = http_body.concat(Array(Math.max(0, 512 - http_body.length)).fill(0));
+
+  inputs[1]["start_line_hash"] = DataHasher(http_start_line_padded);
+  let http_header_0_hash = DataHasher(http_header_0_padded);
+  let http_header_1_hash = DataHasher(http_header_1_padded);
+  inputs[1]["header_hashes"] = [http_header_0_hash, http_header_1_hash, 0, 0, 0];
+  inputs[1]["body_hash"] = DataHasher(http_body_padded);
+  inputs[1]["step_in"] = DataHasher(extendedHTTPInput);
+  console.log("http", inputs[1]);
   let wtns = await generateWitness(circuits[1], inputs[1]);
   witnesses.push({
     val: wtns.data
   });
 
-  console.log("http lock header");
-  let wtnsHttp = await generateWitness(circuits[2], inputs[2]);
-  witnesses.push({
-    val: wtnsHttp.data
-  });
+  // console.log("json mask object");
+  // let wtnsJson = await generateWitness(circuits[4], inputs[4]);
+  // witnesses.push({
+  //   val: wtnsJson.data,
+  // });
 
-  console.log("http body mask");
-  let wtnsHttp2 = await generateWitness(circuits[3], inputs[3]);
-  witnesses.push({
-    val: wtnsHttp2.data
-  });
-
-  console.log("json mask object");
-  let wtnsJson = await generateWitness(circuits[4], inputs[4]);
-  witnesses.push({
-    val: wtnsJson.data,
-  });
-
-  console.log("json extract value");
-  let wtnsFinal = await generateWitness(circuits[6], inputs[6]);
-  console.log("wtnsFinal", wtnsFinal);
-  witnesses.push({
-    val: wtnsFinal.data,
-  });
+  // console.log("json extract value");
+  // let wtnsFinal = await generateWitness(circuits[6], inputs[6]);
+  // console.log("wtnsFinal", wtnsFinal);
+  // witnesses.push({
+  //   val: wtnsFinal.data,
+  // });
 
   return witnesses;
 };
@@ -190,13 +190,60 @@ const AES_CIPHER_TEXT = [
   33, 58, 180, 251, 29, 43, 123, 163, 118, 89, 10, 44, 36, 29, 31, 80, 141, 198, 167, 244, 24, 161,
   69, 3, 222, 184, 155, 23, 170, 219, 40, 6, 247,
 ];
+const http_start_line = [
+  72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0,
+];
+const http_header_0 = [
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99, 111, 110, 116, 101, 110, 116, 45, 116,
+  121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106, 115, 111,
+  110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13, 10, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+];
 
-const AES_COUNTER = [
-  0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 6, 0, 0, 0, 7, 0, 0, 0, 8,
-  0, 0, 0, 9, 0, 0, 0, 10, 0, 0, 0, 11, 0, 0, 0, 12, 0, 0, 0, 13, 0, 0, 0, 14, 0, 0, 0, 15, 0, 0,
-  0, 16, 0, 0, 0, 17, 0, 0, 0, 18, 0, 0, 0, 19, 0, 0, 0, 20, 0, 0, 0, 21, 0, 0, 0, 22, 0, 0, 0, 23,
-  0, 0, 0, 24, 0, 0, 0, 25, 0, 0, 0, 26, 0, 0, 0, 27, 0, 0, 0, 28, 0, 0, 0, 29, 0, 0, 0, 30, 0, 0,
-  0, 31, 0, 0, 0, 32,
+const http_header_1 = [
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  99, 111, 110, 116, 101, 110, 116, 45, 101, 110, 99, 111, 100, 105, 110, 103, 58, 32, 103, 122,
+  105, 112, 13, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+];
+const http_body = [
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 123, 13, 10, 32, 32, 32, 34,
+  100, 97, 116, 97, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 34, 105, 116, 101, 109,
+  115, 34, 58, 32, 91, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 123, 13, 10, 32, 32, 32,
+  32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34, 65, 114,
+  116, 105, 115, 116, 34, 44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+  34, 112, 114, 111, 102, 105, 108, 101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32,
+  32, 32, 32, 32, 32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121, 108, 111,
+  114, 32, 83, 119, 105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+  32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32,
+  32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125,
 ];
 
 // let extendedInput = Array(TOTAL_BYTES_ACROSS_NIVC).fill(0);
@@ -222,9 +269,9 @@ var inputs = [{
   "aad": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   "step_in": 0,
 },
-  // {
-  //   "step_in": extendedHTTPInput,
-  // },
+{
+  "data": extendedHTTPInput,
+},
   // { "key": [100, 97, 116, 97, 0, 0, 0, 0, 0, 0], "keyLen": [4], "step_in": jsonExtendedInput },
   // { "key": [105, 116, 101, 109, 115, 0, 0, 0, 0, 0], "keyLen": [5], "step_in": jsonExtendedInput },
   // { "index": [0] },
