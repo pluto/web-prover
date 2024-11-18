@@ -350,8 +350,8 @@ fn test_end_to_end_proofs() {
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
     setup_data,
-    rom_data,
-    rom,
+    rom_data: rom_data.clone(),
+    rom: rom.clone(),
     initial_nivc_input,
     inputs,
     witnesses: vec![],
@@ -362,13 +362,40 @@ fn test_end_to_end_proofs() {
 
   let recursive_snark = program::run(&program_data).unwrap();
 
-  let _ = program::compress_proof(&recursive_snark, &program_data.public_params);
+  let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
 
   let val = "\"Taylor Swift\"".as_bytes();
   let mut final_value = [0; MAX_VALUE_LENGTH];
   final_value[..val.len()].copy_from_slice(val);
 
   assert_eq!(*recursive_snark.zi_primary().first().unwrap(), data_hasher(&final_value));
+
+  let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
+
+  let mut verifier_rom = program_data
+    .rom
+    .iter()
+    .map(|opcode_config| {
+      program_data
+        .rom_data
+        .get(&opcode_config.name)
+        .ok_or_else(|| {
+          ProofError::Other(format!("Opcode config '{}' not found in rom_data", opcode_config.name))
+        })
+        .map(|config| config.opcode)
+    })
+    .collect::<Result<Vec<u64>, ProofError>>()
+    .unwrap();
+
+  verifier_rom.resize(program_data.setup_data.max_rom_length, u64::MAX);
+
+  // Get the public inputs needed for circuits
+  let mut z0_primary: Vec<F<G1>> = program_data.initial_nivc_input.clone();
+  z0_primary.push(F::<G1>::ZERO); // rom_index = 0
+  z0_primary.extend(verifier_rom.iter().map(|opcode| <E1 as Engine>::Scalar::from(*opcode)));
+
+  let z0_secondary = vec![F::<G2>::ZERO];
+  proof.0.verify(&program_data.public_params, &vk, &z0_primary, &z0_secondary).unwrap();
 }
 
 #[test]
