@@ -2,7 +2,6 @@ use std::io::{Read, Write};
 
 use client_side_prover::supernova::{get_circuit_shapes, AuxParams};
 use flate2::{read::ZlibDecoder, write::ZlibEncoder};
-use halo2curves::bn256::Fr;
 use serde_json::json;
 
 use super::*;
@@ -103,7 +102,7 @@ pub struct ProgramData<S: SetupStatus, W: WitnessStatus> {
   pub setup_data:         SetupData,
   pub rom_data:           HashMap<String, CircuitData>,
   pub rom:                Vec<InstructionConfig>,
-  pub initial_nivc_input: Vec<Fr>,
+  pub initial_nivc_input: Vec<F<G1>>,
   pub inputs:             W::PrivateInputs,
   pub witnesses:          Vec<Vec<F<G1>>>, // TODO: Ideally remove this
 }
