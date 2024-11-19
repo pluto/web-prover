@@ -223,6 +223,36 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   }
 }
 
+impl ProgramData<Online, Expanded> {
+  pub fn extend_public_inputs(&self) -> Result<(Vec<F<G1>>, Vec<u64>), ProofError> {
+    // Resize the rom to be the `max_rom_length` committed to in the `SetupData`
+    let mut rom = self
+      .rom
+      .iter()
+      .map(|opcode_config| {
+        self
+          .rom_data
+          .get(&opcode_config.name)
+          .ok_or_else(|| {
+            ProofError::Other(format!(
+              "Opcode config '{}' not found in rom_data",
+              opcode_config.name
+            ))
+          })
+          .map(|config| config.opcode)
+      })
+      .collect::<Result<Vec<u64>, ProofError>>()?;
+
+    rom.resize(self.setup_data.max_rom_length, u64::MAX);
+
+    // Get the public inputs needed for circuits
+    let mut z0_primary: Vec<F<G1>> = self.initial_nivc_input.clone();
+    z0_primary.push(F::<G1>::ZERO); // rom_index = 0
+    z0_primary.extend(rom.iter().map(|opcode| <E1 as Engine>::Scalar::from(*opcode)));
+    Ok((z0_primary, rom.clone()))
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
