@@ -3,7 +3,7 @@ import init, {
   initThreadPool,
 } from "../pkg/client_wasm.js";
 import { poseidon2 } from "poseidon-lite";
-import "./witness.js";
+import { witness } from "./witness.js";
 
 const numConcurrency = navigator.hardwareConcurrency;
 
@@ -94,21 +94,21 @@ const generateWitnessBytes = async function (circuits, inputs) {
 
   // AES
   console.log("AES")
-  let plaintext_length = inputs[0]["plainText"].length;
-  let plaintext = inputs[0]["plainText"];
-  let cipherText = inputs[0]["cipherText"];
-  inputs[0]["step_in"] = 0;
-  for (var i = 0; i < plaintext_length / 16; i++) {
-    inputs[0]["plainText"] = plaintext.slice(i * 16, (i + 1) * 16);
-    inputs[0]["cipherText"] = cipherText.slice(i * 16, (i + 1) * 16);
-    inputs[0]["ctr"] = [0, 0, 0, i + 1];
-    console.log("inputs[0]", inputs[0]);
-    let wtns = await generateWitness(circuits[0], inputs[0]);
-    witnesses.push({
-      val: wtns.data
-    });
-    inputs[0]["step_in"] = DataHasher(plaintext.slice(0, (i + 1) * 16));
-  };
+  // let plaintext_length = inputs[0]["plainText"].length;
+  // let plaintext = inputs[0]["plainText"];
+  // let cipherText = inputs[0]["cipherText"];
+  // inputs[0]["step_in"] = 0;
+  // for (var i = 0; i < plaintext_length / 16; i++) {
+  //   inputs[0]["plainText"] = plaintext.slice(i * 16, (i + 1) * 16);
+  //   inputs[0]["cipherText"] = cipherText.slice(i * 16, (i + 1) * 16);
+  //   inputs[0]["ctr"] = [0, 0, 0, i + 1];
+  //   console.log("inputs[0]", inputs[0]);
+  //   let wtns = await generateWitness(circuits[0], inputs[0]);
+  //   witnesses.push({
+  //     val: wtns.data
+  //   });
+  //   inputs[0]["step_in"] = DataHasher(plaintext.slice(0, (i + 1) * 16));
+  // };
 
   // HTTP
   console.log(http_start_line.length)

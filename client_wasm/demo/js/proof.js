@@ -1,4 +1,5 @@
 import init, { prover, setup_tracing, initThreadPool } from "../pkg/client_wasm";
+import { witness } from './witness.js';  // Import here too if using worker
 
 let wasmInitialized = false;
 let sharedMemory = null;
