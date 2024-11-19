@@ -1,6 +1,4 @@
-//! Used for computing the witnesses needed for a Web Proof NIVC chain for the hashchain-based
-//! circuits. In theory, we don't need to do this for AES since that is handled elsewhere, so this
-//! is solely going to be for the HTTP and JSON elements of the chain.
+//! Used for computing the witnesses needed for HTTP and JSON elements of Web Proof NIVC hashchain-based circuits. 
 
 use ff::PrimeField;
 use serde_json::Value;
