@@ -21,13 +21,12 @@ use std::collections::HashMap;
 
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::{
-  program::data::{CircuitData, InstructionConfig},
+  program::data::{CircuitData, FoldInput, InstructionConfig},
   witness::{compute_http_header_witness, compute_http_witness, compute_json_witness, data_hasher},
 };
-
 /// JSON key required to extract particular value from response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -96,6 +95,17 @@ const JSON_MASK_OBJECT_KEY_NAME: &str = "key";
 const JSON_MASK_OBJECT_KEYLEN_NAME: &str = "keyLen";
 const JSON_MAX_KEY_LENGTH: usize = 10;
 const JSON_MASK_ARRAY_SIGNAL_NAME: &str = "index";
+const AES_PLAINTEXT_SIGNAL_NAME: &str = "plainText";
+const AES_CIPHERTEXT_SIGNAL_NAME: &str = "cipherText";
+const AES_COUNTER_SIGNAL_NAME: &str = "ctr";
+
+pub fn generate_aes_counter(plaintext_blocks: usize) -> Vec<u8> {
+  let mut ctr = Vec::new();
+  for i in 0..plaintext_blocks {
+    ctr.append(&mut vec![0, 0, 0, (i + 1) as u8]);
+  }
+  ctr
+}
 
 impl Manifest {
   /// generates [`crate::program::ProgramData::rom_data`] and [`crate::program::ProgramData::rom`]
@@ -106,9 +116,9 @@ impl Manifest {
     aes_iv: &[u8],
     aes_aad: &[u8],
     plaintext: &[u8],
-    plaintext_len: usize,
-  ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>) {
-    assert_eq!(plaintext_len % AES_INPUT_LENGTH, 0);
+    ciphertext: &[u8],
+  ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>, HashMap<String, FoldInput>) {
+    assert_eq!(plaintext.len() % AES_INPUT_LENGTH, 0);
 
     let aes_instr = String::from("AES_GCM_1");
     let mut rom_data = HashMap::from([(aes_instr.clone(), CircuitData { opcode: 0 })]);
@@ -120,7 +130,8 @@ impl Manifest {
         (String::from(AES_AAD_SIGNAL), json!(aes_aad)),
       ]),
     };
-    let mut rom = vec![aes_rom_opcode_config; plaintext_len / AES_INPUT_LENGTH];
+    let rom_len = plaintext.len() / AES_INPUT_LENGTH;
+    let mut rom = vec![aes_rom_opcode_config; rom_len];
 
     // TODO(Sambhav): find a better way to prevent this code duplication for request and response
     // compute hashes http start line and headers signals
@@ -157,7 +168,24 @@ impl Manifest {
       ]),
     });
 
-    (rom_data, rom)
+    let fold_inputs = HashMap::from([(aes_instr.clone(), FoldInput {
+      value: HashMap::from([
+        (
+          String::from(AES_PLAINTEXT_SIGNAL_NAME),
+          plaintext.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
+        ),
+        (
+          String::from(AES_CIPHERTEXT_SIGNAL_NAME),
+          ciphertext.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
+        ),
+        (
+          String::from(AES_COUNTER_SIGNAL_NAME),
+          generate_aes_counter(rom_len).iter().map(|val| json!(val)).collect::<Vec<Value>>(),
+        ),
+      ]),
+    })]);
+
+    (rom_data, rom, fold_inputs)
   }
 
   /// generates ROM from [`Manifest::response`]
@@ -167,9 +195,8 @@ impl Manifest {
     aes_iv: [u8; 12],
     aes_aad: [u8; 16],
     plaintext: &[u8],
-    plaintext_len: usize,
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>) {
-    assert_eq!(plaintext_len % AES_INPUT_LENGTH, 0);
+    assert_eq!(plaintext.len() % AES_INPUT_LENGTH, 0);
 
     let aes_instr = String::from("AES_GCM_1");
     let mut rom_data = HashMap::from([(aes_instr.clone(), CircuitData { opcode: 0 })]);
@@ -181,7 +208,7 @@ impl Manifest {
         (String::from(AES_AAD_SIGNAL), json!(aes_aad)),
       ]),
     };
-    let mut rom = vec![aes_rom_opcode_config; plaintext_len / AES_INPUT_LENGTH];
+    let mut rom = vec![aes_rom_opcode_config; plaintext.len() / AES_INPUT_LENGTH];
 
     // compute hashes http start line and headers signals
     let http_start_line_hash =
@@ -361,12 +388,12 @@ mod tests {
     let plaintext_len = 256;
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
-    let (rom_data, rom) = manifest.rom_from_request(
+    let (rom_data, rom, fold_input) = manifest.rom_from_request(
       &AES_KEY.1,
       &AES_IV.1,
       &AES_AAD.1,
       TEST_MANIFEST_REQUEST,
-      plaintext_len,
+      TEST_MANIFEST_REQUEST,
     );
 
     // AES + HTTP parse + HTTP headers length
@@ -382,6 +409,10 @@ mod tests {
     assert!(rom[http_instruction_len].private_input.contains_key("start_line_hash"));
     assert!(rom[http_instruction_len].private_input.contains_key("header_hashes"));
     assert!(rom[http_instruction_len].private_input.contains_key("body_hash"));
+
+    assert!(fold_input.contains_key(AES_PLAINTEXT_SIGNAL_NAME));
+    assert!(fold_input.contains_key(AES_CIPHERTEXT_SIGNAL_NAME));
+    assert!(fold_input.contains_key(AES_COUNTER_SIGNAL_NAME));
   }
 
   #[test]
@@ -390,13 +421,8 @@ mod tests {
 
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
-    let (rom_data, rom) = manifest.rom_from_response(
-      AES_KEY.1,
-      AES_IV.1,
-      AES_AAD.1,
-      TEST_MANIFEST_RESPONSE,
-      plaintext_length,
-    );
+    let (rom_data, rom) =
+      manifest.rom_from_response(AES_KEY.1, AES_IV.1, AES_AAD.1, TEST_MANIFEST_RESPONSE);
 
     // AES + http + json mask (object + array) + extract
     assert_eq!(rom_data.len(), 1 + 1 + manifest.response.body.json.len() + 1);

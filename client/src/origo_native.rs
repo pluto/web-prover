@@ -35,7 +35,6 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
 
   let program_data = generate_program_data(&witness, config.proving).await?;
-  dbg!(&program_data.inputs[0].get("cipherText"));
   let program_output = program::run(&program_data)?;
   let compressed_verifier = program::compress_proof(&program_output, &program_data.public_params)?;
   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
@@ -125,34 +124,13 @@ async fn generate_program_data(
 
   let rom_len = padded_request_plaintext.len() / AES_CHUNK_LENGTH;
 
-  let (rom_data, rom) = proving.manifest.unwrap().rom_from_request(
+  let (rom_data, rom, fold_input) = proving.manifest.unwrap().rom_from_request(
     &key,
     &iv,
     &padded_aad,
     &padded_request_plaintext,
-    512,
+    &padded_request_ciphertext,
   );
-  let aes_instr = String::from("AES_GCM_1");
-
-  // TODO (Sambhav): update fold input from manifest
-  let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
-    value: HashMap::from([
-      (
-        String::from("plainText"),
-        padded_request_plaintext.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-      ),
-      (
-        String::from("cipherText"),
-        padded_request_ciphertext.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-      ),
-      (
-        String::from(AES_COUNTER.0),
-        AES_COUNTER.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-      ),
-    ]),
-  })]);
-  dbg!(&rom_data);
-  dbg!(&rom);
   // ----------------------------------------------------------------------------------------------------------------------- //
 
   debug!("Setting up `PublicParams`... (this may take a moment)");
@@ -166,7 +144,7 @@ async fn generate_program_data(
       rom,
       rom_data,
       initial_nivc_input: vec![proofs::F::<G1>::from(0)],
-      inputs,
+      inputs: fold_input,
       witnesses: vec![vec![F::<G1>::from(0)]],
     }
     .into_expanded()?,
