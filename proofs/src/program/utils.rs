@@ -59,7 +59,7 @@ pub fn next_rom_index_and_pc<CS: ConstraintSystem<F<G1>>>(
     let current_value = allocated_rom
       .get(current_rom_index)
       .and_then(|v| v.get_value())
-      .ok_or_else(|| SynthesisError::AssignmentMissing)?;
+      .ok_or(SynthesisError::AssignmentMissing)?;
 
     Ok(next_value.unwrap_or(current_value))
   })?;
@@ -126,25 +126,19 @@ pub fn into_input_json(
     .collect();
 
   let input = CircomInput { step_in: decimal_stringified_input, extra: private_input.clone() };
-  let input_str = serde_json::to_string(&input)?;
-  Ok(input_str)
-  // TODO (Sambhav): change this conversion of string back and forth
-  // let mapped_inputs = remap_inputs(&input_str)?;
-  // Ok(serde_json::to_string(&mapped_inputs)?)
+  Ok(serde_json::to_string(&input)?)
 }
 
-pub fn remap_inputs(input_json: &str) -> Result<HashMap<String, Vec<String>>, ProofError> {
+pub fn remap_inputs(input_json: &str) -> Result<Vec<(String, Vec<BigInt>)>, ProofError> {
   let circom_input: CircomInput = serde_json::from_str(input_json)?;
-  let mut remapped = HashMap::new();
+  let mut remapped = vec![];
 
-  let step_in_values: Vec<String> = circom_input
+  let step_in_values: Result<Vec<BigInt>, _> = circom_input
     .step_in
-    .iter()
-    .map(|x| {
-      BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.clone().into_bytes()).to_str_radix(10)
-    })
+    .into_iter()
+    .map(|s| BigInt::from_str(&s).map_err(ProofError::from))
     .collect();
-  remapped.insert("step_in".to_string(), step_in_values);
+  remapped.push(("step_in".to_string(), step_in_values?));
 
   for (k, v) in circom_input.extra {
     let val = v
@@ -152,20 +146,12 @@ pub fn remap_inputs(input_json: &str) -> Result<HashMap<String, Vec<String>>, Pr
       .ok_or_else(|| ProofError::Other(format!("Expected array for key {}", k)))?
       .iter()
       .map(|x| {
-        let x = match x {
-          Value::String(num) =>
-            BigInt::from_bytes_le(num_bigint::Sign::Plus, &num.clone().into_bytes())
-              .to_str_radix(10),
-          Value::Number(num) =>
-            BigInt::from_bytes_le(num_bigint::Sign::Plus, &num.as_u64().unwrap().to_le_bytes())
-              .to_str_radix(10),
-          _ => return Err(ProofError::Other(format!("Expect string or number, got: {:?}", x))),
-        };
-        Ok(x)
+        x.as_str()
+          .ok_or_else(|| ProofError::Other(format!("Expected string for key {}", k)))
+          .and_then(|s| BigInt::from_str(s).map_err(ProofError::from))
       })
-      .collect::<Result<Vec<String>, ProofError>>()?;
-    dbg!(&k, &val);
-    remapped.insert(k, val);
+      .collect::<Result<Vec<BigInt>, ProofError>>()?;
+    remapped.push((k, val));
   }
 
   Ok(remapped)
