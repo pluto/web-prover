@@ -122,8 +122,6 @@ async fn generate_program_data(
     request_ciphertext[..request_plaintext.len()].to_vec().clone();
   padded_request_ciphertext.extend(vec![0; padding]);
 
-  let rom_len = padded_request_plaintext.len() / AES_CHUNK_LENGTH;
-
   let (rom_data, rom, fold_input) = proving.manifest.unwrap().rom_from_request(
     &key,
     &iv,

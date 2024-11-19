@@ -118,7 +118,7 @@ async fn generate_program_data(
   };
 
   // TODO: Is padding the approach we want or change to support variable length?
-  let padding = request_plaintext.len().next_power_of_two() * 2 - request_plaintext.len();
+  let padding = 512 - request_plaintext.len();
   let mut padded_request_plaintext = request_plaintext.clone();
   padded_request_plaintext.extend(vec![0; padding]);
 
@@ -131,78 +131,13 @@ async fn generate_program_data(
   debug!("plaintext: {:?}", padded_request_plaintext);
   debug!("ciphertext: {:?}", padded_request_ciphertext);
 
-  let aes_instr = String::from("AES_GCM_1");
-  let rom_data = HashMap::from([
-    (aes_instr.clone(), CircuitData { opcode: 0 }),
-    (String::from("HTTP_NIVC"), CircuitData { opcode: 1 }),
-    (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 2 }),
-    (String::from("JSON_MASK_ARRAY_INDEX"), CircuitData { opcode: 3 }),
-    (String::from("EXTRACT_VALUE"), CircuitData { opcode: 4 }),
-  ]);
-
-  let aes_rom_opcode_config = InstructionConfig {
-    name:          aes_instr.clone(),
-    private_input: HashMap::from([
-      (String::from("key"), json!(key)),
-      (String::from("iv"), json!(iv)),
-      (String::from("aad"), json!(padded_aad)),
-    ]),
-  };
-
-  // compute hashes http start line and headers signals
-  let http_start_line_hash = data_hasher(&compute_http_witness(
+  let (rom_data, rom, fold_input) = proving.manifest.unwrap().rom_from_request(
+    &key,
+    &iv,
+    &padded_aad,
     &padded_request_plaintext,
-    proofs::witness::HttpMaskType::StartLine,
-  ));
-  let mut http_header_hashes = vec!["0".to_string(); 5];
-  for header_name in proving.manifest.unwrap().request.headers.keys() {
-    let (index, masked_header) =
-      compute_http_header_witness(&padded_request_plaintext, header_name.as_bytes());
-    http_header_hashes[index] =
-      BigInt::from_bytes_le(num_bigint::Sign::Plus, &data_hasher(&masked_header).to_bytes())
-        .to_str_radix(10);
-  }
-
-  let http_body =
-    compute_http_witness(&padded_request_plaintext, proofs::witness::HttpMaskType::Body);
-  let http_body_hash = data_hasher(&http_body);
-
-  let mut rom = vec![aes_rom_opcode_config; padded_request_plaintext.len() / AES_CHUNK_LENGTH];
-  rom.extend([InstructionConfig {
-    name:          String::from("HTTP_NIVC"),
-    private_input: HashMap::from([
-      (String::from("data"), json!(padded_request_plaintext)),
-      (
-        String::from("start_line_hash"),
-        json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
-          .to_str_radix(10)]),
-      ),
-      (String::from("header_hashes"), json!(http_header_hashes)),
-      (
-        String::from("body_hash"),
-        json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
-          .to_str_radix(10),]),
-      ),
-    ]),
-  }]);
-
-  // TODO (Sambhav): update fold input from manifest
-  let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
-    value: HashMap::from([
-      (
-        String::from("plainText"),
-        padded_request_plaintext.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-      ),
-      (
-        String::from("cipherText"),
-        padded_request_ciphertext.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-      ),
-      (
-        String::from(AES_COUNTER.0),
-        AES_COUNTER.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-      ),
-    ]),
-  })]);
+    &padded_request_ciphertext,
+  );
 
   debug!("generating public params");
   // let public_params = program::setup(&setup_data);
@@ -213,7 +148,7 @@ async fn generate_program_data(
     rom,
     rom_data,
     initial_nivc_input: vec![proofs::F::<G1>::from(0)],
-    inputs,
+    inputs: fold_input,
     witnesses,
   }
   .into_online();

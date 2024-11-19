@@ -118,6 +118,7 @@ impl Manifest {
     plaintext: &[u8],
     ciphertext: &[u8],
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>, HashMap<String, FoldInput>) {
+    assert_eq!(plaintext.len(), ciphertext.len());
     assert_eq!(plaintext.len() % AES_INPUT_LENGTH, 0);
 
     let aes_instr = String::from("AES_GCM_1");
@@ -195,7 +196,9 @@ impl Manifest {
     aes_iv: [u8; 12],
     aes_aad: [u8; 16],
     plaintext: &[u8],
-  ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>) {
+    ciphertext: &[u8],
+  ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>, HashMap<String, FoldInput>) {
+    assert_eq!(plaintext.len(), ciphertext.len());
     assert_eq!(plaintext.len() % AES_INPUT_LENGTH, 0);
 
     let aes_instr = String::from("AES_GCM_1");
@@ -208,7 +211,9 @@ impl Manifest {
         (String::from(AES_AAD_SIGNAL), json!(aes_aad)),
       ]),
     };
-    let mut rom = vec![aes_rom_opcode_config; plaintext.len() / AES_INPUT_LENGTH];
+
+    let rom_len = plaintext.len() / AES_INPUT_LENGTH;
+    let mut rom = vec![aes_rom_opcode_config; rom_len];
 
     // compute hashes http start line and headers signals
     let http_start_line_hash =
@@ -287,7 +292,24 @@ impl Manifest {
       private_input: HashMap::from([(String::from(DATA_SIGNAL_NAME), json!(masked_body))]),
     });
 
-    (rom_data, rom)
+    let fold_inputs = HashMap::from([(aes_instr.clone(), FoldInput {
+      value: HashMap::from([
+        (
+          String::from(AES_PLAINTEXT_SIGNAL_NAME),
+          plaintext.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
+        ),
+        (
+          String::from(AES_CIPHERTEXT_SIGNAL_NAME),
+          ciphertext.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
+        ),
+        (
+          String::from(AES_COUNTER_SIGNAL_NAME),
+          generate_aes_counter(rom_len).iter().map(|val| json!(val)).collect::<Vec<Value>>(),
+        ),
+      ]),
+    })]);
+
+    (rom_data, rom, fold_inputs)
   }
 }
 
@@ -385,7 +407,6 @@ mod tests {
 
   #[test]
   fn generate_rom_from_request() {
-    let plaintext_len = 256;
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
     let (rom_data, rom, fold_input) = manifest.rom_from_request(
@@ -401,28 +422,32 @@ mod tests {
     assert_eq!(rom_data.get(&String::from("HTTP_NIVC")).unwrap().opcode, 1);
 
     // should contain http parse and http headers
-    assert_eq!(rom.len(), plaintext_len / AES_INPUT_LENGTH + 1);
+    assert_eq!(rom.len(), TEST_MANIFEST_REQUEST.len() / AES_INPUT_LENGTH + 1);
 
     // assert http parse inputs
-    let http_instruction_len = plaintext_len / AES_INPUT_LENGTH;
+    let http_instruction_len = TEST_MANIFEST_REQUEST.len() / AES_INPUT_LENGTH;
     assert_eq!(rom[http_instruction_len].name, String::from("HTTP_NIVC"));
     assert!(rom[http_instruction_len].private_input.contains_key("start_line_hash"));
     assert!(rom[http_instruction_len].private_input.contains_key("header_hashes"));
     assert!(rom[http_instruction_len].private_input.contains_key("body_hash"));
 
-    assert!(fold_input.contains_key(AES_PLAINTEXT_SIGNAL_NAME));
-    assert!(fold_input.contains_key(AES_CIPHERTEXT_SIGNAL_NAME));
-    assert!(fold_input.contains_key(AES_COUNTER_SIGNAL_NAME));
+    let aes_fold_input = fold_input.get(&String::from("AES_GCM_1")).unwrap();
+    assert!(aes_fold_input.value.contains_key(AES_PLAINTEXT_SIGNAL_NAME));
+    assert!(aes_fold_input.value.contains_key(AES_CIPHERTEXT_SIGNAL_NAME));
+    assert!(aes_fold_input.value.contains_key(AES_COUNTER_SIGNAL_NAME));
   }
 
   #[test]
   fn generate_rom_from_response() {
-    let plaintext_length = 512;
-
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
-    let (rom_data, rom) =
-      manifest.rom_from_response(AES_KEY.1, AES_IV.1, AES_AAD.1, TEST_MANIFEST_RESPONSE);
+    let (rom_data, rom, fold_input) = manifest.rom_from_response(
+      AES_KEY.1,
+      AES_IV.1,
+      AES_AAD.1,
+      TEST_MANIFEST_RESPONSE,
+      TEST_MANIFEST_RESPONSE,
+    );
 
     // AES + http + json mask (object + array) + extract
     assert_eq!(rom_data.len(), 1 + 1 + manifest.response.body.json.len() + 1);
@@ -434,11 +459,11 @@ mod tests {
 
     assert_eq!(
       rom.len(),
-      plaintext_length / AES_INPUT_LENGTH + 1 + manifest.response.body.json.len() + 1
+      TEST_MANIFEST_RESPONSE.len() / AES_INPUT_LENGTH + 1 + manifest.response.body.json.len() + 1
     );
 
     // assert http parse inputs
-    let http_instruction_len = plaintext_length / AES_INPUT_LENGTH;
+    let http_instruction_len = TEST_MANIFEST_RESPONSE.len() / AES_INPUT_LENGTH;
 
     assert_eq!(rom[http_instruction_len].name, String::from("HTTP_NIVC"));
     assert!(rom[http_instruction_len].private_input.contains_key("start_line_hash"));
@@ -448,5 +473,10 @@ mod tests {
     // check final circuit is extract
     assert_eq!(rom[rom.len() - 1].name, String::from("EXTRACT_VALUE"));
     assert!(rom[rom.len() - 1].private_input.contains_key("data"));
+
+    let aes_fold_input = fold_input.get(&String::from("AES_GCM_1")).unwrap();
+    assert!(aes_fold_input.value.contains_key(AES_PLAINTEXT_SIGNAL_NAME));
+    assert!(aes_fold_input.value.contains_key(AES_CIPHERTEXT_SIGNAL_NAME));
+    assert!(aes_fold_input.value.contains_key(AES_COUNTER_SIGNAL_NAME));
   }
 }
