@@ -217,7 +217,9 @@ pub fn data_hasher(preimage: &[u8]) -> F<G1> {
   let packed_inputs = preimage.chunks(16).map(bytepack).collect::<Vec<F<G1>>>();
   let mut hash_val = F::<G1>::ZERO;
   for packed_input in packed_inputs {
-    hash_val = poseidon_chainer(&[hash_val, packed_input]);
+    if packed_input != F::<G1>::ZERO {
+      hash_val = poseidon_chainer(&[hash_val, packed_input]);
+    }
   }
   hash_val
 }
