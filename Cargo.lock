@@ -3,23 +3,6 @@
 version = 4
 
 [[package]]
-name = "abomonation"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56e72913c99b1f927aa7bd59a41518fdd9995f63ffc8760f211609e0241c4fb2"
-
-[[package]]
-name = "abomonation_derive_ng"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c34056136e0910411c88e9af0bca6e23fcdba258da239684014cd45ca900c9f0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.85",
-]
-
-[[package]]
 name = "addchain"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -128,7 +111,7 @@ dependencies = [
  "bytes",
  "cfg-if",
  "const-hex",
- "derive_more 1.0.0",
+ "derive_more",
  "foldhash",
  "hashbrown 0.15.0",
  "hex-literal",
@@ -234,51 +217,6 @@ name = "anyhow"
 version = "1.0.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c042108f3ed77fd83760a5fd79b53be043192bb3b9dba91d8c574c0ada7850c8"
-
-[[package]]
-name = "arecibo"
-version = "0.2.0"
-source = "git+https://github.com/argumentcomputer/arecibo#3dea91fb6e6b6915a4387321bba9385e4f45c449"
-dependencies = [
- "abomonation",
- "abomonation_derive_ng",
- "bellpepper",
- "bellpepper-core",
- "bincode",
- "bitvec",
- "byteorder",
- "cfg-if",
- "derive_more 0.99.18",
- "digest 0.10.7",
- "ff",
- "generic-array 1.1.0",
- "getrandom 0.2.15",
- "group",
- "grumpkin-msm",
- "halo2curves",
- "itertools 0.13.0",
- "neptune",
- "num-bigint 0.4.6",
- "num-integer",
- "num-traits",
- "once_cell",
- "pairing",
- "pasta_curves",
- "proptest",
- "rand 0.8.5",
- "rand_chacha 0.3.1",
- "rand_core 0.6.4",
- "rayon",
- "rayon-scan",
- "ref-cast",
- "serde",
- "sha3",
- "static_assertions",
- "subtle",
- "thiserror",
- "tracing",
- "vergen",
-]
 
 [[package]]
 name = "ark-bn254"
@@ -1299,7 +1237,6 @@ name = "client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "arecibo",
  "async-tungstenite 0.25.1",
  "base64 0.22.1",
  "cfg-if",
@@ -1315,6 +1252,7 @@ dependencies = [
  "hyper 1.5.0",
  "hyper-util",
  "js-sys",
+ "num-bigint 0.4.6",
  "p256",
  "parking_lot",
  "pin-project-lite",
@@ -1531,7 +1469,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68578f196d2a33ff61b27fae256c3164f65e36382648e30666dde05b8cc9dfdf"
 dependencies = [
  "async-trait",
- "convert_case 0.6.0",
+ "convert_case",
  "json5",
  "nom",
  "pathdiff",
@@ -1640,12 +1578,6 @@ dependencies = [
  "circom_algebra",
  "json",
 ]
-
-[[package]]
-name = "convert_case"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
 
 [[package]]
 name = "convert_case"
@@ -1991,19 +1923,6 @@ checksum = "ebcda35c7a396850a55ffeac740804b40ffec779b98fffbb1738f4033f0ee79e"
 dependencies = [
  "derive_builder_core 0.12.0",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "derive_more"
-version = "0.99.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f33878137e4dafd7fa914ad4e259e18a4e8e532b9617a2d0150262bf53abfce"
-dependencies = [
- "convert_case 0.4.0",
- "proc-macro2",
- "quote",
- "rustc_version 0.4.1",
- "syn 2.0.85",
 ]
 
 [[package]]
@@ -3622,8 +3541,6 @@ name = "neptune"
 version = "13.0.0"
 source = "git+https://github.com/argumentcomputer/neptune?branch=dev#3df907eb871498a13f4f1629e0bc1687557e1358"
 dependencies = [
- "abomonation",
- "abomonation_derive_ng",
  "bellpepper",
  "bellpepper-core",
  "blake2s_simd",

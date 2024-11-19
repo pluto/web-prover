@@ -1,5 +1,4 @@
 // logic common to wasm32 and native
-use arecibo::{provider::Bn256EngineKZG, supernova::RecursiveSNARK};
 use serde::Serialize;
 use serde_json::json;
 use tls_client2::{origo::WitnessData, CipherSuite, Decrypter2, ProtocolVersion};

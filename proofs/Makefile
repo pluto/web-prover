@@ -3,7 +3,7 @@
 # Finally run test using these files
 
 web-prover-circuits-512:
-	curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/download/v0.3.1/circom-artifacts-target_512b-v0.3.1.zip
+	curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/download/v0.5.2/circom-artifacts-target_512b-v0.5.2.zip
 	mkdir -p web_proof_circuits/target_512b/
 	unzip -o circuits.zip -d web_proof_circuits/target_512b/
 	rm circuits.zip
@@ -30,7 +30,7 @@ test-circuits:
 	build-circuit examples/circuit_data/swap_memory.circom examples/circuit_data/swap_memory.bin -l node_modules
 
 proof: web-prover-circuits-512
-	cargo test --release -- tests::test_end_to_end_proofs --exact --show-output
+	cargo test --release --features timing -- tests::test_end_to_end_proofs --exact --show-output
 
 params:
 	cargo test --release -- tests::test_offline_proofs --exact --show-output --ignored

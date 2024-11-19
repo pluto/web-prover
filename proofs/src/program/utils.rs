@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use bellpepper_core::{
   boolean::{AllocatedBit, Boolean},
   LinearCombination,
@@ -61,7 +59,7 @@ pub fn next_rom_index_and_pc<CS: ConstraintSystem<F<G1>>>(
     let current_value = allocated_rom
       .get(current_rom_index)
       .and_then(|v| v.get_value())
-      .ok_or_else(|| SynthesisError::AssignmentMissing)?;
+      .ok_or(SynthesisError::AssignmentMissing)?;
 
     Ok(next_value.unwrap_or(current_value))
   })?;

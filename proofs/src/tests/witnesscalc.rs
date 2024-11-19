@@ -66,7 +66,7 @@ fn run_entry(
     setup_data,
     rom_data,
     rom,
-    initial_nivc_input: INIT_PUBLIC_INPUT.to_vec(),
+    initial_nivc_input: vec![F::<G1>::from(1), F::<G1>::from(2)],
     inputs: HashMap::new(),
     witnesses: vec![],
   }
@@ -127,20 +127,22 @@ fn test_run_serialized_verify() {
 
   // Extend the initial state input with the ROM (happens internally inside of `program::run`, so
   // we do it out here just for the test)
-  let mut z0_primary = INIT_PUBLIC_INPUT.to_vec();
-  z0_primary.push(0);
-  let mut rom = ROM.to_vec();
-  rom.resize(MAX_ROM_LENGTH, u64::MAX);
-  z0_primary.extend(rom.iter());
+  let mut z0_primary = vec![F::<G1>::ONE, F::<G1>::from(2)];
+  z0_primary.push(F::<G1>::ZERO);
+  let mut rom = vec![
+    F::<G1>::ZERO,
+    F::<G1>::ONE,
+    F::<G1>::from(2),
+    F::<G1>::ZERO,
+    F::<G1>::ONE,
+    F::<G1>::from(2),
+  ];
+  rom.resize(MAX_ROM_LENGTH, F::<G1>::from(u64::MAX));
+  z0_primary.extend_from_slice(&rom);
 
   // Check that it verifies with offlined `PublicParams` regenerated pkey vkey
   let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
-  let res = proof.0.verify(
-    &program_data.public_params,
-    &vk,
-    z0_primary.clone().into_iter().map(F::<G1>::from).collect::<Vec<_>>().as_slice(),
-    [0].into_iter().map(F::<G2>::from).collect::<Vec<_>>().as_slice(),
-  );
+  let res = proof.0.verify(&program_data.public_params, &vk, &z0_primary, &[F::<G2>::ZERO]);
   assert!(res.is_ok());
   std::fs::remove_file(PathBuf::from_str(TEST_OFFLINE_PATH).unwrap()).unwrap();
 }

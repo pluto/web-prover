@@ -125,8 +125,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
   rom.resize(program_data.setup_data.max_rom_length, u64::MAX);
 
   // Get the public inputs needed for circuits
-  let mut z0_primary: Vec<F<G1>> =
-    program_data.initial_nivc_input.iter().map(|val| F::<G1>::from(*val)).collect();
+  let mut z0_primary: Vec<F<G1>> = program_data.initial_nivc_input.clone();
   z0_primary.push(F::<G1>::ZERO); // rom_index = 0
   z0_primary.extend(rom.iter().map(|opcode| <E1 as Engine>::Scalar::from(*opcode)));
 

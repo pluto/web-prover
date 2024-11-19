@@ -65,7 +65,8 @@ jobs:
 
       - name: compile wasm
         run: |
-          make wasm
+          # TODO (sambhav): move this to wasm
+          make wasm-debug
 
       - run: "tar czf pkg.tar.gz ./pkg/*"
         if: matrix.os == 'ubuntu-latest'

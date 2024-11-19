@@ -28,8 +28,6 @@ use crate::{
   circuits::*, config, config::ProvingData, errors, errors::ClientErrors, origo::SignBody, Proof,
 };
 
-const JSON_MAX_ROM_LENGTH: usize = 35;
-
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
   let (sb, witness) = proxy(config.clone(), session_id.clone()).await?;
@@ -50,27 +48,38 @@ async fn generate_program_data(
   proving: ProvingData,
 ) -> Result<ProgramData<Online, Expanded>, ClientErrors> {
   // ----------------------------------------------------------------------------------------------------------------------- //
-  // - get AES key, IV, request ciphertext, request plaintext, and AAD -
+  // - get AES key, IV -
   debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
   debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
 
   let key: [u8; 16] = witness.request.aes_key[..16].try_into()?;
   let iv: [u8; 12] = witness.request.aes_iv[..12].try_into()?;
-  let ct: &[u8] = witness.request.ciphertext.as_bytes();
+  // ----------------------------------------------------------------------------------------------------------------------- //
+  // Get the request ciphertext, request plaintext, and AAD
+  let request_ciphertext = hex::decode(witness.request.ciphertext.as_bytes())?;
 
-  let dec = Decrypter2::new(key, iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
-  let (plaintext, meta) = dec.decrypt_tls13_aes(
+  let request_decrypter = Decrypter2::new(key, iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
+  let (plaintext, meta) = request_decrypter.decrypt_tls13_aes(
     &OpaqueMessage {
       typ:     ContentType::ApplicationData,
       version: ProtocolVersion::TLSv1_3,
-      payload: Payload::new(hex::decode(ct)?),
+      payload: Payload::new(request_ciphertext.clone()), /* TODO (autoparallel): old way didn't
+                                                          * introduce a clone */
     },
     0,
   )?;
-  let pt = plaintext.payload.0.to_vec();
+
   let aad = hex::decode(meta.additional_data.to_owned())?;
   let mut padded_aad = vec![0; 16 - aad.len()];
   padded_aad.extend(aad);
+
+  let request_plaintext = plaintext.payload.0.to_vec();
+  // -- NOTE: Above is the following:
+  // GET https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json HTTP/1.1
+  // host: gist.githubusercontent.com
+  // accept-encoding: identity
+  // connection: close
+  // accept: */*
   // ----------------------------------------------------------------------------------------------------------------------- //
 
   // TODO (Colin): ultimately we want to download the `AuxParams` here and deserialize to setup
@@ -81,18 +90,14 @@ async fn generate_program_data(
   let setup_data = SetupData {
     r1cs_types:              vec![
       R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
       WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
@@ -103,37 +108,27 @@ async fn generate_program_data(
   // ----------------------------------------------------------------------------------------------------------------------- //
 
   // ----------------------------------------------------------------------------------------------------------------------- //
-  // - construct private inputs and program layout for AES proof -
-  let mut private_input = HashMap::new();
-  private_input.insert("key".to_string(), serde_json::to_value(&key)?);
-  private_input.insert("iv".to_string(), serde_json::to_value(&iv)?);
-
+  // - construct private inputs and program layout for AES proof for request -
   // TODO: Is padding the approach we want or change to support variable length?
-  let janky_padding = if pt.len() % 16 != 0 { 16 - pt.len() % 16 } else { 0 };
-  let mut janky_plaintext_padding = vec![0; janky_padding];
-  let rom_len = (pt.len() + janky_padding) / 16;
-  janky_plaintext_padding.extend(pt);
+  // TODO (autoparallel): For now I am padding to 512b due to our circuits. THIS IS HARD CODED AND
+  // NOT THE RIGHT WAY TO DO IT. PLEASE CHANGE THIS.
+  let padding = 512 - request_plaintext.len();
+  let mut padded_request_plaintext = request_plaintext.clone();
+  padded_request_plaintext.extend(vec![0; padding]);
 
-  let (rom_data, rom) = proving.manifest.unwrap().rom_from_request(
+  // NOTE (autoparallel): This removes the 16 + 1 extra bytes for authtag and tls inner content
+  // type, then pads with 0.
+  let mut padded_request_ciphertext =
+    request_ciphertext[..request_plaintext.len()].to_vec().clone();
+  padded_request_ciphertext.extend(vec![0; padding]);
+
+  let (rom_data, rom, fold_input) = proving.manifest.unwrap().rom_from_request(
     &key,
     &iv,
     &padded_aad,
-    janky_plaintext_padding.len(),
+    &padded_request_plaintext,
+    &padded_request_ciphertext,
   );
-  let aes_instr = String::from("AES_GCM_1");
-
-  // TODO (Sambhav): update fold input from manifest
-  let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
-    value: HashMap::from([(
-      String::from("plainText"),
-      janky_plaintext_padding.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-    )]),
-  })]);
-
-  let mut initial_input = vec![];
-  initial_input.extend(janky_plaintext_padding.iter());
-  initial_input.resize(TOTAL_BYTES_ACROSS_NIVC, 0);
-  let final_input: Vec<u64> = initial_input.into_iter().map(u64::from).collect();
   // ----------------------------------------------------------------------------------------------------------------------- //
 
   debug!("Setting up `PublicParams`... (this may take a moment)");
@@ -146,8 +141,8 @@ async fn generate_program_data(
       setup_data,
       rom,
       rom_data,
-      initial_nivc_input: final_input.to_vec(),
-      inputs,
+      initial_nivc_input: vec![proofs::F::<G1>::from(0)],
+      inputs: fold_input,
       witnesses: vec![vec![F::<G1>::from(0)]],
     }
     .into_expanded()?,

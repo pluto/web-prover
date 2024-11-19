@@ -22,9 +22,6 @@ tls-client-async2={ path="../tls/tls-client-async", package="tls-client-async", 
 ] }
 tls-core={ path="../tls/tls-core", package="tls-core" }
 proofs={ path="../proofs", package="proofs" }
-arecibo = { git = "https://github.com/argumentcomputer/arecibo", default-features = false, features = [
-    "portable",
-] }
 
 webpki-roots="0.26.1"
 pki-types   ={ package="rustls-pki-types", version="1.7" }
@@ -32,9 +29,9 @@ cfg-if      ="1.0.0"
 # Serde
 serde.workspace     =true
 serde_json.workspace=true
-serde_bytes = "0.11"
+serde_bytes         ="0.11"
 # Web
-hex = "0.4"
+hex           ="0.4"
 url           ="2.5"
 hyper         ={ version="1.4", features=["client", "http1"] }
 http-body-util="0.1"
@@ -52,6 +49,8 @@ tokio-util={ version="0.7", features=[
 ] } # compat is used to work with AsyncRead and AsyncWrite from other crates
 chrono="0.4"
 p256={ version="0.13", features=["pem", "ecdsa"] }
+num-bigint="0.4"
+
 [dependencies.uuid]
 version         ="1.10.0"
 default-features=false
