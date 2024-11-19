@@ -205,15 +205,19 @@ fn test_end_to_end_proofs() {
 
   // After setting the AES config for the ROM, pad the plaintext to match what http_nivc_512b
   // requires
-  let mut http_response_plaintext = HTTP_RESPONSE_PLAINTEXT.1.to_vec();
-  http_response_plaintext.resize(512, 0);
-  dbg!(&http_response_plaintext);
+  let mut padded_http_response_plaintext = HTTP_RESPONSE_PLAINTEXT.1.to_vec();
+  padded_http_response_plaintext.resize(512, 0);
 
-  let http_start_line_hash =
-    data_hasher(&compute_http_witness(&http_response_plaintext, witness::HttpMaskType::StartLine));
-  let http_header_1_hash =
-    data_hasher(&compute_http_witness(&http_response_plaintext, witness::HttpMaskType::Header(1)));
-  let http_body = compute_http_witness(&http_response_plaintext, witness::HttpMaskType::Body);
+  let http_start_line_hash = data_hasher(&compute_http_witness(
+    &padded_http_response_plaintext,
+    witness::HttpMaskType::StartLine,
+  ));
+  let http_header_1_hash = data_hasher(&compute_http_witness(
+    &padded_http_response_plaintext,
+    witness::HttpMaskType::Header(1),
+  ));
+  let http_body =
+    compute_http_witness(&padded_http_response_plaintext, witness::HttpMaskType::Body);
   let http_body_hash = data_hasher(&http_body);
 
   let masked_json_key_1 =
@@ -237,7 +241,7 @@ fn test_end_to_end_proofs() {
     InstructionConfig {
       name:          String::from("HTTP_NIVC"),
       private_input: HashMap::from([
-        (String::from("data"), json!(http_response_plaintext)),
+        (String::from("data"), json!(padded_http_response_plaintext)),
         (
           String::from("start_line_hash"),
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
