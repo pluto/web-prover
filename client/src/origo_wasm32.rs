@@ -5,9 +5,9 @@ use std::{
   sync::Arc,
 };
 
-use client_wasm::{create_witness, WitnessInput};
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::{body::Bytes, Request, StatusCode};
+use js_sys::Promise;
 use num_bigint::BigInt;
 use proofs::{
   circom::witness::load_witness_from_bin_reader,
@@ -21,7 +21,7 @@ use proofs::{
   witness::{compute_http_header_witness, compute_http_witness, compute_json_witness, data_hasher},
   G1,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tls_client2::{
   origo::WitnessData, CipherSuite, ClientConnection, Decrypter2, ProtocolVersion,
@@ -31,6 +31,7 @@ use tls_client_async2::bind_client;
 use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
 use tracing::debug;
 use url::Url;
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use web_time::Instant;
 use ws_stream_wasm::WsMeta;
@@ -39,6 +40,49 @@ use crate::{circuits::*, config, config::ProvingData, errors, origo::SignBody, P
 
 const JSON_MASK_KEY_DEPTH_1: (&str, [u8; 10]) = ("key", [100, 97, 116, 97, 0, 0, 0, 0, 0, 0]); // "data"
 const JSON_MASK_KEYLEN_DEPTH_1: (&str, [u8; 1]) = ("keyLen", [4]);
+
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Serialize, Clone, Deserialize)]
+pub struct WitnessInput {
+  pub key:        Vec<u8>,
+  pub iv:         Vec<u8>,
+  // #[serde(with = "serde_bytes")]
+  pub aad:        Vec<u8>,
+  // #[serde(with = "serde_bytes")]
+  pub plaintext:  Vec<u8>,
+  // #[serde(with = "serde_bytes")]
+  pub ciphertext: Vec<u8>,
+}
+
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WitnessOutput {
+  #[serde(with = "serde_bytes")]
+  pub data: Vec<u8>,
+}
+
+// #[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+extern "C" {
+  #[wasm_bindgen(js_namespace = witness, js_name = createWitness)]
+  fn create_witness_js(input: &JsValue) -> JsValue;
+}
+
+// #[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub async fn create_witness(input: WitnessInput) -> Result<WitnessOutput, JsValue> {
+  // Convert the Rust WitnessInput to a JsValue
+  let js_input = serde_wasm_bindgen::to_value(&input).unwrap();
+
+  // Call JavaScript function and await the Promise
+  let mut js_result = create_witness_js(&js_input);
+
+  // Convert the JavaScript result to Rust WitnessOutput
+  let witness_output: WitnessOutput = serde_wasm_bindgen::from_value(js_result)?;
+
+  debug!("js witnes output: {:?}", witness_output);
+  Ok(witness_output)
+}
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
@@ -139,13 +183,15 @@ async fn generate_program_data(
   debug!("ciphertext: {:?}", padded_request_ciphertext);
 
   let witness_input = WitnessInput {
-    key,
-    iv,
-    aad: padded_aad,
-    plaintext: padded_request_plaintext,
-    ciphertext: padded_request_ciphertext,
+    key:        key.to_vec(),
+    iv:         iv.to_vec(),
+    aad:        padded_aad.clone(),
+    plaintext:  padded_request_plaintext.clone(),
+    ciphertext: padded_request_ciphertext.clone(),
   };
-  let witness_output = create_witness(witness_input).unwrap();
+
+  let witness_output = create_witness(witness_input).await.unwrap();
+  debug!("witness output: {:?}", witness_output);
 
   let aes_instr = String::from("AES_GCM_1");
   let rom_data = HashMap::from([
