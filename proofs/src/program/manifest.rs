@@ -27,6 +27,7 @@ use crate::{
   program::data::{CircuitData, FoldInput, InstructionConfig},
   witness::{compute_http_header_witness, compute_http_witness, compute_json_witness, data_hasher},
 };
+
 /// JSON key required to extract particular value from response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -80,13 +81,16 @@ pub struct Manifest {
   pub response: Response,
 }
 
+/// AES inputs
 const AES_INPUT_LENGTH: usize = 16;
+const AES_PLAINTEXT_SIGNAL_NAME: &str = "plainText";
+const AES_CIPHERTEXT_SIGNAL_NAME: &str = "cipherText";
+const AES_COUNTER_SIGNAL_NAME: &str = "ctr";
 const AES_KEY_SIGNAL: &str = "key";
 const AES_IV_SIGNAL: &str = "iv";
 const AES_AAD_SIGNAL: &str = "aad";
 
-// HTTP
-
+/// HTTP
 const DATA_SIGNAL_NAME: &str = "data";
 const HTTP_START_LINE_HASH_SIGNAL_NAME: &str = "start_line_hash";
 const HTTP_HEADER_HASHES_SIGNAL_NAME: &str = "header_hashes";
@@ -95,10 +99,8 @@ const JSON_MASK_OBJECT_KEY_NAME: &str = "key";
 const JSON_MASK_OBJECT_KEYLEN_NAME: &str = "keyLen";
 const JSON_MAX_KEY_LENGTH: usize = 10;
 const JSON_MASK_ARRAY_SIGNAL_NAME: &str = "index";
-const AES_PLAINTEXT_SIGNAL_NAME: &str = "plainText";
-const AES_CIPHERTEXT_SIGNAL_NAME: &str = "cipherText";
-const AES_COUNTER_SIGNAL_NAME: &str = "ctr";
 
+/// generates AES counter for each block
 pub fn generate_aes_counter(plaintext_blocks: usize) -> Vec<u8> {
   let mut ctr = Vec::new();
   for i in 0..plaintext_blocks {
@@ -292,6 +294,7 @@ impl Manifest {
       private_input: HashMap::from([(String::from(DATA_SIGNAL_NAME), json!(masked_body))]),
     });
 
+    // fold inputs
     let fold_inputs = HashMap::from([(aes_instr.clone(), FoldInput {
       value: HashMap::from([
         (
