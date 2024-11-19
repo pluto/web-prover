@@ -1,4 +1,5 @@
-//! Used for computing the witnesses needed for HTTP and JSON elements of Web Proof NIVC hashchain-based circuits. 
+//! Used for computing the witnesses needed for HTTP and JSON elements of Web Proof NIVC
+//! hashchain-based circuits.
 
 use ff::PrimeField;
 use serde_json::Value;

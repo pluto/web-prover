@@ -136,7 +136,7 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
   /// # Type Parameters
   ///
   /// * `S` - The program status type parameter (Online/Offline) carried over from the original data
-  /// 
+  ///
   /// # Details
   ///
   /// The expansion process handles fold inputs, which are inputs that need to be distributed across
@@ -186,7 +186,7 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
 }
 
 impl<W: WitnessStatus> ProgramData<Offline, W> {
-  /// Converts an offline program data instance back into an online version by decompressing and 
+  /// Converts an offline program data instance back into an online version by decompressing and
   /// deserializing the public parameters and reconstructing the circuit shapes.
   ///
   /// This method performs the following steps:
@@ -217,7 +217,8 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
   ///
   /// # Type Parameters
   ///
-  /// * `W: WitnessStatus` - The witness status type parameter carried over from the original program data
+  /// * `W: WitnessStatus` - The witness status type parameter carried over from the original
+  ///   program data
   ///
   /// # Features
   ///
@@ -272,8 +273,8 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
 }
 
 impl<W: WitnessStatus> ProgramData<Online, W> {
-  /// Converts an online program data instance into an offline version by serializing and compressing
-  /// the public parameters to disk.
+  /// Converts an online program data instance into an offline version by serializing and
+  /// compressing the public parameters to disk.
   ///
   /// This method performs the following steps:
   /// 1. Extracts auxiliary parameters from the public parameters
@@ -302,7 +303,8 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   ///
   /// # Type Parameters
   ///
-  /// * `W: WitnessStatus` - The witness status type parameter carried over from the original program data
+  /// * `W: WitnessStatus` - The witness status type parameter carried over from the original
+  ///   program data
   pub fn into_offline(self, path: PathBuf) -> Result<ProgramData<Offline, W>, ProofError> {
     let (_, aux_params) = self.public_params.into_parts();
     let serialized = bincode::serialize(&aux_params)?;
