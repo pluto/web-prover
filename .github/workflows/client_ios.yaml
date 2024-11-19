@@ -39,9 +39,10 @@ jobs:
         run: |
           cd proofs && make web-prover-circuits-512
 
-      - name: compile iOS
+      - name: Compile iOS
         run: |
           make ios
+          make ios-sim
 
       - uses: actions/upload-artifact@v4
         with:
