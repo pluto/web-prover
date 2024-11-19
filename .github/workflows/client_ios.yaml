@@ -57,7 +57,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: "libclient_ios.h"
-          path: "target/aarch64-apple-ios/release/libclient_ios.h"
+          path: "client_ios/headers/libclient_ios.h"
 
       - uses: actions/upload-artifact@v4
         with:
