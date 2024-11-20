@@ -56,9 +56,12 @@ async fn generate_program_data(
   let iv: [u8; 12] = witness.request.aes_iv[..12].try_into()?;
   // ----------------------------------------------------------------------------------------------------------------------- //
   // Get the request ciphertext, request plaintext, and AAD
+  debug!("Decoding ciphertext hex...");
   let request_ciphertext = hex::decode(witness.request.ciphertext.as_bytes())?;
 
+  debug!("Running decryptor on ciphertext...");
   let request_decrypter = Decrypter2::new(key, iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
+  trace!("Created decrypter!");
   let (plaintext, meta) = request_decrypter.decrypt_tls13_aes(
     &OpaqueMessage {
       typ:     ContentType::ApplicationData,
@@ -68,6 +71,7 @@ async fn generate_program_data(
     },
     0,
   )?;
+  debug!("Finished decrypting ciphertext!");
 
   let aad = hex::decode(meta.additional_data.to_owned())?;
   let mut padded_aad = vec![0; 16 - aad.len()];
