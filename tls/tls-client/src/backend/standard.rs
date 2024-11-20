@@ -1,13 +1,20 @@
 use super::{origo::OrigoConnection, Backend, BackendError};
-use crate::{DecryptMode, EncryptMode, Error};
+use crate::{backend::standard13::make_nonce, DecryptMode, EncryptMode, Error};
 use aes_gcm::{
     aead::{generic_array::GenericArray, Aead, NewAead, Payload},
     Aes128Gcm,
 };
 use async_trait::async_trait;
+use log::{debug, trace};
 use p256::{ecdh::EphemeralSecret, EncodedPoint, PublicKey as ECDHPublicKey};
 use rand::{rngs::OsRng, thread_rng, Rng};
-
+use chacha20poly1305::{
+    aead::{Aead as ChachaAead , Payload as ChaChaPayload},
+    ChaCha20Poly1305,
+    Nonce,
+    Key,
+    KeyInit,
+  };
 use digest::Digest;
 use std::{any::Any, collections::VecDeque, convert::TryInto};
 use tls_core::{
@@ -142,10 +149,25 @@ impl RustCryptoBackend {
                     ))?;
                 write_key.copy_from_slice(&session_keys[0..16]);
                 write_iv.copy_from_slice(&session_keys[32..36]);
-                self.encrypter = Some(Encrypter::new(write_key, write_iv, cipher_suite.suite()));
+                self.encrypter = Some(Encrypter::new(EncryptionKey::AES128GCM(write_key),
+                InitializationVector::Aes(write_iv), 
+                cipher_suite.suite()));
             },
             CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
-                todo!("implement encrypter for TLS13_CHACHA20_POLY1305_SHA256");
+                
+                let mut write_key = [0u8; 32];
+                let mut write_iv = [0u8; 12];
+                let session_keys = self
+                    .session_keys
+                    .as_ref()
+                    .ok_or(BackendError::InvalidState(
+                        "can not set encrypter, session_keys are not set".to_string(),
+                    ))?;
+                write_key.copy_from_slice(&session_keys[0..32]);
+                write_iv.copy_from_slice(&session_keys[32..44]);
+                self.encrypter = Some(Encrypter::new(EncryptionKey::CHACHA20POLY1305(write_key),
+                InitializationVector::ChaCha(write_iv),
+                cipher_suite.suite()));
             }
             suite => return Err(BackendError::UnsupportedCiphersuite(suite)),
         }
@@ -385,8 +407,13 @@ impl Backend for RustCryptoBackend {
             ))?;
 
         match enc.cipher_suite {
-            CipherSuite::TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
-            | CipherSuite::TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 => match msg.version {
+            CipherSuite::TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256| 
+            CipherSuite::TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256|
+            CipherSuite::TLS_DHE_RSA_WITH_AES_128_GCM_SHA256|
+            CipherSuite::TLS_DHE_PSK_WITH_AES_128_GCM_SHA256|
+            CipherSuite::TLS_RSA_PSK_WITH_AES_128_GCM_SHA256|
+            CipherSuite::TLS_PSK_WITH_AES_128_GCM_SHA256
+             => match msg.version {
                 ProtocolVersion::TLSv1_2 => {
                     return enc.encrypt_aes128gcm(&msg, seq, &seq.to_be_bytes());
                 }
@@ -394,6 +421,18 @@ impl Backend for RustCryptoBackend {
                     return Err(BackendError::UnsupportedProtocolVersion(version));
                 }
             },
+            CipherSuite::TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256|
+            CipherSuite::TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256|
+            CipherSuite::TLS_DHE_PSK_WITH_CHACHA20_POLY1305_SHA256|
+            CipherSuite::TLS_RSA_PSK_WITH_CHACHA20_POLY1305_SHA256|
+            CipherSuite::TLS_PSK_WITH_CHACHA20_POLY1305_SHA256 => match msg.version {
+                ProtocolVersion::TLSv1_2 => {
+                    return enc.encrypt_tls13_chacha20_poly1305(&msg, seq);
+                }
+                version => {
+                    return Err(BackendError::UnsupportedProtocolVersion(version));
+                }
+            }
             suite => {
                 return Err(BackendError::UnsupportedCiphersuite(suite));
             }
@@ -455,20 +494,102 @@ fn concat<const O: usize>(left: &[u8], right: &[u8]) -> [u8; O] {
     out
 }
 
+#[derive(Clone)]
+enum EncryptionKey{
+    AES128GCM([u8; 16]), // 128-bit key
+    CHACHA20POLY1305([u8; 32]), // 256-bit key
+}
+
+#[derive(Clone)]
+enum InitializationVector {
+    Aes([u8; 4]),         // AES IV
+    ChaCha([u8; 12]),     // ChaCha20-Poly1305 nonce
+}
+impl AsRef<[u8]> for InitializationVector {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            InitializationVector::Aes(iv) => iv,
+            InitializationVector::ChaCha(iv) => iv,
+        }
+    }
+}
+
+impl AsRef<[u8]> for EncryptionKey {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            EncryptionKey::AES128GCM(key) => key,
+            EncryptionKey::CHACHA20POLY1305(key) => key,
+        }
+    }
+}
+
 pub struct Encrypter {
-    write_key: [u8; 16],
-    write_iv: [u8; 4],
+    write_key: EncryptionKey,
+    write_iv: InitializationVector,
     cipher_suite: CipherSuite,
 }
 
 impl Encrypter {
-    pub fn new(write_key: [u8; 16], write_iv: [u8; 4], cipher_suite: CipherSuite) -> Self {
+    pub fn new(write_key: EncryptionKey, write_iv: InitializationVector, cipher_suite: CipherSuite) -> Self {
         Self {
             write_key,
             write_iv,
             cipher_suite,
         }
     }
+
+    fn encrypt_tls13_chacha20_poly1305(
+        &self,
+        m: &PlainMessage,
+        seq: u64,
+      ) -> Result<OpaqueMessage, BackendError> {
+        let total_len = m.payload.0.len() + 1 + 16;
+        let mut aad = [0u8; 13];
+        aad[..8].copy_from_slice(&seq.to_be_bytes());
+        aad[8] = m.typ.get_u8();
+        aad[9..11].copy_from_slice(&m.version.get_u16().to_be_bytes());
+        aad[11..13].copy_from_slice(&(m.payload.0.len() as u16).to_be_bytes());
+        let mut payload = Vec::with_capacity(total_len);
+        payload.extend_from_slice(&m.payload.0);
+        payload.push(m.typ.get_u8()); // Very important, encrypted messages must have the type appended.
+    
+        let write_key = match &self.write_key {
+            EncryptionKey::CHACHA20POLY1305(key) => Key::from_slice(key),
+            _ => return Err(BackendError::EncryptionError("Invalid key type".to_string())),
+        };
+        let cipher = ChaCha20Poly1305::new(write_key);
+        let iv = match self.write_iv {
+            InitializationVector::ChaCha(iv) => iv,
+            _ => return Err(BackendError::EncryptionError("Invalid IV type".to_string())),
+        };
+        let init_nonce = Nonce::from(make_nonce(iv, seq));
+        let payload = ChaChaPayload { msg: &payload, aad: &aad };
+        let ciphertext = cipher
+          .encrypt(&init_nonce, payload)
+          .map_err(|e| BackendError::EncryptionError(e.to_string()))?;
+    
+        trace!("ENC: cipher={:?}", hex::encode(ciphertext.clone()));
+        trace!("ENC: plain_text={:?}", hex::encode(m.payload.0.clone()));
+        debug!(
+          "ENC: cipher_len={:?}, plain_len={:?}, seq={:?}, iv={:?}, dec_key={:?}, nonce={:?}, aad={:?}",
+          ciphertext.len(),
+          m.payload.0.len(),
+          seq,
+          hex::encode(self.write_iv.clone()),
+          hex::encode(self.write_key.clone()),
+          hex::encode(init_nonce),
+          hex::encode(aad),
+        );
+    
+        Ok(
+          OpaqueMessage {
+            typ:     ContentType::ApplicationData, // Always send Application Data label
+            version: ProtocolVersion::TLSv1_2,     // Opaque Messages lie.
+            payload: TLSPayload::new(ciphertext.clone()),
+          },
+        )
+        
+      }
 
     /// Encrypt with AES128GCM using TLS-specific AAD.
     fn encrypt_aes128gcm(
@@ -488,10 +609,17 @@ impl Encrypter {
         };
 
         let mut nonce = [0u8; 12];
-        nonce[..4].copy_from_slice(&self.write_iv);
+        if let InitializationVector::Aes(iv) = &self.write_iv {
+            nonce[..4].copy_from_slice(iv);
+        };
         nonce[4..].copy_from_slice(explicit_nonce);
         let nonce = GenericArray::from_slice(&nonce);
-        let cipher = Aes128Gcm::new_from_slice(&self.write_key).unwrap();
+
+        let key = match &self.write_key {
+            EncryptionKey::AES128GCM(key) => key,
+            _ => return Err(BackendError::EncryptionError("Invalid key type".to_string())),
+        };
+        let cipher = Aes128Gcm::new_from_slice(key).unwrap();
         // ciphertext will have the MAC appended
         let ciphertext = cipher
             .encrypt(nonce, payload)

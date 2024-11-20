@@ -577,7 +577,12 @@ impl Backend for RustCryptoBackend13 {
       .ok_or(BackendError::EncryptionError("Encrypter not ready".to_string()))?;
 
     match enc.cipher_suite {
-      CipherSuite::TLS13_AES_128_GCM_SHA256 => match msg.version {
+      CipherSuite::TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256| 
+      CipherSuite::TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256|
+      CipherSuite::TLS_DHE_RSA_WITH_AES_128_GCM_SHA256|
+      CipherSuite::TLS_DHE_PSK_WITH_AES_128_GCM_SHA256|
+      CipherSuite::TLS_RSA_PSK_WITH_AES_128_GCM_SHA256|
+      CipherSuite::TLS_PSK_WITH_AES_128_GCM_SHA256 => match msg.version {
         // TODO: Do we need both on the encrypt side?
         ProtocolVersion::TLSv1_3 => {
           let (cipher_msg, meta) = enc.encrypt_tls13_aes(&msg, seq)?;
@@ -589,7 +594,11 @@ impl Backend for RustCryptoBackend13 {
           return Err(BackendError::UnsupportedProtocolVersion(version));
         },
       },
-      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => match msg.version{
+      CipherSuite::TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256|
+      CipherSuite::TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256|
+      CipherSuite::TLS_DHE_PSK_WITH_CHACHA20_POLY1305_SHA256|
+      CipherSuite::TLS_RSA_PSK_WITH_CHACHA20_POLY1305_SHA256|
+      CipherSuite::TLS_PSK_WITH_CHACHA20_POLY1305_SHA256 => match msg.version{
         ProtocolVersion::TLSv1_3  => {
           let (cipher_msg, meta) = enc.encrypt_tls13_chacha20_poly1305(&msg, seq)?;
 
@@ -613,7 +622,13 @@ impl Backend for RustCryptoBackend13 {
       .ok_or(BackendError::DecryptionError("Decrypter not ready".to_string()))?;
 
     match dec.cipher_suite {
-      CipherSuite::TLS13_AES_128_GCM_SHA256 => match msg.version {
+      CipherSuite::TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256| 
+      CipherSuite::TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256|
+      CipherSuite::TLS_DHE_RSA_WITH_AES_128_GCM_SHA256|
+      CipherSuite::TLS_DHE_PSK_WITH_AES_128_GCM_SHA256|
+      CipherSuite::TLS_RSA_PSK_WITH_AES_128_GCM_SHA256|
+      CipherSuite::TLS_PSK_WITH_AES_128_GCM_SHA256
+       => match msg.version {
         // NOTE: Must support both because cipher messages are labeled 1.2
         ProtocolVersion::TLSv1_3 | ProtocolVersion::TLSv1_2 => {
           let (plain_message, record_meta) = dec.decrypt_tls13_aes(&msg, seq)?;
@@ -630,6 +645,26 @@ impl Backend for RustCryptoBackend13 {
           return Err(BackendError::UnsupportedProtocolVersion(version));
         },
       },
+      CipherSuite::TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256|
+      CipherSuite::TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256|
+      CipherSuite::TLS_DHE_PSK_WITH_CHACHA20_POLY1305_SHA256|
+      CipherSuite::TLS_RSA_PSK_WITH_CHACHA20_POLY1305_SHA256|
+      CipherSuite::TLS_PSK_WITH_CHACHA20_POLY1305_SHA256 => match msg.version {
+        ProtocolVersion::TLSv1_3 | ProtocolVersion::TLSv1_2 => {
+          let (plain_message, record_meta) = dec.decrypt_tls12_chacha20(&msg, seq)?;
+          self.insert_record(
+            Direction::Received,
+            seq,
+            plain_message.typ,
+            plain_message.payload.0[0],
+            record_meta,
+          );
+          return Ok(plain_message);
+        },
+        version => {
+          return Err(BackendError::UnsupportedProtocolVersion(version));
+        },
+            }
       suite => {
         return Err(BackendError::UnsupportedCiphersuite(suite));
       },

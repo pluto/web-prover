@@ -98,8 +98,21 @@ impl StandardCrypto {
             cipher_suite_name: None,
             curve: Some(NamedGroup::secp256r1),
             implemented_suites: [
+                // aes128gcm
                 CipherSuite::TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
                 CipherSuite::TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+                CipherSuite::TLS_DHE_RSA_WITH_AES_128_GCM_SHA256,
+                CipherSuite::TLS_DHE_PSK_WITH_AES_128_GCM_SHA256,
+                CipherSuite::TLS_RSA_PSK_WITH_AES_128_GCM_SHA256,
+                CipherSuite::TLS_PSK_WITH_AES_128_GCM_SHA256,
+                // Chacha20Poly1305
+                CipherSuite::TLS_CHACHA20_POLY1305_SHA256,
+                CipherSuite::TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+                CipherSuite::TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+                CipherSuite::TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+                CipherSuite::TLS_DHE_PSK_WITH_CHACHA20_POLY1305_SHA256,
+                CipherSuite::TLS_RSA_PSK_WITH_CHACHA20_POLY1305_SHA256,
+                CipherSuite::TLS_PSK_WITH_CHACHA20_POLY1305_SHA256,
             ],
             encrypter: None,
             decrypter: None,
