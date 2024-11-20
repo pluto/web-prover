@@ -136,19 +136,26 @@ impl Manifest {
     let rom_len = plaintext.len() / AES_INPUT_LENGTH;
     let mut rom = vec![aes_rom_opcode_config; rom_len];
 
+    // Pad internally the plaintext for using in circuits
+    let mut padded_plaintext = plaintext.to_vec();
+    padded_plaintext.resize(512, 0); // TODO (autoparallel): I hardcoded this to 512 -- this is likely NOT what we want to do!
+
     // TODO(Sambhav): find a better way to prevent this code duplication for request and response
     // compute hashes http start line and headers signals
-    let http_start_line_hash =
-      data_hasher(&compute_http_witness(plaintext, crate::witness::HttpMaskType::StartLine));
+    let http_start_line_hash = data_hasher(&compute_http_witness(
+      &padded_plaintext,
+      crate::witness::HttpMaskType::StartLine,
+    ));
     let mut http_header_hashes = vec!["0".to_string(); 5];
     for header_name in self.request.headers.keys() {
-      let (index, masked_header) = compute_http_header_witness(plaintext, header_name.as_bytes());
+      let (index, masked_header) =
+        compute_http_header_witness(&padded_plaintext, header_name.as_bytes());
       http_header_hashes[index] =
         BigInt::from_bytes_le(num_bigint::Sign::Plus, &data_hasher(&masked_header).to_bytes())
           .to_str_radix(10);
     }
 
-    let http_body = compute_http_witness(plaintext, crate::witness::HttpMaskType::Body);
+    let http_body = compute_http_witness(&padded_plaintext, crate::witness::HttpMaskType::Body);
     let http_body_hash = data_hasher(&http_body);
 
     // initialise rom data and rom
@@ -156,7 +163,7 @@ impl Manifest {
     rom.push(InstructionConfig {
       name:          String::from("HTTP_NIVC"),
       private_input: HashMap::from([
-        (String::from(DATA_SIGNAL_NAME), json!(plaintext.to_vec())),
+        (String::from(DATA_SIGNAL_NAME), json!(&padded_plaintext.to_vec())),
         (
           String::from(HTTP_START_LINE_HASH_SIGNAL_NAME),
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
@@ -171,6 +178,7 @@ impl Manifest {
       ]),
     });
 
+    // Here we can use unpadded plaintext because AES reads in chunks, not a 512b size.
     let fold_inputs = HashMap::from([(aes_instr.clone(), FoldInput {
       value: HashMap::from([
         (
