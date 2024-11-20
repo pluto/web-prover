@@ -319,7 +319,6 @@ impl RustCryptoBackend13 {
         (k0_secret, b"c hs traffic", b"s hs traffic")
       };
 
-    // todo(debug target) - context?
     // Expand the master secret into two labeled secrets
     // expect: context / handshake hash = h3 at handshake layer
     let context = self.ems_seed.clone().unwrap();
@@ -349,78 +348,124 @@ impl RustCryptoBackend13 {
     debug!("intermediate witness set during encrypt_mode: {:?}", self.encrypt_mode);
 
     // Finally, derive the actual AES key and IV for each secret.
-    let e = self.hkdf_provider.expander_for_okm(&client_secret);
-    let client_aes_key = hkdf_expand_label_aead_key(e.as_ref(), 16, b"key", &[]);
-    let client_aes_iv = hkdf_expand_label_aead_key(e.as_ref(), 12, b"iv", &[]);
+    let (client_key, client_iv, server_key, server_iv) =
 
-    let e = self.hkdf_provider.expander_for_okm(&server_secret);
-    let server_aes_key = hkdf_expand_label_aead_key(e.as_ref(), 16, b"key", &[]);
-    let server_aes_iv = hkdf_expand_label_aead_key(e.as_ref(), 12, b"iv", &[]);
+    match self.cipher_suite.unwrap().suite() {
+      CipherSuite::TLS13_AES_128_GCM_SHA256 => {
+        let e = self.hkdf_provider.expander_for_okm(&client_secret);
+        let client_key = hkdf_expand_label_aead_key(e.as_ref(), 16, b"key", &[]);
+        let client_iv = hkdf_expand_label_aead_key(e.as_ref(), 12, b"iv", &[]);
+
+        let e = self.hkdf_provider.expander_for_okm(&server_secret);
+        let server_key = hkdf_expand_label_aead_key(e.as_ref(), 16, b"key", &[]);
+        let server_iv = hkdf_expand_label_aead_key(e.as_ref(), 12, b"iv", &[]);
+        (
+          client_key,
+          client_iv,
+          server_key,
+          server_iv,
+        )
+      },
+      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
+        let e = self.hkdf_provider.expander_for_okm(&client_secret);
+        let client_key = hkdf_expand_label_aead_key(e.as_ref(), 32, b"key", &[]);
+        let client_iv = hkdf_expand_label_aead_key(e.as_ref(), 12, b"iv", &[]);
+
+        let e = self.hkdf_provider.expander_for_okm(&server_secret);
+        let server_key = hkdf_expand_label_aead_key(e.as_ref(), 32, b"key", &[]);
+        let server_iv = hkdf_expand_label_aead_key(e.as_ref(), 12, b"iv", &[]);
+        (
+          client_key,
+          client_iv,
+          server_key,
+          server_iv,
+        )
+
+      },
+      _ => panic!("unsupported ciphersuite"),
+    };
+
 
     trace!(
-      "client_aes_iv={:?}, iv_len={:?}",
-      hex::encode(client_aes_iv.buf),
-      client_aes_iv.buf.len()
+      "client_iv={:?}, iv_len={:?}",
+      hex::encode(client_iv.buf),
+      client_iv.buf.len()
     );
     self.logger.lock().unwrap().set_secret(
-      format!("{:?}:client_aes_iv", self.encrypt_mode).to_string(),
-      client_aes_iv.buf.into(),
+      format!("{:?}:client_iv", self.encrypt_mode).to_string(),
+      client_iv.buf.into(),
     );
 
     trace!(
-      "client_aes_key={:?}, iv_len={:?}",
-      hex::encode(client_aes_key.buf),
-      client_aes_iv.buf.len()
+      "client_key={:?}, iv_len={:?}",
+      hex::encode(client_key.buf),
+      client_iv.buf.len()
     );
     self.logger.lock().unwrap().set_secret(
-      format!("{:?}:client_aes_key", self.encrypt_mode).to_string(),
-      client_aes_key.buf.into(),
+      format!("{:?}:client_key", self.encrypt_mode).to_string(),
+      client_key.buf.into(),
     );
 
     trace!(
-      "server_aes_iv={:?}, iv_len={:?}",
-      hex::encode(server_aes_iv.buf),
-      server_aes_iv.buf.len()
+      "server_iv={:?}, iv_len={:?}",
+      hex::encode(server_iv.buf),
+      server_iv.buf.len()
     );
     self.logger.lock().unwrap().set_secret(
-      format!("{:?}:server_aes_iv", self.encrypt_mode).to_string(),
-      server_aes_iv.buf.into(),
+      format!("{:?}:server_iv", self.encrypt_mode).to_string(),
+      server_iv.buf.into(),
     );
 
     trace!(
-      "server_aes_key={:?}, iv_len={:?}",
-      hex::encode(server_aes_key.buf),
-      server_aes_key.buf.len()
+      "server_key={:?}, iv_len={:?}",
+      hex::encode(server_key.buf),
+      server_key.buf.len()
     );
     self.logger.lock().unwrap().set_secret(
-      format!("{:?}:server_aes_key", self.encrypt_mode).to_string(),
-      server_aes_key.buf.into(),
+      format!("{:?}:server_key", self.encrypt_mode).to_string(),
+      server_key.buf.into(),
     );
 
     TlsKeys {
-      client_key: client_aes_key,
-      client_iv:  client_aes_iv,
-      server_key: server_aes_key,
-      server_iv:  server_aes_iv,
+      client_key,
+      client_iv,
+      server_key,
+      server_iv,
     }
   }
 
   /// Derive an encrypter from the given keys
   pub fn get_encrypter(&self, keys: &TlsKeys) -> Encrypter {
-    Encrypter::new(
-      keys.client_key.buf[..16].try_into().unwrap(),
-      keys.client_iv.buf[..12].try_into().unwrap(),
-      self.cipher_suite.unwrap().suite(),
-    )
+    match self.cipher_suite.unwrap().suite() {
+      CipherSuite::TLS13_AES_128_GCM_SHA256 => Encrypter::new(
+        keys.client_key.buf[..16].try_into().unwrap(),
+        keys.client_iv.buf[..12].try_into().unwrap(),
+        self.cipher_suite.unwrap().suite(),
+      ),
+      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => Encrypter::new(
+        keys.client_key.buf[..32].try_into().unwrap(),
+        keys.client_iv.buf[..12].try_into().unwrap(),
+        self.cipher_suite.unwrap().suite(),
+      ),
+      _ => panic!("unsupported ciphersuite"),
+    }
   }
 
   /// Derive an decrypter from the given keys
   pub fn get_decrypter(&self, keys: &TlsKeys) -> Decrypter {
-    Decrypter::new(
-      keys.server_key.buf[..16].try_into().unwrap(),
+    match self.cipher_suite.unwrap().suite() {
+      CipherSuite::TLS13_AES_128_GCM_SHA256 => Decrypter::new(
+        keys.server_key.buf[..16].try_into().unwrap(),
+        keys.server_iv.buf[..12].try_into().unwrap(),
+        self.cipher_suite.unwrap().suite(),
+      ),
+      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => Decrypter::new(
+      keys.server_key.buf[..32].try_into().unwrap(),
       keys.server_iv.buf[..12].try_into().unwrap(),
       self.cipher_suite.unwrap().suite(),
-    )
+      ),
+      _ => panic!("unsupported ciphersuite"),
+    }
   }
 }
 
