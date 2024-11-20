@@ -333,7 +333,7 @@ fn test_end_to_end_proofs() {
 
   // should be zero
   let initial_nivc_input = vec![Fr::ZERO];
-  // let initial_nivc_input = initial_nivc_input.into_iter().map(u64::from).collect();
+
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
     setup_data,
@@ -345,7 +345,6 @@ fn test_end_to_end_proofs() {
   }
   .into_expanded()
   .unwrap();
-  debug!("program_data.inputs: {:?}, {:?}", program_data.inputs.len(), program_data.inputs[15]);
 
   let recursive_snark = program::run(&program_data).unwrap();
 
