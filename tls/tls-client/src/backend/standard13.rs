@@ -585,7 +585,7 @@ impl Backend for RustCryptoBackend13 {
       CipherSuite::TLS_RSA_PSK_WITH_AES_128_GCM_SHA256|
       CipherSuite::TLS_PSK_WITH_AES_128_GCM_SHA256 => match msg.version {
         // TODO: Do we need both on the encrypt side?
-        ProtocolVersion::TLSv1_3 => {
+        ProtocolVersion::TLSv1_3 | ProtocolVersion::TLSv1_2 => {
           let (cipher_msg, meta) = enc.encrypt_tls13_aes(&msg, seq)?;
 
           self.insert_record(Direction::Sent, seq, msg.typ, msg.payload.0[0], meta);
@@ -600,7 +600,7 @@ impl Backend for RustCryptoBackend13 {
       CipherSuite::TLS_DHE_PSK_WITH_CHACHA20_POLY1305_SHA256|
       CipherSuite::TLS_RSA_PSK_WITH_CHACHA20_POLY1305_SHA256|
       CipherSuite::TLS_PSK_WITH_CHACHA20_POLY1305_SHA256 => match msg.version{
-        ProtocolVersion::TLSv1_3  => {
+        ProtocolVersion::TLSv1_3 | ProtocolVersion::TLSv1_2  => {
           let (cipher_msg, meta) = enc.encrypt_tls13_chacha20_poly1305(&msg, seq)?;
 
           self.insert_record(Direction::Sent, seq, msg.typ, msg.payload.0[0], meta);

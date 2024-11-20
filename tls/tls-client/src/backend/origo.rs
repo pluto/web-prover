@@ -34,7 +34,7 @@ pub struct RecordMeta {
   pub additional_data: String,
   pub payload:         String,
   pub ciphertext:      String,
-  pub nonce:         String,
+  pub nonce:           String,
 }
 
 impl RecordMeta {
@@ -129,13 +129,13 @@ impl OrigoConnection {
 
     WitnessData {
       request:  DecryptTarget {
-        aes_iv:     self.secret_map.get("Application:client_aes_iv").unwrap().to_vec(),
-        aes_key:    self.secret_map.get("Application:client_aes_key").unwrap().to_vec(),
+        aes_iv:     self.secret_map.get("Application:client_iv").unwrap().to_vec(),
+        aes_key:    self.secret_map.get("Application:client_key").unwrap().to_vec(),
         ciphertext: vec![self.record_map.get(&req_key).unwrap().ciphertext.clone()],
       },
       response: DecryptTarget {
-        aes_iv:     self.secret_map.get("Application:server_aes_iv").unwrap().to_vec(),
-        aes_key:    self.secret_map.get("Application:server_aes_key").unwrap().to_vec(),
+        aes_iv:     self.secret_map.get("Application:server_iv").unwrap().to_vec(),
+        aes_key:    self.secret_map.get("Application:server_key").unwrap().to_vec(),
         ciphertext: ciphertext_chunks,
       },
     }

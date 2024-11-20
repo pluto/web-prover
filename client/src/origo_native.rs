@@ -214,9 +214,9 @@ async fn proxy(
   client_socket.close().await?;
 
   let server_aes_iv =
-    origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_iv").unwrap().clone();
+    origo_conn.lock().unwrap().secret_map.get("Handshake:server_iv").unwrap().clone();
   let server_aes_key =
-    origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_key").unwrap().clone();
+    origo_conn.lock().unwrap().secret_map.get("Handshake:server_key").unwrap().clone();
 
   let witness = origo_conn.lock().unwrap().to_witness_data();
   let sb = SignBody {
