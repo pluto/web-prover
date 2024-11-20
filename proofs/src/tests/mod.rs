@@ -28,7 +28,7 @@ const MAX_ROM_LENGTH: usize = 10;
 
 // -----------------------------------------------------------------------------------------------
 // JSON Proof Material
-const JSON_MAX_ROM_LENGTH: usize = 40;
+const JSON_MAX_ROM_LENGTH: usize = 28;
 
 // Circuit 0
 const AES_GCM_R1CS: &[u8] =
@@ -79,8 +79,7 @@ const BYTES_PER_FOLD: usize = 16;
 //        ]
 //    }
 // }
-// Then padded with 192 zero bits
-const HTTP_RESPONSE_PLAINTEXT: (&str, [u8; 512]) = ("plainText", [
+const HTTP_RESPONSE_PLAINTEXT: (&str, [u8; 320]) = ("plainText", [
   72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101, 110,
   116, 45, 116, 121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106,
   115, 111, 110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13, 10, 99,
@@ -95,16 +94,10 @@ const HTTP_RESPONSE_PLAINTEXT: (&str, [u8; 512]) = ("plainText", [
   32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121, 108, 111, 114, 32, 83, 119,
   105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13,
   10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 93, 13,
-  10, 32, 32, 32, 125, 13, 10, 125, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  10, 32, 32, 32, 125, 13, 10, 125,
 ]);
 
-const AES_CIPHER_TEXT: (&str, [u8; 512]) = ("cipherText", [
+const AES_CIPHER_TEXT: (&str, [u8; 320]) = ("cipherText", [
   75, 220, 142, 158, 79, 135, 141, 163, 211, 26, 242, 137, 81, 253, 181, 117, 253, 246, 197, 197,
   61, 46, 55, 87, 218, 137, 240, 143, 241, 177, 225, 129, 80, 114, 125, 72, 45, 18, 224, 179, 79,
   231, 153, 198, 163, 252, 197, 219, 233, 46, 202, 120, 99, 253, 76, 9, 70, 11, 200, 218, 228, 251,
@@ -120,24 +113,13 @@ const AES_CIPHER_TEXT: (&str, [u8; 512]) = ("cipherText", [
   109, 24, 201, 217, 186, 191, 232, 63, 93, 153, 118, 214, 157, 167, 15, 216, 191, 152, 41, 106,
   24, 127, 8, 144, 78, 218, 133, 125, 89, 97, 10, 246, 8, 244, 112, 169, 190, 206, 14, 217, 109,
   147, 130, 61, 214, 237, 143, 77, 14, 14, 70, 56, 94, 97, 207, 214, 106, 249, 37, 7, 186, 95, 174,
-  146, 203, 148, 173, 172, 13, 113, 226, 226, 152, 46, 39, 47, 219, 124, 244, 181, 132, 176, 149,
-  160, 249, 87, 253, 184, 40, 104, 148, 55, 227, 125, 196, 139, 42, 211, 121, 198, 243, 198, 233,
-  87, 238, 119, 175, 184, 140, 101, 148, 155, 161, 46, 236, 69, 194, 40, 101, 228, 144, 122, 228,
-  42, 238, 129, 56, 152, 172, 223, 145, 226, 228, 194, 29, 130, 142, 10, 118, 222, 43, 182, 187,
-  111, 134, 158, 94, 239, 31, 97, 141, 237, 210, 117, 98, 129, 43, 154, 20, 232, 153, 106, 92, 53,
-  45, 243, 129, 126, 96, 214, 236, 32, 17, 154, 82, 200, 10, 97, 236, 25, 86, 34, 98, 114, 64, 33,
-  45, 236, 202, 81, 95, 234, 182, 62, 39, 52, 88, 121, 72, 168, 54, 167, 222, 32, 92, 254, 192,
-  194, 136, 53, 28, 52, 139, 17, 121, 65, 221, 10, 99, 217, 148, 112, 62, 99, 217, 74, 68, 104, 4,
-  33, 58, 180, 251, 29, 43, 123, 163, 118, 89, 10, 44, 36, 29, 31, 80, 141, 198, 167, 244, 24, 161,
-  69, 3, 222, 184, 155, 23, 170, 219, 40, 6, 247,
+  146, 203, 148, 173, 172, 13, 113,
 ]);
 
-const AES_COUNTER: (&str, [u8; 128]) = ("ctr", [
+const AES_COUNTER: (&str, [u8; 80]) = ("ctr", [
   0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 6, 0, 0, 0, 7, 0, 0, 0, 8,
   0, 0, 0, 9, 0, 0, 0, 10, 0, 0, 0, 11, 0, 0, 0, 12, 0, 0, 0, 13, 0, 0, 0, 14, 0, 0, 0, 15, 0, 0,
-  0, 16, 0, 0, 0, 17, 0, 0, 0, 18, 0, 0, 0, 19, 0, 0, 0, 20, 0, 0, 0, 21, 0, 0, 0, 22, 0, 0, 0, 23,
-  0, 0, 0, 24, 0, 0, 0, 25, 0, 0, 0, 26, 0, 0, 0, 27, 0, 0, 0, 28, 0, 0, 0, 29, 0, 0, 0, 30, 0, 0,
-  0, 31, 0, 0, 0, 32,
+  0, 16, 0, 0, 0, 17, 0, 0, 0, 18, 0, 0, 0, 19, 0, 0, 0, 20,
 ]);
 
 const AES_KEY: (&str, [u8; 16]) = ("key", [0; 16]);
@@ -221,16 +203,21 @@ fn test_end_to_end_proofs() {
 
   let mut rom = vec![aes_rom_opcode_config; HTTP_RESPONSE_PLAINTEXT.1.len() / BYTES_PER_FOLD];
 
+  // After setting the AES config for the ROM, pad the plaintext to match what http_nivc_512b
+  // requires
+  let mut padded_http_response_plaintext = HTTP_RESPONSE_PLAINTEXT.1.to_vec();
+  padded_http_response_plaintext.resize(512, 0);
+
   let http_start_line_hash = data_hasher(&compute_http_witness(
-    HTTP_RESPONSE_PLAINTEXT.1.as_ref(),
+    &padded_http_response_plaintext,
     witness::HttpMaskType::StartLine,
   ));
   let http_header_1_hash = data_hasher(&compute_http_witness(
-    HTTP_RESPONSE_PLAINTEXT.1.as_ref(),
+    &padded_http_response_plaintext,
     witness::HttpMaskType::Header(1),
   ));
   let http_body =
-    compute_http_witness(HTTP_RESPONSE_PLAINTEXT.1.as_ref(), witness::HttpMaskType::Body);
+    compute_http_witness(&padded_http_response_plaintext, witness::HttpMaskType::Body);
   let http_body_hash = data_hasher(&http_body);
 
   let masked_json_key_1 =
@@ -254,7 +241,7 @@ fn test_end_to_end_proofs() {
     InstructionConfig {
       name:          String::from("HTTP_NIVC"),
       private_input: HashMap::from([
-        (String::from("data"), json!(HTTP_RESPONSE_PLAINTEXT.1.to_vec())),
+        (String::from("data"), json!(padded_http_response_plaintext)),
         (
           String::from("start_line_hash"),
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
@@ -346,7 +333,7 @@ fn test_end_to_end_proofs() {
 
   // should be zero
   let initial_nivc_input = vec![Fr::ZERO];
-  // let initial_nivc_input = initial_nivc_input.into_iter().map(u64::from).collect();
+
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
     setup_data,
@@ -358,7 +345,6 @@ fn test_end_to_end_proofs() {
   }
   .into_expanded()
   .unwrap();
-  debug!("program_data.inputs: {:?}, {:?}", program_data.inputs.len(), program_data.inputs[15]);
 
   let recursive_snark = program::run(&program_data).unwrap();
 
