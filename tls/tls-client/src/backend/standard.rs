@@ -143,6 +143,9 @@ impl RustCryptoBackend {
                 write_key.copy_from_slice(&session_keys[0..16]);
                 write_iv.copy_from_slice(&session_keys[32..36]);
                 self.encrypter = Some(Encrypter::new(write_key, write_iv, cipher_suite.suite()));
+            },
+            CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
+                todo!("implement encrypter for TLS13_CHACHA20_POLY1305_SHA256");
             }
             suite => return Err(BackendError::UnsupportedCiphersuite(suite)),
         }
@@ -169,6 +172,9 @@ impl RustCryptoBackend {
                 write_key.copy_from_slice(&session_keys[16..32]);
                 write_iv.copy_from_slice(&session_keys[36..40]);
                 self.decrypter = Some(Decrypter::new(write_key, write_iv, cipher_suite.suite()));
+            },
+            CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
+                todo!("implement decrypter for TLS13_CHACHA20_POLY1305_SHA256");
             }
             suite => return Err(BackendError::UnsupportedCiphersuite(suite)),
         }
@@ -278,10 +284,10 @@ impl Backend for RustCryptoBackend {
             NamedGroup::secp384r1 => 48,
             group => return Err(BackendError::UnsupportedCurveGroup(group)),
         };
-
+        
         let mut pms = vec![0u8; x_size];
         let secret = *sk.diffie_hellman(&server_pk).raw_secret_bytes();
-        pms.copy_from_slice(&secret);
+        pms.copy_from_slice(secret.as_slice());
 
         let (client_random, server_random) = match (self.client_random, self.server_random) {
             (Some(cr), Some(sr)) => (cr.0, sr.0),
