@@ -407,6 +407,84 @@ mod tests {
     input: HashMap<String, FoldInput>,
   }
 
+  // Helper function to create test program data
+  fn create_test_program_data() -> ProgramData<Online, Expanded> {
+    // Load add.r1cs from examples
+    let add_r1cs = include_bytes!("../../examples/circuit_data/add_external.r1cs");
+    let r1cs = R1CSType::Raw(add_r1cs.to_vec());
+    // Create ROM data with proper circuit data
+    let mut rom_data = HashMap::new();
+    rom_data.insert("add".to_string(), CircuitData { opcode: 1u64 });
+    rom_data.insert("mul".to_string(), CircuitData { opcode: 2u64 });
+
+    // Rest of the function remains same
+    let rom: Vec<InstructionConfig> = vec![
+      InstructionConfig { name: "add".to_string(), private_input: HashMap::new() },
+      InstructionConfig { name: "mul".to_string(), private_input: HashMap::new() },
+    ];
+
+    let setup_data = SetupData {
+      max_rom_length:          4,
+      r1cs_types:              vec![r1cs],
+      witness_generator_types: vec![WitnessGeneratorType::Raw(vec![])],
+    };
+
+    let public_params = program::setup(&setup_data);
+
+    ProgramData {
+      public_params,
+      setup_data,
+      rom_data,
+      rom,
+      initial_nivc_input: vec![F::<G1>::ONE],
+      inputs: vec![HashMap::new()],
+      witnesses: vec![vec![F::<G1>::ONE]],
+    }
+  }
+
+  #[test]
+  fn test_extend_public_inputs() {
+    // Setup test data
+    let program_data = create_test_program_data();
+
+    // Test successful case
+    let result = program_data.extend_public_inputs();
+    assert!(result.is_ok());
+
+    let (z0_primary, expanded_rom) = result.unwrap();
+
+    // Verify z0_primary structure
+    assert_eq!(
+      z0_primary.len(),
+      program_data.initial_nivc_input.len() + 1 + program_data.setup_data.max_rom_length
+    );
+    assert_eq!(z0_primary[program_data.initial_nivc_input.len()], F::<G1>::ZERO); // Check ROM index is 0
+
+    // Verify ROM expansion
+    assert_eq!(expanded_rom.len(), program_data.setup_data.max_rom_length);
+    assert_eq!(expanded_rom[0], 1u64); // First opcode
+    assert_eq!(expanded_rom[1], 2u64); // Second opcode
+    assert_eq!(expanded_rom[2], u64::MAX); // Padding
+  }
+
+  #[test]
+  fn test_extend_public_inputs_missing_opcode() {
+    let mut program_data = create_test_program_data();
+
+    // Add an opcode config that doesn't exist in rom_data
+    program_data.rom.push(InstructionConfig {
+      name:          "nonexistent".to_string(),
+      private_input: HashMap::new(),
+    });
+
+    let result = program_data.extend_public_inputs();
+    assert!(result.is_err());
+    assert!(matches!(
+        result.unwrap_err(),
+        ProofError::Other(e) if e.contains("not found in rom_data")
+    ));
+  }
+
   #[test]
   #[tracing_test::traced_test]
   fn test_deserialize_inputs() {
