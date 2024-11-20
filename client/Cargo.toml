@@ -21,7 +21,7 @@ tls-client-async2={ path="../tls/tls-client-async", package="tls-client-async", 
   "tracing",
 ] }
 tls-core={ path="../tls/tls-core", package="tls-core" }
-proofs={ path="../proofs", package="proofs" }
+proofs={ path="../proofs", package="proofs", features=["timing"] }
 
 webpki-roots="0.26.1"
 pki-types   ={ package="rustls-pki-types", version="1.7" }
