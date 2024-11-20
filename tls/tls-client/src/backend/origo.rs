@@ -26,7 +26,7 @@ pub struct RecordMeta {
   pub additional_data: String,
   pub payload:         String,
   pub ciphertext:      String,
-  pub counter:         String,
+  pub nonce:         String,
 }
 
 impl RecordMeta {
@@ -35,7 +35,7 @@ impl RecordMeta {
       additional_data: hex::encode(additional_data),
       payload:         hex::encode(payload),
       ciphertext:      hex::encode(ciphertext),
-      counter:           hex::encode(nonce),
+      nonce:           hex::encode(nonce),
     }
   }
 }
