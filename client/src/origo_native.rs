@@ -22,7 +22,7 @@ use tls_client2::{
 };
 use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
-use tracing::debug;
+use tracing::{debug, trace};
 
 use crate::{
   circuits::*, config, config::ProvingData, errors, errors::ClientErrors, origo::SignBody, Proof,
@@ -74,6 +74,7 @@ async fn generate_program_data(
   padded_aad.extend(aad);
 
   let request_plaintext = plaintext.payload.0.to_vec();
+  trace!("Raw request plaintext: {:?}", request_plaintext);
   // -- NOTE: Above is the following:
   // GET https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json HTTP/1.1
   // host: gist.githubusercontent.com
@@ -109,14 +110,20 @@ async fn generate_program_data(
 
   // ----------------------------------------------------------------------------------------------------------------------- //
   // - construct private inputs and program layout for AES proof for request -
+  debug!("Padding plaintext and ciphertext to nearest 16...");
   let mut nearest_16_padded_plaintext = request_plaintext.clone();
   let mut nearest_16_padded_ciphertext = request_ciphertext.clone();
   let remainder = request_plaintext.len() % 16;
   if remainder != 0 {
     let padding = 16 - remainder;
-    nearest_16_padded_plaintext.extend(std::iter::repeat(0).take(padding));
-    nearest_16_padded_ciphertext.extend(std::iter::repeat(0).take(padding));
+    nearest_16_padded_plaintext.resize(request_plaintext.len() + padding, 0);
+    nearest_16_padded_ciphertext.resize(request_plaintext.len() + padding, 0);
   }
+  trace!(
+    "Padded plaintext: {:?}\nPadded ciphertext: {:?}",
+    nearest_16_padded_plaintext,
+    nearest_16_padded_ciphertext
+  );
 
   let (rom_data, rom, fold_input) = proving.manifest.unwrap().rom_from_request(
     &key,
