@@ -1,4 +1,4 @@
-pub const JSON_MAX_ROM_LENGTH: usize = 40;
+pub const JSON_MAX_ROM_LENGTH: usize = 28;
 pub const AES_CHUNK_LENGTH: usize = 16;
 // Circuit 0
 pub const AES_GCM_R1CS: &[u8] =

@@ -117,26 +117,24 @@ async fn generate_program_data(
     max_rom_length:          JSON_MAX_ROM_LENGTH,
   };
 
-  // TODO: Is padding the approach we want or change to support variable length?
-  let padding = 512 - request_plaintext.len();
-  let mut padded_request_plaintext = request_plaintext.clone();
-  padded_request_plaintext.extend(vec![0; padding]);
+  let mut nearest_16_padded_plaintext = request_plaintext.clone();
+  let mut nearest_16_padded_ciphertext = request_ciphertext.clone();
+  let remainder = request_plaintext.len() % 16;
+  if remainder != 0 {
+    let padding = 16 - remainder;
+    nearest_16_padded_plaintext.extend(std::iter::repeat(0).take(padding));
+    nearest_16_padded_ciphertext.extend(std::iter::repeat(0).take(padding));
+  }
 
-  // NOTE (autoparallel): This removes the 16 + 1 extra bytes for authtag and tls inner content
-  // type, then pads with 0.
-  let mut padded_request_ciphertext =
-    request_ciphertext[..request_plaintext.len()].to_vec().clone();
-  padded_request_ciphertext.extend(vec![0; padding]);
-
-  debug!("plaintext: {:?}", padded_request_plaintext);
-  debug!("ciphertext: {:?}", padded_request_ciphertext);
+  debug!("plaintext: {:?}", nearest_16_padded_plaintext);
+  debug!("ciphertext: {:?}", nearest_16_padded_ciphertext);
 
   let (rom_data, rom, fold_input) = proving.manifest.unwrap().rom_from_request(
     &key,
     &iv,
     &padded_aad,
-    &padded_request_plaintext,
-    &padded_request_ciphertext,
+    &nearest_16_padded_plaintext,
+    &nearest_16_padded_plaintext,
   );
 
   debug!("generating public params");

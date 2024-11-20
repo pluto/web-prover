@@ -77,11 +77,11 @@ function DataHasher(input) {
     }
 
     // Compute next hash using previous hash and packed input, but if packed input is zero, don't hash it.
-    // if (packedInput == BigInt(0)) {
-    // hashes.push(hashes[i]);
-    // } else {
-    hashes.push(poseidon2([hashes[i], packedInput]));
-    // }
+    if (packedInput == BigInt(0)) {
+      hashes.push(hashes[i]);
+    } else {
+      hashes.push(poseidon2([hashes[i], packedInput]));
+    }
   }
 
   // Return the last hash
@@ -93,7 +93,7 @@ const generateWitnessBytes = async function (circuits, inputs) {
 
   // AES
   console.log("AES")
-  let plaintext_length = inputs[0]["plainText"].length;
+  let plaintext_length = http_response_plaintext.length;
   let plaintext = inputs[0]["plainText"];
   let cipherText = inputs[0]["cipherText"];
   inputs[0]["step_in"] = 0;
@@ -110,11 +110,10 @@ const generateWitnessBytes = async function (circuits, inputs) {
   };
 
   // HTTP
-  console.log(http_start_line.length)
-  let http_start_line_padded = http_start_line.concat(Array(Math.max(0, 512 - http_start_line.length)).fill(0));
-  let http_header_0_padded = http_header_0.concat(Array(Math.max(0, 512 - http_header_0.length)).fill(0));
-  let http_header_1_padded = http_header_1.concat(Array(Math.max(0, 512 - http_header_1.length)).fill(0));
-  let http_body_padded = http_body.concat(Array(Math.max(0, 512 - http_body.length)).fill(0));
+  let http_start_line_padded = http_start_line.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - http_start_line.length)).fill(0));
+  let http_header_0_padded = http_header_0.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - http_header_0.length)).fill(0));
+  let http_header_1_padded = http_header_1.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - http_header_1.length)).fill(0));
+  let http_body_padded = http_body.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - http_body.length)).fill(0));
 
   inputs[1]["start_line_hash"] = DataHasher(http_start_line_padded);
   let http_header_0_hash = DataHasher(http_header_0_padded);
@@ -179,16 +178,7 @@ const AES_CIPHER_TEXT = [
   109, 24, 201, 217, 186, 191, 232, 63, 93, 153, 118, 214, 157, 167, 15, 216, 191, 152, 41, 106,
   24, 127, 8, 144, 78, 218, 133, 125, 89, 97, 10, 246, 8, 244, 112, 169, 190, 206, 14, 217, 109,
   147, 130, 61, 214, 237, 143, 77, 14, 14, 70, 56, 94, 97, 207, 214, 106, 249, 37, 7, 186, 95, 174,
-  146, 203, 148, 173, 172, 13, 113, 226, 226, 152, 46, 39, 47, 219, 124, 244, 181, 132, 176, 149,
-  160, 249, 87, 253, 184, 40, 104, 148, 55, 227, 125, 196, 139, 42, 211, 121, 198, 243, 198, 233,
-  87, 238, 119, 175, 184, 140, 101, 148, 155, 161, 46, 236, 69, 194, 40, 101, 228, 144, 122, 228,
-  42, 238, 129, 56, 152, 172, 223, 145, 226, 228, 194, 29, 130, 142, 10, 118, 222, 43, 182, 187,
-  111, 134, 158, 94, 239, 31, 97, 141, 237, 210, 117, 98, 129, 43, 154, 20, 232, 153, 106, 92, 53,
-  45, 243, 129, 126, 96, 214, 236, 32, 17, 154, 82, 200, 10, 97, 236, 25, 86, 34, 98, 114, 64, 33,
-  45, 236, 202, 81, 95, 234, 182, 62, 39, 52, 88, 121, 72, 168, 54, 167, 222, 32, 92, 254, 192,
-  194, 136, 53, 28, 52, 139, 17, 121, 65, 221, 10, 99, 217, 148, 112, 62, 99, 217, 74, 68, 104, 4,
-  33, 58, 180, 251, 29, 43, 123, 163, 118, 89, 10, 44, 36, 29, 31, 80, 141, 198, 167, 244, 24, 161,
-  69, 3, 222, 184, 155, 23, 170, 219, 40, 6, 247,
+  146, 203, 148, 173, 172, 13, 113
 ];
 const http_start_line = [
   72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -248,23 +238,13 @@ const http_body = [
 
 // let extendedInput = Array(TOTAL_BYTES_ACROSS_NIVC).fill(0);
 let extendedHTTPInput = http_response_plaintext.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - http_response_plaintext.length)).fill(0));
-
-let jsonInput = [123, 13, 10, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32,
-  32, 34, 105, 116, 101, 109, 115, 34, 58, 32, 91, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-  32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116,
-  97, 34, 58, 32, 34, 65, 114, 116, 105, 115, 116, 34, 44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32,
-  32, 32, 32, 32, 32, 32, 32, 34, 112, 114, 111, 102, 105, 108, 101, 34, 58, 32, 123, 13, 10, 32,
-  32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32,
-  34, 84, 97, 121, 108, 111, 114, 32, 83, 119, 105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32,
-  32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125,
-  13, 10, 32, 32, 32, 32, 32, 32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125];
-let jsonExtendedInput = jsonInput.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - jsonInput.length)).fill(0));
+let extendedCiphertext = AES_CIPHER_TEXT.concat(Array(TOTAL_BYTES_ACROSS_NIVC - AES_CIPHER_TEXT.length).fill(0));
 
 var inputs = [{
   "key": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   "iv": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   "plainText": extendedHTTPInput,
-  "cipherText": AES_CIPHER_TEXT,
+  "cipherText": extendedCiphertext,
   "ctr": [0, 0, 0, 0],
   "aad": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   "step_in": 0,
