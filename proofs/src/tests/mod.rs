@@ -356,6 +356,8 @@ fn test_end_to_end_proofs() {
 
   assert_eq!(*recursive_snark.zi_primary().first().unwrap(), data_hasher(&final_value));
 
+  // TODO (autoparallel): This is redundant, we call the setup inside compress_proof. We should
+  // likely just store the vk and pk
   let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
 
   let (z0_primary, _) = program_data.extend_public_inputs().unwrap();

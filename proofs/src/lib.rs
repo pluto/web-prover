@@ -26,13 +26,15 @@ pub mod proof;
 #[cfg(test)] mod tests;
 pub mod witness;
 
-// pub type E1 = Bn256EngineKZG;
-pub type E1 = Bn256EngineIPA;
+pub type E1 = client_side_prover::provider::Bn256EngineKZG;
+// pub type E1 = Bn256EngineIPA;
 pub type E2 = GrumpkinEngine;
 pub type G1 = <E1 as Engine>::GE;
 pub type G2 = <E2 as Engine>::GE;
-// pub type EE1 = EvaluationEngine<halo2curves::bn256::Bn256, E1>;
-pub type EE1 = client_side_prover::provider::ipa_pc::EvaluationEngine<E1>;
+pub type EE1 =
+  client_side_prover::provider::hyperkzg::EvaluationEngine<halo2curves::bn256::Bn256, E1>;
+// pub type EE1 = client_side_prover::provider::hyperkzg::EvaluationEngine<E1>;l
+// pub type EE1 = client_side_prover::provider::ipa_pc::EvaluationEngine<E1>;
 pub type EE2 = client_side_prover::provider::ipa_pc::EvaluationEngine<E2>;
 pub type S1 = BatchedRelaxedR1CSSNARK<E1, EE1>;
 pub type S2 = BatchedRelaxedR1CSSNARK<E2, EE2>;
