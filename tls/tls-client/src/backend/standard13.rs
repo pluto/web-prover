@@ -253,7 +253,7 @@ impl RustCryptoBackend13 {
     first_byte: u8,
     record_meta: RecordMeta,
   ) {
-    self.record_map.insert(record_meta.counter.clone(), record_meta.clone());
+    self.record_map.insert(record_meta.nonce.clone(), record_meta.clone());
     self.logger.lock().unwrap().insert_record(RecordKey::new(d, ct, seq, first_byte), record_meta);
   }
 
