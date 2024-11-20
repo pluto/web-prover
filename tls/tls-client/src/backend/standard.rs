@@ -495,13 +495,13 @@ fn concat<const O: usize>(left: &[u8], right: &[u8]) -> [u8; O] {
 }
 
 #[derive(Clone)]
-enum EncryptionKey{
+pub enum EncryptionKey{
     AES128GCM([u8; 16]), // 128-bit key
     CHACHA20POLY1305([u8; 32]), // 256-bit key
 }
 
 #[derive(Clone)]
-enum InitializationVector {
+pub enum InitializationVector {
     Aes([u8; 4]),         // AES IV
     ChaCha([u8; 12]),     // ChaCha20-Poly1305 nonce
 }
