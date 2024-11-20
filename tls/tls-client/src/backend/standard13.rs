@@ -577,6 +577,7 @@ impl Backend for RustCryptoBackend13 {
       .ok_or(BackendError::EncryptionError("Encrypter not ready".to_string()))?;
 
     match enc.cipher_suite {
+      CipherSuite::TLS13_AES_128_GCM_SHA256|
       CipherSuite::TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256| 
       CipherSuite::TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256|
       CipherSuite::TLS_DHE_RSA_WITH_AES_128_GCM_SHA256|
@@ -622,6 +623,7 @@ impl Backend for RustCryptoBackend13 {
       .ok_or(BackendError::DecryptionError("Decrypter not ready".to_string()))?;
 
     match dec.cipher_suite {
+      CipherSuite::TLS13_AES_128_GCM_SHA256|
       CipherSuite::TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256| 
       CipherSuite::TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256|
       CipherSuite::TLS_DHE_RSA_WITH_AES_128_GCM_SHA256|
