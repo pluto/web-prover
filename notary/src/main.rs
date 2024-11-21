@@ -70,7 +70,7 @@ struct OrigoSession {
 /// - Configuration loading fails
 /// - TCP listener binding fails
 /// - TLS setup fails (either static or ACME)
-/// 
+///
 /// # Environment Variables
 ///
 /// * `RUST_LOG` - Controls log level (e.g. "info", "debug")
@@ -123,7 +123,6 @@ async fn main() -> Result<(), NotaryServerError> {
   }
   Ok(())
 }
-
 
 /// Starts an HTTPS server with automatic TLS certificate management via ACME protocol.
 ///
@@ -262,7 +261,7 @@ async fn acme_listen(
 ///
 /// Returns `Ok(())` if the server starts successfully, or a `NotaryServerError` if:
 /// - Certificate files cannot be loaded
-/// - Private key cannot be loaded  
+/// - Private key cannot be loaded
 /// - TLS server configuration fails
 ///
 /// # Errors
