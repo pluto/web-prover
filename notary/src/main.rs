@@ -54,6 +54,37 @@ struct OrigoSession {
   _timestamp: SystemTime,
 }
 
+/// Main entry point for the notary server application.
+///
+/// This function:
+/// 1. Initializes logging with line numbers and environment-based log levels
+/// 2. Loads configuration from environment/files
+/// 3. Sets up a TLS-enabled HTTP server with either:
+///    - Static certificates provided in config, or
+///    - Automatic certificate management via ACME/Let's Encrypt
+/// 4. Configures routes for notary and proxy services
+///
+/// # Returns
+///
+/// Returns `Ok(())` if the server starts and runs successfully, or a `NotaryServerError` if:
+/// - Configuration loading fails
+/// - TCP listener binding fails
+/// - TLS setup fails (either static or ACME)
+/// 
+/// # Environment Variables
+///
+/// * `RUST_LOG` - Controls log level (e.g. "info", "debug")
+/// * `GIT_HASH` - Git commit hash (set at build time)
+///
+/// # Errors
+///
+/// This function will return an error if:
+/// - TCP binding fails
+/// - Configuration is invalid
+/// - TLS certificate setup fails
+///
+/// Server startup errors are returned immediately, while runtime errors are logged
+/// but don't terminate the server.
 #[tokio::main]
 async fn main() -> Result<(), NotaryServerError> {
   tracing_subscriber::registry()
@@ -93,6 +124,38 @@ async fn main() -> Result<(), NotaryServerError> {
   Ok(())
 }
 
+
+/// Starts an HTTPS server with automatic TLS certificate management via ACME protocol.
+///
+/// This function sets up an HTTPS server that:
+/// 1. Configures automatic certificate provisioning using Let's Encrypt
+/// 2. Handles ACME TLS-ALPN-01 challenges for domain validation
+/// 3. Manages certificate renewal in the background
+/// 4. Serves HTTPS traffic using the obtained certificates
+///
+/// # Arguments
+///
+/// * `listener` - TCP listener bound to the server's address
+/// * `router` - Axum router containing the HTTP request handlers
+/// * `domain` - Domain name for which to obtain certificates
+/// * `email` - Contact email address for Let's Encrypt registration
+///
+/// # Returns
+///
+/// Returns `Ok(())` if the server starts successfully, or a `NotaryServerError` if:
+/// - ACME configuration fails
+/// - TLS configuration fails
+/// - Server initialization fails
+///
+/// # Errors
+///
+/// This function will return an error if:
+/// - ACME state initialization fails
+/// - TLS configuration fails
+/// - Server configuration is invalid
+///
+/// Connection-level errors and ACME events are logged but do not terminate the server.
+/// Certificate renewal errors are handled automatically with exponential backoff.
 async fn acme_listen(
   listener: TcpListener,
   router: Router,
@@ -180,6 +243,36 @@ async fn acme_listen(
   }
 }
 
+/// Starts a TLS-enabled HTTP server using provided certificates.
+///
+/// This function creates a TLS-enabled HTTP server that:
+/// 1. Loads certificates and private key from the filesystem
+/// 2. Configures TLS with HTTP/1.1 ALPN support
+/// 3. Accepts incoming TLS connections in an infinite loop
+/// 4. Spawns a new task for each connection to handle HTTP requests
+///
+/// # Arguments
+///
+/// * `listener` - TCP listener bound to the server's address
+/// * `router` - Axum router containing the HTTP request handlers
+/// * `server_cert_path` - Path to the TLS certificate file in PEM format
+/// * `server_key_path` - Path to the private key file in PEM format
+///
+/// # Returns
+///
+/// Returns `Ok(())` if the server starts successfully, or a `NotaryServerError` if:
+/// - Certificate files cannot be loaded
+/// - Private key cannot be loaded  
+/// - TLS server configuration fails
+///
+/// # Errors
+///
+/// This function will return an error if:
+/// - Certificate or private key files cannot be read
+/// - TLS configuration fails
+/// - Server configuration is invalid
+///
+/// Connection-level errors are logged but do not terminate the server.
 async fn listen(
   listener: TcpListener,
   router: Router,
