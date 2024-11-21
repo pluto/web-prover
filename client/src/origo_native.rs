@@ -59,6 +59,9 @@ async fn generate_program_data(
   debug!("Decoding ciphertext hex...");
   let request_ciphertext = hex::decode(witness.request.ciphertext.as_bytes())?;
 
+
+  // TODO(WJ 2024-11-21): Currently this will fail since we are getting chacha ciphertext but decrypting with AES
+  // need a way to know which one we are using.
   let request_decrypter =
     Decrypter::new(EncryptionKey::AES128GCM(key), iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
   let (plaintext, meta) = request_decrypter.decrypt_tls13_aes(
@@ -155,6 +158,8 @@ async fn generate_program_data(
   )
 }
 
+/// we want to be able to specify somewhere in here what cipher suite to use. 
+/// Perhapse the config object should have this information.
 async fn proxy(
   config: config::Config,
   session_id: String,
