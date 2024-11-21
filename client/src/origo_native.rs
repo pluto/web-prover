@@ -167,18 +167,18 @@ async fn generate_program_data(
 
   let setup_data_1024 = SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+      R1CSType::Raw(AES_GCM_1024_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_NIVC_1024_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_OBJECT_1024_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_1024_R1CS.to_vec()),
+      R1CSType::Raw(EXTRACT_VALUE_1024_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(AES_GCM_1024_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_NIVC_1024_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_1024_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_1024_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(EXTRACT_VALUE_1024_GRAPH.to_vec()),
     ],
     max_rom_length:          65,
   };
@@ -204,7 +204,7 @@ async fn generate_program_data(
   );
 
   let (request_rom_data, request_rom, request_fold_inputs) =
-    proving.manifest.unwrap().rom_from_request(
+    proving.manifest.as_ref().unwrap().rom_from_request(
       &key,
       &iv,
       &padded_aad,
@@ -257,7 +257,7 @@ async fn generate_program_data(
   }
   .into_expanded();
 
-  response_program_data
+  Ok(response_program_data?)
 }
 
 async fn proxy(

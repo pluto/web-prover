@@ -101,13 +101,15 @@ const JSON_MAX_KEY_LENGTH: usize = 10;
 const JSON_MASK_ARRAY_SIGNAL_NAME: &str = "index";
 
 /// generates AES counter for each block
-pub fn generate_aes_counter(plaintext_blocks: usize) -> Vec<u8> {
+fn generate_aes_counter(plaintext_blocks: usize) -> Vec<u8> {
   let mut ctr = Vec::new();
   for i in 0..plaintext_blocks {
     ctr.append(&mut vec![0, 0, 0, (i + 1) as u8]);
   }
   ctr
 }
+
+fn circuit_size(plaintext_length: usize) -> usize { plaintext_length.next_power_of_two().max(512) }
 
 impl Manifest {
   /// generates [`crate::program::ProgramData::rom_data`] and [`crate::program::ProgramData::rom`]
@@ -138,7 +140,7 @@ impl Manifest {
 
     // Pad internally the plaintext for using in circuits
     let mut padded_plaintext = plaintext.to_vec();
-    padded_plaintext.resize(512, 0); // TODO (autoparallel): I hardcoded this to 512 -- this is likely NOT what we want to do!
+    padded_plaintext.resize(circuit_size(plaintext.len()), 0);
 
     // TODO(Sambhav): find a better way to prevent this code duplication for request and response
     // compute hashes http start line and headers signals
@@ -202,9 +204,9 @@ impl Manifest {
   /// generates ROM from [`Manifest::response`]
   pub fn rom_from_response(
     &self,
-    aes_key: [u8; 16],
-    aes_iv: [u8; 12],
-    aes_aad: [u8; 16],
+    aes_key: &[u8],
+    aes_iv: &[u8],
+    aes_aad: &[u8],
     plaintext: &[u8],
     ciphertext: &[u8],
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>, HashMap<String, FoldInput>) {
@@ -224,6 +226,10 @@ impl Manifest {
 
     let rom_len = plaintext.len() / AES_INPUT_LENGTH;
     let mut rom = vec![aes_rom_opcode_config; rom_len];
+
+    // Pad internally the plaintext for using in circuits
+    let mut padded_plaintext = plaintext.to_vec();
+    padded_plaintext.resize(circuit_size(plaintext.len()), 0);
 
     // compute hashes http start line and headers signals
     let http_start_line_hash =
@@ -453,9 +459,9 @@ mod tests {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
     let (rom_data, rom, fold_input) = manifest.rom_from_response(
-      AES_KEY.1,
-      AES_IV.1,
-      AES_AAD.1,
+      &AES_KEY.1,
+      &AES_IV.1,
+      &AES_AAD.1,
       TEST_MANIFEST_RESPONSE,
       TEST_MANIFEST_RESPONSE,
     );
