@@ -55,7 +55,7 @@ struct OrigoSession {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), NotaryServerError>{
+async fn main() -> Result<(), NotaryServerError> {
   tracing_subscriber::registry()
     .with(tracing_subscriber::fmt::layer().with_line_number(true))
     .with(tracing_subscriber::EnvFilter::from_default_env()) // set via RUST_LOG=INFO etc
@@ -86,14 +86,19 @@ async fn main() -> Result<(), NotaryServerError>{
     .with_state(shared_state);
 
   if &c.server_cert != "" || &c.server_key != "" {
-    listen(listener, router, &c.server_cert, &c.server_key).await;
+    let _ = listen(listener, router, &c.server_cert, &c.server_key).await;
   } else {
-    acme_listen(listener, router, &c.acme_domain, &c.acme_email).await;
+    let _ = acme_listen(listener, router, &c.acme_domain, &c.acme_email).await;
   }
   Ok(())
 }
 
-async fn acme_listen(listener: TcpListener, router: Router, domain: &str, email: &str) {
+async fn acme_listen(
+  listener: TcpListener,
+  router: Router,
+  domain: &str,
+  email: &str,
+) -> Result<(), NotaryServerError> {
   let protocol = Arc::new(http1::Builder::new());
 
   let mut state = AcmeConfig::new([domain])
@@ -109,34 +114,67 @@ async fn acme_listen(listener: TcpListener, router: Router, domain: &str, email:
 
   tokio::spawn(async move {
     loop {
-      match state.next().await.unwrap() {
-        Ok(ok) => info!("event: {:?}", ok),
-        Err(err) => error!("error: {:?}", err),
+      match state.next().await {
+        Some(result) => match result {
+          Ok(ok) => info!("event: {:?}", ok),
+          Err(err) => error!("error: {:?}", err),
+        },
+        None => {
+          error!("ACME state stream ended unexpectedly");
+        },
       }
     }
   });
 
   loop {
-    let (tcp, _) = listener.accept().await.unwrap();
+    let (tcp, _) = match listener.accept().await {
+      Ok(connection) => connection,
+      Err(e) => {
+        error!("Failed to accept connection: {}", e);
+        continue;
+      },
+    };
     let challenge_rustls_config = challenge_rustls_config.clone();
     let rustls_config = rustls_config.clone();
     let tower_service = router.clone();
     let protocol = protocol.clone();
 
     tokio::spawn(async move {
-      let start_handshake = LazyConfigAcceptor::new(Default::default(), tcp).await.unwrap();
+      let start_handshake = match LazyConfigAcceptor::new(Default::default(), tcp).await {
+        Ok(handshake) => handshake,
+        Err(e) => {
+          error!("Failed to initialize TLS handshake: {}", e);
+          return;
+        },
+      };
 
       if rustls_acme::is_tls_alpn_challenge(&start_handshake.client_hello()) {
         info!("received TLS-ALPN-01 validation request");
-        let mut tls = start_handshake.into_stream(challenge_rustls_config).await.unwrap();
-        tls.shutdown().await.unwrap();
+        let mut tls = match start_handshake.into_stream(challenge_rustls_config).await {
+          Ok(stream) => stream,
+          Err(e) => {
+            error!("Failed to establish TLS-ALPN challenge stream: {}", e);
+            return;
+          },
+        };
+        if let Err(e) = tls.shutdown().await {
+          error!("Failed to shutdown TLS-ALPN challenge connection: {}", e);
+        }
       } else {
-        let tls = start_handshake.into_stream(Arc::new(rustls_config)).await.unwrap();
+        let tls = match start_handshake.into_stream(Arc::new(rustls_config)).await {
+          Ok(stream) => stream,
+          Err(e) => {
+            error!("Failed to establish TLS stream: {}", e);
+            return;
+          },
+        };
         let io = TokioIo::new(tls);
         let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
           tower_service.clone().call(request)
         });
-        let _ = protocol.serve_connection(io, hyper_service).with_upgrades().await;
+        if let Err(e) = protocol.serve_connection(io, hyper_service).with_upgrades().await {
+          error!("Connection error: {}", e);
+        }
       }
     });
   }
@@ -147,20 +185,49 @@ async fn listen(
   router: Router,
   server_cert_path: &str,
   server_key_path: &str,
-) {
+) -> Result<(), NotaryServerError> {
   let protocol = Arc::new(http1::Builder::new());
 
   info!("Using {} and {}", server_cert_path, server_key_path);
-  let certs = load_certs(server_cert_path).unwrap();
-  let key = load_private_key(server_key_path).unwrap();
+  let certs = match load_certs(server_cert_path) {
+    Ok(certs) => certs,
+    Err(e) => {
+      error!("Failed to load certificates: {}", e);
+      return Err(NotaryServerError::CertificateError(e.to_string()));
+    },
+  };
 
-  let mut server_config =
-    ServerConfig::builder().with_no_client_auth().with_single_cert(certs, key).unwrap();
-  server_config.alpn_protocols = vec![b"http/1.1".to_vec()];
+  let key = match load_private_key(server_key_path) {
+    Ok(key) => key,
+    Err(e) => {
+      error!("Failed to load private key: {}", e);
+      return Err(NotaryServerError::CertificateError(e.to_string()));
+    },
+  };
+
+  let server_config =
+    match ServerConfig::builder().with_no_client_auth().with_single_cert(certs, key) {
+      Ok(config) => {
+        let mut config = config;
+        config.alpn_protocols = vec![b"http/1.1".to_vec()];
+        config
+      },
+      Err(e) => {
+        error!("Failed to create server config: {}", e);
+        return Err(NotaryServerError::ServerConfigError(e.to_string()));
+      },
+    };
+
   let tls_acceptor = TlsAcceptor::from(Arc::new(server_config));
 
   loop {
-    let (tcp_stream, _) = listener.accept().await.unwrap();
+    let (tcp_stream, _) = match listener.accept().await {
+      Ok(connection) => connection,
+      Err(e) => {
+        error!("Failed to accept connection: {}", e);
+        continue;
+      },
+    };
     let tls_acceptor = tls_acceptor.clone();
     let tower_service = router.clone();
     let protocol = protocol.clone();
@@ -172,11 +239,12 @@ async fn listen(
           let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
             tower_service.clone().call(request)
           });
-          // TODO should we check returned Result here?
-          let _ = protocol.serve_connection(io, hyper_service).with_upgrades().await;
+          if let Err(e) = protocol.serve_connection(io, hyper_service).with_upgrades().await {
+            error!("Connection error: {}", e);
+          }
         },
         Err(err) => {
-          error!("{err:#}"); // TODO format this better
+          error!("TLS acceptance error: {}", err);
         },
       }
     });

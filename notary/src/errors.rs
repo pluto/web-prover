@@ -2,7 +2,6 @@ use axum::{
   http::StatusCode,
   response::{IntoResponse, Response},
 };
-use clap::error;
 use eyre::Report;
 use thiserror::Error;
 use tlsn_verifier::tls::{VerifierConfigBuilderError, VerifierError};
@@ -55,6 +54,12 @@ pub enum NotaryServerError {
 
   #[error(transparent)]
   Io(#[from] std::io::Error),
+
+  #[error("Error occurred from reading certificates: {0}")]
+  CertificateError(String),
+
+  #[error("Error occurred from reasing server config: {0}")]
+  ServerConfigError(String),
 }
 
 impl From<VerifierError> for NotaryServerError {
