@@ -55,6 +55,7 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
   let mut response_serialized_compressed_verifier =
     response_compressed_verifier.serialize_and_compress();
 
+  // TODO(Sambhav): this is seriously wrong
   request_serialized_compressed_verifier.0.append(&mut response_serialized_compressed_verifier.0);
   Ok(crate::Proof::Origo(request_serialized_compressed_verifier.0))
 }
@@ -200,12 +201,7 @@ async fn generate_program_data(
   // TODO (Colin): ultimately we want to download the `AuxParams` here and deserialize to setup
   // `PublicParams` alongside of calling `client_side_prover::supernova::get_circuit_shapes` for
   // this next step
-  // ----------------------------------------------------------------------------------------------------------------------- //
-  // - create program setup (creating new `PublicParams` each time, for the moment) -
 
-  // ----------------------------------------------------------------------------------------------------------------------- //
-
-  // ----------------------------------------------------------------------------------------------------------------------- //
   // - construct private inputs and program layout for AES proof for request -
   debug!("Padding plaintext and ciphertext to nearest 16...");
   // TODO (Sambhav): padding should happen inside manifest

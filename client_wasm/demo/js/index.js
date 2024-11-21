@@ -88,7 +88,101 @@ function DataHasher(input) {
   return hashes[Math.floor(input.length / 16)];
 }
 
-const generateWitnessBytes = async function (circuits, inputs) {
+function toByte(data) {
+  const byteArray = [];
+  for (let i = 0; i < data.length; i++) {
+    byteArray.push(data.charCodeAt(i));
+  }
+  return byteArray
+}
+
+function isNullOrSpace(val) {
+  return !(val == 0 || val == '\t'.charCodeAt(0) || val == '\n'.charCodeAt(0) || val == '\r'.charCodeAt(0) || val == '\x0C'.charCodeAt(0) || val == ' '.charCodeAt(0));
+}
+
+// Function to convert byte array to string
+function byteArrayToString(byteArray) {
+  return Array.from(byteArray)
+    .map(byte => String.fromCharCode(byte))
+    .join('');
+}
+
+function arraysEqual(a, b) {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (a.length !== b.length) return false;
+
+  // If you don't care about the order of the elements inside
+  // the array, you should sort both arrays here.
+  // Please note that calling sort on an array will modify that array.
+  // you might want to clone your array first.
+
+  for (var i = 0; i < a.length; ++i) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+// Function to convert byte array to object with multiple parsing methods
+function byteArrayToObject(byteArray) {
+  try {
+    // Method 1: Using TextDecoder
+    if (typeof TextDecoder !== 'undefined') {
+      const decoder = new TextDecoder('utf-8');
+      const jsonString = decoder.decode(new Uint8Array(byteArray));
+      return JSON.parse(jsonString);
+    }
+
+    // Method 2: Manual conversion (fallback)
+    const jsonString = byteArrayToString(byteArray);
+    return JSON.parse(jsonString);
+  } catch (error) {
+    throw new Error(`Failed to convert byte array to object: ${error.message}`);
+  }
+}
+
+function compute_json_witness(padded_plaintext, key) {
+  let plaintext = padded_plaintext.filter(isNullOrSpace);
+
+  let plaintext_as_json = byteArrayToObject(plaintext);
+  let data = JSON.stringify(plaintext_as_json[key]);
+  let data_bytes = toByte(data);
+  data_bytes = data_bytes.filter(isNullOrSpace);
+
+  let startIdx = 0;
+  let endIdx = 0;
+  for (var i = 0; i < padded_plaintext.length; i++) {
+    let filtered_body = padded_plaintext.slice(i, padded_plaintext.length).filter(isNullOrSpace);
+    filtered_body = filtered_body.slice(0, data_bytes.length);
+    if (arraysEqual(filtered_body, data_bytes) && filtered_body[0] === padded_plaintext[i]) {
+      startIdx = i;
+    }
+  }
+
+  for (var i = 0; i < padded_plaintext.length; i++) {
+    let filtered_body = padded_plaintext.slice(0, i + 1).filter(isNullOrSpace);
+    filtered_body.reverse();
+    filtered_body = filtered_body.slice(0, data_bytes.length);
+    filtered_body.reverse();
+    console.log("filtered_body", i, filtered_body, data_bytes, filtered_body[data_bytes.length - 1], padded_plaintext[i]);
+    if (arraysEqual(filtered_body, data_bytes) && filtered_body[data_bytes.length - 1] === padded_plaintext[i]) {
+      endIdx = i;
+    }
+  }
+
+  let result = [];
+  for (var i = 0; i < padded_plaintext.length; i++) {
+    if (i > startIdx && i < endIdx) {
+      result.push(padded_plaintext[i]);
+    } else {
+      result.push(0);
+    }
+  }
+
+  return result;
+}
+
+const generateWitnessBytesForRequest = async function (circuits, inputs) {
   let witnesses = [];
 
   // AES
@@ -129,6 +223,61 @@ const generateWitnessBytes = async function (circuits, inputs) {
 
   // console.log("json mask object");
   // let wtnsJson = await generateWitness(circuits[4], inputs[4]);
+  // witnesses.push({
+  //   val: wtnsJson.data,
+  // });
+
+  // console.log("json extract value");
+  // let wtnsFinal = await generateWitness(circuits[6], inputs[6]);
+  // console.log("wtnsFinal", wtnsFinal);
+  // witnesses.push({
+  //   val: wtnsFinal.data,
+  // });
+
+  return witnesses;
+};
+
+const generateWitnessBytesForResponse = async function (circuits, inputs) {
+  let witnesses = [];
+
+  // AES
+  console.log("AES")
+  let plaintext_length = http_response_plaintext.length;
+  let plaintext = inputs[0]["plainText"];
+  let cipherText = inputs[0]["cipherText"];
+  inputs[0]["step_in"] = 0;
+  for (var i = 0; i < plaintext_length / 16; i++) {
+    inputs[0]["plainText"] = plaintext.slice(i * 16, (i + 1) * 16);
+    inputs[0]["cipherText"] = cipherText.slice(i * 16, (i + 1) * 16);
+    inputs[0]["ctr"] = [0, 0, 0, i + 1];
+    console.log("inputs[0]", inputs[0]);
+    let wtns = await generateWitness(circuits[0], inputs[0]);
+    witnesses.push({
+      val: wtns.data
+    });
+    inputs[0]["step_in"] = DataHasher(plaintext.slice(0, (i + 1) * 16));
+  };
+
+  // HTTP
+  let http_start_line_padded = http_start_line.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - http_start_line.length)).fill(0));
+  let http_header_0_padded = http_header_0.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - http_header_0.length)).fill(0));
+  let http_header_1_padded = http_header_1.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - http_header_1.length)).fill(0));
+  let http_body_padded = http_body.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - http_body.length)).fill(0));
+
+  inputs[1]["start_line_hash"] = DataHasher(http_start_line_padded);
+  let http_header_0_hash = DataHasher(http_header_0_padded);
+  let http_header_1_hash = DataHasher(http_header_1_padded);
+  inputs[1]["header_hashes"] = [http_header_0_hash, http_header_1_hash, 0, 0, 0];
+  inputs[1]["body_hash"] = DataHasher(http_body_padded);
+  inputs[1]["step_in"] = DataHasher(extendedHTTPInput);
+  console.log("http", inputs[1]);
+  let wtns = await generateWitness(circuits[1], inputs[1]);
+  witnesses.push({
+    val: wtns.data
+  });
+
+  // console.log("json mask object");
+  // let wtnsJson = await generateWitness(circuits[2], inputs[2]);
   // witnesses.push({
   //   val: wtnsJson.data,
   // });
@@ -236,6 +385,9 @@ const http_body = [
   32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125,
 ];
 
+let json_witness = compute_json_witness(http_body, "data");
+console.log(json_witness);
+
 // let extendedInput = Array(TOTAL_BYTES_ACROSS_NIVC).fill(0);
 let extendedHTTPInput = http_response_plaintext.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - http_response_plaintext.length)).fill(0));
 let extendedCiphertext = AES_CIPHER_TEXT.concat(Array(TOTAL_BYTES_ACROSS_NIVC - AES_CIPHER_TEXT.length).fill(0));
@@ -263,7 +415,7 @@ var inputs = [{
 // TODO: Configurable identifiers
 var circuits = ["aes_gctr_nivc_512b", "http_nivc_512b", "json_mask_object_512b", "json_mask_array_index_512b", "json_extract_value_512b"];
 // var r1cs = await getConstraints(circuits);
-var witnesses = await generateWitnessBytes(circuits, inputs);
+var witnesses = await generateWitnessBytesForRequest(circuits, inputs);
 
 console.log("witness", witnesses);
 
