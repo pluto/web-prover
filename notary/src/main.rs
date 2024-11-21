@@ -13,6 +13,7 @@ use axum::{
   routing::{get, post},
   Router,
 };
+use errors::NotaryServerError;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use k256::ecdsa::SigningKey as Secp256k1SigningKey;
@@ -54,7 +55,7 @@ struct OrigoSession {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), NotaryServerError>{
   tracing_subscriber::registry()
     .with(tracing_subscriber::fmt::layer().with_line_number(true))
     .with(tracing_subscriber::EnvFilter::from_default_env()) // set via RUST_LOG=INFO etc
@@ -64,7 +65,7 @@ async fn main() {
 
   let c = config::read_config();
 
-  let listener = TcpListener::bind(&c.listen).await.unwrap();
+  let listener = TcpListener::bind(&c.listen).await?;
   info!("Listening on https://{}", &c.listen);
 
   let shared_state = Arc::new(SharedState {
@@ -89,6 +90,7 @@ async fn main() {
   } else {
     acme_listen(listener, router, &c.acme_domain, &c.acme_email).await;
   }
+  Ok(())
 }
 
 async fn acme_listen(listener: TcpListener, router: Router, domain: &str, email: &str) {

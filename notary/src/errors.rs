@@ -2,6 +2,7 @@ use axum::{
   http::StatusCode,
   response::{IntoResponse, Response},
 };
+use clap::error;
 use eyre::Report;
 use thiserror::Error;
 use tlsn_verifier::tls::{VerifierConfigBuilderError, VerifierError};
@@ -39,14 +40,21 @@ impl IntoResponse for ProxyError {
 pub enum NotaryServerError {
   #[error(transparent)]
   Unexpected(#[from] Report),
+
   #[error("Failed to connect to prover: {0}")]
   Connection(String),
+
   #[error("Error occurred during notarization: {0}")]
   Notarization(Box<dyn std::error::Error + Send + 'static>),
+
   #[error("Invalid request from prover: {0}")]
   BadProverRequest(String),
+
   #[error("Unauthorized request from prover: {0}")]
   UnauthorizedProverRequest(String),
+
+  #[error(transparent)]
+  Io(#[from] std::io::Error),
 }
 
 impl From<VerifierError> for NotaryServerError {

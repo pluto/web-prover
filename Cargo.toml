@@ -1,7 +1,8 @@
 [workspace]
-members=["client", "client_ios", "client_wasm", "notary", "proofs"]
+# members=["client", "client_ios", "client_wasm", "notary", "proofs"]
 # members =["client", "client_wasm"] # config for wasm32 rust analyzer
 # members =["client", "client_ios"] # config for ios rust analyzer
+members = ["notary"]
 resolver="2"
 
 [workspace.dependencies]
