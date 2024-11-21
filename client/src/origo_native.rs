@@ -114,7 +114,7 @@ async fn generate_program_data(
   for (i, ct_chunk) in witness.response.ciphertext.iter().enumerate() {
     let ct_chunk = hex::decode(ct_chunk).unwrap();
 
-    //
+    // decrypt ciphertext
     let (plaintext, meta) = response_dec
       .decrypt_tls13_aes(
         &OpaqueMessage {
@@ -127,9 +127,9 @@ async fn generate_program_data(
       .unwrap();
 
     // push ciphertext
-    response_ct.extend(ct_chunk);
-
     let pt = plaintext.payload.0.to_vec();
+    response_ct.extend_from_slice(&ct_chunk[..pt.len()]);
+
     response_pt.extend(pt);
     let aad = hex::decode(meta.additional_data.to_owned()).unwrap();
     let mut padded_aad = vec![0; 16 - aad.len()];

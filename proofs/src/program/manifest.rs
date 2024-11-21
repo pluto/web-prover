@@ -22,6 +22,7 @@ use std::collections::HashMap;
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use tracing::debug;
 
 use crate::{
   program::data::{CircuitData, FoldInput, InstructionConfig},
@@ -232,16 +233,19 @@ impl Manifest {
     padded_plaintext.resize(circuit_size(plaintext.len()), 0);
 
     // compute hashes http start line and headers signals
-    let http_start_line_hash =
-      data_hasher(&compute_http_witness(plaintext, crate::witness::HttpMaskType::StartLine));
-    let mut http_header_hashes = vec!["0".to_string(); 5];
+    let http_start_line_hash = data_hasher(&compute_http_witness(
+      &padded_plaintext,
+      crate::witness::HttpMaskType::StartLine,
+    ));
+    let mut http_header_hashes = vec!["0".to_string(); 25];
     for header_name in self.request.headers.keys() {
-      let (index, masked_header) = compute_http_header_witness(plaintext, header_name.as_bytes());
+      let (index, masked_header) =
+        compute_http_header_witness(&padded_plaintext, header_name.as_bytes());
       http_header_hashes[index] =
         BigInt::from_bytes_le(num_bigint::Sign::Plus, &data_hasher(&masked_header).to_bytes())
           .to_str_radix(10);
     }
-    let http_body = compute_http_witness(plaintext, crate::witness::HttpMaskType::Body);
+    let http_body = compute_http_witness(&padded_plaintext, crate::witness::HttpMaskType::Body);
     let http_body_hash = data_hasher(&http_body);
 
     // http parse
@@ -249,7 +253,7 @@ impl Manifest {
     rom.push(InstructionConfig {
       name:          String::from("HTTP_NIVC"),
       private_input: HashMap::from([
-        (String::from(DATA_SIGNAL_NAME), json!(plaintext.to_vec())),
+        (String::from(DATA_SIGNAL_NAME), json!(padded_plaintext.to_vec())),
         (
           String::from(HTTP_START_LINE_HASH_SIGNAL_NAME),
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
