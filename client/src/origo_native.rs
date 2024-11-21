@@ -18,8 +18,7 @@ use reqwest::Client;
 use serde_json::{json, Value};
 use tls_client2::{
   origo::{OrigoConnection, WitnessData},
-  CipherSuite, Decrypter, ProtocolVersion,
-  EncryptionKey
+  CipherSuite, Decrypter, EncryptionKey, ProtocolVersion,
 };
 use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
@@ -60,7 +59,8 @@ async fn generate_program_data(
   debug!("Decoding ciphertext hex...");
   let request_ciphertext = hex::decode(witness.request.ciphertext.as_bytes())?;
 
-  let request_decrypter = Decrypter::new(EncryptionKey::AES128GCM(key), iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
+  let request_decrypter =
+    Decrypter::new(EncryptionKey::AES128GCM(key), iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
   let (plaintext, meta) = request_decrypter.decrypt_tls13_aes(
     &OpaqueMessage {
       typ:     ContentType::ApplicationData,
