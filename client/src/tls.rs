@@ -78,7 +78,19 @@ pub(crate) fn decrypt_tls_ciphertext(
   witness: &WitnessData,
 ) -> Result<(AESEncryptionInput, AESEncryptionInput), ClientErrors> {
   // - get AES key, IV, request ciphertext, request plaintext, and AAD -
-  let key: [u8; 16] = witness.request.aes_key[..16].try_into()?;
+  let (key, cipher_suite) = match witness.request.aes_key.len() {
+    // chacha has 32 byte keys
+    32 => (
+      EncryptionKey::CHACHA20POLY1305(witness.request.aes_key[..32].try_into()?),
+      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
+    ),
+    // aes has 16 byte keys
+    16 => (
+      EncryptionKey::AES128GCM(witness.request.aes_key[..16].try_into()?),
+      CipherSuite::TLS13_AES_128_GCM_SHA256,
+    ),
+    _ => panic!("Unsupported key length"),
+  };
   let iv: [u8; 12] = witness.request.aes_iv[..12].try_into()?;
 
   // Get the request ciphertext, request plaintext, and AAD
@@ -109,7 +121,19 @@ pub(crate) fn decrypt_tls_ciphertext(
   // response preparation
   let mut response_plaintext = vec![];
   let mut response_ciphertext = vec![];
-  let response_key: [u8; 16] = witness.response.aes_key[..16].try_into().unwrap();
+  let (key, cipher_suite) = match witness.request.aes_key.len() {
+    // chacha has 32 byte keys
+    32 => (
+      EncryptionKey::CHACHA20POLY1305(witness.request.aes_key[..32].try_into()?),
+      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
+    ),
+    // aes has 16 byte keys
+    16 => (
+      EncryptionKey::AES128GCM(witness.request.aes_key[..16].try_into()?),
+      CipherSuite::TLS13_AES_128_GCM_SHA256,
+    ),
+    _ => panic!("Unsupported key length"),
+  };
   let response_iv: [u8; 12] = witness.response.aes_iv[..12].try_into().unwrap();
   let response_dec =
     Decrypter2::new(response_key, response_iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
@@ -141,16 +165,28 @@ pub(crate) fn decrypt_tls_ciphertext(
   trace!("response plaintext: {:?}", response_plaintext);
   assert_eq!(response_plaintext.len(), response_ciphertext.len());
 
+  let destructured_key = match key {
+    EncryptionKey::AES128GCM(key) => key,
+    _ => panic!("Unsupported cipher suite"),
+    // EncryptionKey::CHACHA20POLY1305(key) => key,
+  };
+
+  let destructured_response_key = match response_key {
+    EncryptionKey::AES128GCM(key) => key,
+    _ => panic!("Unsupported cipher suite"),
+    // EncryptionKey::CHACHA20POLY1305(key) => key,
+  };
+
   Ok((
     AESEncryptionInput {
-      key,
+      key: destructured_key,
       iv,
       aad: padded_aad.clone(),
       plaintext: request_plaintext,
       ciphertext: request_ciphertext,
     },
     AESEncryptionInput {
-      key:        response_key,
+      key:        destructured_response_key,
       iv:         response_iv,
       aad:        padded_aad, // TODO: use response's AAD
       plaintext:  response_plaintext,

@@ -352,10 +352,12 @@ impl RustCryptoBackend13 {
     let server_expander = self.hkdf_provider.expander_for_okm(&server_secret);
     let client_iv = hkdf_expand_label_aead_key(client_expander.as_ref(), 12, b"iv", &[]);
     let server_iv = hkdf_expand_label_aead_key(server_expander.as_ref(), 12, b"iv", &[]);
+    debug!("CipherSuite={:?}", self.cipher_suite.unwrap().suite());
     let (client_key, server_key) = match self.cipher_suite.unwrap().suite() {
       CipherSuite::TLS13_AES_128_GCM_SHA256 => {
         let client_key = hkdf_expand_label_aead_key(client_expander.as_ref(), 16, b"key", &[]);
         let server_key = hkdf_expand_label_aead_key(server_expander.as_ref(), 16, b"key", &[]);
+        debug!("client_key={:?}", client_key.buf.len());
         (
           client_key,
           server_key,
@@ -364,6 +366,7 @@ impl RustCryptoBackend13 {
       CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
         let client_key = hkdf_expand_label_aead_key(client_expander.as_ref(), 32, b"key", &[]);
         let server_key = hkdf_expand_label_aead_key(server_expander.as_ref(), 32, b"key", &[]);
+        debug!("client_key={:?}", client_key.buf.len());
         (
           client_key,
           server_key,
@@ -428,6 +431,7 @@ impl RustCryptoBackend13 {
       CipherSuite::TLS13_AES_128_GCM_SHA256 => {
         let mut key = [0u8; 16];
         key.copy_from_slice(&keys.client_key.buf[..16]);
+        debug!("Got Encrypter with key length: {:?}", key.len());
         Encrypter::new(
         EncryptionKey::AES128GCM(key),
         keys.client_iv.buf[..12].try_into().unwrap(),
@@ -436,6 +440,7 @@ impl RustCryptoBackend13 {
       CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
         let mut key = [0u8; 32];
         key.copy_from_slice(&keys.client_key.buf[..32]);
+        debug!("Got Encrypter with key length: {:?}", key.len());
         Encrypter::new(
         EncryptionKey::CHACHA20POLY1305(key),
         keys.client_iv.buf[..12].try_into().unwrap(),
@@ -451,6 +456,7 @@ impl RustCryptoBackend13 {
       CipherSuite::TLS13_AES_128_GCM_SHA256 => {
         let mut key = [0u8; 16];
         key.copy_from_slice(&keys.server_key.buf[..16]);
+        debug!("Got Decrypter with key length: {:?}", key.len());
         Decrypter::new(
         EncryptionKey::AES128GCM(key),
         keys.server_iv.buf[..12].try_into().unwrap(),
@@ -459,6 +465,7 @@ impl RustCryptoBackend13 {
       CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
         let mut key = [0u8; 32];
         key.copy_from_slice(&keys.server_key.buf[..32]);
+        debug!("Got Decrypter with key length: {:?}", key.len());
          Decrypter::new(
       EncryptionKey::CHACHA20POLY1305(key),
       keys.server_iv.buf[..12].try_into().unwrap(),
@@ -508,6 +515,7 @@ impl Backend for RustCryptoBackend13 {
     Ok(())
   }
 
+  // TODO(WJ 2024-11-21): this is unused
   // NOTE: For now only support the bare minimum. Extend to more in the future.
   async fn get_suite(&mut self) -> Result<SupportedCipherSuite, BackendError> {
     Ok(suites::tls13::TLS13_AES_128_GCM_SHA256)
@@ -996,6 +1004,7 @@ impl Decrypter {
 
     let cipher = Aes128Gcm::new_from_slice(&write_key).unwrap();
     let nonce = GenericArray::<u8, U12>::from_slice(&init_nonce);
+    debug!("Attempting to aes decrypt with key: {:?}", write_key);
     let mut plaintext = cipher
       .decrypt(nonce, aes_payload)
       .map_err(|e| BackendError::DecryptionError(e.to_string()))?; // error in invalid here
