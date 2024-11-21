@@ -199,6 +199,7 @@ pub fn compress_proof(
 ) -> Result<Proof<CompressedSNARK<E1, S1, S2>>, ProofError> {
   debug!("Generating `CompressedSNARK`");
   let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(public_params)?;
+  debug!("Completed Setup for `CompressedSNARK`");
 
   // Optionally time the `CompressedSNARK` creation
   #[cfg(feature = "timing")]
