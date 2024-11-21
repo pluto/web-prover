@@ -935,11 +935,9 @@ impl Decrypter {
     seq: u64,
   ) -> Result<(PlainMessage, RecordMeta), BackendError> {
 
-    let total_len = m.payload.0.len() + 1 + 16;
-    let aad = make_tls13_aad(total_len);
-    let mut payload = Vec::with_capacity(total_len);
-    payload.extend_from_slice(&m.payload.0);
-    payload.push(m.typ.get_u8()); // Very important, encrypted messages must have the type appended.
+    let aad = make_tls13_aad(m.payload.0.len());
+    // let init_nonce = make_nonce(self.write_iv, seq);
+
 
     let write_key = match self.write_key {
       EncryptionKey::CHACHA20POLY1305(key) => key,
@@ -948,11 +946,11 @@ impl Decrypter {
     let write_key = Key::from_slice(&write_key);
     let cipher = ChaCha20Poly1305::new(write_key);
     let init_nonce = Nonce::from(make_nonce(self.write_iv, seq));
-    let payload = ChaChaPayload { msg: &payload, aad: &aad };
+    let chacha_payload = ChaChaPayload { msg: &m.payload.0, aad: &aad };
 
     let mut plaintext = cipher
-      .decrypt(&init_nonce, payload)
-      .map_err(|e| BackendError::DecryptionError(e.to_string()))?; // error in invalid here
+      .decrypt(&init_nonce, chacha_payload)
+      .map_err(|e| BackendError::DecryptionError(e.to_string()))?;
 
     let typ = unpad_tls13(&mut plaintext);
     if typ == ContentType::Unknown(0) {
