@@ -23,10 +23,11 @@ pub struct DecryptTarget {
 /// Client's request and Server's response decryption target for a TLS transcript
 #[derive(Debug, Clone)]
 pub struct WitnessData {
+  pub server_handshake: DecryptTarget,
   /// TLS request
-  pub request:  DecryptTarget,
+  pub request:   DecryptTarget,
   /// TLS response
-  pub response: DecryptTarget,
+  pub response:  DecryptTarget,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -128,12 +129,17 @@ impl OrigoConnection {
     }
 
     WitnessData {
-      request:  DecryptTarget {
+      server_handshake: DecryptTarget {
+        aes_iv:     self.secret_map.get("Handshake:server_aes_iv").unwrap().to_vec(),
+        aes_key:    self.secret_map.get("Handshake:server_aes_key").unwrap().to_vec(),
+        ciphertext: "".to_string(), // empty
+      },
+      request:   DecryptTarget {
         aes_iv:     self.secret_map.get("Application:client_aes_iv").unwrap().to_vec(),
         aes_key:    self.secret_map.get("Application:client_aes_key").unwrap().to_vec(),
         ciphertext: vec![self.record_map.get(&req_key).unwrap().ciphertext.clone()],
       },
-      response: DecryptTarget {
+      response:  DecryptTarget {
         aes_iv:     self.secret_map.get("Application:server_aes_iv").unwrap().to_vec(),
         aes_key:    self.secret_map.get("Application:server_aes_key").unwrap().to_vec(),
         ciphertext: ciphertext_chunks,

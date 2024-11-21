@@ -9,16 +9,28 @@ use crate::errors;
 
 #[derive(Serialize)]
 pub struct SignBody {
-  pub hs_server_aes_iv:  String,
-  pub hs_server_aes_key: String,
+  pub handshake_server_aes_iv:    String,
+  pub handshake_server_aes_key:   String,
+  pub application_client_aes_iv:  String,
+  pub application_client_aes_key: String,
+  pub application_server_aes_iv:  String,
+  pub application_server_aes_key: String,
 }
 
 pub async fn sign(
   config: crate::config::Config,
   session_id: String,
-  sb: SignBody,
   witness: &WitnessData,
 ) -> Result<Vec<u8>, crate::errors::ClientErrors> {
+  let sb = SignBody {
+    handshake_server_aes_iv:    hex::encode(&witness.server_handshake.aes_iv),
+    handshake_server_aes_key:   hex::encode(&witness.server_handshake.aes_key),
+    application_client_aes_iv:  hex::encode(&witness.request.aes_iv),
+    application_client_aes_key: hex::encode(&witness.request.aes_key),
+    application_server_aes_iv:  hex::encode(&witness.response.aes_iv),
+    application_server_aes_key: hex::encode(&witness.response.aes_key),
+  };
+
   let url = format!(
     "https://{}:{}/v1/origo/sign?session_id={}",
     config.notary_host.clone(),

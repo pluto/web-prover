@@ -68,8 +68,12 @@ pub struct SignReply {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct SignBody {
-  hs_server_aes_iv:  String,
-  hs_server_aes_key: String,
+  pub handshake_server_aes_iv:    String,
+  pub handshake_server_aes_key:   String,
+  pub application_client_aes_iv:  String,
+  pub application_client_aes_key: String,
+  pub application_server_aes_iv:  String,
+  pub application_server_aes_key: String,
 }
 
 pub async fn sign(
@@ -230,8 +234,8 @@ fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
 }
 
 fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>, ProxyError> {
-  let server_aes_key = hex::decode(payload.hs_server_aes_key).unwrap();
-  let server_aes_iv = hex::decode(payload.hs_server_aes_iv).unwrap();
+  let server_aes_key = hex::decode(payload.handshake_server_aes_key).unwrap();
+  let server_aes_iv = hex::decode(payload.handshake_server_aes_iv).unwrap();
 
   let mut cursor = Cursor::new(bytes);
   let mut messages: Vec<Message> = vec![];

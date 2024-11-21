@@ -30,9 +30,9 @@ use crate::{
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
-  let (sb, witness) = proxy(config.clone(), session_id.clone()).await?;
+  let witness = proxy(config.clone(), session_id.clone()).await?;
 
-  let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
+  let sign_data = crate::origo::sign(config.clone(), session_id.clone(), &witness).await;
 
   debug!("generating NIVC program data!");
   let program_data = generate_program_data(&witness, config.proving).await?;
@@ -107,7 +107,7 @@ async fn generate_program_data(
 async fn proxy(
   config: config::Config,
   session_id: String,
-) -> Result<(SignBody, WitnessData), errors::ClientErrors> {
+) -> Result<WitnessData, errors::ClientErrors> {
   // TODO build sanitized query
   let wss_url = format!(
     "wss://{}:{}/v1/origo?session_id={}&target_host={}&target_port={}",
@@ -164,18 +164,8 @@ async fn proxy(
   let mut client_socket = connection_receiver.await.unwrap()?.io.into_inner();
   client_socket.close().await.unwrap();
 
-  let server_aes_iv =
-    origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_iv").unwrap().clone();
-  let server_aes_key =
-    origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_key").unwrap().clone();
-
   let witness = origo_conn.lock().unwrap().to_witness_data();
-  let sb = SignBody {
-    hs_server_aes_iv:  hex::encode(server_aes_iv.to_vec()),
-    hs_server_aes_key: hex::encode(server_aes_key.to_vec()),
-  };
-
-  Ok((sb, witness))
+  Ok(witness)
 }
 
 use core::slice;
