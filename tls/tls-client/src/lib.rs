@@ -356,7 +356,7 @@ pub use crate::{
     kx::{SupportedKxGroup, ALL_KX_GROUPS},
 };
 pub use backend::{
-    Backend, BackendError, DecryptMode, EncryptMode, RustCryptoBackend, RustCryptoBackend13,
+    Backend, BackendError, DecryptMode, EncryptMode, RustCryptoBackend13,
 };
 pub use cipher::{MessageDecrypter, MessageEncrypter};
 pub use tls_core::{
