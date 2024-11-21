@@ -33,19 +33,77 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
 
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
 
-  let program_data = generate_program_data(&witness, config.proving).await?;
-  let program_output = program::run(&program_data)?;
-  let compressed_verifier = program::compress_proof(&program_output, &program_data.public_params)?;
-  let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
+  debug!("generating program data!");
+  let (request_program_data, response_program_data) =
+    generate_program_data(&witness, config.proving).await?;
 
-  Ok(crate::Proof::Origo(serialized_compressed_verifier.0))
+  debug!("starting request recursive proving");
+  let request_program_output = program::run(&request_program_data)?;
+
+  debug!("starting response recursive proving");
+  let response_program_output = program::run(&response_program_data)?;
+
+  debug!("starting request proof compression");
+  let request_compressed_verifier =
+    program::compress_proof(&request_program_output, &request_program_data.public_params)?;
+  let response_compressed_verifier =
+    program::compress_proof(&response_program_output, &response_program_data.public_params)?;
+
+  debug!("verification");
+  let mut request_serialized_compressed_verifier =
+    request_compressed_verifier.serialize_and_compress();
+  let mut response_serialized_compressed_verifier =
+    response_compressed_verifier.serialize_and_compress();
+
+  request_serialized_compressed_verifier.0.append(&mut response_serialized_compressed_verifier.0);
+  Ok(crate::Proof::Origo(request_serialized_compressed_verifier.0))
+}
+
+fn get_setup_data_512() -> SetupData {
+  SetupData {
+    r1cs_types:              vec![
+      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
+      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+    ],
+    witness_generator_types: vec![
+      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
+    ],
+    max_rom_length:          JSON_MAX_ROM_LENGTH,
+  }
+}
+
+fn get_setup_data_1024() -> SetupData {
+  SetupData {
+    r1cs_types:              vec![
+      R1CSType::Raw(AES_GCM_1024_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_NIVC_1024_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_OBJECT_1024_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_1024_R1CS.to_vec()),
+      R1CSType::Raw(EXTRACT_VALUE_1024_R1CS.to_vec()),
+    ],
+    witness_generator_types: vec![
+      WitnessGeneratorType::Raw(AES_GCM_1024_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_NIVC_1024_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_1024_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_1024_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(EXTRACT_VALUE_1024_GRAPH.to_vec()),
+    ],
+    max_rom_length:          JSON_MAX_ROM_1024B_LENGTH,
+  }
 }
 
 // TODO: Dedup origo_native and origo_wasm. The difference is the witness/r1cs preparation.
 async fn generate_program_data(
   witness: &WitnessData,
   proving: ProvingData,
-) -> Result<ProgramData<Online, Expanded>, ClientErrors> {
+) -> Result<(ProgramData<Online, Expanded>, ProgramData<Online, Expanded>), ClientErrors> {
   // ----------------------------------------------------------------------------------------------------------------------- //
   // - get AES key, IV -
   debug!(
@@ -84,8 +142,6 @@ async fn generate_program_data(
   let mut padded_aad = vec![0; 16 - aad.len()];
   padded_aad.extend(aad);
 
-  let request_plaintext = plaintext.payload.0.to_vec();
-  trace!("Raw request plaintext: {:?}", request_plaintext);
   // -- NOTE: Above is the following:
   // GET https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json HTTP/1.1
   // host: gist.githubusercontent.com
@@ -93,6 +149,9 @@ async fn generate_program_data(
   // connection: close
   // accept: */*
   // - get AES key, IV, request ciphertext, request plaintext, and AAD -
+  let request_plaintext = plaintext.payload.0.to_vec();
+  trace!("Raw request plaintext: {:?}", request_plaintext);
+
   debug!(
     "response_key_as_string: {:?}, length: {}",
     witness.response.aes_key,
@@ -143,45 +202,6 @@ async fn generate_program_data(
   // this next step
   // ----------------------------------------------------------------------------------------------------------------------- //
   // - create program setup (creating new `PublicParams` each time, for the moment) -
-  // let setup_data_512 = SetupData {
-  //   r1cs_types:              vec![
-  //     R1CSType::Raw(AES_GCM_512_R1CS.to_vec()),
-  //     R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_512_R1CS.to_vec()),
-  //     R1CSType::Raw(HTTP_LOCK_HEADER_512_R1CS.to_vec()),
-  //     R1CSType::Raw(HTTP_BODY_MASK_512_R1CS.to_vec()),
-  //     R1CSType::Raw(JSON_MASK_OBJECT_512_R1CS.to_vec()),
-  //     R1CSType::Raw(JSON_MASK_ARRAY_INDEX_512_R1CS.to_vec()),
-  //     R1CSType::Raw(EXTRACT_VALUE_512_R1CS.to_vec()),
-  //   ],
-  //   witness_generator_types: vec![
-  //     WitnessGeneratorType::Raw(AES_GCM_512_GRAPH.to_vec()),
-  //     WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_512_GRAPH.to_vec()),
-  //     WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_512_GRAPH.to_vec()),
-  //     WitnessGeneratorType::Raw(HTTP_BODY_MASK_512_GRAPH.to_vec()),
-  //     WitnessGeneratorType::Raw(JSON_MASK_OBJECT_512_GRAPH.to_vec()),
-  //     WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_512_GRAPH.to_vec()),
-  //     WitnessGeneratorType::Raw(EXTRACT_VALUE_512_GRAPH.to_vec()),
-  //   ],
-  //   max_rom_length:          JSON_MAX_ROM_LENGTH,
-  // };
-
-  let setup_data_1024 = SetupData {
-    r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_1024_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_NIVC_1024_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_OBJECT_1024_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_1024_R1CS.to_vec()),
-      R1CSType::Raw(EXTRACT_VALUE_1024_R1CS.to_vec()),
-    ],
-    witness_generator_types: vec![
-      WitnessGeneratorType::Raw(AES_GCM_1024_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_NIVC_1024_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_1024_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_1024_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(EXTRACT_VALUE_1024_GRAPH.to_vec()),
-    ],
-    max_rom_length:          65,
-  };
 
   // ----------------------------------------------------------------------------------------------------------------------- //
 
@@ -232,22 +252,26 @@ async fn generate_program_data(
   debug!("Setting up `PublicParams`... (this may take a moment)");
   // let public_params = program::setup(&setup_data_512);
   // TODO: remove this duplicate params or use serialized params
-  let public_params2 = program::setup(&setup_data_1024);
+  let setup_data_512 = get_setup_data_512();
+  let public_params_512 = program::setup(&setup_data_512);
+
+  let setup_data_1024 = get_setup_data_1024();
+  let public_params_1024 = program::setup(&setup_data_1024);
   debug!("Created `PublicParams`!");
 
-  // let request_program_data = ProgramData::<Online, NotExpanded> {
-  //   public_params,
-  //   setup_data: setup_data_512,
-  //   rom: request_rom,
-  //   rom_data: request_rom_data,
-  //   initial_nivc_input: vec![proofs::F::<G1>::from(0)],
-  //   inputs: request_fold_inputs,
-  //   witnesses: vec![vec![F::<G1>::from(0)]],
-  // }
-  // .into_expanded();
+  let request_program_data = ProgramData::<Online, NotExpanded> {
+    public_params:      public_params_512,
+    setup_data:         setup_data_512,
+    rom:                request_rom,
+    rom_data:           request_rom_data,
+    initial_nivc_input: vec![proofs::F::<G1>::from(0)],
+    inputs:             request_fold_inputs,
+    witnesses:          vec![vec![F::<G1>::from(0)]],
+  }
+  .into_expanded();
 
   let response_program_data = ProgramData::<Online, NotExpanded> {
-    public_params:      public_params2,
+    public_params:      public_params_1024,
     setup_data:         setup_data_1024,
     rom:                response_rom,
     rom_data:           response_rom_data,
@@ -257,7 +281,7 @@ async fn generate_program_data(
   }
   .into_expanded();
 
-  Ok(response_program_data?)
+  Ok((request_program_data?, response_program_data?))
 }
 
 async fn proxy(
