@@ -1,7 +1,7 @@
 #[cfg(feature = "logging")]
 use crate::log::{debug, error, trace, warn};
 use crate::{
-    backend::{Backend, RustCryptoBackend},
+    backend::{Backend, RustCryptoBackend13},
     client::ClientConnectionData,
     error::Error,
     record_layer,
