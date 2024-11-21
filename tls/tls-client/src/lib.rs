@@ -356,7 +356,7 @@ pub use crate::{
     kx::{SupportedKxGroup, ALL_KX_GROUPS},
 };
 pub use backend::{
-    Backend, BackendError, DecryptMode, EncryptMode, RustCryptoBackend13,
+    Backend, BackendError, DecryptMode, EncryptMode, RustCryptoBackend13, EncryptionKey
 };
 pub use cipher::{MessageDecrypter, MessageEncrypter};
 pub use tls_core::{
@@ -368,9 +368,7 @@ pub use tls_core::{
     suites::{SupportedCipherSuite, ALL_CIPHER_SUITES},
     versions::{SupportedProtocolVersion, ALL_VERSIONS},
 };
-pub use backend::Decrypter2;
-//pub use crate::stream::{Stream, StreamOwned};
-//pub use crate::ticketer::Ticketer;
+pub use backend::Decrypter;
 
 /// Items for use in a client.
 pub mod client {
