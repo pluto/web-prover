@@ -197,9 +197,12 @@ pub fn compress_proof(
   recursive_snark: &RecursiveSNARK<E1>,
   public_params: &PublicParams<E1>,
 ) -> Result<Proof<CompressedSNARK<E1, S1, S2>>, ProofError> {
-  debug!("Generating `CompressedSNARK`");
+  debug!("Setting up `CompressedSNARK`");
+  #[cfg(feature = "timing")]
+  let time = std::time::Instant::now();
   let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(public_params)?;
-  debug!("Completed Setup for `CompressedSNARK`");
+  #[cfg(feature = "timing")]
+  trace!("`CompressedSNARK::setup` elapsed: {:?}", time.elapsed());
 
   // Optionally time the `CompressedSNARK` creation
   #[cfg(feature = "timing")]
@@ -209,7 +212,7 @@ pub fn compress_proof(
   debug!("`CompressedSNARK::prove completed!");
 
   #[cfg(feature = "timing")]
-  trace!("`CompressedSNARK::prove` of `program::run()` elapsed: {:?}", time.elapsed());
+  trace!("`CompressedSNARK::prove` elapsed: {:?}", time.elapsed());
 
   Ok(proof)
 }
