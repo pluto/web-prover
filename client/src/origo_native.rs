@@ -111,6 +111,8 @@ async fn generate_program_data(
   Ok((request_program_data?, response_program_data?))
 }
 
+/// we want to be able to specify somewhere in here what cipher suite to use.
+/// Perhapse the config object should have this information.
 async fn proxy(
   config: config::Config,
   session_id: String,

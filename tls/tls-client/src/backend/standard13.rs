@@ -427,7 +427,7 @@ impl RustCryptoBackend13 {
     match self.cipher_suite.unwrap().suite() {
       CipherSuite::TLS13_AES_128_GCM_SHA256 => {
         let mut key = [0u8; 16];
-        key.copy_from_slice(&keys.server_key.buf[..16]);
+        key.copy_from_slice(&keys.client_key.buf[..16]);
         Encrypter::new(
         EncryptionKey::AES128GCM(key),
         keys.client_iv.buf[..12].try_into().unwrap(),
@@ -435,7 +435,7 @@ impl RustCryptoBackend13 {
       )},
       CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
         let mut key = [0u8; 32];
-        key.copy_from_slice(&keys.server_key.buf[..32]);
+        key.copy_from_slice(&keys.client_key.buf[..32]);
         Encrypter::new(
         EncryptionKey::CHACHA20POLY1305(key),
         keys.client_iv.buf[..12].try_into().unwrap(),
@@ -841,7 +841,7 @@ impl Encrypter {
     let payload = ChaChaPayload { msg: &payload, aad: &aad };
     let ciphertext = cipher
       .encrypt(&init_nonce, payload)
-      .map_err(|e| BackendError::EncryptionError(e.to_string()))?;;
+      .map_err(|e| BackendError::EncryptionError(e.to_string()))?;
 
     trace!("ENC: cipher={:?}", hex::encode(ciphertext.clone()));
     trace!("ENC: plain_text={:?}", hex::encode(m.payload.0.clone()));

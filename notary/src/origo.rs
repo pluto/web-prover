@@ -20,7 +20,7 @@ use tls_client2::{
   hash_hs::HandshakeHashBuffer,
   internal::msgs::hsjoiner::HandshakeJoiner,
   tls_core::{
-    msgs::{
+    key, msgs::{
       base::Payload,
       codec::{self, Codec, Reader},
       enums::Compression,
@@ -29,10 +29,9 @@ use tls_client2::{
         ServerExtension, ServerHelloPayload, SessionID,
       },
       message::{Message, MessagePayload, OpaqueMessage},
-    },
-    verify::{construct_tls13_server_verify_message, verify_tls13},
+    }, verify::{construct_tls13_server_verify_message, verify_tls13}
   },
-  Certificate, CipherSuite,
+  Certificate, CipherSuite, EncryptionKey,
 };
 use tls_parser::{parse_tls_message_handshake, ClientHello, TlsMessage, TlsMessageHandshake};
 use tokio::{
@@ -247,6 +246,7 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
         //
         // These are plaintext. The first encrypted message is an extension from the server
         // which is labeled application data, like all subsequent encrypted messages in TLS1.3
+        let mut key = vec![];
         if record.hdr.record_type == tls_parser::TlsRecordType::Handshake {
           let rec = parse_tls_message_handshake(record.data);
           match rec {
@@ -270,6 +270,10 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
 
                   let cipher_suites: Vec<CipherSuite> =
                     ch.ciphers().iter().map(|suite| CipherSuite::from(suite.0)).collect();
+                  
+                  for suite in &cipher_suites {
+                    debug!("cipher suite: {:?}", suite);
+                  }
 
                   let compressions_methods: Vec<Compression> =
                     ch.comp().iter().map(|method| Compression::from(method.0)).collect();
@@ -327,6 +331,21 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
                   let mut r = Reader::init(&extension_byte);
                   let extensions = codec::read_vec_u16::<ServerExtension>(&mut r)
                     .expect("unable to read server extension payload");
+                  debug!("cipher: {:?}", sh.cipher.0);
+
+                  let suite = CipherSuite::from(sh.cipher.0);
+
+                  match suite {
+                    CipherSuite::TLS13_AES_128_GCM_SHA256 => {
+                      key = server_aes_key[..16].to_vec();
+                    },
+                    CipherSuite::TLS13_AES_256_GCM_SHA384 => {
+                      key = server_aes_key[..32].to_vec();
+                    },
+                    _ => {
+                      debug!("cipher suite: {:?}", suite);
+                    },
+                  }
 
                   let server_hello_message = Message {
                     version: tls_client2::ProtocolVersion::from(sh.version.0),
@@ -355,11 +374,25 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
             },
           }
         }
+
+        let (cipher_suite, key_type) = match key.len() {
+          16 => {
+              let mut key_array = [0u8; 16];
+              key_array.copy_from_slice(&key);
+              (CipherSuite::TLS13_AES_128_GCM_SHA256, EncryptionKey::AES128GCM(key_array))
+          },
+          32 => {
+              let mut key_array = [0u8; 32];
+              key_array.copy_from_slice(&key);
+              (CipherSuite::TLS13_AES_256_GCM_SHA384, EncryptionKey::CHACHA20POLY1305(key_array))
+          },
+          _ => panic!("invalid key length"),
+        };
         if record.hdr.record_type == tls_parser::TlsRecordType::ApplicationData {
-          let d = tls_client2::Decrypter2::new(
-            server_aes_key[..16].try_into().unwrap(),
+          let d = tls_client2::Decrypter::new(
+            key_type,
             server_aes_iv[..12].try_into().unwrap(),
-            tls_client2::CipherSuite::TLS13_AES_128_CCM_SHA256,
+            cipher_suite,
           );
 
           let msg = OpaqueMessage {
