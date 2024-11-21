@@ -1,6 +1,6 @@
 // TODO many root_stores ... this could use some cleanup where possible
 use proofs::program::manifest::AESEncryptionInput;
-use tls_client2::{origo::WitnessData, CipherSuite, Decrypter2, ProtocolVersion};
+use tls_client2::{origo::WitnessData, CipherSuite, Decrypter2, EncryptionKey, ProtocolVersion};
 use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
 use tracing::{debug, trace};
 
@@ -84,7 +84,8 @@ pub(crate) fn decrypt_tls_ciphertext(
   // Get the request ciphertext, request plaintext, and AAD
   let request_ciphertext = hex::decode(witness.request.ciphertext[0].as_bytes())?;
 
-  let request_decrypter = Decrypter2::new(key, iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
+  let request_decrypter =
+    Decrypter2::new(EncryptionKey::AES128GCM(key), iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
   let (plaintext, meta) = request_decrypter.decrypt_tls13_aes(
     &OpaqueMessage {
       typ:     ContentType::ApplicationData,

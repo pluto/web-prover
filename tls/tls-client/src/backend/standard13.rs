@@ -18,7 +18,7 @@ use chacha20poly1305::{
 };
 
 use async_trait::async_trait;
-use base64::{prelude::BASE64_STANDARD, Engine};
+use base64::{prelude::BASE64_STANDARD, write, Engine};
 use log::{debug, error, info, kv::ToValue, trace, warn, Record};
 use p256::{ecdh::EphemeralSecret, EncodedPoint, PublicKey as ECDHPublicKey};
 use rand::{rngs::OsRng, thread_rng, Rng};
@@ -425,16 +425,22 @@ impl RustCryptoBackend13 {
   /// Derive an encrypter from the given keys
   pub fn get_encrypter(&self, keys: &TlsKeys) -> Encrypter {
     match self.cipher_suite.unwrap().suite() {
-      CipherSuite::TLS13_AES_128_GCM_SHA256 => Encrypter::new(
-        keys.client_key.buf[..16].try_into().unwrap(),
+      CipherSuite::TLS13_AES_128_GCM_SHA256 => {
+        let mut key = [0u8; 16];
+        key.copy_from_slice(&keys.server_key.buf[..16]);
+        Encrypter::new(
+        EncryptionKey::AES128GCM(key),
         keys.client_iv.buf[..12].try_into().unwrap(),
         self.cipher_suite.unwrap().suite(),
-      ),
-      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => Encrypter::new(
-        keys.client_key.buf[..32].try_into().unwrap(),
+      )},
+      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&keys.server_key.buf[..32]);
+        Encrypter::new(
+        EncryptionKey::CHACHA20POLY1305(key),
         keys.client_iv.buf[..12].try_into().unwrap(),
         self.cipher_suite.unwrap().suite(),
-      ),
+      )},
       _ => panic!("unsupported ciphersuite"),
     }
   }
@@ -442,16 +448,22 @@ impl RustCryptoBackend13 {
   /// Derive an decrypter from the given keys
   pub fn get_decrypter(&self, keys: &TlsKeys) -> Decrypter {
     match self.cipher_suite.unwrap().suite() {
-      CipherSuite::TLS13_AES_128_GCM_SHA256 => Decrypter::new(
-        keys.server_key.buf[..16].try_into().unwrap(),
+      CipherSuite::TLS13_AES_128_GCM_SHA256 => {
+        let mut key = [0u8; 16];
+        key.copy_from_slice(&keys.server_key.buf[..16]);
+        Decrypter::new(
+        EncryptionKey::AES128GCM(key),
         keys.server_iv.buf[..12].try_into().unwrap(),
         self.cipher_suite.unwrap().suite(),
-      ),
-      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => Decrypter::new(
-      keys.server_key.buf[..32].try_into().unwrap(),
+      )},
+      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&keys.server_key.buf[..32]);
+         Decrypter::new(
+      EncryptionKey::CHACHA20POLY1305(key),
       keys.server_iv.buf[..12].try_into().unwrap(),
       self.cipher_suite.unwrap().suite(),
-      ),
+      )},
       _ => panic!("unsupported ciphersuite"),
     }
   }
@@ -782,16 +794,29 @@ fn make_tls13_aad(len: usize) -> [u8; 5] {
   ]
 }
 
-// could add a method to this to encrypt a record
-// maybe also support a few key types
+#[derive(Clone)]
+pub enum EncryptionKey{
+    AES128GCM([u8; 16]), // 128-bit key
+    CHACHA20POLY1305([u8; 32]), // 256-bit key
+}
+
+impl AsRef<[u8]> for EncryptionKey {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            EncryptionKey::AES128GCM(key) => key,
+            EncryptionKey::CHACHA20POLY1305(key) => key,
+        }
+    }
+}
+
 pub struct Encrypter {
-  write_key:    [u8; 16],
-  write_iv:     [u8; 12],
-  cipher_suite: CipherSuite,
+    write_key: EncryptionKey,
+    write_iv: [u8; 12],
+    cipher_suite: CipherSuite,
 }
 
 impl Encrypter {
-  pub fn new(write_key: [u8; 16], write_iv: [u8; 12], cipher_suite: CipherSuite) -> Self {
+  pub fn new(write_key: EncryptionKey, write_iv: [u8; 12], cipher_suite: CipherSuite) -> Self {
     Self { write_key, write_iv, cipher_suite }
   }
 
@@ -806,7 +831,11 @@ impl Encrypter {
     payload.extend_from_slice(&m.payload.0);
     payload.push(m.typ.get_u8()); // Very important, encrypted messages must have the type appended.
 
-    let write_key = Key::from_slice(&self.write_key);
+    let write_key = match self.write_key {
+      EncryptionKey::CHACHA20POLY1305(key) => key,
+      _ => panic!("wrong key type"),
+    };
+    let write_key = Key::from_slice(&write_key);
     let cipher = ChaCha20Poly1305::new(write_key);
     let init_nonce = Nonce::from(make_nonce(self.write_iv, seq));
     let payload = ChaChaPayload { msg: &payload, aad: &aad };
@@ -822,7 +851,7 @@ impl Encrypter {
       m.payload.0.len(),
       seq,
       hex::encode(self.write_iv),
-      hex::encode(self.write_key),
+      hex::encode(write_key),
       hex::encode(init_nonce),
       hex::encode(aad),
     );
@@ -845,7 +874,7 @@ impl Encrypter {
   ) -> Result<(OpaqueMessage, RecordMeta), BackendError> {
     let total_len = m.payload.0.len() + 1 + 16;
     let aad = make_tls13_aad(total_len);
-    let init_nonce = make_nonce(self.write_iv, seq);
+    let init_nonce =  make_nonce(self.write_iv, seq);
 
     let mut payload = Vec::with_capacity(total_len);
     payload.extend_from_slice(&m.payload.0);
@@ -853,7 +882,12 @@ impl Encrypter {
 
     let aes_payload = Payload { msg: &payload, aad: &aad };
 
-    let cipher = Aes128Gcm::new((&self.write_key).into());
+    let write_key = match self.write_key {
+      EncryptionKey::AES128GCM(key) => key,
+      _ => panic!("wrong key type"),
+    };
+
+    let cipher = Aes128Gcm::new((&write_key).into());
     let nonce = GenericArray::<u8, U12>::from_slice(&init_nonce);
     let ciphertext = cipher
       .encrypt(nonce, aes_payload)
@@ -867,7 +901,7 @@ impl Encrypter {
       m.payload.0.len(),
       seq,
       hex::encode(self.write_iv),
-      hex::encode(self.write_key),
+      hex::encode(write_key),
       hex::encode(nonce),
       hex::encode(aad),
     );
@@ -884,13 +918,14 @@ impl Encrypter {
 }
 
 pub struct Decrypter {
-  write_key:    [u8; 16],
+  // Keys are symetric for us right now
+  write_key:   EncryptionKey,
   write_iv:     [u8; 12],
   cipher_suite: CipherSuite,
 }
 
 impl Decrypter {
-  pub fn new(write_key: [u8; 16], write_iv: [u8; 12], cipher_suite: CipherSuite) -> Self {
+  pub fn new(write_key: EncryptionKey, write_iv: [u8; 12], cipher_suite: CipherSuite) -> Self {
     Self { write_key, write_iv, cipher_suite }
   }
 
@@ -906,7 +941,11 @@ impl Decrypter {
     payload.extend_from_slice(&m.payload.0);
     payload.push(m.typ.get_u8()); // Very important, encrypted messages must have the type appended.
 
-    let write_key = Key::from_slice(&self.write_key);
+    let write_key = match self.write_key {
+      EncryptionKey::CHACHA20POLY1305(key) => key,
+      _ => panic!("wrong key"),};
+
+    let write_key = Key::from_slice(&write_key);
     let cipher = ChaCha20Poly1305::new(write_key);
     let init_nonce = Nonce::from(make_nonce(self.write_iv, seq));
     let payload = ChaChaPayload { msg: &payload, aad: &aad };
@@ -927,7 +966,7 @@ impl Decrypter {
       plaintext.len(),
       seq,
       hex::encode(self.write_iv),
-      hex::encode(self.write_key),
+      hex::encode(write_key),
       hex::encode(init_nonce),
       hex::encode(aad)
     );
@@ -953,7 +992,11 @@ impl Decrypter {
 
     let aes_payload = Payload { msg: &m.payload.0, aad: &aad };
 
-    let cipher = Aes128Gcm::new_from_slice(&self.write_key).unwrap();
+    let write_key = match self.write_key {
+      EncryptionKey::AES128GCM(key) => key,
+      _ => panic!("wrong key"),};
+
+    let cipher = Aes128Gcm::new_from_slice(&write_key).unwrap();
     let nonce = GenericArray::<u8, U12>::from_slice(&init_nonce);
     let mut plaintext = cipher
       .decrypt(nonce, aes_payload)
@@ -972,7 +1015,7 @@ impl Decrypter {
       plaintext.len(),
       seq,
       hex::encode(self.write_iv),
-      hex::encode(self.write_key),
+      hex::encode(write_key),
       hex::encode(nonce),
       hex::encode(aad)
     );
