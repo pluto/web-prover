@@ -52,28 +52,53 @@ async fn generate_program_data(
   debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
   debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
 
-  let key: [u8; 16] = witness.request.aes_key[..16].try_into()?;
+  let (key, cipher_suite) = match witness.request.aes_key.len() {
+    // chacha has 32 byte keys
+    32 => (
+      EncryptionKey::CHACHA20POLY1305(witness.request.aes_key[..32].try_into()?),
+      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
+    ),
+    // aes has 16 byte keys
+    16 => (
+      EncryptionKey::AES128GCM(witness.request.aes_key[..16].try_into()?),
+      CipherSuite::TLS13_AES_128_GCM_SHA256,
+    ),
+    _ => panic!("Unsupported key length"),
+  };
+
   let iv: [u8; 12] = witness.request.aes_iv[..12].try_into()?;
   // ----------------------------------------------------------------------------------------------------------------------- //
   // Get the request ciphertext, request plaintext, and AAD
   debug!("Decoding ciphertext hex...");
   let request_ciphertext = hex::decode(witness.request.ciphertext.as_bytes())?;
 
+  let request_decrypter = Decrypter::new(key.clone(), iv, cipher_suite);
 
-  // TODO(WJ 2024-11-21): Currently this will fail since we are getting chacha ciphertext but decrypting with AES
-  // need a way to know which one we are using.
-  let request_decrypter =
-    Decrypter::new(EncryptionKey::AES128GCM(key), iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
-  let (plaintext, meta) = request_decrypter.decrypt_tls13_aes(
-    &OpaqueMessage {
-      typ:     ContentType::ApplicationData,
-      version: ProtocolVersion::TLSv1_3,
-      payload: Payload::new(request_ciphertext.clone()), /* TODO (autoparallel): old way didn't
-                                                          * introduce a clone */
-    },
-    0,
-  )?;
-  debug!("Finished decrypting ciphertext!");
+  let (plaintext, meta) = match cipher_suite {
+    CipherSuite::TLS13_AES_128_GCM_SHA256 =>
+      (request_decrypter.decrypt_tls13_aes(
+        &OpaqueMessage {
+          typ:     ContentType::ApplicationData,
+          version: ProtocolVersion::TLSv1_3,
+          payload: Payload::new(request_ciphertext.clone()), /* TODO (autoparallel): old way
+                                                              * didn't
+                                                              * introduce a clone */
+        },
+        0,
+      )?),
+    CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 =>
+      (request_decrypter.decrypt_tls13_chacha20(
+        &OpaqueMessage {
+          typ:     ContentType::ApplicationData,
+          version: ProtocolVersion::TLSv1_3,
+          payload: Payload::new(request_ciphertext.clone()), /* TODO (autoparallel): old way
+                                                              * didn't
+                                                              * introduce a clone */
+        },
+        0,
+      )?),
+    _ => panic!("Unsupported cipher suite"),
+  };
 
   let aad = hex::decode(meta.additional_data.to_owned())?;
   let mut padded_aad = vec![0; 16 - aad.len()];
@@ -131,8 +156,16 @@ async fn generate_program_data(
     nearest_16_padded_ciphertext
   );
 
+  let destructured_key = match key {
+    EncryptionKey::AES128GCM(key) => key,
+    _ => panic!("Unsupported cipher suite"),
+    // EncryptionKey::CHACHA20POLY1305(key) => key,
+  };
+  // TODO(WJ 2024-11-21): this is as far as i have gotten with adding chacha support. Pushing chacha
+  // down into rom data will require the circuits
+
   let (rom_data, rom, fold_input) = proving.manifest.unwrap().rom_from_request(
-    &key,
+    &destructured_key,
     &iv,
     &padded_aad,
     &nearest_16_padded_plaintext,
@@ -158,7 +191,7 @@ async fn generate_program_data(
   )
 }
 
-/// we want to be able to specify somewhere in here what cipher suite to use. 
+/// we want to be able to specify somewhere in here what cipher suite to use.
 /// Perhapse the config object should have this information.
 async fn proxy(
   config: config::Config,

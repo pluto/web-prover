@@ -20,7 +20,8 @@ use tls_client2::{
   hash_hs::HandshakeHashBuffer,
   internal::msgs::hsjoiner::HandshakeJoiner,
   tls_core::{
-    key, msgs::{
+    key,
+    msgs::{
       base::Payload,
       codec::{self, Codec, Reader},
       enums::Compression,
@@ -29,7 +30,8 @@ use tls_client2::{
         ServerExtension, ServerHelloPayload, SessionID,
       },
       message::{Message, MessagePayload, OpaqueMessage},
-    }, verify::{construct_tls13_server_verify_message, verify_tls13}
+    },
+    verify::{construct_tls13_server_verify_message, verify_tls13},
   },
   Certificate, CipherSuite, EncryptionKey,
 };
@@ -231,6 +233,8 @@ fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
 fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>, ProxyError> {
   let server_aes_key = hex::decode(payload.hs_server_aes_key).unwrap();
   let server_aes_iv = hex::decode(payload.hs_server_aes_iv).unwrap();
+  info!("key_as_string: {:?}, length: {}", server_aes_key, server_aes_key.len());
+  info!("iv_as_string: {:?}, length: {}", server_aes_iv, server_aes_iv.len());
 
   let mut cursor = Cursor::new(bytes);
   let mut messages: Vec<Message> = vec![];
@@ -270,10 +274,6 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
 
                   let cipher_suites: Vec<CipherSuite> =
                     ch.ciphers().iter().map(|suite| CipherSuite::from(suite.0)).collect();
-                  
-                  for suite in &cipher_suites {
-                    debug!("cipher suite: {:?}", suite);
-                  }
 
                   let compressions_methods: Vec<Compression> =
                     ch.comp().iter().map(|method| Compression::from(method.0)).collect();
@@ -338,9 +338,11 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
                   match suite {
                     CipherSuite::TLS13_AES_128_GCM_SHA256 => {
                       key = server_aes_key[..16].to_vec();
+                      debug!("Key for AES128GCM: {:?}", key);
                     },
-                    CipherSuite::TLS13_AES_256_GCM_SHA384 => {
+                    CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
                       key = server_aes_key[..32].to_vec();
+                      debug!("Key for CHACHCHA20POLY1305: {:?}", key);
                     },
                     _ => {
                       debug!("cipher suite: {:?}", suite);
@@ -377,16 +379,19 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
 
         let (cipher_suite, key_type) = match key.len() {
           16 => {
-              let mut key_array = [0u8; 16];
-              key_array.copy_from_slice(&key);
-              (CipherSuite::TLS13_AES_128_GCM_SHA256, EncryptionKey::AES128GCM(key_array))
+            let mut key_array = [0u8; 16];
+            key_array.copy_from_slice(&key);
+            (CipherSuite::TLS13_AES_128_GCM_SHA256, EncryptionKey::AES128GCM(key_array))
           },
           32 => {
-              let mut key_array = [0u8; 32];
-              key_array.copy_from_slice(&key);
-              (CipherSuite::TLS13_AES_256_GCM_SHA384, EncryptionKey::CHACHA20POLY1305(key_array))
+            let mut key_array = [0u8; 32];
+            key_array.copy_from_slice(&key);
+            (
+              CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
+              EncryptionKey::CHACHA20POLY1305(key_array),
+            )
           },
-          _ => panic!("invalid key length"),
+          _ => panic!("invalid key length {}", key.len()),
         };
         if record.hdr.record_type == tls_parser::TlsRecordType::ApplicationData {
           let d = tls_client2::Decrypter::new(
@@ -401,18 +406,41 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
             payload: Payload(record.data.to_vec()),
           };
 
-          match d.decrypt_tls13_aes(&msg, seq) {
-            Ok((plain_message, _meta)) => {
-              let mut handshake_joiner = HandshakeJoiner::new();
-              handshake_joiner.take_message(plain_message);
-              while let Some(msg) = handshake_joiner.frames.pop_front() {
-                messages.push(msg);
-              }
+          match cipher_suite {
+            CipherSuite::TLS13_AES_128_GCM_SHA256 => {
+              match d.decrypt_tls13_aes(&msg, seq) {
+                Ok((plain_message, _meta)) => {
+                  let mut handshake_joiner = HandshakeJoiner::new();
+                  handshake_joiner.take_message(plain_message);
+                  while let Some(msg) = handshake_joiner.frames.pop_front() {
+                    messages.push(msg);
+                  }
+                },
+                Err(_) => {
+                  // This occurs once we pass the handshake records, we will no longer
+                  // have the correct keys to decrypt. We want to continue logging the ciphertext.
+                  trace!("Unable to decrypt record. Skipping.");
+                },
+              };
             },
-            Err(_) => {
-              // This occurs once we pass the handshake records, we will no longer
-              // have the correct keys to decrypt. We want to continue logging the ciphertext.
-              trace!("Unable to decrypt record. Skipping.");
+            CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
+              match d.decrypt_tls13_chacha20(&msg, seq) {
+                Ok((plain_message, _meta)) => {
+                  let mut handshake_joiner = HandshakeJoiner::new();
+                  handshake_joiner.take_message(plain_message);
+                  while let Some(msg) = handshake_joiner.frames.pop_front() {
+                    messages.push(msg);
+                  }
+                },
+                Err(_) => {
+                  // This occurs once we pass the handshake records, we will no longer
+                  // have the correct keys to decrypt. We want to continue logging the ciphertext.
+                  trace!("Unable to decrypt record. Skipping.");
+                },
+              };
+            },
+            _ => {
+              panic!("invalid cipher suite");
             },
           }
           seq += 1;
