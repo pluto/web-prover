@@ -348,37 +348,25 @@ impl RustCryptoBackend13 {
     debug!("intermediate witness set during encrypt_mode: {:?}", self.encrypt_mode);
 
     // Finally, derive the actual AES key and IV for each secret.
-    let (client_key, client_iv, server_key, server_iv) =
-
-    match self.cipher_suite.unwrap().suite() {
+    let client_expander = self.hkdf_provider.expander_for_okm(&client_secret);
+    let server_expander = self.hkdf_provider.expander_for_okm(&server_secret);
+    let client_iv = hkdf_expand_label_aead_key(client_expander.as_ref(), 12, b"iv", &[]);
+    let server_iv = hkdf_expand_label_aead_key(server_expander.as_ref(), 12, b"iv", &[]);
+    let (client_key, server_key) = match self.cipher_suite.unwrap().suite() {
       CipherSuite::TLS13_AES_128_GCM_SHA256 => {
-        let e = self.hkdf_provider.expander_for_okm(&client_secret);
-        let client_key = hkdf_expand_label_aead_key(e.as_ref(), 16, b"key", &[]);
-        let client_iv = hkdf_expand_label_aead_key(e.as_ref(), 12, b"iv", &[]);
-
-        let e = self.hkdf_provider.expander_for_okm(&server_secret);
-        let server_key = hkdf_expand_label_aead_key(e.as_ref(), 16, b"key", &[]);
-        let server_iv = hkdf_expand_label_aead_key(e.as_ref(), 12, b"iv", &[]);
+        let client_key = hkdf_expand_label_aead_key(client_expander.as_ref(), 16, b"key", &[]);
+        let server_key = hkdf_expand_label_aead_key(server_expander.as_ref(), 16, b"key", &[]);
         (
           client_key,
-          client_iv,
           server_key,
-          server_iv,
         )
       },
       CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
-        let e = self.hkdf_provider.expander_for_okm(&client_secret);
-        let client_key = hkdf_expand_label_aead_key(e.as_ref(), 32, b"key", &[]);
-        let client_iv = hkdf_expand_label_aead_key(e.as_ref(), 12, b"iv", &[]);
-
-        let e = self.hkdf_provider.expander_for_okm(&server_secret);
-        let server_key = hkdf_expand_label_aead_key(e.as_ref(), 32, b"key", &[]);
-        let server_iv = hkdf_expand_label_aead_key(e.as_ref(), 12, b"iv", &[]);
+        let client_key = hkdf_expand_label_aead_key(client_expander.as_ref(), 32, b"key", &[]);
+        let server_key = hkdf_expand_label_aead_key(server_expander.as_ref(), 32, b"key", &[]);
         (
           client_key,
-          client_iv,
           server_key,
-          server_iv,
         )
 
       },
@@ -653,7 +641,7 @@ impl Backend for RustCryptoBackend13 {
       CipherSuite::TLS_RSA_PSK_WITH_CHACHA20_POLY1305_SHA256|
       CipherSuite::TLS_PSK_WITH_CHACHA20_POLY1305_SHA256 => match msg.version {
         ProtocolVersion::TLSv1_3 | ProtocolVersion::TLSv1_2 => {
-          let (plain_message, record_meta) = dec.decrypt_tls12_chacha20(&msg, seq)?;
+          let (plain_message, record_meta) = dec.decrypt_tls13_chacha20(&msg, seq)?;
           self.insert_record(
             Direction::Received,
             seq,
@@ -926,7 +914,7 @@ impl Decrypter {
     Self { write_key, write_iv, cipher_suite }
   }
 
-  pub fn decrypt_tls12_chacha20(
+  pub fn decrypt_tls13_chacha20(
     &self,
     m: &OpaqueMessage,
     seq: u64,
