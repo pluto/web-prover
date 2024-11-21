@@ -337,6 +337,13 @@ pub fn data_hasher(preimage: &[ByteOrPad]) -> F<G1> {
   hash_val
 }
 
+pub fn json_tree_hasher(
+  key_sequence: Vec<JsonMaskType>,
+  max_stack_height: usize,
+) -> Vec<[F<G1>; 2]> {
+  todo!();
+}
+
 #[cfg(test)]
 mod tests {
 
