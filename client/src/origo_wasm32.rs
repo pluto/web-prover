@@ -23,7 +23,7 @@ use proofs::{
 use serde::Serialize;
 use serde_json::{json, Value};
 use tls_client2::{
-  origo::WitnessData, CipherSuite, ClientConnection, Decrypter, EncryptionKey, ProtocolVersion,
+  origo::WitnessData, CipherSuite, CipherSuiteKey, ClientConnection, Decrypter, ProtocolVersion,
   RustCryptoBackend13, ServerName,
 };
 use tls_client_async2::bind_client;
