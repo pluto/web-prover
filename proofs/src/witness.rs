@@ -337,11 +337,32 @@ pub fn data_hasher(preimage: &[ByteOrPad]) -> F<G1> {
   hash_val
 }
 
+// TODO: Need to take into account if we enter into a value that is an object inside of object. So
+// need a bit more than just `JsonMaskType` maybe.
 pub fn json_tree_hasher(
   key_sequence: Vec<JsonMaskType>,
+  target_value: Vec<u8>,
   max_stack_height: usize,
-) -> Vec<[F<G1>; 2]> {
-  todo!();
+) -> (Vec<[F<G1>; 2]>, Vec<[F<G1>; 2]>) {
+  assert!(key_sequence.len() < max_stack_height);
+  let mut stack = Vec::new();
+  let mut tree_hashes = Vec::new();
+  for val_type in key_sequence {
+    match val_type {
+      JsonMaskType::Object(str_bytes) => {
+        stack.push([F::<G1>::ONE, F::<G1>::ZERO]);
+        let mut string_hash = F::<G1>::ZERO;
+        for byte in str_bytes {
+          string_hash = poseidon_chainer(&[string_hash, F::<G1>::from(byte as u64)]);
+        }
+        tree_hashes.push([string_hash, F::<G1>::ZERO]);
+      },
+      JsonMaskType::ArrayIndex(idx) => {
+        stack.push([F::<G1>::from(2), F::<G1>::ZERO]);
+      },
+    }
+  }
+  (stack, tree_hashes)
 }
 
 #[cfg(test)]
@@ -668,5 +689,20 @@ mod tests {
     assert_eq!(masked_array, MASKED_KEY2_ARRAY);
     let masked_array = compute_json_witness(&masked_array, JsonMaskType::Object(KEY3.to_vec()));
     assert_eq!(masked_array, MASKED_KEY3_ARRAY);
+  }
+
+  #[test]
+  fn test_json_tree_hasher() {
+    let key_sequence = vec![
+      JsonMaskType::Object(KEY0.to_vec()),
+      JsonMaskType::Object(KEY1.to_vec()),
+      JsonMaskType::ArrayIndex(0),
+      JsonMaskType::Object(KEY2.to_vec()),
+      JsonMaskType::Object(KEY3.to_vec()),
+    ];
+    let target_value = "Taylor Swift".as_bytes();
+    let (stack, tree_hashes) = json_tree_hasher(key_sequence, target_value.to_vec(), 10);
+    dbg!(stack);
+    dbg!(tree_hashes);
   }
 }
