@@ -9,7 +9,6 @@ crate-type=["cdylib", "rlib"]
 
 [dependencies]
 client={ path="../client", features=["websocket"] }
-
 chrono              ="0.4"
 elliptic-curve      ={ version="0.13.5", features=["pkcs8"] }
 futures             ="0.3"

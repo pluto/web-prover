@@ -9,6 +9,7 @@
 	"max_sent_data": 10000,
 	"max_recv_data": 10000,
 	"proving": {
+		"params": null,
 		"manifest": {
 			"manifestVersion": "1",
 			"id": "reddit-user-karma",

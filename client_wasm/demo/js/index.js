@@ -43,9 +43,21 @@ const getWitnessGenerator = async function (circuit) {
   return wasm;
 }
 
-async function generateWitness(circuit, input) {
-  const wasm = await getWitnessGenerator(circuit);
+const getSerializedHashParams = async function (setupFile) {
+  const ppUrl = new URL(`${setupFile}.bin`, "https://localhost:8090/build/").toString();
+  const pp = await fetch(ppUrl).then((r) => r.arrayBuffer());
+  console.log("hash_params", pp);
+  return pp;
+}
 
+const getSerializedCircuitParams = async function (setupFile) {
+  const ppUrl = new URL(`${setupFile}.json`, "https://localhost:8090/build/").toString();
+  const pp = await fetch(ppUrl).then((r) => r.json());
+  console.log("circuit_params", pp);
+  return pp;
+}
+
+async function generateWitness(circuit, input, wasm) {
   const witStart = +Date.now();
   let wtns = { type: "mem" };
   await snarkjs.wtns.calculate(input, new Uint8Array(wasm), wtns);
@@ -92,12 +104,19 @@ const generateWitnessBytesForResponse = async function (circuits, inputs) {
   console.log("AES");
   let plaintext_length = plaintext.length;
   let cipherText = inputs[0]["cipherText"].concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
+  let cached_wasm = {};
+
   inputs[0]["step_in"] = 0;
   for (var i = 0; i < plaintext_length / 16; i++) {
     inputs[0]["plainText"] = plaintext.slice(i * 16, (i + 1) * 16);
     inputs[0]["cipherText"] = cipherText.slice(i * 16, (i + 1) * 16);
     inputs[0]["ctr"] = [0, 0, 0, i + 1];
-    let wtns = await generateWitness(circuits[0], inputs[0]);
+    console.log("inputs[0]", inputs[0]);
+    if(!(circuits[0] in cached_wasm)) {
+      const wasm = await getWitnessGenerator(circuits[0]);
+      cached_wasm[circuits[0]] = wasm;
+    }
+    let wtns = await generateWitness(circuits[0], inputs[0], cached_wasm[circuits[0]]);
     witnesses.push(wtns.data);
     inputs[0]["step_in"] = DataHasher(plaintext.slice(0, (i + 1) * 16));
   };
@@ -316,6 +335,10 @@ var inputs = [{
 // TODO: Configurable identifiers
 var circuits = ["aes_gctr_nivc_512b", "http_nivc_512b", "json_mask_object_512b", "json_mask_array_index_512b", "json_extract_value_512b"];
 var witnesses = await generateWitnessBytesForRequest(circuits, inputs);
+console.log("witness", witnesses);
+
+var hp = await getSerializedHashParams("serialized_setup_aes");
+var cp = await getSerializedCircuitParams("serialized_setup_aes");
 
 start();
 
@@ -331,6 +354,10 @@ let proverConfig = {
   max_recv_data: 10000,
   proving: {
     witnesses: witnesses,
+    params: {
+      circuit_params: cp,
+      hash_params: hp,
+    },
     manifest: {
       "manifestVersion": "1",
       "id": "reddit-user-karma",
@@ -403,7 +430,7 @@ proofWorker.onmessage = (event) => {
 //   proving: {
 //     r1cs: r1cs,
 //     witnesses: witnesses,
-//     serialized_pp: pp,
+//     params: pp,
 //   }
 // });
 

@@ -23,11 +23,12 @@ pub enum NotaryMode {
   TLSN,
 }
 
-/// Proving data containing [`Manifest`] and serialized witnesses used for WASM
+use proofs::program::data::SerializedParams;
+
 #[derive(Deserialize, Clone, Debug)]
 pub struct ProvingData {
-  // TODO(sambhav): remove witnesses after wasm witness generation works
   pub witnesses: Option<Vec<Vec<u8>>>,
+  pub params:    Option<SerializedParams>,
   pub manifest:  Option<Manifest>,
 }
 

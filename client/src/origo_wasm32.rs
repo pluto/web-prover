@@ -80,7 +80,7 @@ async fn generate_program_data(
   // let public_params = program::setup(&setup_data);
 
   let pd = ProgramData::<Offline, NotExpanded> {
-    public_params: SERIALIZED_AUX_PARAMS.to_vec(),
+    public_params: proving.params.unwrap(),
     setup_data,
     rom: request_rom,
     rom_data: request_rom_data,

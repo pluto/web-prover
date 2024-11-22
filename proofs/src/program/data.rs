@@ -1,10 +1,38 @@
-use std::io::{Read, Write};
+use std::{
+  io::{Read, Write},
+  sync::Arc,
+};
 
-use client_side_prover::supernova::{get_circuit_shapes, AuxParams};
-use flate2::{read::ZlibDecoder, write::ZlibEncoder};
+use client_side_prover::{
+  supernova::{get_circuit_shapes, AuxParams, SuperNovaAugmentedCircuitParams},
+  traits::{CurveCycleEquipped, Dual, ROConstants, ROConstantsCircuit},
+  CommitmentKey, R1CSWithArity,
+};
 use serde_json::json;
 
 use super::*;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(bound = "")]
+pub struct AuxParamsCircuit<E1>
+where E1: CurveCycleEquipped {
+  ck_primary: Arc<CommitmentKey<E1>>, // This is shared between all circuit params
+  augmented_circuit_params_primary: SuperNovaAugmentedCircuitParams,
+  ck_secondary: Arc<CommitmentKey<Dual<E1>>>,
+  circuit_shape_secondary: R1CSWithArity<Dual<E1>>,
+  augmented_circuit_params_secondary: SuperNovaAugmentedCircuitParams,
+  digest: E1::Scalar,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(bound = "")]
+pub struct AuxParamsHash<E1>
+where E1: CurveCycleEquipped {
+  ro_consts_primary:           ROConstants<E1>,
+  ro_consts_circuit_primary:   ROConstantsCircuit<Dual<E1>>,
+  ro_consts_secondary:         ROConstants<Dual<E1>>,
+  ro_consts_circuit_secondary: ROConstantsCircuit<E1>,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FoldInput {
@@ -52,6 +80,13 @@ pub enum WitnessGeneratorType {
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SerializedParams {
+  circuit_params: AuxParamsCircuit<E1>,
+  #[serde(with = "serde_bytes")]
+  hash_params:    Vec<u8>,
+}
+
 // Note, the below are typestates that prevent misuse of our current API.
 pub trait SetupStatus {
   type PublicParams;
@@ -62,8 +97,7 @@ impl SetupStatus for Online {
 }
 pub struct Offline;
 impl SetupStatus for Offline {
-  // type PublicParams = PathBuf;
-  type PublicParams = Vec<u8>;
+  type PublicParams = SerializedParams;
 }
 
 pub trait WitnessStatus {
@@ -228,15 +262,22 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
   ///
   /// # Example
   pub fn into_online(self) -> Result<ProgramData<Online, W>, ProofError> {
-    #[cfg(feature = "timing")]
-    let time = std::time::Instant::now();
+    let cp = self.public_params.circuit_params;
+    let hp: AuxParamsHash<E1> = bincode::deserialize(&self.public_params.hash_params).unwrap();
 
-    let file = self.public_params;
-    let mut decoder = ZlibDecoder::new(&file[..]);
-    let mut decompressed = Vec::new();
-    decoder.read_to_end(&mut decompressed)?;
-    info!("starting deserializing");
-    let aux_params: AuxParams<E1> = bincode::deserialize(&decompressed)?;
+    let aux_params = AuxParams {
+      ck_primary: cp.ck_primary,
+      ck_secondary: cp.ck_secondary,
+      augmented_circuit_params_primary: cp.augmented_circuit_params_primary,
+      circuit_shape_secondary: cp.circuit_shape_secondary,
+      augmented_circuit_params_secondary: cp.augmented_circuit_params_secondary,
+      digest: cp.digest,
+
+      ro_consts_primary:           hp.ro_consts_primary,
+      ro_consts_circuit_primary:   hp.ro_consts_circuit_primary,
+      ro_consts_secondary:         hp.ro_consts_secondary,
+      ro_consts_circuit_secondary: hp.ro_consts_circuit_secondary,
+    };
 
     #[cfg(feature = "timing")]
     let aux_params_duration = {
@@ -307,23 +348,46 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   ///   program data
   pub fn into_offline(self, path: PathBuf) -> Result<ProgramData<Offline, W>, ProofError> {
     let (_, aux_params) = self.public_params.into_parts();
-    let serialized = bincode::serialize(&aux_params)?;
-    dbg!(&serialized.len());
-    // TODO: May not need to do flate2 compression. Need to test this actually shrinks things
-    // meaningfully -- otherwise remove.
-    let mut encoder = ZlibEncoder::new(Vec::new(), flate2::Compression::best());
-    encoder.write_all(&serialized)?;
-    let compressed = encoder.finish()?;
-    dbg!(&compressed.len());
+
+    let sp = aux_params.clone();
+    let circuit_params = AuxParamsCircuit::<E1> {
+      ck_primary: sp.ck_primary,
+      ck_secondary: sp.ck_secondary,
+      augmented_circuit_params_primary: sp.augmented_circuit_params_primary,
+      circuit_shape_secondary: sp.circuit_shape_secondary,
+      augmented_circuit_params_secondary: sp.augmented_circuit_params_secondary,
+      digest: sp.digest,
+    };
+
+    let hash_params = AuxParamsHash::<E1> {
+      ro_consts_primary:           sp.ro_consts_primary,
+      ro_consts_circuit_primary:   sp.ro_consts_circuit_primary,
+      ro_consts_secondary:         sp.ro_consts_secondary,
+      ro_consts_circuit_secondary: sp.ro_consts_circuit_secondary,
+    };
+
+    let serialized_json = serde_json::to_string(&circuit_params)?;
+    let serialized_bin = bincode::serialize(&hash_params)?;
+    dbg!(&serialized_json.len(), &serialized_bin.len());
+
     if let Some(parent) = path.parent() {
       std::fs::create_dir_all(parent)?;
     }
-    let mut file = std::fs::File::create(&path)?;
-    file.write_all(&compressed)?;
+
+    let stem = path.file_stem().unwrap();
+    let json_path =
+      format!("{}/{}.json", path.parent().unwrap().to_str().unwrap(), stem.to_str().unwrap());
+    let bin_path =
+      format!("{}/{}.bin", path.parent().unwrap().to_str().unwrap(), stem.to_str().unwrap());
+    debug!("json_path={:?}, bin_path={:?}", json_path, bin_path);
+    let mut json_file = std::fs::File::create(&json_path)?;
+    let mut bin_file = std::fs::File::create(&bin_path)?;
+    json_file.write_all(&serialized_json.as_bytes())?;
+    bin_file.write_all(&serialized_bin)?;
 
     let Self { setup_data, rom_data, rom, initial_nivc_input, inputs, witnesses, .. } = self;
     Ok(ProgramData {
-      public_params: compressed,
+      public_params: SerializedParams { circuit_params, hash_params: serialized_bin },
       setup_data,
       rom_data,
       rom,
@@ -499,14 +563,26 @@ mod tests {
   #[test]
   #[tracing_test::traced_test]
   fn test_expand_private_inputs() {
+    let setup_data = SetupData {
+      r1cs_types:              vec![R1CSType::Raw(vec![])],
+      witness_generator_types: vec![WitnessGeneratorType::Raw(vec![])],
+      max_rom_length:          3,
+    };
+    let public_params = program::setup(&setup_data);
+    let ap = public_params.aux_params();
+    let circuit_params = AuxParamsCircuit::<E1> {
+      ck_primary: ap.ck_primary,
+      ck_secondary: ap.ck_secondary,
+      augmented_circuit_params_primary: ap.augmented_circuit_params_primary,
+      circuit_shape_secondary: ap.circuit_shape_secondary,
+      augmented_circuit_params_secondary: ap.augmented_circuit_params_secondary,
+      digest: ap.digest,
+    };
+
     let mock_inputs: MockInputs = serde_json::from_str(JSON).unwrap();
     let program_data = ProgramData::<Offline, NotExpanded> {
-      public_params:      vec![],
-      setup_data:         SetupData {
-        r1cs_types:              vec![R1CSType::Raw(vec![])],
-        witness_generator_types: vec![WitnessGeneratorType::Raw(vec![])],
-        max_rom_length:          3,
-      },
+      public_params:      SerializedParams { circuit_params, hash_params: vec![] },
+      setup_data,
       rom_data:           HashMap::from([
         (String::from("CIRCUIT_1"), CircuitData { opcode: 0 }),
         (String::from("CIRCUIT_2"), CircuitData { opcode: 1 }),

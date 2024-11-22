@@ -204,7 +204,6 @@ pub fn compress_proof(
   #[cfg(feature = "timing")]
   trace!("`CompressedSNARK::setup` elapsed: {:?}", time.elapsed());
 
-  // Optionally time the `CompressedSNARK` creation
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
 

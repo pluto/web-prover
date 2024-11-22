@@ -130,7 +130,7 @@ struct ContentView: View {
                                         "val": []
                                     }
                                 ],
-                                "serialized_pp": [],
+                                "params": null,
                                 "manifest": {
                                     "manifestVersion": "1",
                                     "id": "reddit-user-karma",

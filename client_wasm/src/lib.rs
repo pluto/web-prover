@@ -25,7 +25,6 @@ use ws_stream_wasm::WsMeta;
 #[wasm_bindgen]
 pub async fn prover(config: JsValue) -> Result<String, JsValue> {
   panic::set_hook(Box::new(console_error_panic_hook::hook));
-
   let config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
 
   let proof = client::prover_inner(config)
