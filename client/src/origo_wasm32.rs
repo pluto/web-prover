@@ -73,7 +73,7 @@ async fn generate_program_data(
   let request_ciphertext = hex::decode(witness.request.ciphertext.as_bytes())?;
 
   let request_decrypter =
-    Decrypter::new(EncryptionKey::AES128GCM(key), iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
+    Decrypter::new(CipherSuiteKey::AES128GCM(key), iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
   let (plaintext, meta) = request_decrypter.decrypt_tls13_aes(
     &OpaqueMessage {
       typ:     ContentType::ApplicationData,
