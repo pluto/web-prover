@@ -18,7 +18,7 @@ use reqwest::Client;
 use serde_json::{json, Value};
 use tls_client2::{
   origo::{OrigoConnection, WitnessData},
-  CipherSuite, Decrypter, EncryptionKey, ProtocolVersion,
+  CipherSuite, CipherSuiteKey, Decrypter, ProtocolVersion,
 };
 use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
@@ -55,12 +55,12 @@ async fn generate_program_data(
   let (key, cipher_suite) = match witness.request.aes_key.len() {
     // chacha has 32 byte keys
     32 => (
-      EncryptionKey::CHACHA20POLY1305(witness.request.aes_key[..32].try_into()?),
+      CipherSuiteKey::CHACHA20POLY1305(witness.request.aes_key[..32].try_into()?),
       CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
     ),
     // aes has 16 byte keys
     16 => (
-      EncryptionKey::AES128GCM(witness.request.aes_key[..16].try_into()?),
+      CipherSuiteKey::AES128GCM(witness.request.aes_key[..16].try_into()?),
       CipherSuite::TLS13_AES_128_GCM_SHA256,
     ),
     _ => panic!("Unsupported key length"),
@@ -158,7 +158,7 @@ async fn generate_program_data(
   );
 
   let destructured_key = match key {
-    EncryptionKey::AES128GCM(key) => key,
+    CipherSuiteKey::AES128GCM(key) => key,
     _ => panic!("Unsupported cipher suite"),
     // EncryptionKey::CHACHA20POLY1305(key) => key,
   };

@@ -23,7 +23,7 @@ use proofs::{
 use serde::Serialize;
 use serde_json::{json, Value};
 use tls_client2::{
-  origo::WitnessData, CipherSuite, ClientConnection, Decrypter, ProtocolVersion,
+  origo::WitnessData, CipherSuite, ClientConnection, Decrypter, EncryptionKey, ProtocolVersion,
   RustCryptoBackend13, ServerName,
 };
 use tls_client_async2::bind_client;
@@ -72,7 +72,8 @@ async fn generate_program_data(
   // Get the request ciphertext, request plaintext, and AAD
   let request_ciphertext = hex::decode(witness.request.ciphertext.as_bytes())?;
 
-  let request_decrypter = Decrypter::new(key, iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
+  let request_decrypter =
+    Decrypter::new(EncryptionKey::AES128GCM(key), iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
   let (plaintext, meta) = request_decrypter.decrypt_tls13_aes(
     &OpaqueMessage {
       typ:     ContentType::ApplicationData,

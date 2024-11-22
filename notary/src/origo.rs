@@ -33,7 +33,7 @@ use tls_client2::{
     },
     verify::{construct_tls13_server_verify_message, verify_tls13},
   },
-  Certificate, CipherSuite, EncryptionKey,
+  Certificate, CipherSuite, CipherSuiteKey,
 };
 use tls_parser::{parse_tls_message_handshake, ClientHello, TlsMessage, TlsMessageHandshake};
 use tokio::{
@@ -381,14 +381,14 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
           16 => {
             let mut key_array = [0u8; 16];
             key_array.copy_from_slice(&key);
-            (CipherSuite::TLS13_AES_128_GCM_SHA256, EncryptionKey::AES128GCM(key_array))
+            (CipherSuite::TLS13_AES_128_GCM_SHA256, CipherSuiteKey::AES128GCM(key_array))
           },
           32 => {
             let mut key_array = [0u8; 32];
             key_array.copy_from_slice(&key);
             (
               CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
-              EncryptionKey::CHACHA20POLY1305(key_array),
+              CipherSuiteKey::CHACHA20POLY1305(key_array),
             )
           },
           _ => panic!("invalid key length {}", key.len()),
