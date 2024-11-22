@@ -51,9 +51,10 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
   let mut response_serialized_compressed_verifier =
     response_compressed_verifier.serialize_and_compress();
 
-  // TODO(Sambhav): this is seriously wrong
-  request_serialized_compressed_verifier.0.append(&mut response_serialized_compressed_verifier.0);
-  Ok(crate::Proof::Origo(request_serialized_compressed_verifier.0))
+  Ok(crate::Proof::Origo((
+    request_serialized_compressed_verifier.0,
+    response_serialized_compressed_verifier.0,
+  )))
 }
 
 fn get_setup_data_512() -> SetupData {
@@ -126,9 +127,8 @@ pub(crate) fn get_circuit_inputs(
   padded_aad.extend(aad);
 
   let request_plaintext = plaintext.payload.0.to_vec();
+  let request_ciphertext = request_ciphertext[..request_plaintext.len()].to_vec();
   trace!("Raw request plaintext: {:?}", request_plaintext);
-
-  assert_eq!(request_ciphertext.len(), request_plaintext.len());
 
   // ----------------------------------------------------------------------------------------------------------------------- //
   // response preparation

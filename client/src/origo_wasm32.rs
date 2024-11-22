@@ -56,7 +56,7 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
   debug!("running compressed verifier!");
   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
 
-  Ok(crate::Proof::Origo(serialized_compressed_verifier.0))
+  Ok(crate::Proof::Origo((serialized_compressed_verifier.0, vec![])))
 }
 
 async fn generate_program_data(
