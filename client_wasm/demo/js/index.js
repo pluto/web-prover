@@ -88,7 +88,7 @@ function DataHasher(input) {
   return hashes[Math.floor(input.length / 16)];
 }
 
-const generateWitnessBytesForRequest = async function (circuits, inputs) {
+const generateWitnessBytesForResponse = async function (circuits, inputs) {
   let witnesses = [];
 
   let plaintext = inputs[0]["plainText"];
@@ -185,20 +185,21 @@ const generateWitnessBytesForRequest = async function (circuits, inputs) {
   return witnesses;
 };
 
-const generateWitnessBytesForResponse = async function (circuits, inputs) {
+const generateWitnessBytesForRequest = async function (circuits, inputs) {
   let witnesses = [];
 
-  // AES
-  console.log("AES")
-  let plaintext_length = AES_PLAINTEXT.length;
   let plaintext = inputs[0]["plainText"];
-  let cipherText = inputs[0]["cipherText"];
+  let extendedHTTPInput = plaintext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
+
+  // AES
+  console.log("AES");
+  let plaintext_length = plaintext.length;
+  let cipherText = inputs[0]["cipherText"].concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
   inputs[0]["step_in"] = 0;
   for (var i = 0; i < plaintext_length / 16; i++) {
     inputs[0]["plainText"] = plaintext.slice(i * 16, (i + 1) * 16);
     inputs[0]["cipherText"] = cipherText.slice(i * 16, (i + 1) * 16);
     inputs[0]["ctr"] = [0, 0, 0, i + 1];
-    console.log("inputs[0]", inputs[0]);
     let wtns = await generateWitness(circuits[0], inputs[0]);
     witnesses.push({
       val: wtns.data
@@ -207,28 +208,72 @@ const generateWitnessBytesForResponse = async function (circuits, inputs) {
   };
 
   // HTTP
-  let extendedHTTPInput = plaintext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
   let http_start_line = computeHttpWitnessStartline(extendedHTTPInput);
   let http_header_0 = computeHttpWitnessHeader(extendedHTTPInput, toByte("content-type"));
   let http_header_1 = computeHttpWitnessHeader(extendedHTTPInput, toByte("content-encoding"));
   let http_body = computeHttpWitnessBody(extendedHTTPInput);
 
   inputs[1]["start_line_hash"] = DataHasher(http_start_line);
-  let http_header_0_hash = DataHasher(http_header_0);
-  let http_header_1_hash = DataHasher(http_header_1);
+  let http_header_0_hash = DataHasher(http_header_0[1]);
+  let http_header_1_hash = DataHasher(http_header_1[1]);
   inputs[1]["header_hashes"] = [http_header_0_hash, http_header_1_hash, 0, 0, 0];
   inputs[1]["body_hash"] = DataHasher(http_body);
   inputs[1]["step_in"] = DataHasher(extendedHTTPInput);
-
+  inputs[1]["data"] = extendedHTTPInput;
+  let wtns = await generateWitness(circuits[1], inputs[1]);
+  witnesses.push({
+    val: wtns.data
+  });
 
   // console.log("json mask object");
-  // let wtnsJson = await generateWitness(circuits[2], inputs[2]);
+  // inputs[2]["data"] = http_body;
+  // inputs[2]["step_in"] = DataHasher(http_body);
+  // let wtnsJsonKey1 = await generateWitness(circuits[2], inputs[2]);
   // witnesses.push({
-  //   val: wtnsJson.data,
+  //   val: wtnsJsonKey1.data,
+  // });
+
+  // console.log("json mask object");
+  // let jsonWitnessKey1 = compute_json_witness(http_body, byteArrayToString(inputs[2]["key"].slice(0, inputs[2]["keyLen"])));
+  // inputs[3]["data"] = jsonWitnessKey1;
+  // inputs[3]["step_in"] = DataHasher(jsonWitnessKey1);
+  // let wtnsJsonKey2 = await generateWitness(circuits[2], inputs[3]);
+  // witnesses.push({
+  //   val: wtnsJsonKey2.data,
+  // });
+
+  // console.log("json mask array");
+  // let jsonWitnessKey2 = compute_json_witness(jsonWitnessKey1, byteArrayToString(inputs[3]["key"].slice(0, inputs[3]["keyLen"])));
+  // inputs[4]["data"] = jsonWitnessKey2;
+  // inputs[4]["step_in"] = DataHasher(jsonWitnessKey2);
+  // let wtnsJsonKey3 = await generateWitness(circuits[3], inputs[4]);
+  // witnesses.push({
+  //   val: wtnsJsonKey3.data,
+  // });
+
+  // console.log("json mask object");
+  // let jsonWitnessKey3 = compute_json_witness(jsonWitnessKey2, inputs[4]["index"]);
+  // inputs[5]["data"] = jsonWitnessKey3;
+  // inputs[5]["step_in"] = DataHasher(jsonWitnessKey3);
+  // let wtnsJsonKey4 = await generateWitness(circuits[2], inputs[5]);
+  // witnesses.push({
+  //   val: wtnsJsonKey4.data,
+  // });
+
+  // console.log("json mask object");
+  // let jsonWitnessKey4 = compute_json_witness(jsonWitnessKey3, byteArrayToString(inputs[5]["key"].slice(0, inputs[5]["keyLen"])));
+  // inputs[6]["data"] = jsonWitnessKey4;
+  // inputs[6]["step_in"] = DataHasher(jsonWitnessKey4);
+  // let wtnsJsonKey5 = await generateWitness(circuits[2], inputs[6]);
+  // witnesses.push({
+  //   val: wtnsJsonKey5.data,
   // });
 
   // console.log("json extract value");
-  // let wtnsFinal = await generateWitness(circuits[6], inputs[6]);
+  // let jsonWitnessKey5 = compute_json_witness(jsonWitnessKey4, byteArrayToString(inputs[6]["key"].slice(0, inputs[6]["keyLen"])));
+  // inputs[7]["data"] = jsonWitnessKey5
+  // inputs[7]["step_in"] = DataHasher(jsonWitnessKey5);
+  // let wtnsFinal = await generateWitness(circuits[4], inputs[7]);
   // console.log("wtnsFinal", wtnsFinal);
   // witnesses.push({
   //   val: wtnsFinal.data,
@@ -286,12 +331,12 @@ var inputs = [{
 {
   "data": AES_PLAINTEXT,
 },
-{ "key": [100, 97, 116, 97, 0, 0, 0, 0, 0, 0], "keyLen": [4] },
-{ "key": [105, 116, 101, 109, 115, 0, 0, 0, 0, 0], "keyLen": [5] },
-{ "index": [0] },
-{ "key": [112, 114, 111, 102, 105, 108, 101, 0, 0, 0], "keyLen": [7] },
-{ "key": [110, 97, 109, 101, 0, 0, 0, 0, 0, 0], "keyLen": [4] },
-{},
+  // { "key": [100, 97, 116, 97, 0, 0, 0, 0, 0, 0], "keyLen": [4] },
+  // { "key": [105, 116, 101, 109, 115, 0, 0, 0, 0, 0], "keyLen": [5] },
+  // { "index": [0] },
+  // { "key": [112, 114, 111, 102, 105, 108, 101, 0, 0, 0], "keyLen": [7] },
+  // { "key": [110, 97, 109, 101, 0, 0, 0, 0, 0, 0], "keyLen": [4] },
+  // {},
 ];
 
 // TODO: Configurable identifiers
