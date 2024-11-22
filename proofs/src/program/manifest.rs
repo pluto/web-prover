@@ -136,8 +136,8 @@ impl Manifest {
     let mut ciphertext = inputs.ciphertext.to_vec();
     if remainder != 0 {
       let padding = 16 - remainder;
-      plaintext.extend(std::iter::repeat(0).take(padding));
-      ciphertext.extend(std::iter::repeat(0).take(padding));
+      plaintext.resize(plaintext.len() + padding, 0);
+      ciphertext.resize(ciphertext.len() + padding, 0);
     }
 
     assert_eq!(plaintext.len() % AES_INPUT_LENGTH, 0);
@@ -223,17 +223,18 @@ impl Manifest {
     &self,
     inputs: AESEncryptionInput,
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>, HashMap<String, FoldInput>) {
+    assert_eq!(inputs.plaintext.len(), inputs.ciphertext.len());
+
     debug!("Padding plaintext and ciphertext to nearest 16...");
     let remainder = inputs.plaintext.len() % 16;
     let mut plaintext = inputs.plaintext.to_vec();
     let mut ciphertext = inputs.ciphertext.to_vec();
     if remainder != 0 {
       let padding = 16 - remainder;
-      plaintext.extend(std::iter::repeat(0).take(padding));
-      ciphertext.extend(std::iter::repeat(0).take(padding));
+      plaintext.resize(plaintext.len() + padding, 0);
+      ciphertext.resize(ciphertext.len() + padding, 0);
     }
 
-    assert_eq!(plaintext.len(), ciphertext.len());
     assert_eq!(plaintext.len() % AES_INPUT_LENGTH, 0);
 
     let aes_instr = String::from("AES_GCM_1");

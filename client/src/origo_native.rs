@@ -11,13 +11,9 @@ use proofs::{
   },
   F, G1,
 };
-use tls_client2::{
-  origo::{OrigoConnection, WitnessData},
-  CipherSuite, Decrypter2, ProtocolVersion,
-};
-use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
+use tls_client2::origo::{OrigoConnection, WitnessData};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
-use tracing::{debug, trace};
+use tracing::debug;
 
 use crate::{
   circuits::*, config, config::ProvingData, errors, errors::ClientErrors, origo::SignBody, Proof,
@@ -46,9 +42,8 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
     program::compress_proof(&response_program_output, &response_program_data.public_params)?;
 
   debug!("verification");
-  let mut request_serialized_compressed_verifier =
-    request_compressed_verifier.serialize_and_compress();
-  let mut response_serialized_compressed_verifier =
+  let request_serialized_compressed_verifier = request_compressed_verifier.serialize_and_compress();
+  let response_serialized_compressed_verifier =
     response_compressed_verifier.serialize_and_compress();
 
   Ok(crate::Proof::Origo((

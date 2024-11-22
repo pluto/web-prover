@@ -1,10 +1,7 @@
 use proofs::program::manifest::AESEncryptionInput;
-use tls_client2::{
-  origo::{OrigoConnection, WitnessData},
-  CipherSuite, Decrypter2, ProtocolVersion,
-};
+use tls_client2::{origo::WitnessData, CipherSuite, Decrypter2, ProtocolVersion};
 use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
-use tracing::{debug, trace};
+use tracing::trace;
 
 use crate::errors::ClientErrors;
 
@@ -97,6 +94,7 @@ pub(crate) fn get_circuit_inputs_from_witness(
 
   let request_plaintext = plaintext.payload.0.to_vec();
   let request_ciphertext = request_ciphertext[..request_plaintext.len()].to_vec();
+  assert_eq!(request_plaintext.len(), request_ciphertext.len());
   trace!("Raw request plaintext: {:?}", request_plaintext);
 
   // ----------------------------------------------------------------------------------------------------------------------- //
@@ -132,7 +130,8 @@ pub(crate) fn get_circuit_inputs_from_witness(
     let mut padded_aad = vec![0; 16 - aad.len()];
     padded_aad.extend(&aad);
   }
-  debug!("response plaintext: {:?}", response_plaintext);
+  trace!("response plaintext: {:?}", response_plaintext);
+  assert_eq!(response_plaintext.len(), response_ciphertext.len());
 
   Ok((
     AESEncryptionInput {

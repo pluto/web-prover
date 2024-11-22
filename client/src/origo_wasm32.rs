@@ -1,35 +1,25 @@
 use std::{
-  collections::HashMap,
   io::{BufReader, Cursor},
-  path::{Path, PathBuf},
   sync::Arc,
 };
 
 use futures::{channel::oneshot, AsyncWriteExt};
-use hyper::{body::Bytes, Request, StatusCode};
-use num_bigint::BigInt;
+use hyper::StatusCode;
 use proofs::{
   circom::witness::load_witness_from_bin_reader,
   program::{
     self,
     data::{
-      CircuitData, Expanded, FoldInput, InstructionConfig, NotExpanded, Offline, Online,
-      ProgramData, R1CSType, SetupData, WitnessGeneratorType,
+      Expanded, NotExpanded, Offline, Online, ProgramData, R1CSType, SetupData,
+      WitnessGeneratorType,
     },
   },
-  witness::{compute_http_header_witness, compute_http_witness, compute_json_witness, data_hasher},
   G1,
 };
-use serde::Serialize;
 use serde_json::{json, Value};
-use tls_client2::{
-  origo::WitnessData, CipherSuite, ClientConnection, Decrypter2, ProtocolVersion,
-  RustCryptoBackend, RustCryptoBackend13, ServerName,
-};
+use tls_client2::origo::WitnessData;
 use tls_client_async2::bind_client;
-use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
 use tracing::debug;
-use url::Url;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
