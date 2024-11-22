@@ -110,6 +110,15 @@ fn generate_aes_counter(plaintext_blocks: usize) -> Vec<u8> {
   ctr
 }
 
+// TODO(Sambhav): can we remove usage of vec here?
+pub struct AESEncryptionInput {
+  pub key:        [u8; 16],
+  pub iv:         [u8; 12],
+  pub aad:        Vec<u8>,
+  pub plaintext:  Vec<u8>,
+  pub ciphertext: Vec<u8>,
+}
+
 fn circuit_size(plaintext_length: usize) -> usize { plaintext_length.next_power_of_two().max(512) }
 
 impl Manifest {
@@ -117,13 +126,20 @@ impl Manifest {
   /// from [`Manifest::request`]
   pub fn rom_from_request(
     &self,
-    aes_key: &[u8],
-    aes_iv: &[u8],
-    aes_aad: &[u8],
-    plaintext: &[u8],
-    ciphertext: &[u8],
+    inputs: AESEncryptionInput,
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>, HashMap<String, FoldInput>) {
-    assert_eq!(plaintext.len(), ciphertext.len());
+    assert_eq!(inputs.plaintext.len(), inputs.ciphertext.len());
+
+    debug!("Padding plaintext and ciphertext to nearest 16...");
+    let remainder = inputs.plaintext.len() % 16;
+    let mut plaintext = inputs.plaintext.to_vec();
+    let mut ciphertext = inputs.ciphertext.to_vec();
+    if remainder != 0 {
+      let padding = 16 - remainder;
+      plaintext.extend(std::iter::repeat(0).take(padding));
+      ciphertext.extend(std::iter::repeat(0).take(padding));
+    }
+
     assert_eq!(plaintext.len() % AES_INPUT_LENGTH, 0);
 
     let aes_instr = String::from("AES_GCM_1");
@@ -131,9 +147,9 @@ impl Manifest {
     let aes_rom_opcode_config = InstructionConfig {
       name:          aes_instr.clone(),
       private_input: HashMap::from([
-        (String::from(AES_KEY_SIGNAL), json!(aes_key)),
-        (String::from(AES_IV_SIGNAL), json!(aes_iv)),
-        (String::from(AES_AAD_SIGNAL), json!(aes_aad)),
+        (String::from(AES_KEY_SIGNAL), json!(inputs.key)),
+        (String::from(AES_IV_SIGNAL), json!(inputs.iv)),
+        (String::from(AES_AAD_SIGNAL), json!(inputs.aad)),
       ]),
     };
     let rom_len = plaintext.len() / AES_INPUT_LENGTH;
@@ -205,12 +221,18 @@ impl Manifest {
   /// generates ROM from [`Manifest::response`]
   pub fn rom_from_response(
     &self,
-    aes_key: &[u8],
-    aes_iv: &[u8],
-    aes_aad: &[u8],
-    plaintext: &[u8],
-    ciphertext: &[u8],
+    inputs: AESEncryptionInput,
   ) -> (HashMap<String, CircuitData>, Vec<InstructionConfig>, HashMap<String, FoldInput>) {
+    debug!("Padding plaintext and ciphertext to nearest 16...");
+    let remainder = inputs.plaintext.len() % 16;
+    let mut plaintext = inputs.plaintext.to_vec();
+    let mut ciphertext = inputs.ciphertext.to_vec();
+    if remainder != 0 {
+      let padding = 16 - remainder;
+      plaintext.extend(std::iter::repeat(0).take(padding));
+      ciphertext.extend(std::iter::repeat(0).take(padding));
+    }
+
     assert_eq!(plaintext.len(), ciphertext.len());
     assert_eq!(plaintext.len() % AES_INPUT_LENGTH, 0);
 
@@ -219,9 +241,9 @@ impl Manifest {
     let aes_rom_opcode_config = InstructionConfig {
       name:          aes_instr.clone(),
       private_input: HashMap::from([
-        (String::from(AES_KEY_SIGNAL), json!(aes_key)),
-        (String::from(AES_IV_SIGNAL), json!(aes_iv)),
-        (String::from(AES_AAD_SIGNAL), json!(aes_aad)),
+        (String::from(AES_KEY_SIGNAL), json!(inputs.key)),
+        (String::from(AES_IV_SIGNAL), json!(inputs.iv)),
+        (String::from(AES_AAD_SIGNAL), json!(inputs.aad)),
       ]),
     };
 
@@ -430,13 +452,13 @@ mod tests {
   fn generate_rom_from_request() {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
-    let (rom_data, rom, fold_input) = manifest.rom_from_request(
-      &AES_KEY.1,
-      &AES_IV.1,
-      &AES_AAD.1,
-      TEST_MANIFEST_REQUEST,
-      TEST_MANIFEST_REQUEST,
-    );
+    let (rom_data, rom, fold_input) = manifest.rom_from_request(AESEncryptionInput {
+      key:        AES_KEY.1,
+      iv:         AES_IV.1,
+      aad:        AES_AAD.1.to_vec(),
+      plaintext:  TEST_MANIFEST_REQUEST.to_vec(),
+      ciphertext: TEST_MANIFEST_REQUEST.to_vec(),
+    });
 
     // AES + HTTP parse + HTTP headers length
     assert_eq!(rom_data.len(), 2);
@@ -462,13 +484,13 @@ mod tests {
   fn generate_rom_from_response() {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
-    let (rom_data, rom, fold_input) = manifest.rom_from_response(
-      &AES_KEY.1,
-      &AES_IV.1,
-      &AES_AAD.1,
-      TEST_MANIFEST_RESPONSE,
-      TEST_MANIFEST_RESPONSE,
-    );
+    let (rom_data, rom, fold_input) = manifest.rom_from_response(AESEncryptionInput {
+      key:        AES_KEY.1,
+      iv:         AES_IV.1,
+      aad:        AES_AAD.1.to_vec(),
+      plaintext:  TEST_MANIFEST_RESPONSE.to_vec(),
+      ciphertext: TEST_MANIFEST_RESPONSE.to_vec(),
+    });
 
     // AES + http + json mask (object + array) + extract
     assert_eq!(rom_data.len(), 1 + 1 + manifest.response.body.json.len() + 1);

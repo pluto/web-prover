@@ -28,6 +28,7 @@ pub struct Witness {
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct ProvingData {
+  // TODO: make these option
   pub witnesses:     Vec<Witness>,
   #[serde(with = "serde_bytes")]
   pub serialized_pp: Vec<u8>,

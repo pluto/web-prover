@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
@@ -6,20 +6,16 @@ use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
   program::{
     self,
-    data::{
-      Expanded, FoldInput, NotExpanded, Online, ProgramData, R1CSType, SetupData,
-      WitnessGeneratorType,
-    },
+    data::{Expanded, NotExpanded, Online, ProgramData, R1CSType, SetupData, WitnessGeneratorType},
+    manifest::AESEncryptionInput,
   },
   F, G1,
 };
-use reqwest::Client;
-use serde_json::{json, Value};
 use tls_client2::{
   origo::{OrigoConnection, WitnessData},
   CipherSuite, Decrypter2, ProtocolVersion,
 };
-use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
+use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::{debug, trace};
 
@@ -100,27 +96,13 @@ fn get_setup_data_1024() -> SetupData {
   }
 }
 
-// TODO: Dedup origo_native and origo_wasm. The difference is the witness/r1cs preparation.
-async fn generate_program_data(
+pub(crate) fn get_circuit_inputs(
   witness: &WitnessData,
-  proving: ProvingData,
-) -> Result<(ProgramData<Online, Expanded>, ProgramData<Online, Expanded>), ClientErrors> {
-  // ----------------------------------------------------------------------------------------------------------------------- //
-  // - get AES key, IV -
-  debug!(
-    "request_key_as_string: {:?}, length: {}",
-    witness.request.aes_key,
-    witness.request.aes_key.len()
-  );
-  debug!(
-    "request_iv_as_string: {:?}, length: {}",
-    witness.request.aes_iv,
-    witness.request.aes_iv.len()
-  );
-
+) -> Result<(AESEncryptionInput, AESEncryptionInput), ClientErrors> {
+  // - get AES key, IV, request ciphertext, request plaintext, and AAD -
   let key: [u8; 16] = witness.request.aes_key[..16].try_into()?;
   let iv: [u8; 12] = witness.request.aes_iv[..12].try_into()?;
-  // ----------------------------------------------------------------------------------------------------------------------- //
+
   // Get the request ciphertext, request plaintext, and AAD
   debug!("Decoding ciphertext hex...");
   let request_ciphertext = hex::decode(witness.request.ciphertext.as_bytes())?;
@@ -143,29 +125,15 @@ async fn generate_program_data(
   let mut padded_aad = vec![0; 16 - aad.len()];
   padded_aad.extend(aad);
 
-  // -- NOTE: Above is the following:
-  // GET https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json HTTP/1.1
-  // host: gist.githubusercontent.com
-  // accept-encoding: identity
-  // connection: close
-  // accept: */*
-  // - get AES key, IV, request ciphertext, request plaintext, and AAD -
   let request_plaintext = plaintext.payload.0.to_vec();
   trace!("Raw request plaintext: {:?}", request_plaintext);
 
-  debug!(
-    "response_key_as_string: {:?}, length: {}",
-    witness.response.aes_key,
-    witness.response.aes_key.len()
-  );
-  debug!(
-    "response_iv_as_string: {:?}, length: {}",
-    witness.response.aes_iv,
-    witness.response.aes_iv.len()
-  );
+  assert_eq!(request_ciphertext.len(), request_plaintext.len());
 
-  let mut response_pt = vec![];
-  let mut response_ct = vec![];
+  // ----------------------------------------------------------------------------------------------------------------------- //
+  // response preparation
+  let mut response_plaintext = vec![];
+  let mut response_ciphertext = vec![];
   let response_key: [u8; 16] = witness.response.aes_key[..16].try_into().unwrap();
   let response_iv: [u8; 12] = witness.response.aes_iv[..12].try_into().unwrap();
   let response_dec =
@@ -188,73 +156,58 @@ async fn generate_program_data(
 
     // push ciphertext
     let pt = plaintext.payload.0.to_vec();
-    response_ct.extend_from_slice(&ct_chunk[..pt.len()]);
+    response_ciphertext.extend_from_slice(&ct_chunk[..pt.len()]);
 
-    response_pt.extend(pt);
+    response_plaintext.extend(pt);
     let aad = hex::decode(meta.additional_data.to_owned()).unwrap();
     let mut padded_aad = vec![0; 16 - aad.len()];
-    padded_aad.extend(aad);
+    padded_aad.extend(&aad);
   }
-  debug!("response plaintext: {:?}", response_pt);
-  // ----------------------------------------------------------------------------------------------------------------------- //
+  debug!("response plaintext: {:?}", response_plaintext);
 
-  // TODO (Colin): ultimately we want to download the `AuxParams` here and deserialize to setup
-  // `PublicParams` alongside of calling `client_side_prover::supernova::get_circuit_shapes` for
-  // this next step
+  Ok((
+    AESEncryptionInput {
+      key,
+      iv,
+      aad: padded_aad.clone(),
+      plaintext: request_plaintext,
+      ciphertext: request_ciphertext,
+    },
+    AESEncryptionInput {
+      key:        response_key,
+      iv:         response_iv,
+      aad:        padded_aad, // TODO: use response's AAD
+      plaintext:  response_plaintext,
+      ciphertext: response_ciphertext,
+    },
+  ))
+}
+
+async fn generate_program_data(
+  witness: &WitnessData,
+  proving: ProvingData,
+) -> Result<(ProgramData<Online, Expanded>, ProgramData<Online, Expanded>), ClientErrors> {
+  let (request_inputs, response_inputs) = get_circuit_inputs(witness)?;
 
   // - construct private inputs and program layout for AES proof for request -
-  debug!("Padding plaintext and ciphertext to nearest 16...");
-  // TODO (Sambhav): padding should happen inside manifest
-  let mut nearest_16_padded_plaintext = request_plaintext.clone();
-  let mut nearest_16_padded_ciphertext = request_ciphertext.clone();
-  let remainder = request_plaintext.len() % 16;
-  if remainder != 0 {
-    let padding = 16 - remainder;
-    nearest_16_padded_plaintext.resize(request_plaintext.len() + padding, 0);
-    nearest_16_padded_ciphertext.resize(request_plaintext.len() + padding, 0);
-  }
-  trace!(
-    "Padded plaintext: {:?}\nPadded ciphertext: {:?}",
-    nearest_16_padded_plaintext,
-    nearest_16_padded_ciphertext
-  );
-
   let (request_rom_data, request_rom, request_fold_inputs) =
-    proving.manifest.as_ref().unwrap().rom_from_request(
-      &key,
-      &iv,
-      &padded_aad,
-      &nearest_16_padded_plaintext,
-      &nearest_16_padded_plaintext,
-    );
-
-  // pad AES response ciphertext
-  let remainder = if response_pt.len() % 16 != 0 { 16 - response_pt.len() % 16 } else { 0 };
-  let mut response_nearest_16_padded_plaintext = response_pt.clone();
-  let mut response_nearest_16_padded_ciphertext = response_ct.clone();
-  response_nearest_16_padded_plaintext.extend(std::iter::repeat(0).take(remainder));
-  response_nearest_16_padded_ciphertext.extend(std::iter::repeat(0).take(remainder));
+    proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);
 
   let (response_rom_data, response_rom, response_fold_inputs) =
-    proving.manifest.as_ref().unwrap().rom_from_response(
-      &response_key,
-      &response_iv,
-      &padded_aad, // TODO: use response's AAD
-      &response_nearest_16_padded_plaintext,
-      &response_nearest_16_padded_ciphertext,
-    );
+    proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
+
   // ----------------------------------------------------------------------------------------------------------------------- //
 
   debug!("Setting up `PublicParams`... (this may take a moment)");
   // let public_params = program::setup(&setup_data_512);
-  // TODO: remove this duplicate params or use serialized params
   let setup_data_512 = get_setup_data_512();
   let public_params_512 = program::setup(&setup_data_512);
 
   let setup_data_1024 = get_setup_data_1024();
   let public_params_1024 = program::setup(&setup_data_1024);
-  debug!("Created `PublicParams`!");
 
+  debug!("Created `PublicParams`!");
+  // TODO (sambhav): handle response input in a better manner, what if response is 512B
   let request_program_data = ProgramData::<Online, NotExpanded> {
     public_params:      public_params_512,
     setup_data:         setup_data_512,

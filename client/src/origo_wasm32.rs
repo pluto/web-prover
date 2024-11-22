@@ -33,10 +33,10 @@ use url::Url;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
-use crate::{circuits::*, config, config::ProvingData, errors, origo::SignBody, Proof};
-
-const JSON_MASK_KEY_DEPTH_1: (&str, [u8; 10]) = ("key", [100, 97, 116, 97, 0, 0, 0, 0, 0, 0]); // "data"
-const JSON_MASK_KEYLEN_DEPTH_1: (&str, [u8; 1]) = ("keyLen", [4]);
+use crate::{
+  circuits::*, config, config::ProvingData, errors, origo::SignBody,
+  origo_native::get_circuit_inputs, Proof,
+};
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
@@ -63,36 +63,7 @@ async fn generate_program_data(
   witness: &WitnessData,
   proving: ProvingData,
 ) -> Result<ProgramData<Online, Expanded>, errors::ClientErrors> {
-  debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
-  debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
-
-  let key: [u8; 16] = witness.request.aes_key[..16].try_into()?;
-  let iv: [u8; 12] = witness.request.aes_iv[..12].try_into()?;
-
-  // Get the request ciphertext, request plaintext, and AAD
-  let request_ciphertext = hex::decode(witness.request.ciphertext.as_bytes())?;
-
-  let request_decrypter = Decrypter2::new(key, iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
-  let (plaintext, meta) = request_decrypter.decrypt_tls13_aes(
-    &OpaqueMessage {
-      typ:     ContentType::ApplicationData,
-      version: ProtocolVersion::TLSv1_3,
-      payload: Payload::new(request_ciphertext.clone()), /* TODO (autoparallel): old way didn't
-                                                          * introduce a clone */
-    },
-    0,
-  )?;
-
-  let aad = hex::decode(meta.additional_data.to_owned())?;
-  let mut padded_aad = vec![0; 16 - aad.len()];
-  padded_aad.extend(aad);
-
-  let request_plaintext = plaintext.payload.0.to_vec();
-
-  let mut witnesses = Vec::new();
-  for w in proving.witnesses {
-    witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w.val)))?);
-  }
+  let (request_inputs, response_inputs) = get_circuit_inputs(witness);
 
   let setup_data = SetupData {
     r1cs_types:              vec![
@@ -117,25 +88,17 @@ async fn generate_program_data(
     max_rom_length:          JSON_MAX_ROM_LENGTH,
   };
 
-  let mut nearest_16_padded_plaintext = request_plaintext.clone();
-  let mut nearest_16_padded_ciphertext = request_ciphertext.clone();
-  let remainder = request_plaintext.len() % 16;
-  if remainder != 0 {
-    let padding = 16 - remainder;
-    nearest_16_padded_plaintext.extend(std::iter::repeat(0).take(padding));
-    nearest_16_padded_ciphertext.extend(std::iter::repeat(0).take(padding));
+  let (request_rom_data, request_rom, request_fold_inputs) =
+    proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);
+
+  // // pad AES response ciphertext
+  // let (response_rom_data, response_rom, response_fold_inputs) =
+  // proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
+
+  let mut witnesses = Vec::new();
+  for w in proving.witnesses {
+    witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w.val)))?);
   }
-
-  debug!("plaintext: {:?}", nearest_16_padded_plaintext);
-  debug!("ciphertext: {:?}", nearest_16_padded_ciphertext);
-
-  let (rom_data, rom, fold_input) = proving.manifest.unwrap().rom_from_request(
-    &key,
-    &iv,
-    &padded_aad,
-    &nearest_16_padded_plaintext,
-    &nearest_16_padded_plaintext,
-  );
 
   debug!("generating public params");
   // let public_params = program::setup(&setup_data);
@@ -143,10 +106,10 @@ async fn generate_program_data(
   let pd = ProgramData::<Offline, NotExpanded> {
     public_params: proving.serialized_pp,
     setup_data,
-    rom,
-    rom_data,
+    rom: request_rom,
+    rom_data: request_rom_data,
     initial_nivc_input: vec![proofs::F::<G1>::from(0)],
-    inputs: fold_input,
+    inputs: request_fold_inputs,
     witnesses,
   }
   .into_online();
