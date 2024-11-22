@@ -96,17 +96,32 @@ pub(crate) fn decrypt_tls_ciphertext(
   // Get the request ciphertext, request plaintext, and AAD
   let request_ciphertext = hex::decode(witness.request.ciphertext[0].as_bytes())?;
 
-  let request_decrypter =
-    Decrypter2::new(EncryptionKey::AES128GCM(key), iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
-  let (plaintext, meta) = request_decrypter.decrypt_tls13_aes(
-    &OpaqueMessage {
-      typ:     ContentType::ApplicationData,
-      version: ProtocolVersion::TLSv1_3,
-      payload: Payload::new(request_ciphertext.clone()), /* TODO (autoparallel): old way didn't
-                                                          * introduce a clone */
+  let request_decrypter = Decrypter2::new(key.clone(), iv, cipher_suite);
+  let (plaintext, meta) = match cipher_suite {
+    CipherSuite::TLS13_AES_128_GCM_SHA256 => {
+      debug!("Decrypting AES");
+      (request_decrypter.decrypt_tls13_aes(
+        &OpaqueMessage {
+          typ:     ContentType::ApplicationData,
+          version: ProtocolVersion::TLSv1_3,
+          payload: Payload::new(request_ciphertext.clone()),
+        },
+        0,
+      )?)
     },
-    0,
-  )?;
+    CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
+      debug!("Decrypting Chacha");
+      (request_decrypter.decrypt_tls13_chacha20(
+        &OpaqueMessage {
+          typ:     ContentType::ApplicationData,
+          version: ProtocolVersion::TLSv1_3,
+          payload: Payload::new(request_ciphertext.clone()),
+        },
+        0,
+      )?)
+    },
+    _ => panic!("Unsupported cipher suite"),
+  };
 
   let aad = hex::decode(meta.additional_data.to_owned())?;
   let mut padded_aad = vec![0; 16 - aad.len()];
@@ -121,7 +136,7 @@ pub(crate) fn decrypt_tls_ciphertext(
   // response preparation
   let mut response_plaintext = vec![];
   let mut response_ciphertext = vec![];
-  let (key, cipher_suite) = match witness.request.aes_key.len() {
+  let (response_key, cipher_suite) = match witness.request.aes_key.len() {
     // chacha has 32 byte keys
     32 => (
       EncryptionKey::CHACHA20POLY1305(witness.request.aes_key[..32].try_into()?),
@@ -135,23 +150,37 @@ pub(crate) fn decrypt_tls_ciphertext(
     _ => panic!("Unsupported key length"),
   };
   let response_iv: [u8; 12] = witness.response.aes_iv[..12].try_into().unwrap();
-  let response_dec =
-    Decrypter2::new(response_key, response_iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
+  let response_dec = Decrypter2::new(response_key, response_iv, cipher_suite);
 
   for (i, ct_chunk) in witness.response.ciphertext.iter().enumerate() {
     let ct_chunk = hex::decode(ct_chunk).unwrap();
 
     // decrypt ciphertext
-    let (plaintext, meta) = response_dec
-      .decrypt_tls13_aes(
-        &OpaqueMessage {
-          typ:     ContentType::ApplicationData,
-          version: ProtocolVersion::TLSv1_3,
-          payload: Payload::new(ct_chunk.clone()),
-        },
-        (i + 1) as u64,
-      )
-      .unwrap();
+    let (plaintext, meta) = match cipher_suite {
+      CipherSuite::TLS13_AES_128_GCM_SHA256 => {
+        debug!("Decrypting AES");
+        (response_dec.decrypt_tls13_aes(
+          &OpaqueMessage {
+            typ:     ContentType::ApplicationData,
+            version: ProtocolVersion::TLSv1_3,
+            payload: Payload::new(ct_chunk.clone()),
+          },
+          0,
+        )?)
+      },
+      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
+        debug!("Decrypting Chacha");
+        (response_dec.decrypt_tls13_chacha20(
+          &OpaqueMessage {
+            typ:     ContentType::ApplicationData,
+            version: ProtocolVersion::TLSv1_3,
+            payload: Payload::new(ct_chunk.clone()),
+          },
+          0,
+        )?)
+      },
+      _ => panic!("Unsupported cipher suite"),
+    };
 
     // push ciphertext
     let pt = plaintext.payload.0.to_vec();

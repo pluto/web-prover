@@ -356,7 +356,15 @@ impl RustCryptoBackend13 {
     let (client_key, server_key) = match self.cipher_suite.unwrap().suite() {
       CipherSuite::TLS13_AES_128_GCM_SHA256 => {
         let client_key = hkdf_expand_label_aead_key(client_expander.as_ref(), 16, b"key", &[]);
+        self.logger.lock().unwrap().set_secret(
+          format!("{:?}:client_key", self.encrypt_mode).to_string(),
+          client_key.buf[..16].to_vec(),
+        );
         let server_key = hkdf_expand_label_aead_key(server_expander.as_ref(), 16, b"key", &[]);
+        self.logger.lock().unwrap().set_secret(
+          format!("{:?}:server_key", self.encrypt_mode).to_string(),
+          server_key.buf[..16].to_vec(),
+        );
         debug!("client_key={:?}", client_key.buf.len());
         (
           client_key,
@@ -365,7 +373,15 @@ impl RustCryptoBackend13 {
       },
       CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
         let client_key = hkdf_expand_label_aead_key(client_expander.as_ref(), 32, b"key", &[]);
+        self.logger.lock().unwrap().set_secret(
+          format!("{:?}:client_key", self.encrypt_mode).to_string(),
+          client_key.buf.into(),
+        );
         let server_key = hkdf_expand_label_aead_key(server_expander.as_ref(), 32, b"key", &[]);
+        self.logger.lock().unwrap().set_secret(
+          format!("{:?}:server_key", self.encrypt_mode).to_string(),
+          server_key.buf.into(),
+        );
         debug!("client_key={:?}", client_key.buf.len());
         (
           client_key,
@@ -392,10 +408,6 @@ impl RustCryptoBackend13 {
       hex::encode(client_key.buf),
       client_iv.buf.len()
     );
-    self.logger.lock().unwrap().set_secret(
-      format!("{:?}:client_key", self.encrypt_mode).to_string(),
-      client_key.buf.into(),
-    );
 
     trace!(
       "server_iv={:?}, iv_len={:?}",
@@ -411,10 +423,6 @@ impl RustCryptoBackend13 {
       "server_key={:?}, iv_len={:?}",
       hex::encode(server_key.buf),
       server_key.buf.len()
-    );
-    self.logger.lock().unwrap().set_secret(
-      format!("{:?}:server_key", self.encrypt_mode).to_string(),
-      server_key.buf.into(),
     );
 
     TlsKeys {
