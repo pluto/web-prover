@@ -441,7 +441,7 @@ impl RustCryptoBackend13 {
         key.copy_from_slice(&keys.client_key.buf[..16]);
         debug!("Got Encrypter with key length: {:?}", key.len());
         Encrypter::new(
-        EncryptionKey::AES128GCM(key),
+        CipherSuiteKey::AES128GCM(key),
         keys.client_iv.buf[..12].try_into().unwrap(),
         self.cipher_suite.unwrap().suite(),
       )},
@@ -450,7 +450,7 @@ impl RustCryptoBackend13 {
         key.copy_from_slice(&keys.client_key.buf[..32]);
         debug!("Got Encrypter with key length: {:?}", key.len());
         Encrypter::new(
-        EncryptionKey::CHACHA20POLY1305(key),
+        CipherSuiteKey::CHACHA20POLY1305(key),
         keys.client_iv.buf[..12].try_into().unwrap(),
         self.cipher_suite.unwrap().suite(),
       )},
@@ -466,7 +466,7 @@ impl RustCryptoBackend13 {
         key.copy_from_slice(&keys.server_key.buf[..16]);
         debug!("Got Decrypter with key length: {:?}", key.len());
         Decrypter::new(
-        EncryptionKey::AES128GCM(key),
+        CipherSuiteKey::AES128GCM(key),
         keys.server_iv.buf[..12].try_into().unwrap(),
         self.cipher_suite.unwrap().suite(),
       )},
@@ -475,7 +475,7 @@ impl RustCryptoBackend13 {
         key.copy_from_slice(&keys.server_key.buf[..32]);
         debug!("Got Decrypter with key length: {:?}", key.len());
          Decrypter::new(
-      EncryptionKey::CHACHA20POLY1305(key),
+      CipherSuiteKey::CHACHA20POLY1305(key),
       keys.server_iv.buf[..12].try_into().unwrap(),
       self.cipher_suite.unwrap().suite(),
       )},
@@ -811,28 +811,28 @@ fn make_tls13_aad(len: usize) -> [u8; 5] {
 }
 
 #[derive(Clone)]
-pub enum EncryptionKey{
+pub enum CipherSuiteKey{
     AES128GCM([u8; 16]), // 128-bit key
     CHACHA20POLY1305([u8; 32]), // 256-bit key
 }
 
-impl AsRef<[u8]> for EncryptionKey {
+impl AsRef<[u8]> for CipherSuiteKey {
     fn as_ref(&self) -> &[u8] {
         match self {
-            EncryptionKey::AES128GCM(key) => key,
-            EncryptionKey::CHACHA20POLY1305(key) => key,
+            CipherSuiteKey::AES128GCM(key) => key,
+            CipherSuiteKey::CHACHA20POLY1305(key) => key,
         }
     }
 }
 
 pub struct Encrypter {
-    write_key: EncryptionKey,
+    write_key: CipherSuiteKey,
     write_iv: [u8; 12],
     cipher_suite: CipherSuite,
 }
 
 impl Encrypter {
-  pub fn new(write_key: EncryptionKey, write_iv: [u8; 12], cipher_suite: CipherSuite) -> Self {
+  pub fn new(write_key: CipherSuiteKey, write_iv: [u8; 12], cipher_suite: CipherSuite) -> Self {
     Self { write_key, write_iv, cipher_suite }
   }
 
@@ -848,7 +848,7 @@ impl Encrypter {
     payload.push(m.typ.get_u8()); // Very important, encrypted messages must have the type appended.
 
     let write_key = match self.write_key {
-      EncryptionKey::CHACHA20POLY1305(key) => key,
+      CipherSuiteKey::CHACHA20POLY1305(key) => key,
       _ => panic!("wrong key type"),
     };
     let write_key = Key::from_slice(&write_key);
@@ -899,7 +899,7 @@ impl Encrypter {
     let aes_payload = Payload { msg: &payload, aad: &aad };
 
     let write_key = match self.write_key {
-      EncryptionKey::AES128GCM(key) => key,
+      CipherSuiteKey::AES128GCM(key) => key,
       _ => panic!("wrong key type"),
     };
 
@@ -935,13 +935,13 @@ impl Encrypter {
 
 pub struct Decrypter {
   // Keys are symetric for us right now
-  write_key:   EncryptionKey,
+  write_key:   CipherSuiteKey,
   write_iv:     [u8; 12],
   cipher_suite: CipherSuite,
 }
 
 impl Decrypter {
-  pub fn new(write_key: EncryptionKey, write_iv: [u8; 12], cipher_suite: CipherSuite) -> Self {
+  pub fn new(write_key: CipherSuiteKey, write_iv: [u8; 12], cipher_suite: CipherSuite) -> Self {
     Self { write_key, write_iv, cipher_suite }
   }
 
@@ -956,7 +956,7 @@ impl Decrypter {
 
 
     let write_key = match self.write_key {
-      EncryptionKey::CHACHA20POLY1305(key) => key,
+      CipherSuiteKey::CHACHA20POLY1305(key) => key,
       _ => panic!("wrong key"),};
 
     let write_key = Key::from_slice(&write_key);
@@ -1007,7 +1007,7 @@ impl Decrypter {
     let aes_payload = Payload { msg: &m.payload.0, aad: &aad };
 
     let write_key = match self.write_key {
-      EncryptionKey::AES128GCM(key) => key,
+      CipherSuiteKey::AES128GCM(key) => key,
       _ => panic!("wrong key"),};
 
     let cipher = Aes128Gcm::new_from_slice(&write_key).unwrap();
