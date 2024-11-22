@@ -96,6 +96,8 @@ const DATA_SIGNAL_NAME: &str = "data";
 const HTTP_START_LINE_HASH_SIGNAL_NAME: &str = "start_line_hash";
 const HTTP_HEADER_HASHES_SIGNAL_NAME: &str = "header_hashes";
 const HTTP_BODY_HASH_SIGNAL_NAME: &str = "body_hash";
+const HTTP_MAX_HEADER_512: usize = 10;
+const HTTP_MAX_HEADER_1024: usize = 25;
 const JSON_MASK_OBJECT_KEY_NAME: &str = "key";
 const JSON_MASK_OBJECT_KEYLEN_NAME: &str = "keyLen";
 const JSON_MAX_KEY_LENGTH: usize = 10;
@@ -111,14 +113,21 @@ fn generate_aes_counter(plaintext_blocks: usize) -> Vec<u8> {
 }
 
 // TODO(Sambhav): can we remove usage of vec here?
+/// AES-128 encryption input required to generate witness for the circuits
 pub struct AESEncryptionInput {
+  /// 128-bit key
   pub key:        [u8; 16],
+  /// 96-bit IV
   pub iv:         [u8; 12],
+  /// 128-bit AAD
   pub aad:        Vec<u8>,
+  /// plaintext to be encrypted
   pub plaintext:  Vec<u8>,
+  /// ciphertext associated with plaintext
   pub ciphertext: Vec<u8>,
 }
 
+/// ideal circuit size to used for a plaintext with a minimum size of 512 bytes
 fn circuit_size(plaintext_length: usize) -> usize { plaintext_length.next_power_of_two().max(512) }
 
 impl Manifest {
@@ -136,6 +145,7 @@ impl Manifest {
     let mut ciphertext = inputs.ciphertext.to_vec();
     if remainder != 0 {
       let padding = 16 - remainder;
+      // TODO(Sambhav): remove padding from 0
       plaintext.resize(plaintext.len() + padding, 0);
       ciphertext.resize(ciphertext.len() + padding, 0);
     }
@@ -156,6 +166,7 @@ impl Manifest {
     let mut rom = vec![aes_rom_opcode_config; rom_len];
 
     // Pad internally the plaintext for using in circuits
+    // TODO(Sambhav): remove padding to 256/-1
     let mut padded_plaintext = plaintext.to_vec();
     padded_plaintext.resize(circuit_size(plaintext.len()), 0);
 
@@ -165,7 +176,7 @@ impl Manifest {
       &padded_plaintext,
       crate::witness::HttpMaskType::StartLine,
     ));
-    let mut http_header_hashes = vec!["0".to_string(); 5];
+    let mut http_header_hashes = vec!["0".to_string(); HTTP_MAX_HEADER_512];
     for header_name in self.request.headers.keys() {
       let (index, masked_header) =
         compute_http_header_witness(&padded_plaintext, header_name.as_bytes());
@@ -231,6 +242,7 @@ impl Manifest {
     let mut ciphertext = inputs.ciphertext.to_vec();
     if remainder != 0 {
       let padding = 16 - remainder;
+      // TODO(Sambhav): remove padding to 256
       plaintext.resize(plaintext.len() + padding, 0);
       ciphertext.resize(ciphertext.len() + padding, 0);
     }
@@ -252,6 +264,7 @@ impl Manifest {
     let mut rom = vec![aes_rom_opcode_config; rom_len];
 
     // Pad internally the plaintext for using in circuits
+    // TODO(Sambhav): remove padding to 256
     let mut padded_plaintext = plaintext.to_vec();
     padded_plaintext.resize(circuit_size(plaintext.len()), 0);
 
@@ -260,7 +273,7 @@ impl Manifest {
       &padded_plaintext,
       crate::witness::HttpMaskType::StartLine,
     ));
-    let mut http_header_hashes = vec!["0".to_string(); 25];
+    let mut http_header_hashes = vec!["0".to_string(); HTTP_MAX_HEADER_1024];
     for header_name in self.request.headers.keys() {
       let (index, masked_header) =
         compute_http_header_witness(&padded_plaintext, header_name.as_bytes());

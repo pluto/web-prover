@@ -9,12 +9,6 @@
 	"max_sent_data": 10000,
 	"max_recv_data": 10000,
 	"proving": {
-		"witnesses": [
-			{
-				"val": []
-			}
-		],
-		"serialized_pp": [],
 		"manifest": {
 			"manifestVersion": "1",
 			"id": "reddit-user-karma",

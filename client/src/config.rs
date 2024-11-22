@@ -14,25 +14,21 @@ use url::Url;
 
 use crate::errors::ClientErrors;
 
+/// Notary can run in multiple modes depending on the use case, each with its own trust assumptions.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum NotaryMode {
+  /// Origo proxy mode
   Origo,
+  /// TLS notary MPC-TLS mode
   TLSN,
 }
 
-#[derive(Deserialize, Clone, Debug)]
-pub struct Witness {
-  #[serde(with = "serde_bytes")]
-  pub val: Vec<u8>,
-}
-
+/// Proving data containing [`Manifest`] and serialized witnesses used for WASM
 #[derive(Deserialize, Clone, Debug)]
 pub struct ProvingData {
-  // TODO: make these option
-  pub witnesses:     Vec<Witness>,
-  #[serde(with = "serde_bytes")]
-  pub serialized_pp: Vec<u8>,
-  pub manifest:      Option<Manifest>,
+  // TODO(sambhav): remove witnesses after wasm witness generation works
+  pub witnesses: Option<Vec<Vec<u8>>>,
+  pub manifest:  Option<Manifest>,
 }
 
 #[derive(Deserialize, Clone, Debug)]

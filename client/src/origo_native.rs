@@ -16,7 +16,8 @@ use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
 use crate::{
-  circuits::*, config, config::ProvingData, errors, errors::ClientErrors, origo::SignBody, Proof,
+  circuits::*, config, config::ProvingData, errors, errors::ClientErrors, origo::SignBody,
+  tls::decrypt_tls_ciphertext, Proof,
 };
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
@@ -46,57 +47,26 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
   let response_serialized_compressed_verifier =
     response_compressed_verifier.serialize_and_compress();
 
+  // TODO(Sambhav): handle request and response into one proof
   Ok(crate::Proof::Origo((
     request_serialized_compressed_verifier.0,
     response_serialized_compressed_verifier.0,
   )))
 }
 
-fn get_setup_data_512() -> SetupData {
-  SetupData {
-    r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
-    ],
-    witness_generator_types: vec![
-      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
-    ],
-    max_rom_length:          JSON_MAX_ROM_LENGTH,
-  }
-}
-
-fn get_setup_data_1024() -> SetupData {
-  SetupData {
-    r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_1024_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_NIVC_1024_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_OBJECT_1024_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_1024_R1CS.to_vec()),
-      R1CSType::Raw(EXTRACT_VALUE_1024_R1CS.to_vec()),
-    ],
-    witness_generator_types: vec![
-      WitnessGeneratorType::Raw(AES_GCM_1024_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_NIVC_1024_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_1024_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_1024_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(EXTRACT_VALUE_1024_GRAPH.to_vec()),
-    ],
-    max_rom_length:          JSON_MAX_ROM_1024B_LENGTH,
-  }
-}
-
+/// takes TLS transcripts and [`ProvingData`] and generates NIVC [`ProgramData`] for request and
+/// response separately
+/// - decrypts TLS ciphertext in [`WitnessData`]
+/// - generates NIVC ROM from [`Manifest`] config for request and response
+/// - get circuit [`SetupData`] containing circuit R1CS and witness generator files according to
+///   input sizes
+/// - create consolidate [`ProgramData`]
+/// - expand private inputs into fold inputs as per circuits
 async fn generate_program_data(
   witness: &WitnessData,
   proving: ProvingData,
 ) -> Result<(ProgramData<Online, Expanded>, ProgramData<Online, Expanded>), ClientErrors> {
-  let (request_inputs, response_inputs) = get_circuit_inputs_from_witness(witness)?;
+  let (request_inputs, response_inputs) = decrypt_tls_ciphertext(witness)?;
 
   // - construct private inputs and program layout for AES proof for request -
   let (request_rom_data, request_rom, request_fold_inputs) =
@@ -108,11 +78,10 @@ async fn generate_program_data(
   // ----------------------------------------------------------------------------------------------------------------------- //
 
   debug!("Setting up `PublicParams`... (this may take a moment)");
-  // let public_params = program::setup(&setup_data_512);
-  let setup_data_512 = get_setup_data_512();
+  let setup_data_512 = construct_setup_data_512();
   let public_params_512 = program::setup(&setup_data_512);
 
-  let setup_data_1024 = get_setup_data_1024();
+  let setup_data_1024 = construct_setup_data_1024();
   let public_params_1024 = program::setup(&setup_data_1024);
 
   debug!("Created `PublicParams`!");
