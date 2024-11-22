@@ -33,10 +33,7 @@ use url::Url;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
-use crate::{
-  circuits::*, config, config::ProvingData, errors, origo::SignBody,
-  origo_native::get_circuit_inputs, Proof,
-};
+use crate::{circuits::*, config, config::ProvingData, errors, origo::SignBody, Proof};
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
@@ -59,13 +56,8 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
   Ok(crate::Proof::Origo((serialized_compressed_verifier.0, vec![])))
 }
 
-async fn generate_program_data(
-  witness: &WitnessData,
-  proving: ProvingData,
-) -> Result<ProgramData<Online, Expanded>, errors::ClientErrors> {
-  let (request_inputs, response_inputs) = get_circuit_inputs(witness);
-
-  let setup_data = SetupData {
+fn get_setup_data_512() -> SetupData {
+  SetupData {
     r1cs_types:              vec![
       R1CSType::Raw(AES_GCM_R1CS.to_vec()),
       R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
@@ -74,11 +66,6 @@ async fn generate_program_data(
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      // WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
       WitnessGeneratorType::Browser,
       WitnessGeneratorType::Browser,
       WitnessGeneratorType::Browser,
@@ -86,7 +73,36 @@ async fn generate_program_data(
       WitnessGeneratorType::Browser,
     ],
     max_rom_length:          JSON_MAX_ROM_LENGTH,
-  };
+  }
+}
+
+fn get_setup_data_1024() -> SetupData {
+  SetupData {
+    r1cs_types:              vec![
+      R1CSType::Raw(AES_GCM_1024_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_NIVC_1024_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_OBJECT_1024_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_1024_R1CS.to_vec()),
+      R1CSType::Raw(EXTRACT_VALUE_1024_R1CS.to_vec()),
+    ],
+    witness_generator_types: vec![
+      WitnessGeneratorType::Browser,
+      WitnessGeneratorType::Browser,
+      WitnessGeneratorType::Browser,
+      WitnessGeneratorType::Browser,
+      WitnessGeneratorType::Browser,
+    ],
+    max_rom_length:          JSON_MAX_ROM_1024B_LENGTH,
+  }
+}
+
+async fn generate_program_data(
+  witness: &WitnessData,
+  proving: ProvingData,
+) -> Result<ProgramData<Online, Expanded>, errors::ClientErrors> {
+  let (request_inputs, response_inputs) = get_circuit_inputs_from_witness(witness)?;
+
+  let setup_data = get_setup_data_512();
 
   let (request_rom_data, request_rom, request_fold_inputs) =
     proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);

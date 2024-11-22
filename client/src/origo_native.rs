@@ -97,97 +97,11 @@ fn get_setup_data_1024() -> SetupData {
   }
 }
 
-pub(crate) fn get_circuit_inputs(
-  witness: &WitnessData,
-) -> Result<(AESEncryptionInput, AESEncryptionInput), ClientErrors> {
-  // - get AES key, IV, request ciphertext, request plaintext, and AAD -
-  let key: [u8; 16] = witness.request.aes_key[..16].try_into()?;
-  let iv: [u8; 12] = witness.request.aes_iv[..12].try_into()?;
-
-  // Get the request ciphertext, request plaintext, and AAD
-  debug!("Decoding ciphertext hex...");
-  let request_ciphertext = hex::decode(witness.request.ciphertext.as_bytes())?;
-
-  debug!("Running decryptor on ciphertext...");
-  let request_decrypter = Decrypter2::new(key, iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
-  trace!("Created decrypter!");
-  let (plaintext, meta) = request_decrypter.decrypt_tls13_aes(
-    &OpaqueMessage {
-      typ:     ContentType::ApplicationData,
-      version: ProtocolVersion::TLSv1_3,
-      payload: Payload::new(request_ciphertext.clone()), /* TODO (autoparallel): old way didn't
-                                                          * introduce a clone */
-    },
-    0,
-  )?;
-  debug!("Finished decrypting ciphertext!");
-
-  let aad = hex::decode(meta.additional_data.to_owned())?;
-  let mut padded_aad = vec![0; 16 - aad.len()];
-  padded_aad.extend(aad);
-
-  let request_plaintext = plaintext.payload.0.to_vec();
-  let request_ciphertext = request_ciphertext[..request_plaintext.len()].to_vec();
-  trace!("Raw request plaintext: {:?}", request_plaintext);
-
-  // ----------------------------------------------------------------------------------------------------------------------- //
-  // response preparation
-  let mut response_plaintext = vec![];
-  let mut response_ciphertext = vec![];
-  let response_key: [u8; 16] = witness.response.aes_key[..16].try_into().unwrap();
-  let response_iv: [u8; 12] = witness.response.aes_iv[..12].try_into().unwrap();
-  let response_dec =
-    Decrypter2::new(response_key, response_iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
-
-  for (i, ct_chunk) in witness.response.ciphertext.iter().enumerate() {
-    let ct_chunk = hex::decode(ct_chunk).unwrap();
-
-    // decrypt ciphertext
-    let (plaintext, meta) = response_dec
-      .decrypt_tls13_aes(
-        &OpaqueMessage {
-          typ:     ContentType::ApplicationData,
-          version: ProtocolVersion::TLSv1_3,
-          payload: Payload::new(ct_chunk.clone()),
-        },
-        (i + 1) as u64,
-      )
-      .unwrap();
-
-    // push ciphertext
-    let pt = plaintext.payload.0.to_vec();
-    response_ciphertext.extend_from_slice(&ct_chunk[..pt.len()]);
-
-    response_plaintext.extend(pt);
-    let aad = hex::decode(meta.additional_data.to_owned()).unwrap();
-    let mut padded_aad = vec![0; 16 - aad.len()];
-    padded_aad.extend(&aad);
-  }
-  debug!("response plaintext: {:?}", response_plaintext);
-
-  Ok((
-    AESEncryptionInput {
-      key,
-      iv,
-      aad: padded_aad.clone(),
-      plaintext: request_plaintext,
-      ciphertext: request_ciphertext,
-    },
-    AESEncryptionInput {
-      key:        response_key,
-      iv:         response_iv,
-      aad:        padded_aad, // TODO: use response's AAD
-      plaintext:  response_plaintext,
-      ciphertext: response_ciphertext,
-    },
-  ))
-}
-
 async fn generate_program_data(
   witness: &WitnessData,
   proving: ProvingData,
 ) -> Result<(ProgramData<Online, Expanded>, ProgramData<Online, Expanded>), ClientErrors> {
-  let (request_inputs, response_inputs) = get_circuit_inputs(witness)?;
+  let (request_inputs, response_inputs) = get_circuit_inputs_from_witness(witness)?;
 
   // - construct private inputs and program layout for AES proof for request -
   let (request_rom_data, request_rom, request_fold_inputs) =
