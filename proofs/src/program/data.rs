@@ -581,14 +581,14 @@ mod tests {
 
     let mock_inputs: MockInputs = serde_json::from_str(JSON).unwrap();
     let program_data = ProgramData::<Offline, NotExpanded> {
-      public_params:      SerializedParams { circuit_params, hash_params: vec![] },
+      public_params: SerializedParams { circuit_params, hash_params: vec![] },
       setup_data,
-      rom_data:           HashMap::from([
+      rom_data: HashMap::from([
         (String::from("CIRCUIT_1"), CircuitData { opcode: 0 }),
         (String::from("CIRCUIT_2"), CircuitData { opcode: 1 }),
         (String::from("CIRCUIT_3"), CircuitData { opcode: 2 }),
       ]),
-      rom:                vec![
+      rom: vec![
         InstructionConfig {
           name:          String::from("CIRCUIT_1"),
           private_input: HashMap::new(),
@@ -603,8 +603,8 @@ mod tests {
         },
       ],
       initial_nivc_input: vec![],
-      inputs:             mock_inputs.input,
-      witnesses:          vec![],
+      inputs: mock_inputs.input,
+      witnesses: vec![],
     };
     let program_data = program_data.into_expanded().unwrap();
     dbg!(&program_data.inputs);
