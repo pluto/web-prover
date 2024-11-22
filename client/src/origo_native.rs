@@ -75,31 +75,32 @@ async fn generate_program_data(
   let request_decrypter = Decrypter::new(key.clone(), iv, cipher_suite);
 
   let (plaintext, meta) = match cipher_suite {
-    CipherSuite::TLS13_AES_128_GCM_SHA256 =>
+    CipherSuite::TLS13_AES_128_GCM_SHA256 => {
+      debug!("Decrypting AES");
       (request_decrypter.decrypt_tls13_aes(
         &OpaqueMessage {
           typ:     ContentType::ApplicationData,
           version: ProtocolVersion::TLSv1_3,
-          payload: Payload::new(request_ciphertext.clone()), /* TODO (autoparallel): old way
-                                                              * didn't
-                                                              * introduce a clone */
+          payload: Payload::new(request_ciphertext.clone()),
         },
         0,
-      )?),
-    CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 =>
+      )?)
+    },
+    CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
+      debug!("Decrypting Chacha");
       (request_decrypter.decrypt_tls13_chacha20(
         &OpaqueMessage {
           typ:     ContentType::ApplicationData,
           version: ProtocolVersion::TLSv1_3,
-          payload: Payload::new(request_ciphertext.clone()), /* TODO (autoparallel): old way
-                                                              * didn't
-                                                              * introduce a clone */
+          payload: Payload::new(request_ciphertext.clone()),
         },
         0,
-      )?),
+      )?)
+    },
     _ => panic!("Unsupported cipher suite"),
   };
 
+  debug!("Decrypted ciphertext: {:?}", plaintext.payload.0);
   let aad = hex::decode(meta.additional_data.to_owned())?;
   let mut padded_aad = vec![0; 16 - aad.len()];
   padded_aad.extend(aad);
