@@ -253,6 +253,11 @@ fn test_end_to_end_proofs() {
             "0".to_string(),
             "0".to_string(),
             "0".to_string(),
+            "0".to_string(),
+            "0".to_string(),
+            "0".to_string(),
+            "0".to_string(),
+            "0".to_string(),
           ]),
         ),
         (
