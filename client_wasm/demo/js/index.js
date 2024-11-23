@@ -3,7 +3,7 @@ import init, {
   initThreadPool,
 } from "../pkg/client_wasm.js";
 import { poseidon2 } from "poseidon-lite";
-
+import { toByte, computeHttpWitnessBody, computeHttpWitnessHeader, computeHttpWitnessStartline, compute_json_witness, byteArrayToString } from "./witness.js";
 const numConcurrency = navigator.hardwareConcurrency;
 
 // Create a WebAssembly.Memory object
@@ -41,12 +41,6 @@ const getWitnessGenerator = async function (circuit) {
   const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/target_512b/${circuit}_js/`).toString();
   const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
   return wasm;
-}
-
-const getSerializedPublicParams = async function (setupFile) {
-  const ppUrl = new URL(`${setupFile}.bin`, "https://localhost:8090/build/").toString();
-  const pp = await fetch(ppUrl).then((r) => r.arrayBuffer());
-  return pp;
 }
 
 async function generateWitness(circuit, input) {
@@ -88,53 +82,172 @@ function DataHasher(input) {
   return hashes[Math.floor(input.length / 16)];
 }
 
-const generateWitnessBytes = async function (circuits, inputs) {
+const generateWitnessBytesForResponse = async function (circuits, inputs) {
   let witnesses = [];
 
-  // AES
-  console.log("AES")
-  let plaintext_length = http_response_plaintext.length;
   let plaintext = inputs[0]["plainText"];
-  let cipherText = inputs[0]["cipherText"];
+  let extendedHTTPInput = plaintext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
+
+  // AES
+  console.log("AES");
+  let plaintext_length = plaintext.length;
+  let cipherText = inputs[0]["cipherText"].concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
   inputs[0]["step_in"] = 0;
   for (var i = 0; i < plaintext_length / 16; i++) {
     inputs[0]["plainText"] = plaintext.slice(i * 16, (i + 1) * 16);
     inputs[0]["cipherText"] = cipherText.slice(i * 16, (i + 1) * 16);
     inputs[0]["ctr"] = [0, 0, 0, i + 1];
-    console.log("inputs[0]", inputs[0]);
     let wtns = await generateWitness(circuits[0], inputs[0]);
-    witnesses.push({
-      val: wtns.data
-    });
+    witnesses.push(wtns.data);
     inputs[0]["step_in"] = DataHasher(plaintext.slice(0, (i + 1) * 16));
   };
 
   // HTTP
-  let http_start_line_padded = http_start_line.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - http_start_line.length)).fill(0));
-  let http_header_0_padded = http_header_0.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - http_header_0.length)).fill(0));
-  let http_header_1_padded = http_header_1.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - http_header_1.length)).fill(0));
-  let http_body_padded = http_body.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - http_body.length)).fill(0));
+  let http_start_line = computeHttpWitnessStartline(extendedHTTPInput);
+  let http_header_0 = computeHttpWitnessHeader(extendedHTTPInput, toByte("content-type"));
+  let http_header_1 = computeHttpWitnessHeader(extendedHTTPInput, toByte("content-encoding"));
+  let http_body = computeHttpWitnessBody(extendedHTTPInput);
 
-  inputs[1]["start_line_hash"] = DataHasher(http_start_line_padded);
-  let http_header_0_hash = DataHasher(http_header_0_padded);
-  let http_header_1_hash = DataHasher(http_header_1_padded);
-  inputs[1]["header_hashes"] = [http_header_0_hash, http_header_1_hash, 0, 0, 0];
-  inputs[1]["body_hash"] = DataHasher(http_body_padded);
+  inputs[1]["start_line_hash"] = DataHasher(http_start_line);
+  let http_header_0_hash = DataHasher(http_header_0[1]);
+  let http_header_1_hash = DataHasher(http_header_1[1]);
+  inputs[1]["header_hashes"] = [http_header_0_hash, http_header_1_hash, 0, 0, 0, 0, 0, 0, 0, 0];
+  inputs[1]["body_hash"] = DataHasher(http_body);
   inputs[1]["step_in"] = DataHasher(extendedHTTPInput);
-  console.log("http", inputs[1]);
+  inputs[1]["data"] = extendedHTTPInput;
   let wtns = await generateWitness(circuits[1], inputs[1]);
-  witnesses.push({
-    val: wtns.data
-  });
+  witnesses.push(wtns.data);
+
+  console.log("json mask object");
+  inputs[2]["data"] = http_body;
+  inputs[2]["step_in"] = DataHasher(http_body);
+  let wtnsJsonKey1 = await generateWitness(circuits[2], inputs[2]);
+  witnesses.push(wtnsJsonKey1.data);
+
+  console.log("json mask object");
+  let jsonWitnessKey1 = compute_json_witness(http_body, byteArrayToString(inputs[2]["key"].slice(0, inputs[2]["keyLen"])));
+  inputs[3]["data"] = jsonWitnessKey1;
+  inputs[3]["step_in"] = DataHasher(jsonWitnessKey1);
+  let wtnsJsonKey2 = await generateWitness(circuits[2], inputs[3]);
+  witnesses.push(wtnsJsonKey2.data);
+
+  console.log("json mask array");
+  let jsonWitnessKey2 = compute_json_witness(jsonWitnessKey1, byteArrayToString(inputs[3]["key"].slice(0, inputs[3]["keyLen"])));
+  inputs[4]["data"] = jsonWitnessKey2;
+  inputs[4]["step_in"] = DataHasher(jsonWitnessKey2);
+  let wtnsJsonKey3 = await generateWitness(circuits[3], inputs[4]);
+  witnesses.push(wtnsJsonKey3.data);
+
+  console.log("json mask object");
+  let jsonWitnessKey3 = compute_json_witness(jsonWitnessKey2, inputs[4]["index"]);
+  inputs[5]["data"] = jsonWitnessKey3;
+  inputs[5]["step_in"] = DataHasher(jsonWitnessKey3);
+  let wtnsJsonKey4 = await generateWitness(circuits[2], inputs[5]);
+  witnesses.push(wtnsJsonKey4.data);
+
+  console.log("json mask object");
+  let jsonWitnessKey4 = compute_json_witness(jsonWitnessKey3, byteArrayToString(inputs[5]["key"].slice(0, inputs[5]["keyLen"])));
+  inputs[6]["data"] = jsonWitnessKey4;
+  inputs[6]["step_in"] = DataHasher(jsonWitnessKey4);
+  let wtnsJsonKey5 = await generateWitness(circuits[2], inputs[6]);
+  witnesses.push(wtnsJsonKey5.data);
+
+  console.log("json extract value");
+  let jsonWitnessKey5 = compute_json_witness(jsonWitnessKey4, byteArrayToString(inputs[6]["key"].slice(0, inputs[6]["keyLen"])));
+  inputs[7]["data"] = jsonWitnessKey5
+  inputs[7]["step_in"] = DataHasher(jsonWitnessKey5);
+  let wtnsFinal = await generateWitness(circuits[4], inputs[7]);
+  console.log("wtnsFinal", wtnsFinal);
+  witnesses.push(wtnsFinal.data);
+
+  return witnesses;
+};
+
+const generateWitnessBytesForRequest = async function (circuits, inputs) {
+  let witnesses = [];
+
+  let plaintext = inputs[0]["plainText"];
+  let extendedHTTPInput = plaintext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
+
+  // AES
+  console.log("AES");
+  let plaintext_length = plaintext.length;
+  let cipherText = inputs[0]["cipherText"].concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
+  inputs[0]["step_in"] = 0;
+  for (var i = 0; i < plaintext_length / 16; i++) {
+    inputs[0]["plainText"] = plaintext.slice(i * 16, (i + 1) * 16);
+    inputs[0]["cipherText"] = cipherText.slice(i * 16, (i + 1) * 16);
+    inputs[0]["ctr"] = [0, 0, 0, i + 1];
+    let wtns = await generateWitness(circuits[0], inputs[0]);
+    witnesses.push(wtns.data);
+    inputs[0]["step_in"] = DataHasher(plaintext.slice(0, (i + 1) * 16));
+  };
+
+  // HTTP
+  let http_start_line = computeHttpWitnessStartline(extendedHTTPInput);
+  let http_header_0 = computeHttpWitnessHeader(extendedHTTPInput, toByte("content-type"));
+  let http_header_1 = computeHttpWitnessHeader(extendedHTTPInput, toByte("content-encoding"));
+  let http_body = computeHttpWitnessBody(extendedHTTPInput);
+
+  inputs[1]["start_line_hash"] = DataHasher(http_start_line);
+  let http_header_0_hash = DataHasher(http_header_0[1]);
+  let http_header_1_hash = DataHasher(http_header_1[1]);
+  inputs[1]["header_hashes"] = [http_header_0_hash, http_header_1_hash, 0, 0, 0, 0, 0, 0, 0, 0];
+  inputs[1]["body_hash"] = DataHasher(http_body);
+  inputs[1]["step_in"] = DataHasher(extendedHTTPInput);
+  inputs[1]["data"] = extendedHTTPInput;
+  let wtns = await generateWitness(circuits[1], inputs[1]);
+  witnesses.push(wtns.data);
 
   // console.log("json mask object");
-  // let wtnsJson = await generateWitness(circuits[4], inputs[4]);
+  // inputs[2]["data"] = http_body;
+  // inputs[2]["step_in"] = DataHasher(http_body);
+  // let wtnsJsonKey1 = await generateWitness(circuits[2], inputs[2]);
   // witnesses.push({
-  //   val: wtnsJson.data,
+  //   val: wtnsJsonKey1.data,
+  // });
+
+  // console.log("json mask object");
+  // let jsonWitnessKey1 = compute_json_witness(http_body, byteArrayToString(inputs[2]["key"].slice(0, inputs[2]["keyLen"])));
+  // inputs[3]["data"] = jsonWitnessKey1;
+  // inputs[3]["step_in"] = DataHasher(jsonWitnessKey1);
+  // let wtnsJsonKey2 = await generateWitness(circuits[2], inputs[3]);
+  // witnesses.push({
+  //   val: wtnsJsonKey2.data,
+  // });
+
+  // console.log("json mask array");
+  // let jsonWitnessKey2 = compute_json_witness(jsonWitnessKey1, byteArrayToString(inputs[3]["key"].slice(0, inputs[3]["keyLen"])));
+  // inputs[4]["data"] = jsonWitnessKey2;
+  // inputs[4]["step_in"] = DataHasher(jsonWitnessKey2);
+  // let wtnsJsonKey3 = await generateWitness(circuits[3], inputs[4]);
+  // witnesses.push({
+  //   val: wtnsJsonKey3.data,
+  // });
+
+  // console.log("json mask object");
+  // let jsonWitnessKey3 = compute_json_witness(jsonWitnessKey2, inputs[4]["index"]);
+  // inputs[5]["data"] = jsonWitnessKey3;
+  // inputs[5]["step_in"] = DataHasher(jsonWitnessKey3);
+  // let wtnsJsonKey4 = await generateWitness(circuits[2], inputs[5]);
+  // witnesses.push({
+  //   val: wtnsJsonKey4.data,
+  // });
+
+  // console.log("json mask object");
+  // let jsonWitnessKey4 = compute_json_witness(jsonWitnessKey3, byteArrayToString(inputs[5]["key"].slice(0, inputs[5]["keyLen"])));
+  // inputs[6]["data"] = jsonWitnessKey4;
+  // inputs[6]["step_in"] = DataHasher(jsonWitnessKey4);
+  // let wtnsJsonKey5 = await generateWitness(circuits[2], inputs[6]);
+  // witnesses.push({
+  //   val: wtnsJsonKey5.data,
   // });
 
   // console.log("json extract value");
-  // let wtnsFinal = await generateWitness(circuits[6], inputs[6]);
+  // let jsonWitnessKey5 = compute_json_witness(jsonWitnessKey4, byteArrayToString(inputs[6]["key"].slice(0, inputs[6]["keyLen"])));
+  // inputs[7]["data"] = jsonWitnessKey5
+  // inputs[7]["step_in"] = DataHasher(jsonWitnessKey5);
+  // let wtnsFinal = await generateWitness(circuits[4], inputs[7]);
   // console.log("wtnsFinal", wtnsFinal);
   // witnesses.push({
   //   val: wtnsFinal.data,
@@ -143,9 +256,8 @@ const generateWitnessBytes = async function (circuits, inputs) {
   return witnesses;
 };
 
-// TODO: Migrate this from hardcoded to generated in WASM.
 const TOTAL_BYTES_ACROSS_NIVC = 512;
-const http_response_plaintext = [
+const AES_PLAINTEXT = [
   72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101, 110,
   116, 45, 116, 121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106,
   115, 111, 110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13, 10, 99,
@@ -180,94 +292,30 @@ const AES_CIPHER_TEXT = [
   147, 130, 61, 214, 237, 143, 77, 14, 14, 70, 56, 94, 97, 207, 214, 106, 249, 37, 7, 186, 95, 174,
   146, 203, 148, 173, 172, 13, 113
 ];
-const http_start_line = [
-  72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0,
-];
-const http_header_0 = [
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99, 111, 110, 116, 101, 110, 116, 45, 116,
-  121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106, 115, 111,
-  110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13, 10, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-];
-
-const http_header_1 = [
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  99, 111, 110, 116, 101, 110, 116, 45, 101, 110, 99, 111, 100, 105, 110, 103, 58, 32, 103, 122,
-  105, 112, 13, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-];
-const http_body = [
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 123, 13, 10, 32, 32, 32, 34,
-  100, 97, 116, 97, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 34, 105, 116, 101, 109,
-  115, 34, 58, 32, 91, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 123, 13, 10, 32, 32, 32,
-  32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34, 65, 114,
-  116, 105, 115, 116, 34, 44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-  34, 112, 114, 111, 102, 105, 108, 101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32,
-  32, 32, 32, 32, 32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121, 108, 111,
-  114, 32, 83, 119, 105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-  32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32,
-  32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125,
-];
-
-// let extendedInput = Array(TOTAL_BYTES_ACROSS_NIVC).fill(0);
-let extendedHTTPInput = http_response_plaintext.concat(Array(Math.max(0, TOTAL_BYTES_ACROSS_NIVC - http_response_plaintext.length)).fill(0));
-let extendedCiphertext = AES_CIPHER_TEXT.concat(Array(TOTAL_BYTES_ACROSS_NIVC - AES_CIPHER_TEXT.length).fill(0));
 
 var inputs = [{
   "key": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   "iv": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  "plainText": extendedHTTPInput,
-  "cipherText": extendedCiphertext,
+  "plainText": AES_PLAINTEXT,
+  "cipherText": AES_CIPHER_TEXT,
   "ctr": [0, 0, 0, 0],
   "aad": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   "step_in": 0,
 },
 {
-  "data": extendedHTTPInput,
+  "data": AES_PLAINTEXT,
 },
-  // { "key": [100, 97, 116, 97, 0, 0, 0, 0, 0, 0], "keyLen": [4], "step_in": jsonExtendedInput },
-  // { "key": [105, 116, 101, 109, 115, 0, 0, 0, 0, 0], "keyLen": [5], "step_in": jsonExtendedInput },
+  // { "key": [100, 97, 116, 97, 0, 0, 0, 0, 0, 0], "keyLen": [4] },
+  // { "key": [105, 116, 101, 109, 115, 0, 0, 0, 0, 0], "keyLen": [5] },
   // { "index": [0] },
   // { "key": [112, 114, 111, 102, 105, 108, 101, 0, 0, 0], "keyLen": [7] },
   // { "key": [110, 97, 109, 101, 0, 0, 0, 0, 0, 0], "keyLen": [4] },
-  // { "step_in": jsonExtendedInput },
+  // {},
 ];
 
 // TODO: Configurable identifiers
 var circuits = ["aes_gctr_nivc_512b", "http_nivc_512b", "json_mask_object_512b", "json_mask_array_index_512b", "json_extract_value_512b"];
-// var r1cs = await getConstraints(circuits);
-var witnesses = await generateWitnessBytes(circuits, inputs);
-
-console.log("witness", witnesses);
-
-var pp = await getSerializedPublicParams("serialized_setup_aes");
+var witnesses = await generateWitnessBytesForRequest(circuits, inputs);
 
 start();
 
@@ -283,7 +331,6 @@ let proverConfig = {
   max_recv_data: 10000,
   proving: {
     witnesses: witnesses,
-    serialized_pp: pp,
     manifest: {
       "manifestVersion": "1",
       "id": "reddit-user-karma",

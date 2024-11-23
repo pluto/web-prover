@@ -16,19 +16,16 @@ use crate::{
 
 mod witnesscalc;
 
-// const ROM: &[] = &[Fr::ZERO, 1, 2, 0, 1, 2];
-
 const ADD_EXTERNAL_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/add_external.r1cs");
 const SQUARE_ZEROTH_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/square_zeroth.r1cs");
 const SWAP_MEMORY_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/swap_memory.r1cs");
 
-// const INIT_PUBLIC_INPUT: [u64; 2] = [1, 2];
 const EXTERNAL_INPUTS: [[u64; 2]; 2] = [[5, 7], [13, 1]];
 const MAX_ROM_LENGTH: usize = 10;
 
 // -----------------------------------------------------------------------------------------------
 // JSON Proof Material
-const JSON_MAX_ROM_LENGTH: usize = 28;
+const JSON_MAX_ROM_LENGTH: usize = 45;
 
 // Circuit 0
 const AES_GCM_R1CS: &[u8] =
@@ -253,6 +250,11 @@ fn test_end_to_end_proofs() {
             "0".to_string(),
             BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_header_1_hash.to_bytes())
               .to_str_radix(10),
+            "0".to_string(),
+            "0".to_string(),
+            "0".to_string(),
+            "0".to_string(),
+            "0".to_string(),
             "0".to_string(),
             "0".to_string(),
             "0".to_string(),

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
@@ -6,26 +6,18 @@ use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
   program::{
     self,
-    data::{
-      CircuitData, Expanded, FoldInput, InstructionConfig, NotExpanded, Online, ProgramData,
-      R1CSType, SetupData, WitnessGeneratorType,
-    },
-    manifest,
+    data::{Expanded, NotExpanded, Online, ProgramData, R1CSType, SetupData, WitnessGeneratorType},
+    manifest::AESEncryptionInput,
   },
   F, G1,
 };
-use reqwest::Client;
-use serde_json::{json, Value};
-use tls_client2::{
-  origo::{OrigoConnection, WitnessData},
-  CipherSuite, CipherSuiteKey, Decrypter, ProtocolVersion,
-};
-use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
+use tls_client2::origo::{OrigoConnection, WitnessData};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
-use tracing::{debug, trace};
+use tracing::debug;
 
 use crate::{
-  circuits::*, config, config::ProvingData, errors, errors::ClientErrors, origo::SignBody, Proof,
+  circuits::*, config, config::ProvingData, errors, errors::ClientErrors, origo::SignBody,
+  tls::decrypt_tls_ciphertext, Proof,
 };
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
@@ -34,162 +26,89 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
 
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
 
-  let program_data = generate_program_data(&witness, config.proving).await?;
-  let program_output = program::run(&program_data)?;
-  let compressed_verifier = program::compress_proof(&program_output, &program_data.public_params)?;
-  let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
+  debug!("generating program data!");
+  let (request_program_data, response_program_data) =
+    generate_program_data(&witness, config.proving).await?;
 
-  Ok(crate::Proof::Origo(serialized_compressed_verifier.0))
+  debug!("starting request recursive proving");
+  let request_program_output = program::run(&request_program_data)?;
+
+  debug!("starting response recursive proving");
+  let response_program_output = program::run(&response_program_data)?;
+
+  debug!("starting request proof compression");
+  let request_compressed_verifier =
+    program::compress_proof(&request_program_output, &request_program_data.public_params)?;
+  let response_compressed_verifier =
+    program::compress_proof(&response_program_output, &response_program_data.public_params)?;
+
+  debug!("verification");
+  let request_serialized_compressed_verifier = request_compressed_verifier.serialize_and_compress();
+  let response_serialized_compressed_verifier =
+    response_compressed_verifier.serialize_and_compress();
+
+  // TODO(Sambhav): handle request and response into one proof
+  Ok(crate::Proof::Origo((
+    request_serialized_compressed_verifier.0,
+    response_serialized_compressed_verifier.0,
+  )))
 }
 
-// TODO: Dedup origo_native and origo_wasm. The difference is the witness/r1cs preparation.
+/// takes TLS transcripts and [`ProvingData`] and generates NIVC [`ProgramData`] for request and
+/// response separately
+/// - decrypts TLS ciphertext in [`WitnessData`]
+/// - generates NIVC ROM from [`Manifest`] config for request and response
+/// - get circuit [`SetupData`] containing circuit R1CS and witness generator files according to
+///   input sizes
+/// - create consolidate [`ProgramData`]
+/// - expand private inputs into fold inputs as per circuits
 async fn generate_program_data(
   witness: &WitnessData,
   proving: ProvingData,
-) -> Result<ProgramData<Online, Expanded>, ClientErrors> {
-  // ----------------------------------------------------------------------------------------------------------------------- //
-  // - get AES key, IV -
-  debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
-  debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
+) -> Result<(ProgramData<Online, Expanded>, ProgramData<Online, Expanded>), ClientErrors> {
+  let (request_inputs, response_inputs) = decrypt_tls_ciphertext(witness)?;
 
-  let (key, cipher_suite) = match witness.request.aes_key.len() {
-    // chacha has 32 byte keys
-    32 => (
-      CipherSuiteKey::CHACHA20POLY1305(witness.request.aes_key[..32].try_into()?),
-      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
-    ),
-    // aes has 16 byte keys
-    16 => (
-      CipherSuiteKey::AES128GCM(witness.request.aes_key[..16].try_into()?),
-      CipherSuite::TLS13_AES_128_GCM_SHA256,
-    ),
-    _ => panic!("Unsupported key length"),
-  };
-
-  let iv: [u8; 12] = witness.request.aes_iv[..12].try_into()?;
-  // ----------------------------------------------------------------------------------------------------------------------- //
-  // Get the request ciphertext, request plaintext, and AAD
-  debug!("Decoding ciphertext hex...");
-  let request_ciphertext = hex::decode(witness.request.ciphertext.as_bytes())?;
-
-  let request_decrypter = Decrypter::new(key.clone(), iv, cipher_suite);
-
-  let (plaintext, meta) = match cipher_suite {
-    CipherSuite::TLS13_AES_128_GCM_SHA256 => {
-      debug!("Decrypting AES");
-      (request_decrypter.decrypt_tls13_aes(
-        &OpaqueMessage {
-          typ:     ContentType::ApplicationData,
-          version: ProtocolVersion::TLSv1_3,
-          payload: Payload::new(request_ciphertext),
-        },
-        0,
-      )?)
-    },
-    CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
-      debug!("Decrypting Chacha");
-      (request_decrypter.decrypt_tls13_chacha20(
-        &OpaqueMessage {
-          typ:     ContentType::ApplicationData,
-          version: ProtocolVersion::TLSv1_3,
-          payload: Payload::new(request_ciphertext),
-        },
-        0,
-      )?)
-    },
-    _ => panic!("Unsupported cipher suite"),
-  };
-
-  debug!("Decrypted ciphertext: {:?}", plaintext.payload.0);
-  let aad = hex::decode(meta.additional_data.to_owned())?;
-  let mut padded_aad = vec![0; 16 - aad.len()];
-  padded_aad.extend(aad);
-
-  let request_plaintext = plaintext.payload.0.to_vec();
-  trace!("Raw request plaintext: {:?}", request_plaintext);
-  // -- NOTE: Above is the following:
-  // GET https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json HTTP/1.1
-  // host: gist.githubusercontent.com
-  // accept-encoding: identity
-  // connection: close
-  // accept: */*
-  // ----------------------------------------------------------------------------------------------------------------------- //
-
-  // TODO (Colin): ultimately we want to download the `AuxParams` here and deserialize to setup
-  // `PublicParams` alongside of calling `client_side_prover::supernova::get_circuit_shapes` for
-  // this next step
-  // ----------------------------------------------------------------------------------------------------------------------- //
-  // - create program setup (creating new `PublicParams` each time, for the moment) -
-  let setup_data = SetupData {
-    r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
-    ],
-    witness_generator_types: vec![
-      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
-    ],
-    max_rom_length:          JSON_MAX_ROM_LENGTH,
-  };
-
-  // ----------------------------------------------------------------------------------------------------------------------- //
-
-  // ----------------------------------------------------------------------------------------------------------------------- //
   // - construct private inputs and program layout for AES proof for request -
-  debug!("Padding plaintext and ciphertext to nearest 16...");
-  let mut nearest_16_padded_plaintext = request_plaintext;
-  let mut nearest_16_padded_ciphertext = request_ciphertext;
-  let remainder = request_plaintext.len() % 16;
-  if remainder != 0 {
-    let padding = 16 - remainder;
-    nearest_16_padded_plaintext.resize(request_plaintext.len() + padding, 0);
-    nearest_16_padded_ciphertext.resize(request_plaintext.len() + padding, 0);
-  }
-  trace!(
-    "Padded plaintext: {:?}\nPadded ciphertext: {:?}",
-    nearest_16_padded_plaintext,
-    nearest_16_padded_ciphertext
-  );
+  let (request_rom_data, request_rom, request_fold_inputs) =
+    proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);
 
-  let destructured_key = match key {
-    CipherSuiteKey::AES128GCM(key) => key,
-    _ => panic!("Unsupported cipher suite"),
-    // EncryptionKey::CHACHA20POLY1305(key) => key,
-  };
-  // TODO(WJ 2024-11-21): this is as far as i have gotten with adding chacha support. Pushing chacha
-  // down into rom data will require the circuits
+  let (response_rom_data, response_rom, response_fold_inputs) =
+    proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
 
-  let (rom_data, rom, fold_input) = proving.manifest.unwrap().rom_from_request(
-    &destructured_key,
-    &iv,
-    &padded_aad,
-    &nearest_16_padded_plaintext,
-    &nearest_16_padded_plaintext,
-  );
   // ----------------------------------------------------------------------------------------------------------------------- //
 
   debug!("Setting up `PublicParams`... (this may take a moment)");
-  let public_params = program::setup(&setup_data);
-  debug!("Created `PublicParams`!");
+  let setup_data_512 = construct_setup_data_512();
+  let public_params_512 = program::setup(&setup_data_512);
 
-  Ok(
-    ProgramData::<Online, NotExpanded> {
-      public_params,
-      setup_data,
-      rom,
-      rom_data,
-      initial_nivc_input: vec![proofs::F::<G1>::from(0)],
-      inputs: fold_input,
-      witnesses: vec![vec![F::<G1>::from(0)]],
-    }
-    .into_expanded()?,
-  )
+  let setup_data_1024 = construct_setup_data_1024();
+  let public_params_1024 = program::setup(&setup_data_1024);
+
+  debug!("Created `PublicParams`!");
+  // TODO (sambhav): handle response input in a better manner, what if response is 512B
+  let request_program_data = ProgramData::<Online, NotExpanded> {
+    public_params:      public_params_512,
+    setup_data:         setup_data_512,
+    rom:                request_rom,
+    rom_data:           request_rom_data,
+    initial_nivc_input: vec![proofs::F::<G1>::from(0)],
+    inputs:             request_fold_inputs,
+    witnesses:          vec![vec![F::<G1>::from(0)]],
+  }
+  .into_expanded();
+
+  let response_program_data = ProgramData::<Online, NotExpanded> {
+    public_params:      public_params_1024,
+    setup_data:         setup_data_1024,
+    rom:                response_rom,
+    rom_data:           response_rom_data,
+    initial_nivc_input: vec![proofs::F::<G1>::from(0)],
+    inputs:             response_fold_inputs,
+    witnesses:          vec![vec![F::<G1>::from(0)]],
+  }
+  .into_expanded();
+
+  Ok((request_program_data?, response_program_data?))
 }
 
 /// we want to be able to specify somewhere in here what cipher suite to use.

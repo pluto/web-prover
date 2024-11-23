@@ -21,6 +21,7 @@ use tls_client2::{
   hash_hs::HandshakeHashBuffer,
   internal::msgs::hsjoiner::HandshakeJoiner,
   tls_core::{
+    key,
     msgs::{
       base::Payload,
       codec::{self, Codec, Reader},
