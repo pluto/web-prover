@@ -103,7 +103,7 @@ pub(crate) fn decrypt_tls_ciphertext(
         &OpaqueMessage {
           typ:     ContentType::ApplicationData,
           version: ProtocolVersion::TLSv1_3,
-          payload: Payload::new(request_ciphertext),
+          payload: Payload::new(request_ciphertext.clone()),
         },
         0,
       )?)
@@ -114,7 +114,7 @@ pub(crate) fn decrypt_tls_ciphertext(
         &OpaqueMessage {
           typ:     ContentType::ApplicationData,
           version: ProtocolVersion::TLSv1_3,
-          payload: Payload::new(request_ciphertext),
+          payload: Payload::new(request_ciphertext.clone()),
         },
         0,
       )?)
@@ -162,7 +162,7 @@ pub(crate) fn decrypt_tls_ciphertext(
           &OpaqueMessage {
             typ:     ContentType::ApplicationData,
             version: ProtocolVersion::TLSv1_3,
-            payload: Payload::new(ct_chunk),
+            payload: Payload::new(ct_chunk.clone()), // TODO(WJ 2024-11-23): can we remove this clone
           },
           0,
         )?)
@@ -173,7 +173,7 @@ pub(crate) fn decrypt_tls_ciphertext(
           &OpaqueMessage {
             typ:     ContentType::ApplicationData,
             version: ProtocolVersion::TLSv1_3,
-            payload: Payload::new(ct_chunk),
+            payload: Payload::new(ct_chunk.clone()), // TODO(WJ 2024-11-23): can we remove this clone
           },
           0,
         )?)
