@@ -1,9 +1,8 @@
 // TODO many root_stores ... this could use some cleanup where possible
 use proofs::program::manifest::AESEncryptionInput;
-use tls_client2::{origo::WitnessData, CipherSuite, Decrypter2, EncryptionKey, ProtocolVersion};
+use tls_client2::{origo::WitnessData, CipherSuite, Decrypter, CipherSuiteKey, ProtocolVersion};
 use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
 use tracing::{debug, trace};
-
 use crate::errors::ClientErrors;
 
 #[cfg(feature = "notary_ca_cert")]
@@ -81,12 +80,12 @@ pub(crate) fn decrypt_tls_ciphertext(
   let (key, cipher_suite) = match witness.request.aes_key.len() {
     // chacha has 32 byte keys
     32 => (
-      EncryptionKey::CHACHA20POLY1305(witness.request.aes_key[..32].try_into()?),
+      CipherSuiteKey::CHACHA20POLY1305(witness.request.aes_key[..32].try_into()?),
       CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
     ),
     // aes has 16 byte keys
     16 => (
-      EncryptionKey::AES128GCM(witness.request.aes_key[..16].try_into()?),
+      CipherSuiteKey::AES128GCM(witness.request.aes_key[..16].try_into()?),
       CipherSuite::TLS13_AES_128_GCM_SHA256,
     ),
     _ => panic!("Unsupported key length"),
@@ -96,7 +95,7 @@ pub(crate) fn decrypt_tls_ciphertext(
   // Get the request ciphertext, request plaintext, and AAD
   let request_ciphertext = hex::decode(witness.request.ciphertext[0].as_bytes())?;
 
-  let request_decrypter = Decrypter2::new(key.clone(), iv, cipher_suite);
+  let request_decrypter = Decrypter::new(key.clone(), iv, cipher_suite);
   let (plaintext, meta) = match cipher_suite {
     CipherSuite::TLS13_AES_128_GCM_SHA256 => {
       debug!("Decrypting AES");
@@ -104,7 +103,7 @@ pub(crate) fn decrypt_tls_ciphertext(
         &OpaqueMessage {
           typ:     ContentType::ApplicationData,
           version: ProtocolVersion::TLSv1_3,
-          payload: Payload::new(request_ciphertext.clone()),
+          payload: Payload::new(request_ciphertext),
         },
         0,
       )?)
@@ -115,7 +114,7 @@ pub(crate) fn decrypt_tls_ciphertext(
         &OpaqueMessage {
           typ:     ContentType::ApplicationData,
           version: ProtocolVersion::TLSv1_3,
-          payload: Payload::new(request_ciphertext.clone()),
+          payload: Payload::new(request_ciphertext),
         },
         0,
       )?)
@@ -139,18 +138,18 @@ pub(crate) fn decrypt_tls_ciphertext(
   let (response_key, cipher_suite) = match witness.request.aes_key.len() {
     // chacha has 32 byte keys
     32 => (
-      EncryptionKey::CHACHA20POLY1305(witness.request.aes_key[..32].try_into()?),
+      CipherSuiteKey::CHACHA20POLY1305(witness.request.aes_key[..32].try_into()?),
       CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
     ),
     // aes has 16 byte keys
     16 => (
-      EncryptionKey::AES128GCM(witness.request.aes_key[..16].try_into()?),
+      CipherSuiteKey::AES128GCM(witness.request.aes_key[..16].try_into()?),
       CipherSuite::TLS13_AES_128_GCM_SHA256,
     ),
     _ => panic!("Unsupported key length"),
   };
   let response_iv: [u8; 12] = witness.response.aes_iv[..12].try_into().unwrap();
-  let response_dec = Decrypter2::new(response_key, response_iv, cipher_suite);
+  let response_dec = Decrypter::new(response_key.clone(), response_iv, cipher_suite);
 
   for (i, ct_chunk) in witness.response.ciphertext.iter().enumerate() {
     let ct_chunk = hex::decode(ct_chunk).unwrap();
@@ -163,7 +162,7 @@ pub(crate) fn decrypt_tls_ciphertext(
           &OpaqueMessage {
             typ:     ContentType::ApplicationData,
             version: ProtocolVersion::TLSv1_3,
-            payload: Payload::new(ct_chunk.clone()),
+            payload: Payload::new(ct_chunk),
           },
           0,
         )?)
@@ -174,7 +173,7 @@ pub(crate) fn decrypt_tls_ciphertext(
           &OpaqueMessage {
             typ:     ContentType::ApplicationData,
             version: ProtocolVersion::TLSv1_3,
-            payload: Payload::new(ct_chunk.clone()),
+            payload: Payload::new(ct_chunk),
           },
           0,
         )?)
@@ -195,13 +194,13 @@ pub(crate) fn decrypt_tls_ciphertext(
   assert_eq!(response_plaintext.len(), response_ciphertext.len());
 
   let destructured_key = match key {
-    EncryptionKey::AES128GCM(key) => key,
+    CipherSuiteKey::AES128GCM(key) => key,
     _ => panic!("Unsupported cipher suite"),
     // EncryptionKey::CHACHA20POLY1305(key) => key,
   };
 
   let destructured_response_key = match response_key {
-    EncryptionKey::AES128GCM(key) => key,
+    CipherSuiteKey::AES128GCM(key) => key,
     _ => panic!("Unsupported cipher suite"),
     // EncryptionKey::CHACHA20POLY1305(key) => key,
   };
