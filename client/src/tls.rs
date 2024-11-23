@@ -1,8 +1,9 @@
 // TODO many root_stores ... this could use some cleanup where possible
 use proofs::program::manifest::AESEncryptionInput;
-use tls_client2::{origo::WitnessData, CipherSuite, Decrypter, CipherSuiteKey, ProtocolVersion};
+use tls_client2::{origo::WitnessData, CipherSuite, CipherSuiteKey, Decrypter, ProtocolVersion};
 use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
 use tracing::{debug, trace};
+
 use crate::errors::ClientErrors;
 
 #[cfg(feature = "notary_ca_cert")]
@@ -99,25 +100,25 @@ pub(crate) fn decrypt_tls_ciphertext(
   let (plaintext, meta) = match cipher_suite {
     CipherSuite::TLS13_AES_128_GCM_SHA256 => {
       debug!("Decrypting AES");
-      (request_decrypter.decrypt_tls13_aes(
+      request_decrypter.decrypt_tls13_aes(
         &OpaqueMessage {
           typ:     ContentType::ApplicationData,
           version: ProtocolVersion::TLSv1_3,
           payload: Payload::new(request_ciphertext.clone()),
         },
         0,
-      )?)
+      )?
     },
     CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
       debug!("Decrypting Chacha");
-      (request_decrypter.decrypt_tls13_chacha20(
+      request_decrypter.decrypt_tls13_chacha20(
         &OpaqueMessage {
           typ:     ContentType::ApplicationData,
           version: ProtocolVersion::TLSv1_3,
           payload: Payload::new(request_ciphertext.clone()),
         },
         0,
-      )?)
+      )?
     },
     _ => panic!("Unsupported cipher suite"),
   };
@@ -135,15 +136,15 @@ pub(crate) fn decrypt_tls_ciphertext(
   // response preparation
   let mut response_plaintext = vec![];
   let mut response_ciphertext = vec![];
-  let (response_key, cipher_suite) = match witness.request.aes_key.len() {
+  let (response_key, cipher_suite) = match witness.response.aes_key.len() {
     // chacha has 32 byte keys
     32 => (
-      CipherSuiteKey::CHACHA20POLY1305(witness.request.aes_key[..32].try_into()?),
+      CipherSuiteKey::CHACHA20POLY1305(witness.response.aes_key[..32].try_into()?),
       CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
     ),
     // aes has 16 byte keys
     16 => (
-      CipherSuiteKey::AES128GCM(witness.request.aes_key[..16].try_into()?),
+      CipherSuiteKey::AES128GCM(witness.response.aes_key[..16].try_into()?),
       CipherSuite::TLS13_AES_128_GCM_SHA256,
     ),
     _ => panic!("Unsupported key length"),
@@ -158,25 +159,27 @@ pub(crate) fn decrypt_tls_ciphertext(
     let (plaintext, meta) = match cipher_suite {
       CipherSuite::TLS13_AES_128_GCM_SHA256 => {
         debug!("Decrypting AES");
-        (response_dec.decrypt_tls13_aes(
+        response_dec.decrypt_tls13_aes(
           &OpaqueMessage {
             typ:     ContentType::ApplicationData,
             version: ProtocolVersion::TLSv1_3,
-            payload: Payload::new(ct_chunk.clone()), // TODO(WJ 2024-11-23): can we remove this clone
+            payload: Payload::new(ct_chunk.clone()), /* TODO(WJ 2024-11-23): can we remove this
+                                                      * clone */
           },
-          0,
-        )?)
+          (i + 1) as u64,
+        )?
       },
       CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
         debug!("Decrypting Chacha");
-        (response_dec.decrypt_tls13_chacha20(
+        response_dec.decrypt_tls13_chacha20(
           &OpaqueMessage {
             typ:     ContentType::ApplicationData,
             version: ProtocolVersion::TLSv1_3,
-            payload: Payload::new(ct_chunk.clone()), // TODO(WJ 2024-11-23): can we remove this clone
+            payload: Payload::new(ct_chunk.clone()), /* TODO(WJ 2024-11-23): can we remove this
+                                                      * clone */
           },
-          0,
-        )?)
+          (i + 1) as u64,
+        )?
       },
       _ => panic!("Unsupported cipher suite"),
     };

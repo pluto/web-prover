@@ -6,8 +6,7 @@ use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
   program::{
     self,
-    data::{Expanded, NotExpanded, Online, ProgramData, R1CSType, SetupData, WitnessGeneratorType},
-    manifest::AESEncryptionInput,
+    data::{Expanded, NotExpanded, Online, ProgramData},
   },
   F, G1,
 };

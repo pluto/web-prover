@@ -34,7 +34,7 @@ pub struct RecordMeta {
   pub additional_data: String,
   pub payload:         String,
   pub ciphertext:      String,
-  pub nonce:         String,
+  pub nonce:           String,
 }
 
 impl RecordMeta {
