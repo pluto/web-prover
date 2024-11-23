@@ -21,7 +21,7 @@ use crate::errors::ClientErrors;
 #[derive(Debug, Serialize)]
 pub enum Proof {
   TLSN(TlsProof),
-  Origo(Vec<u8>),
+  Origo((Vec<u8>, Vec<u8>)),
 }
 
 pub async fn prover_inner(config: config::Config) -> Result<Proof, errors::ClientErrors> {

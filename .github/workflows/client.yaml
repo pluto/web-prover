@@ -44,7 +44,7 @@ jobs:
 
       - name: Download prebuilt web-prover-circuits artifact
         run: |
-          cd proofs && make web-prover-circuits-512
+          cd proofs && make web-prover-circuits
 
       - run: |
           RUST_LOG=DEBUG cargo +nightly-2024-10-28 run --release -p notary -- --config ./fixture/notary-config.toml &
