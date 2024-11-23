@@ -15,12 +15,12 @@ use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use nom::{bytes::streaming::take, IResult};
 use rs_merkle::{Hasher, MerkleTree};
+use rustls::crypto::cipher;
 use serde::{Deserialize, Serialize};
 use tls_client2::{
   hash_hs::HandshakeHashBuffer,
   internal::msgs::hsjoiner::HandshakeJoiner,
   tls_core::{
-    key,
     msgs::{
       base::Payload,
       codec::{self, Codec, Reader},
@@ -35,7 +35,10 @@ use tls_client2::{
   },
   Certificate, CipherSuite, CipherSuiteKey,
 };
-use tls_parser::{parse_tls_message_handshake, ClientHello, TlsMessage, TlsMessageHandshake};
+use tls_parser::{
+  parse_tls_message_handshake, ClientHello, TlsClientHelloContents, TlsMessage,
+  TlsMessageHandshake, TlsServerHelloContents,
+};
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
   net::TcpStream,
@@ -137,7 +140,6 @@ pub async fn sign(
 
         // TODO: some of these (CertificateRequest, HelloRetryRequest) are not considered in happy
         // path, handle later
-
         // HandshakePayload::KeyUpdate(_) => todo!(),
         // HandshakePayload::ServerHelloDone => todo!(),
         // HandshakePayload::EndOfEarlyData => todo!(),
@@ -230,6 +232,14 @@ fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
   Ok((i, tls_parser::TlsRawRecord { hdr, data }))
 }
 
+/// Extracts and processes TLS handshake messages from raw bytes
+///
+/// # Arguments
+/// * `bytes` - Raw TLS message bytes to parse
+/// * `payload` - Contains encryption keys and IVs for decrypting TLS1.3 messages
+///
+/// # Returns
+/// * `Result<Vec<Message>, ProxyError>` - Vector of parsed TLS messages or error
 fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>, ProxyError> {
   let server_aes_key = hex::decode(payload.hs_server_aes_key).unwrap();
   let server_aes_iv = hex::decode(payload.hs_server_aes_iv).unwrap();
@@ -238,10 +248,11 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
 
   let mut cursor = Cursor::new(bytes);
   let mut messages: Vec<Message> = vec![];
+  let mut seq = 0u64;
 
-  let mut seq = 0;
   while cursor.position() < bytes.len() as u64 {
-    match local_parse_record(&cursor.get_ref()[cursor.position() as usize..]) {
+    let current_bytes = &cursor.get_ref()[cursor.position() as usize..];
+    match local_parse_record(current_bytes) {
       Ok((_, record)) => {
         info!("TLS record type: {}", record.hdr.record_type);
 
@@ -259,82 +270,14 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
                 TlsMessage::Handshake(TlsMessageHandshake::ClientHello(ch)) => {
                   // parses `TlsParser::TlsClientHelloContents` to `Message`
                   debug!("parsing ClientHello");
-
-                  // TODO: write this better
-                  let ch_random_bytes: [u8; 32] =
-                    ch.random().try_into().expect("ch random bytes not of correct size");
-                  let ch_random = Random(ch_random_bytes);
-
-                  // parse session id by adding byte length to TlsParser output
-                  let ch_session_id = ch.session_id().expect("incorrect session_id");
-                  let mut ch_session_id = ch_session_id.to_vec();
-                  ch_session_id.insert(0, ch_session_id.len() as u8);
-                  let session_id = SessionID::read_bytes(&ch_session_id)
-                    .expect("can't read session id from bytes");
-
-                  let cipher_suites: Vec<CipherSuite> =
-                    ch.ciphers().iter().map(|suite| CipherSuite::from(suite.0)).collect();
-
-                  let compressions_methods: Vec<Compression> =
-                    ch.comp().iter().map(|method| Compression::from(method.0)).collect();
-
-                  // Read ClientHelloPayload extensions from TlsParser by preprending byte length
-                  // for TLS codec
-                  let extension_byte: &[u8] =
-                    ch.ext().expect("invalid client hello extension payload");
-                  let mut extension_byte = extension_byte.to_vec();
-                  let ch_extension_len: [u8; 2] = (extension_byte.len() as u16).to_be_bytes();
-                  extension_byte.splice(0..0, ch_extension_len);
-
-                  // create the reader which can decode extensions byte
-                  let mut r = Reader::init(&extension_byte);
-                  let extensions = codec::read_vec_u16::<ClientExtension>(&mut r)
-                    .expect("unable to read client extension payload");
-
-                  let client_hello_message = Message {
-                    version: tls_client2::ProtocolVersion::from(ch.version.0),
-                    payload: MessagePayload::Handshake(HandshakeMessagePayload {
-                      typ:     tls_client2::tls_core::msgs::enums::HandshakeType::ClientHello,
-                      payload: HandshakePayload::ClientHello(ClientHelloPayload {
-                        client_version: tls_client2::ProtocolVersion::from(ch.version.0),
-                        random: ch_random,
-                        session_id,
-                        cipher_suites,
-                        compression_methods: compressions_methods,
-                        extensions,
-                      }),
-                    }),
-                  };
-
-                  messages.push(client_hello_message);
+                  handle_client_hello(ch, &mut messages);
                 },
                 TlsMessage::Handshake(TlsMessageHandshake::ServerHello(sh)) => {
                   // parses `TlsParser::TlsServerHelloContents` to `Message`
                   debug!("parsing ServerHello");
-
-                  let sh_random_bytes: [u8; 32] =
-                    sh.random.try_into().expect("ch random bytes not of correct size");
-                  let sh_random = Random(sh_random_bytes);
-
-                  let sh_session_id = sh.session_id.expect("incorrect session_id");
-                  let mut sh_session_id = sh_session_id.to_vec();
-                  sh_session_id.insert(0, sh_session_id.len() as u8);
-                  let session_id = SessionID::read_bytes(&sh_session_id)
-                    .expect("can't read session id from bytes");
-
-                  let extension_byte: &[u8] =
-                    sh.ext.expect("invalid server hello extension payload");
-                  let mut extension_byte = extension_byte.to_vec();
-                  let sh_extension_len: [u8; 2] = (extension_byte.len() as u16).to_be_bytes();
-                  extension_byte.splice(0..0, sh_extension_len);
-
-                  let mut r = Reader::init(&extension_byte);
-                  let extensions = codec::read_vec_u16::<ServerExtension>(&mut r)
-                    .expect("unable to read server extension payload");
-                  debug!("cipher: {:?}", sh.cipher.0);
+                  handle_server_hello(sh.clone(), &mut messages);
 
                   let suite = CipherSuite::from(sh.cipher.0);
-
                   match suite {
                     CipherSuite::TLS13_AES_128_GCM_SHA256 => {
                       key = server_aes_key[..16].to_vec();
@@ -348,23 +291,6 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
                       debug!("cipher suite: {:?}", suite);
                     },
                   }
-
-                  let server_hello_message = Message {
-                    version: tls_client2::ProtocolVersion::from(sh.version.0),
-                    payload: MessagePayload::Handshake(HandshakeMessagePayload {
-                      typ:     tls_client2::tls_core::msgs::enums::HandshakeType::ServerHello,
-                      payload: HandshakePayload::ServerHello(ServerHelloPayload {
-                        legacy_version: tls_client2::ProtocolVersion::from(sh.version.0),
-                        random: sh_random,
-                        session_id,
-                        cipher_suite: CipherSuite::from(sh.cipher.0),
-                        compression_method: Compression::from(sh.compression.0),
-                        extensions,
-                      }),
-                    }),
-                  };
-
-                  messages.push(server_hello_message);
                 },
                 _ => {
                   println!("{:?}", parse_tls_message);
@@ -376,7 +302,6 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
             },
           }
         }
-
         let (cipher_suite, key_type) = match key.len() {
           16 => {
             let mut key_array = [0u8; 16];
@@ -467,6 +392,111 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
   }
 }
 
+/// Handles TLS ClientHello message processing by converting TlsParser's `TlsClientHelloContents`
+/// into rustls compatible `Message` format.
+///
+/// This function performs the following transformations:
+/// - Extracts and validates the random bytes
+/// - Processes the session ID with proper length prefixing
+/// - Converts cipher suites and compression methods
+/// - Handles extension data with appropriate length prefixing
+///
+/// # Arguments
+///
+/// * `client_hello` - The parsed ClientHello contents from TlsParser
+/// * `messages` - Mutable reference to a vector where the processed Message will be pushed
+///
+/// # Panics
+///
+/// This function will panic if: TODO(WJ 2024-11-23): handle these errors
+/// - Random bytes are invalid or missing
+/// - Session ID is invalid or missing
+/// - Extension payload is invalid or missing
+/// - Extension payload cannot be decoded
+fn handle_client_hello(
+  client_hello: TlsClientHelloContents,
+  messages: &mut Vec<Message>,
+) {
+  let ch_random_bytes: [u8; 32] = client_hello.random().try_into().expect("ch random bytes not of correct size");
+  let ch_random = Random(ch_random_bytes);
+
+  // parse session id by adding byte length to TlsParser output
+  let ch_session_id = client_hello.session_id().expect("invalid session id");
+  let mut ch_session_id = ch_session_id.to_vec();
+  ch_session_id.insert(0, ch_session_id.len() as u8);
+  let session_id = SessionID::read_bytes(&ch_session_id).expect("can't read session id from bytes");
+
+  let cipher_suites: Vec<CipherSuite> =
+    client_hello.ciphers().iter().map(|suite| CipherSuite::from(suite.0)).collect();
+
+  let compressions_methods: Vec<Compression> =
+    client_hello.comp().iter().map(|method| Compression::from(method.0)).collect();
+
+  // Read ClientHelloPayload extensions from TlsParser by preprending byte length
+  // for TLS codec
+  let extension_byte: &[u8] = client_hello.ext().expect("invalid client hello extension payload");
+  let mut extension_byte = extension_byte.to_vec();
+  let ch_extension_len: [u8; 2] = (extension_byte.len() as u16).to_be_bytes();
+  extension_byte.splice(0..0, ch_extension_len);
+
+  // create the reader which can decode extensions byte
+  let mut r = Reader::init(&extension_byte);
+  let extensions = codec::read_vec_u16::<ClientExtension>(&mut r)
+    .expect("unable to read client extension payload");
+
+  let client_hello_message = Message {
+    version: tls_client2::ProtocolVersion::from(client_hello.version.0),
+    payload: MessagePayload::Handshake(HandshakeMessagePayload {
+      typ:     tls_client2::tls_core::msgs::enums::HandshakeType::ClientHello,
+      payload: HandshakePayload::ClientHello(ClientHelloPayload {
+        client_version: tls_client2::ProtocolVersion::from(client_hello.version.0),
+        random: ch_random,
+        session_id,
+        cipher_suites,
+        compression_methods: compressions_methods,
+        extensions,
+      }),
+    }),
+  };
+}
+
+fn handle_server_hello(server_hello: TlsServerHelloContents, messages: &mut Vec<Message>) {
+  let sh_random_bytes: [u8; 32] =
+    server_hello.random.try_into().expect("ch random bytes not of correct size");
+  let sh_random = Random(sh_random_bytes);
+
+  let sh_session_id = server_hello.session_id.expect("incorrect session_id");
+  let mut sh_session_id = sh_session_id.to_vec();
+  sh_session_id.insert(0, sh_session_id.len() as u8);
+  let session_id = SessionID::read_bytes(&sh_session_id).expect("can't read session id from bytes");
+
+  let extension_byte: &[u8] = server_hello.ext.expect("invalid server hello extension payload");
+  let mut extension_byte = extension_byte.to_vec();
+  let sh_extension_len: [u8; 2] = (extension_byte.len() as u16).to_be_bytes();
+  extension_byte.splice(0..0, sh_extension_len);
+
+  let mut r = Reader::init(&extension_byte);
+  let extensions = codec::read_vec_u16::<ServerExtension>(&mut r)
+    .expect("unable to read server extension payload");
+  debug!("cipher: {:?}", server_hello.cipher.0);
+
+  let server_hello_message = Message {
+    version: tls_client2::ProtocolVersion::from(server_hello.version.0),
+    payload: MessagePayload::Handshake(HandshakeMessagePayload {
+      typ:     tls_client2::tls_core::msgs::enums::HandshakeType::ServerHello,
+      payload: HandshakePayload::ServerHello(ServerHelloPayload {
+        legacy_version: tls_client2::ProtocolVersion::from(server_hello.version.0),
+        random: sh_random,
+        session_id,
+        cipher_suite: CipherSuite::from(server_hello.cipher.0),
+        compression_method: Compression::from(server_hello.compression.0),
+        extensions,
+      }),
+    }),
+  };
+  messages.push(server_hello_message);
+}
+
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
   session_id:  String,
@@ -474,6 +504,26 @@ pub struct NotarizeQuery {
   target_port: u16,
 }
 
+/// Handles protocol upgrade requests for notarization sessions.
+///
+/// This function serves as an entry point for both WebSocket and TCP protocol upgrades,
+/// routing the connection to the appropriate notarization handler based on the upgrade type.
+///
+/// # Arguments
+///
+/// * `protocol_upgrade` - The protocol upgrade request (WebSocket or TCP)
+/// * `query` - Query parameters containing notarization session details
+/// * `state` - Shared application state wrapped in an Arc
+///
+/// # Returns
+///
+/// Returns an axum [`Response`] that will handle the protocol upgrade
+///
+/// # Notes
+///
+/// - For WebSocket upgrades, forwards to `websocket_notarize`
+/// - For TCP upgrades, forwards to `tcp_notarize`
+/// - Session ID is logged at the start of each connection
 pub async fn proxy(
   protocol_upgrade: ProtocolUpgrade,
   query: Query<NotarizeQuery>,

@@ -9,6 +9,9 @@ use tlsn_verifier::tls::{VerifierConfigBuilderError, VerifierError};
 #[derive(Debug, Error)]
 pub enum ProxyError {
   #[error(transparent)]
+  TryIntoError(#[from] std::array::TryFromSliceError),
+
+  #[error(transparent)]
   Base64Decode(#[from] base64::DecodeError),
 
   #[error(transparent)]
