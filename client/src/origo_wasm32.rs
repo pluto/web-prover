@@ -78,8 +78,7 @@ async fn generate_program_data(
     &OpaqueMessage {
       typ:     ContentType::ApplicationData,
       version: ProtocolVersion::TLSv1_3,
-      payload: Payload::new(request_ciphertext.clone()), /* TODO (autoparallel): old way didn't
-                                                          * introduce a clone */
+      payload: Payload::new(request_ciphertext),
     },
     0,
   )?;
@@ -118,8 +117,8 @@ async fn generate_program_data(
     max_rom_length:          JSON_MAX_ROM_LENGTH,
   };
 
-  let mut nearest_16_padded_plaintext = request_plaintext.clone();
-  let mut nearest_16_padded_ciphertext = request_ciphertext.clone();
+  let mut nearest_16_padded_plaintext = request_plaintext;
+  let mut nearest_16_padded_ciphertext = request_ciphertext;
   let remainder = request_plaintext.len() % 16;
   if remainder != 0 {
     let padding = 16 - remainder;

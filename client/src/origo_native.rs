@@ -81,7 +81,7 @@ async fn generate_program_data(
         &OpaqueMessage {
           typ:     ContentType::ApplicationData,
           version: ProtocolVersion::TLSv1_3,
-          payload: Payload::new(request_ciphertext.clone()),
+          payload: Payload::new(request_ciphertext),
         },
         0,
       )?)
@@ -92,7 +92,7 @@ async fn generate_program_data(
         &OpaqueMessage {
           typ:     ContentType::ApplicationData,
           version: ProtocolVersion::TLSv1_3,
-          payload: Payload::new(request_ciphertext.clone()),
+          payload: Payload::new(request_ciphertext),
         },
         0,
       )?)
@@ -143,8 +143,8 @@ async fn generate_program_data(
   // ----------------------------------------------------------------------------------------------------------------------- //
   // - construct private inputs and program layout for AES proof for request -
   debug!("Padding plaintext and ciphertext to nearest 16...");
-  let mut nearest_16_padded_plaintext = request_plaintext.clone();
-  let mut nearest_16_padded_ciphertext = request_ciphertext.clone();
+  let mut nearest_16_padded_plaintext = request_plaintext;
+  let mut nearest_16_padded_ciphertext = request_ciphertext;
   let remainder = request_plaintext.len() % 16;
   if remainder != 0 {
     let padding = 16 - remainder;
