@@ -414,11 +414,9 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
 /// - Session ID is invalid or missing
 /// - Extension payload is invalid or missing
 /// - Extension payload cannot be decoded
-fn handle_client_hello(
-  client_hello: TlsClientHelloContents,
-  messages: &mut Vec<Message>,
-) {
-  let ch_random_bytes: [u8; 32] = client_hello.random().try_into().expect("ch random bytes not of correct size");
+fn handle_client_hello(client_hello: TlsClientHelloContents, messages: &mut Vec<Message>) {
+  let ch_random_bytes: [u8; 32] =
+    client_hello.random().try_into().expect("ch random bytes not of correct size");
   let ch_random = Random(ch_random_bytes);
 
   // parse session id by adding byte length to TlsParser output
