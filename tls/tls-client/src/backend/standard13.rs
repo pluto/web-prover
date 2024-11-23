@@ -19,7 +19,7 @@ use chacha20poly1305::{
 
 use async_trait::async_trait;
 use base64::{prelude::BASE64_STANDARD, write, Engine};
-use log::{debug, error, info, kv::ToValue, trace, warn, Record};
+use log::{debug, error, info, trace, warn, Record};
 use p256::{ecdh::EphemeralSecret, EncodedPoint, PublicKey as ECDHPublicKey};
 use rand::{rngs::OsRng, thread_rng, Rng};
 use ring::hkdf::Okm;

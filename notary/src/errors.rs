@@ -3,6 +3,7 @@ use axum::{
   response::{IntoResponse, Response},
 };
 use eyre::Report;
+use nom::error;
 use thiserror::Error;
 use tlsn_verifier::tls::{VerifierConfigBuilderError, VerifierError};
 
@@ -25,6 +26,9 @@ pub enum ProxyError {
 
   #[error("Error occurred during Sign: {0}")]
   Sign(Box<dyn std::error::Error + Send + 'static>),
+
+  #[error("Session ID Error: {0}")]
+  InvalidSessionId(String),
 }
 
 impl IntoResponse for ProxyError {
