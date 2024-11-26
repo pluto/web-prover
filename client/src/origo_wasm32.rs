@@ -32,12 +32,34 @@ pub async fn proxy_and_sign(
   proving_params: Option<Vec<u8>>,
 ) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
-  let (sb, witness) = proxy(config.clone(), session_id.clone()).await?;
+  let mut origo_conn = proxy(config.clone(), session_id.clone()).await?;
 
-  let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
+  let sb = SignBody {
+    handshake_server_aes_iv:    hex::encode(
+      origo_conn.secret_map.get("Handshake:server_aes_iv").unwrap().clone().to_vec(),
+    ),
+    handshake_server_aes_key:   hex::encode(
+      origo_conn.secret_map.get("Handshake:server_aes_key").unwrap().clone().to_vec(),
+    ),
+    application_client_aes_iv:  hex::encode(
+      origo_conn.secret_map.get("Application:client_aes_iv").unwrap().clone().to_vec(),
+    ),
+    application_client_aes_key: hex::encode(
+      origo_conn.secret_map.get("Application:client_aes_key").unwrap().clone().to_vec(),
+    ),
+    application_server_aes_iv:  hex::encode(
+      origo_conn.secret_map.get("Application:server_aes_iv").unwrap().clone().to_vec(),
+    ),
+    application_server_aes_key: hex::encode(
+      origo_conn.secret_map.get("Application:server_aes_key").unwrap().clone().to_vec(),
+    ),
+  };
+
+  let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb).await;
 
   debug!("generating NIVC program data!");
-  let program_data = generate_program_data(&witness, config.proving, proving_params).await?;
+  let witness = origo_conn.to_witness_data();
+  let program_data = generate_program_data(&witness, config.proving).await?;
 
   debug!("starting proof generation!");
   let program_output = program::run(&program_data)?;
@@ -101,7 +123,7 @@ async fn generate_program_data(
 async fn proxy(
   config: config::Config,
   session_id: String,
-) -> Result<(SignBody, WitnessData), errors::ClientErrors> {
+) -> Result<tls_client2::origo::OrigoConnection, errors::ClientErrors> {
   // TODO build sanitized query
   let wss_url = format!(
     "wss://{}:{}/v1/origo?session_id={}&target_host={}&target_port={}",
@@ -158,18 +180,7 @@ async fn proxy(
   let mut client_socket = connection_receiver.await.unwrap()?.io.into_inner();
   client_socket.close().await.unwrap();
 
-  let server_aes_iv =
-    origo_conn.lock().unwrap().secret_map.get("Handshake:server_iv").unwrap().clone();
-  let server_aes_key =
-    origo_conn.lock().unwrap().secret_map.get("Handshake:server_key").unwrap().clone();
-
-  let witness = origo_conn.lock().unwrap().to_witness_data();
-  let sb = SignBody {
-    hs_server_aes_iv:  hex::encode(server_aes_iv.to_vec()),
-    hs_server_aes_key: hex::encode(server_aes_key.to_vec()),
-  };
-
-  Ok((sb, witness))
+  Ok(origo_conn.lock().unwrap())
 }
 
 use core::slice;
