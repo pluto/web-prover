@@ -1,5 +1,6 @@
 use std::{
   io::{BufReader, Cursor},
+  ops::Deref,
   sync::Arc,
 };
 
