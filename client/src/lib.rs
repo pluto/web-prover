@@ -10,11 +10,11 @@ mod circuits;
 pub mod config;
 pub mod errors;
 mod tls;
+use proofs::program::data::ByteParams;
 use serde::Serialize;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
 use tracing::info;
-use proofs::program::data::ByteParams;
 
 use crate::errors::ClientErrors;
 

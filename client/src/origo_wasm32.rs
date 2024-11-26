@@ -10,7 +10,7 @@ use proofs::{
   program::{
     self,
     data::{
-      Expanded, NotExpanded, Offline, Online, ProgramData, R1CSType, SetupData,
+      ByteParams, Expanded, NotExpanded, Offline, Online, ProgramData, R1CSType, SetupData,
       WitnessGeneratorType,
     },
   },
@@ -22,7 +22,6 @@ use tls_client_async2::bind_client;
 use tracing::debug;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
-use proofs::program::data::ByteParams;
 
 use crate::{
   circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
@@ -87,13 +86,13 @@ async fn generate_program_data(
   // let public_params = program::setup(&setup_data);
 
   // TODO: Very jankily override the invalid byte_params
-  // We should construct this elsewhere.  
+  // We should construct this elsewhere.
   use proofs::program::data::SerializedParams;
   let inbound = proving.params.unwrap();
   let serialized_params = SerializedParams {
     circuit_params: inbound.circuit_params,
     hash_params:    inbound.hash_params,
-    byte_params: byte_params.unwrap(),
+    byte_params:    byte_params.unwrap(),
   };
 
   let pd = ProgramData::<Offline, NotExpanded> {
