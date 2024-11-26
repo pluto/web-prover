@@ -16,7 +16,7 @@ serde_json="1.0"
 rust-witness={ git="https://github.com/chancehudson/rust-witness" }
 paste       ="1.0"
 
-client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="76a5a9c" }
+client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="2585467" }
 ff                ={ version="0.13", default-features=false, features=["derive"] }
 bellpepper-core   ="0.4"
 halo2curves       ="0.6.1"
