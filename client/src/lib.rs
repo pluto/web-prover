@@ -10,11 +10,11 @@ mod circuits;
 pub mod config;
 pub mod errors;
 mod tls;
-
 use serde::Serialize;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
 use tracing::info;
+use proofs::program::data::ByteParams;
 
 use crate::errors::ClientErrors;
 
@@ -26,12 +26,12 @@ pub enum Proof {
 
 pub async fn prover_inner(
   config: config::Config,
-  ck_primary: Option<Vec<u8>>,
+  byte_params: Option<ByteParams>,
 ) -> Result<Proof, errors::ClientErrors> {
   info!("GIT_HASH: {}", env!("GIT_HASH"));
   match config.mode {
     config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
-    config::NotaryMode::Origo => prover_inner_origo(config, ck_primary).await,
+    config::NotaryMode::Origo => prover_inner_origo(config, byte_params).await,
   }
 }
 
@@ -69,10 +69,10 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, erro
 
 pub async fn prover_inner_origo(
   config: config::Config,
-  ck_primary: Option<Vec<u8>>,
+  byte_params: Option<ByteParams>,
 ) -> Result<Proof, errors::ClientErrors> {
   #[cfg(target_arch = "wasm32")]
-  return origo_wasm32::proxy_and_sign(config, ck_primary).await;
+  return origo_wasm32::proxy_and_sign(config, byte_params).await;
 
   #[cfg(not(target_arch = "wasm32"))]
   return origo_native::proxy_and_sign(config).await;

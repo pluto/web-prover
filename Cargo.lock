@@ -1400,6 +1400,7 @@ dependencies = [
  "hyper 0.14.31",
  "js-sys",
  "p256",
+ "proofs",
  "rayon",
  "ring 0.17.8",
  "serde",

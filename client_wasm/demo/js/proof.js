@@ -1,4 +1,4 @@
-import init, { prover, setup_tracing, initThreadPool } from "../pkg/client_wasm";
+import init, { prover, setup_tracing, initThreadPool, ByteParamsWasm } from "../pkg/client_wasm";
 
 let wasmInitialized = false;
 let sharedMemory = null;
@@ -54,11 +54,16 @@ function end() {
 
 self.onmessage = async function (e) {
     try {
-        const { proverConfig, ck_primary, memory } = e.data;
+        const { proverConfig, byte_data, memory } = e.data;
         sharedMemory = memory;
         await initializeWasm(sharedMemory);
         start();
-        const proof = await prover(proverConfig, new Uint8Array(ck_primary));
+        console.log("byte data", byte_data);
+        var byte_params = new ByteParamsWasm(
+            new Uint8Array(byte_data.primary_powers_g), 
+            new Uint8Array(byte_data.primary_powers_h)
+        );
+        const proof = await prover(proverConfig, byte_params);
         console.log("sending proof back to main thread");
         end();
         postMessage({ type: 'proof', data: proof });

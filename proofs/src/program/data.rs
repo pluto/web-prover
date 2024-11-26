@@ -80,13 +80,25 @@ pub enum WitnessGeneratorType {
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
 }
 
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ByteParams {
+  pub powers_of_g: Vec<u8>,
+  pub powers_of_h: Vec<u8>,
+}
+
+// TODO (tracy): If we want to extend this to additional parameters
+// we should create a simple binary file representation
+// 
+// Format: header, num_fields, field_name, len, bytes, field_name, len, bytes,...
+// 
+// Before we do that, let's prove the byte encoding is much more efficient.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SerializedParams {
   pub circuit_params: AuxParamsCircuit<E1>,
   #[serde(with = "serde_bytes")]
   pub hash_params:    Vec<u8>,
-  #[serde(with = "serde_bytes")]
-  pub ck_primary:     Vec<u8>,
+  pub byte_params:    ByteParams,
 }
 
 // Note, the below are typestates that prevent misuse of our current API.
@@ -267,18 +279,43 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
     let cp = self.public_params.circuit_params;
     let hp: AuxParamsHash<E1> = bincode::deserialize(&self.public_params.hash_params).unwrap();
 
-    use halo2curves::{bn256::G1Affine, group::cofactor::CofactorCurveAffine, serde::SerdeObject};
-    let in_len = self.public_params.ck_primary.len();
-    debug!("begin loading ck_primary key, len={:?}", in_len);
-    let mut ck = Vec::new();
+    use halo2curves::{bn256::{G1Affine, G2Affine}, group::cofactor::CofactorCurveAffine, serde::SerdeObject};
+
+    // Commitment Type: Pedersen
+    // 
+    // let in_len = self.public_params.ck_primary.len();
+    // debug!("begin loading ck_primary key, len={:?}", in_len);
+    // let mut ck = Vec::new();
+    // let size = G1Affine::identity().to_raw_bytes().len();
+    // for b in self.public_params.ck_primary.chunks(size).into_iter() {
+    //   let p = G1Affine::from_raw_bytes(b).unwrap();
+    //   ck.push(p);
+    // }
+    // let ck_len = ck.len();
+    // let key = Arc::new(CommitmentKey::<E1> { ck });
+    // debug!("done loading ck_primary key len={:?}", ck_len);
+    // 
+
+    // Commitment Type: KZG 
+    let powers_of_g = self.public_params.byte_params.powers_of_g;
+    let powers_of_h = self.public_params.byte_params.powers_of_h;
+
+    debug!("begin loading commitment key, g_len={:?}, h_len={:?}", powers_of_g.len(), powers_of_h.len());
+    let mut g_ck = Vec::new();
     let size = G1Affine::identity().to_raw_bytes().len();
-    for b in self.public_params.ck_primary.chunks(size).into_iter() {
+    for b in powers_of_g.chunks(size).into_iter() {
       let p = G1Affine::from_raw_bytes(b).unwrap();
-      ck.push(p);
+      g_ck.push(p);
     }
-    let ck_len = ck.len();
-    let key = Arc::new(CommitmentKey::<E1> { ck });
-    debug!("done loading ck_primary key len={:?}", ck_len);
+
+    let mut h_ck = Vec::new();
+    let size = G2Affine::identity().to_raw_bytes().len();
+    for b in powers_of_h.chunks(size).into_iter() {
+      let p = G2Affine::from_raw_bytes(b).unwrap();
+      h_ck.push(p);
+    }
+    let key = Arc::new(CommitmentKey::<E1> { powers_of_g: g_ck, powers_of_h: h_ck  });
+    debug!("done loading commitment key");
 
     let aux_params = AuxParams {
       ck_primary: key,
@@ -366,10 +403,22 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
 
     let sp = aux_params.clone();
     use halo2curves::serde::SerdeObject;
-    let mut out: Vec<u8> = vec![];
-    for i in &sp.ck_primary.ck {
+    // let mut out: Vec<u8> = vec![];
+    // for i in &sp.ck_primary.ck {
+    //   let mut bytes = i.to_raw_bytes().clone();
+    //   out.append(&mut bytes);
+    // }
+
+    let mut powers_g: Vec<u8> = vec![];
+    for i in &sp.ck_primary.powers_of_g {
       let mut bytes = i.to_raw_bytes().clone();
-      out.append(&mut bytes);
+      powers_g.append(&mut bytes);
+    }
+
+    let mut powers_h: Vec<u8> = vec![];
+    for i in &sp.ck_primary.powers_of_h {
+      let mut bytes = i.to_raw_bytes().clone();
+      powers_h.append(&mut bytes);
     }
 
     let circuit_params = AuxParamsCircuit::<E1> {
@@ -400,22 +449,29 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
       format!("{}/{}.json", path.parent().unwrap().to_str().unwrap(), stem.to_str().unwrap());
     let bin_path =
       format!("{}/{}.bin", path.parent().unwrap().to_str().unwrap(), stem.to_str().unwrap());
-    let bytes_path =
-      format!("{}/{}.bytes", path.parent().unwrap().to_str().unwrap(), stem.to_str().unwrap());
-    debug!("json_path={:?}, bin_path={:?}, bytes_path={:?}", json_path, bin_path, bytes_path);
+    let powers_of_g_path =
+      format!("{}/{}.powers_of_g.bytes", path.parent().unwrap().to_str().unwrap(), stem.to_str().unwrap());
+    let powers_of_h_path =
+      format!("{}/{}.powers_of_h.bytes", path.parent().unwrap().to_str().unwrap(), stem.to_str().unwrap());
+    debug!("json_path={:?}, bin_path={:?}, g_path={:?}, h_path={:?}", json_path, bin_path, powers_of_g_path, powers_of_h_path);
     let mut json_file = std::fs::File::create(&json_path)?;
     let mut bin_file = std::fs::File::create(&bin_path)?;
-    let mut bytes_file = std::fs::File::create(&bytes_path)?;
+    let mut powers_of_g_file = std::fs::File::create(&powers_of_g_path)?;
+    let mut powers_of_h_file = std::fs::File::create(&powers_of_h_path)?;
     json_file.write_all(&serialized_json.as_bytes())?;
     bin_file.write_all(&serialized_bin)?;
-    bytes_file.write_all(&out)?;
+    powers_of_g_file.write_all(&powers_g)?;
+    powers_of_h_file.write_all(&powers_h)?;
 
     let Self { setup_data, rom_data, rom, initial_nivc_input, inputs, witnesses, .. } = self;
     Ok(ProgramData {
       public_params: SerializedParams {
         circuit_params,
         hash_params: serialized_bin,
-        ck_primary: out,
+        byte_params: ByteParams {
+          powers_of_g: powers_g,
+          powers_of_h: powers_h,
+        },
       },
       setup_data,
       rom_data,
@@ -610,7 +666,7 @@ mod tests {
 
     let mock_inputs: MockInputs = serde_json::from_str(JSON).unwrap();
     let program_data = ProgramData::<Offline, NotExpanded> {
-      public_params: SerializedParams { circuit_params, hash_params: vec![], ck_primary: vec![] },
+      public_params: SerializedParams { circuit_params, hash_params: vec![], byte_params: ByteParams{powers_of_g: vec![], powers_of_h: vec![] }},
       setup_data,
       rom_data: HashMap::from([
         (String::from("CIRCUIT_1"), CircuitData { opcode: 0 }),

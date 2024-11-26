@@ -1,7 +1,7 @@
-use std::panic;
+use std::{collections::HashMap, panic};
 
 use base64::prelude::*;
-use client::config::Config;
+use client::config::{self, Config};
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::Full;
 use hyper::{body::Bytes, Body, Request};
@@ -21,15 +21,40 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 pub use wasm_bindgen_rayon::init_thread_pool;
 use ws_stream_wasm::WsMeta;
+use proofs::program::data::ByteParams;
+
+// TODO: Possibly add a `inner` type to the client 
+// package. 
+#[wasm_bindgen(getter_with_clone)]
+pub struct ByteParamsWasm { 
+    pub powers_of_g: Vec<u8>,
+    pub powers_of_h: Vec<u8>,
+}
 
 #[wasm_bindgen]
-pub async fn prover(config: JsValue, ck_primary: Vec<u8>) -> Result<String, JsValue> {
-  debug!("prover: pre-serde, received ck_primary={:?}", ck_primary.len());
+impl ByteParamsWasm {
+    #[wasm_bindgen(constructor)]
+    pub fn new(g: Vec<u8>, h: Vec<u8>) -> ByteParamsWasm {
+        Self {
+          powers_of_g: g,
+          powers_of_h: h,
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub async fn prover(config: JsValue, byte_params: ByteParamsWasm) -> Result<String, JsValue> {
+  debug!("prover: pre-serde, received byte_params={:?}", byte_params.powers_of_g.len());
   panic::set_hook(Box::new(console_error_panic_hook::hook));
   let config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
   debug!("prover: post-serde");
+  
+  let bp = ByteParams{
+    powers_of_g: byte_params.powers_of_g, 
+    powers_of_h: byte_params.powers_of_h,
+  };
 
-  let proof = client::prover_inner(config, Some(ck_primary))
+  let proof = client::prover_inner(config, Some(bp))
     .await
     .map_err(|e| JsValue::from_str(&format!("Could not produce proof: {:?}", e)))?;
 

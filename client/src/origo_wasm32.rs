@@ -22,6 +22,7 @@ use tls_client_async2::bind_client;
 use tracing::debug;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
+use proofs::program::data::ByteParams;
 
 use crate::{
   circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
@@ -30,7 +31,7 @@ use crate::{
 
 pub async fn proxy_and_sign(
   mut config: config::Config,
-  ck_primary: Option<Vec<u8>>,
+  byte_params: Option<ByteParams>,
 ) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
   let (sb, witness) = proxy(config.clone(), session_id.clone()).await?;
@@ -38,7 +39,7 @@ pub async fn proxy_and_sign(
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
 
   debug!("generating NIVC program data!");
-  let program_data = generate_program_data(&witness, config.proving, ck_primary).await?;
+  let program_data = generate_program_data(&witness, config.proving, byte_params).await?;
 
   debug!("starting proof generation!");
   let program_output = program::run(&program_data)?;
@@ -62,7 +63,7 @@ pub async fn proxy_and_sign(
 async fn generate_program_data(
   witness: &WitnessData,
   proving: ProvingData,
-  ck_primary: Option<Vec<u8>>,
+  byte_params: Option<ByteParams>,
 ) -> Result<ProgramData<Online, Expanded>, errors::ClientErrors> {
   let (request_inputs, _response_inputs) = decrypt_tls_ciphertext(witness)?;
 
@@ -85,15 +86,14 @@ async fn generate_program_data(
   debug!("generating public params");
   // let public_params = program::setup(&setup_data);
 
-  let original = ck_primary.unwrap();
-  debug!("generated intermediate serialzied params: len={:?}", original.len());
-  // TODO: Very jankily override the invalid ck_primary
+  // TODO: Very jankily override the invalid byte_params
+  // We should construct this elsewhere.  
   use proofs::program::data::SerializedParams;
   let inbound = proving.params.unwrap();
   let serialized_params = SerializedParams {
     circuit_params: inbound.circuit_params,
     hash_params:    inbound.hash_params,
-    ck_primary:     original,
+    byte_params: byte_params.unwrap(),
   };
 
   let pd = ProgramData::<Offline, NotExpanded> {
