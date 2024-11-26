@@ -836,6 +836,41 @@ impl Encrypter {
     Self { write_key, write_iv, cipher_suite }
   }
 
+/// Encrypts a TLS 1.3 message using ChaCha20-Poly1305 AEAD cipher.
+///
+/// This function performs TLS 1.3 record layer encryption using ChaCha20-Poly1305:
+/// - Appends the content type to the plaintext (as required by TLS 1.3)
+/// - Generates the additional authenticated data (AAD)
+/// - Encrypts using ChaCha20-Poly1305 with the configured key and nonce
+/// - Returns an opaque message suitable for transmission
+///
+/// # Security Considerations
+/// 
+/// - The sequence number must not repeat for a given key
+/// - The write key must be exactly 32 bytes 
+/// - The initialization vector must be 12 bytes
+///
+/// # Arguments
+///
+/// * `m` - The plaintext message to encrypt
+/// * `seq` - The record sequence number used for nonce generation
+///
+/// # Returns
+///
+/// Returns a tuple containing:
+/// - An `OpaqueMessage` with the encrypted payload
+/// - A `RecordMeta` containing encryption metadata for debugging/verification
+///
+/// # Errors
+///
+/// Returns `BackendError` if:
+/// - Encryption fails
+/// - Wrong key type is used (must be CHACHA20POLY1305)
+///
+/// # Panics
+///
+/// Panics if the write key is not a CHACHA20POLY1305 key
+///
   fn encrypt_tls13_chacha20_poly1305(
     &self,
     m: &PlainMessage,
@@ -849,7 +884,7 @@ impl Encrypter {
 
     let write_key = match self.write_key {
       CipherSuiteKey::CHACHA20POLY1305(key) => key,
-      _ => panic!("wrong key type"),
+      _ => unreachable!("wrong key type"),
     };
     let write_key = Key::from_slice(&write_key);
     let cipher = ChaCha20Poly1305::new(write_key);
@@ -900,7 +935,7 @@ impl Encrypter {
 
     let write_key = match self.write_key {
       CipherSuiteKey::AES128GCM(key) => key,
-      _ => panic!("wrong key type"),
+      _ => unreachable!("wrong key type"),
     };
 
     let cipher = Aes128Gcm::new((&write_key).into());
@@ -945,6 +980,43 @@ impl Decrypter {
     Self { write_key, write_iv, cipher_suite }
   }
 
+  /// Decrypts a TLS 1.3 message using ChaCha20-Poly1305 AEAD cipher.
+  ///
+  /// This function performs TLS 1.3 record layer decryption using ChaCha20-Poly1305:
+  /// - Generates additional authenticated data (AAD) from message length
+  /// - Decrypts using ChaCha20-Poly1305 with the configured key and nonce
+  /// - Removes padding and extracts the true content type
+  /// - Returns the decrypted plaintext message and metadata
+  ///
+  /// # Security Considerations
+  ///
+  /// - The sequence number must not repeat for a given key
+  /// - The write key must be exactly 32 bytes
+  /// - The initialization vector must be 12 bytes
+  /// - Message authentication tag is verified during decryption
+  ///
+  /// # Arguments
+  ///
+  /// * `m` - The encrypted opaque message to decrypt
+  /// * `seq` - The record sequence number used for nonce generation
+  ///
+  /// # Returns
+  ///
+  /// Returns a tuple containing:
+  /// - A `PlainMessage` with the decrypted payload and true content type
+  /// - A `RecordMeta` containing decryption metadata for debugging/verification 
+  ///
+  /// # Errors
+  ///
+  /// Returns `BackendError` if:
+  /// - Decryption fails (invalid tag, corrupted message)
+  /// - Wrong key type is used (must be CHACHA20POLY1305)
+  /// - Message contains invalid padding or content type
+  ///
+  /// # Panics
+  ///
+  /// Panics if the write key is not a CHACHA20POLY1305 key
+  ///
   pub fn decrypt_tls13_chacha20(
     &self,
     m: &OpaqueMessage,
@@ -957,7 +1029,7 @@ impl Decrypter {
 
     let write_key = match self.write_key {
       CipherSuiteKey::CHACHA20POLY1305(key) => key,
-      _ => panic!("wrong key"),};
+      _ => unreachable!("wrong key"),};
 
     let write_key = Key::from_slice(&write_key);
     let cipher = ChaCha20Poly1305::new(write_key);
@@ -1008,7 +1080,7 @@ impl Decrypter {
 
     let write_key = match self.write_key {
       CipherSuiteKey::AES128GCM(key) => key,
-      _ => panic!("wrong key"),};
+      _ => unreachable!("wrong key"),};
 
     let cipher = Aes128Gcm::new_from_slice(&write_key).unwrap();
     let nonce = GenericArray::<u8, U12>::from_slice(&init_nonce);
