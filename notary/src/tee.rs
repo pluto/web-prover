@@ -17,6 +17,7 @@ use crate::{errors::ProxyError, SharedState};
 #[derive(Serialize)]
 pub struct AttestationReply {
   token: String,
+  error: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -26,14 +27,14 @@ pub async fn attestation(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<AttestationBody>,
 ) -> Result<Json<AttestationReply>, ProxyError> {
-  let mut response = AttestationReply { token: "".to_string() };
+  let mut response = AttestationReply { token: "".to_string(), error: "".to_string() };
 
   match run_tee_util() {
     Ok(stdout) => {
 		response.token = stdout
 	},
     Err(e) => {
-      println!("{:}", e)
+		response.error = format!("{:?}", e)
     },
   }
 
