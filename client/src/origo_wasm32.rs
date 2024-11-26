@@ -180,7 +180,8 @@ async fn proxy(
   let mut client_socket = connection_receiver.await.unwrap()?.io.into_inner();
   client_socket.close().await.unwrap();
 
-  Ok(origo_conn.lock().unwrap())
+  let origo_conn = origo_conn.lock().unwrap().deref().clone();
+  Ok(origo_conn)
 }
 
 use core::slice;

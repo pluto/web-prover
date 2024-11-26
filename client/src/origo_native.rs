@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
@@ -236,5 +236,6 @@ async fn proxy(
   let mut client_socket = connection_receiver.await??.io.into_inner().into_inner();
   client_socket.close().await?;
 
-  Ok(origo_conn.lock().unwrap())
+  let origo_conn = origo_conn.lock().unwrap().deref().clone();
+  Ok(origo_conn)
 }
