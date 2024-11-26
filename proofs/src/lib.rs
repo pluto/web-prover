@@ -80,6 +80,7 @@ pub type ProverKey = client_side_prover::supernova::snark::ProverKey<E1, S1, S2>
 /// curves and engines.
 pub type VerifierKey = client_side_prover::supernova::snark::VerifierKey<E1, S1, S2>;
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BackendData {
   pub aux_params:   AuxParams,
   pub prover_key:   ProverKey,
