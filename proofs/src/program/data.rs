@@ -86,7 +86,7 @@ pub struct SerializedParams {
   #[serde(with = "serde_bytes")]
   pub hash_params:    Vec<u8>,
   #[serde(with = "serde_bytes")]
-  pub ck_primary:    Vec<u8>,
+  pub ck_primary:     Vec<u8>,
 }
 
 // Note, the below are typestates that prevent misuse of our current API.
@@ -267,24 +267,20 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
     let cp = self.public_params.circuit_params;
     let hp: AuxParamsHash<E1> = bincode::deserialize(&self.public_params.hash_params).unwrap();
 
-    use halo2curves::serde::SerdeObject;
-    use halo2curves::bn256::G1Affine;
-    use halo2curves::group::cofactor::CofactorCurveAffine;
+    use halo2curves::{bn256::G1Affine, group::cofactor::CofactorCurveAffine, serde::SerdeObject};
     let in_len = self.public_params.ck_primary.len();
     debug!("begin loading ck_primary key, len={:?}", in_len);
     let mut ck = Vec::new();
     let size = G1Affine::identity().to_raw_bytes().len();
     for b in self.public_params.ck_primary.chunks(size).into_iter() {
-        let p = G1Affine::from_raw_bytes(b).unwrap();
-        ck.push(p);
+      let p = G1Affine::from_raw_bytes(b).unwrap();
+      ck.push(p);
     }
     let ck_len = ck.len();
-    let key = Arc::new(CommitmentKey::<E1>{
-      ck
-    });
-    debug!("done loading ck_primary key len={:?}", ck_len); 
+    let key = Arc::new(CommitmentKey::<E1> { ck });
+    debug!("done loading ck_primary key len={:?}", ck_len);
 
-    let aux_params = AuxParams { 
+    let aux_params = AuxParams {
       ck_primary: key,
       ck_secondary: cp.ck_secondary,
       augmented_circuit_params_primary: cp.augmented_circuit_params_primary,
@@ -416,10 +412,10 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
 
     let Self { setup_data, rom_data, rom, initial_nivc_input, inputs, witnesses, .. } = self;
     Ok(ProgramData {
-      public_params: SerializedParams { 
-        circuit_params, 
+      public_params: SerializedParams {
+        circuit_params,
         hash_params: serialized_bin,
-        ck_primary: out
+        ck_primary: out,
       },
       setup_data,
       rom_data,

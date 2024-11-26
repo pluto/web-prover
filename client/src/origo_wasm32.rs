@@ -28,7 +28,10 @@ use crate::{
   Proof,
 };
 
-pub async fn proxy_and_sign(mut config: config::Config, ck_primary: Option<Vec<u8>>) -> Result<Proof, errors::ClientErrors> {
+pub async fn proxy_and_sign(
+  mut config: config::Config,
+  ck_primary: Option<Vec<u8>>,
+) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
   let (sb, witness) = proxy(config.clone(), session_id.clone()).await?;
 
@@ -87,10 +90,10 @@ async fn generate_program_data(
   // TODO: Very jankily override the invalid ck_primary
   use proofs::program::data::SerializedParams;
   let inbound = proving.params.unwrap();
-  let serialized_params = SerializedParams{
+  let serialized_params = SerializedParams {
     circuit_params: inbound.circuit_params,
-    hash_params: inbound.hash_params,
-    ck_primary: original,
+    hash_params:    inbound.hash_params,
+    ck_primary:     original,
   };
 
   let pd = ProgramData::<Offline, NotExpanded> {

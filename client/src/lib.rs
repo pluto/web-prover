@@ -24,7 +24,10 @@ pub enum Proof {
   Origo((Vec<u8>, Vec<u8>)),
 }
 
-pub async fn prover_inner(config: config::Config, ck_primary: Option<Vec<u8>>) -> Result<Proof, errors::ClientErrors> {
+pub async fn prover_inner(
+  config: config::Config,
+  ck_primary: Option<Vec<u8>>,
+) -> Result<Proof, errors::ClientErrors> {
   info!("GIT_HASH: {}", env!("GIT_HASH"));
   match config.mode {
     config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
@@ -64,7 +67,10 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, erro
   Ok(Proof::TLSN(p))
 }
 
-pub async fn prover_inner_origo(config: config::Config, ck_primary: Option<Vec<u8>>) -> Result<Proof, errors::ClientErrors> {
+pub async fn prover_inner_origo(
+  config: config::Config,
+  ck_primary: Option<Vec<u8>>,
+) -> Result<Proof, errors::ClientErrors> {
   #[cfg(target_arch = "wasm32")]
   return origo_wasm32::proxy_and_sign(config, ck_primary).await;
 
