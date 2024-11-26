@@ -13,7 +13,6 @@ async function initializeWasm(memory) {
             shared: true, // Enable shared memory
         });
         await init(undefined, memory);
-        // await init();
         setup_tracing("debug,tlsn_extension_rs=debug");
         await initThreadPool(numConcurrency);
         wasmInitialized = true;
@@ -55,11 +54,11 @@ function end() {
 
 self.onmessage = async function (e) {
     try {
-        const { proverConfig, memory } = e.data;
+        const { proverConfig, ck_primary, memory } = e.data;
         sharedMemory = memory;
         await initializeWasm(sharedMemory);
         start();
-        const proof = await prover(proverConfig);
+        const proof = await prover(proverConfig, new Uint8Array(ck_primary));
         console.log("sending proof back to main thread");
         end();
         postMessage({ type: 'proof', data: proof });

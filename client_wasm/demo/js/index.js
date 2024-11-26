@@ -57,6 +57,13 @@ const getSerializedCircuitParams = async function (setupFile) {
   return pp;
 }
 
+const getCKPrimary = async function (setupFile) {
+  const ppUrl = new URL(`${setupFile}.bytes`, "https://localhost:8090/build/").toString();
+  const pp = await fetch(ppUrl).then((r) => r.arrayBuffer());
+  console.log("ck_primary", pp);
+  return pp;
+}
+
 async function generateWitness(circuit, input, wasm) {
   const witStart = +Date.now();
   let wtns = { type: "mem" };
@@ -339,6 +346,7 @@ console.log("witness", witnesses);
 
 var hp = await getSerializedHashParams("serialized_setup_aes");
 var cp = await getSerializedCircuitParams("serialized_setup_aes");
+var ck_primary = await getCKPrimary("serialized_setup_aes");
 
 start();
 
@@ -357,6 +365,7 @@ let proverConfig = {
     params: {
       circuit_params: cp,
       hash_params: hp,
+      ck_primary: [],
     },
     manifest: {
       "manifestVersion": "1",
@@ -406,7 +415,7 @@ let proverConfig = {
 
 const proofWorker = new Worker(new URL("./proof.js", import.meta.url), { type: "module" });
 console.log("sending message to worker");
-proofWorker.postMessage({ proverConfig, memory });
+proofWorker.postMessage({ proverConfig, ck_primary, memory });
 
 proofWorker.onmessage = (event) => {
   if (event.data.error) {

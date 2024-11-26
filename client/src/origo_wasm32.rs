@@ -28,14 +28,14 @@ use crate::{
   Proof,
 };
 
-pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
+pub async fn proxy_and_sign(mut config: config::Config, ck_primary: Option<Vec<u8>>) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
   let (sb, witness) = proxy(config.clone(), session_id.clone()).await?;
 
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
 
   debug!("generating NIVC program data!");
-  let program_data = generate_program_data(&witness, config.proving).await?;
+  let program_data = generate_program_data(&witness, config.proving, ck_primary).await?;
 
   debug!("starting proof generation!");
   let program_output = program::run(&program_data)?;
@@ -59,6 +59,7 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
 async fn generate_program_data(
   witness: &WitnessData,
   proving: ProvingData,
+  ck_primary: Option<Vec<u8>>,
 ) -> Result<ProgramData<Online, Expanded>, errors::ClientErrors> {
   let (request_inputs, _response_inputs) = decrypt_tls_ciphertext(witness)?;
 
@@ -71,16 +72,29 @@ async fn generate_program_data(
   // let (response_rom_data, response_rom, response_fold_inputs) =
   // proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
 
+  debug!("start loading witnesses from json into objects");
   let mut witnesses = Vec::new();
   for w in proving.witnesses.unwrap() {
     witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w)))?);
   }
+  debug!("done loading witnesses from json into objects");
 
   debug!("generating public params");
   // let public_params = program::setup(&setup_data);
 
+  let original = ck_primary.unwrap();
+  debug!("generated intermediate serialzied params: len={:?}", original.len());
+  // TODO: Very jankily override the invalid ck_primary
+  use proofs::program::data::SerializedParams;
+  let inbound = proving.params.unwrap();
+  let serialized_params = SerializedParams{
+    circuit_params: inbound.circuit_params,
+    hash_params: inbound.hash_params,
+    ck_primary: original,
+  };
+
   let pd = ProgramData::<Offline, NotExpanded> {
-    public_params: proving.params.unwrap(),
+    public_params: serialized_params,
     setup_data,
     rom: request_rom,
     rom_data: request_rom_data,

@@ -23,11 +23,13 @@ pub use wasm_bindgen_rayon::init_thread_pool;
 use ws_stream_wasm::WsMeta;
 
 #[wasm_bindgen]
-pub async fn prover(config: JsValue) -> Result<String, JsValue> {
+pub async fn prover(config: JsValue, ck_primary: Vec<u8>) -> Result<String, JsValue> {
+  debug!("prover: pre-serde, received ck_primary={:?}", ck_primary.len());
   panic::set_hook(Box::new(console_error_panic_hook::hook));
   let config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
+  debug!("prover: post-serde");
 
-  let proof = client::prover_inner(config)
+  let proof = client::prover_inner(config, Some(ck_primary))
     .await
     .map_err(|e| JsValue::from_str(&format!("Could not produce proof: {:?}", e)))?;
 

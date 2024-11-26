@@ -16,7 +16,7 @@ use super::*;
 #[serde(bound = "")]
 pub struct AuxParamsCircuit<E1>
 where E1: CurveCycleEquipped {
-  ck_primary: Arc<CommitmentKey<E1>>, // This is shared between all circuit params
+  // ck_primary: Arc<CommitmentKey<E1>>, // This is shared between all circuit params
   augmented_circuit_params_primary: SuperNovaAugmentedCircuitParams,
   ck_secondary: Arc<CommitmentKey<Dual<E1>>>,
   circuit_shape_secondary: R1CSWithArity<Dual<E1>>,
@@ -82,9 +82,11 @@ pub enum WitnessGeneratorType {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SerializedParams {
-  circuit_params: AuxParamsCircuit<E1>,
+  pub circuit_params: AuxParamsCircuit<E1>,
   #[serde(with = "serde_bytes")]
-  hash_params:    Vec<u8>,
+  pub hash_params:    Vec<u8>,
+  #[serde(with = "serde_bytes")]
+  pub ck_primary:    Vec<u8>,
 }
 
 // Note, the below are typestates that prevent misuse of our current API.
@@ -265,8 +267,25 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
     let cp = self.public_params.circuit_params;
     let hp: AuxParamsHash<E1> = bincode::deserialize(&self.public_params.hash_params).unwrap();
 
-    let aux_params = AuxParams {
-      ck_primary: cp.ck_primary,
+    use halo2curves::serde::SerdeObject;
+    use halo2curves::bn256::G1Affine;
+    use halo2curves::group::cofactor::CofactorCurveAffine;
+    let in_len = self.public_params.ck_primary.len();
+    debug!("begin loading ck_primary key, len={:?}", in_len);
+    let mut ck = Vec::new();
+    let size = G1Affine::identity().to_raw_bytes().len();
+    for b in self.public_params.ck_primary.chunks(size).into_iter() {
+        let p = G1Affine::from_raw_bytes(b).unwrap();
+        ck.push(p);
+    }
+    let ck_len = ck.len();
+    let key = Arc::new(CommitmentKey::<E1>{
+      ck
+    });
+    debug!("done loading ck_primary key len={:?}", ck_len); 
+
+    let aux_params = AuxParams { 
+      ck_primary: key,
       ck_secondary: cp.ck_secondary,
       augmented_circuit_params_primary: cp.augmented_circuit_params_primary,
       circuit_shape_secondary: cp.circuit_shape_secondary,
@@ -350,8 +369,14 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
     let (_, aux_params) = self.public_params.into_parts();
 
     let sp = aux_params.clone();
+    use halo2curves::serde::SerdeObject;
+    let mut out: Vec<u8> = vec![];
+    for i in &sp.ck_primary.ck {
+      let mut bytes = i.to_raw_bytes().clone();
+      out.append(&mut bytes);
+    }
+
     let circuit_params = AuxParamsCircuit::<E1> {
-      ck_primary: sp.ck_primary,
       ck_secondary: sp.ck_secondary,
       augmented_circuit_params_primary: sp.augmented_circuit_params_primary,
       circuit_shape_secondary: sp.circuit_shape_secondary,
@@ -379,15 +404,23 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
       format!("{}/{}.json", path.parent().unwrap().to_str().unwrap(), stem.to_str().unwrap());
     let bin_path =
       format!("{}/{}.bin", path.parent().unwrap().to_str().unwrap(), stem.to_str().unwrap());
-    debug!("json_path={:?}, bin_path={:?}", json_path, bin_path);
+    let bytes_path =
+      format!("{}/{}.bytes", path.parent().unwrap().to_str().unwrap(), stem.to_str().unwrap());
+    debug!("json_path={:?}, bin_path={:?}, bytes_path={:?}", json_path, bin_path, bytes_path);
     let mut json_file = std::fs::File::create(&json_path)?;
     let mut bin_file = std::fs::File::create(&bin_path)?;
+    let mut bytes_file = std::fs::File::create(&bytes_path)?;
     json_file.write_all(&serialized_json.as_bytes())?;
     bin_file.write_all(&serialized_bin)?;
+    bytes_file.write_all(&out)?;
 
     let Self { setup_data, rom_data, rom, initial_nivc_input, inputs, witnesses, .. } = self;
     Ok(ProgramData {
-      public_params: SerializedParams { circuit_params, hash_params: serialized_bin },
+      public_params: SerializedParams { 
+        circuit_params, 
+        hash_params: serialized_bin,
+        ck_primary: out
+      },
       setup_data,
       rom_data,
       rom,
@@ -571,7 +604,7 @@ mod tests {
     let public_params = program::setup(&setup_data);
     let ap = public_params.aux_params();
     let circuit_params = AuxParamsCircuit::<E1> {
-      ck_primary: ap.ck_primary,
+      // ck_primary: ap.ck_primary,
       ck_secondary: ap.ck_secondary,
       augmented_circuit_params_primary: ap.augmented_circuit_params_primary,
       circuit_shape_secondary: ap.circuit_shape_secondary,
@@ -581,7 +614,7 @@ mod tests {
 
     let mock_inputs: MockInputs = serde_json::from_str(JSON).unwrap();
     let program_data = ProgramData::<Offline, NotExpanded> {
-      public_params: SerializedParams { circuit_params, hash_params: vec![] },
+      public_params: SerializedParams { circuit_params, hash_params: vec![], ck_primary: vec![] },
       setup_data,
       rom_data: HashMap::from([
         (String::from("CIRCUIT_1"), CircuitData { opcode: 0 }),

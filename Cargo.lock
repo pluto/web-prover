@@ -1333,7 +1333,7 @@ dependencies = [
 [[package]]
 name = "client-side-prover"
 version = "0.1.0"
-source = "git+https://github.com/pluto/client-side-prover?branch=tl-deserialize-try#2ad822bf61d4ae49ab2586e7ed42d3d438d5d9d1"
+source = "git+https://github.com/pluto/client-side-prover?branch=tl-deserialize-try#bad6eeadcc9d1c2ae95c3ead923ef3021a37ee36"
 dependencies = [
  "bellpepper",
  "bellpepper-core",
