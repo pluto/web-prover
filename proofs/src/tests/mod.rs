@@ -2,9 +2,14 @@
 
 // TODO: (Colin): I'm noticing this module could use some TLC. There's a lot of lint here!
 
-use client_side_prover::supernova::RecursiveSNARK;
+use std::time::Instant;
+
+use client_side_prover::supernova::{get_circuit_shapes, RecursiveSNARK};
 use halo2curves::bn256::Fr;
-use program::data::{CircuitData, InstructionConfig};
+use program::{
+  data::{CircuitData, InstructionConfig, Offline},
+  initialize_circuit_list, Memory,
+};
 use serde_json::json;
 use witness::{compute_http_witness, compute_json_witness};
 
@@ -25,7 +30,7 @@ const MAX_ROM_LENGTH: usize = 10;
 
 // -----------------------------------------------------------------------------------------------
 // JSON Proof Material
-const JSON_MAX_ROM_LENGTH: usize = 45;
+const JSON_MAX_ROM_LENGTH: usize = 48;
 
 // Circuit 0
 const AES_GCM_R1CS: &[u8] =
@@ -135,6 +140,16 @@ const JSON_MASK_KEY_DEPTH_5: (&str, [u8; 10]) = ("key", [110, 97, 109, 101, 0, 0
 const JSON_MASK_KEYLEN_DEPTH_5: (&str, [u8; 1]) = ("keyLen", [4]);
 const MAX_VALUE_LENGTH: usize = 48;
 
+const NUMBER_OF_HEADERS: usize = 5;
+
+// Offline generated circuit data
+const AUX_PARAMS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/aux_params_512b_rom_length_48.bin");
+const PROVER_KEY: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/prover_key_512b_rom_length_48.bin");
+const VERIFIER_KEY: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/verifier_key_512b_rom_length_48.bin");
+
 #[test]
 #[tracing_test::traced_test]
 fn test_end_to_end_proofs() {
@@ -174,7 +189,17 @@ fn test_end_to_end_proofs() {
     max_rom_length:          JSON_MAX_ROM_LENGTH,
   };
   debug!("Setting up `Memory`...");
-  let public_params = program::setup(&setup_data);
+  // TODO (autoparallel): This is clunky and should be properly abstracted, this is a portion of the
+  // `into_online` which does not admit a nice API for this, honestly.
+  let start = Instant::now();
+  let aux_params: AuxParams = bincode::deserialize(AUX_PARAMS).unwrap();
+  let circuits = initialize_circuit_list(&setup_data).unwrap();
+  let memory = Memory { circuits, rom: vec![0; JSON_MAX_ROM_LENGTH] }; // Note, `rom` here is not used in setup, only `circuits`
+  let circuit_shapes = get_circuit_shapes(&memory);
+  let public_params = PublicParams::<E1>::from_parts(circuit_shapes, aux_params);
+  println!("ELAPSED TIME FOR OFFLINE BACKENDPARAMS: {:?}", start.elapsed());
+
+  // let public_params = program::setup(&setup_data);
   debug!("Creating ROM");
   let rom_data = HashMap::from([
     (String::from("AES_GCM_1"), CircuitData { opcode: 0 }),
@@ -234,6 +259,10 @@ fn test_end_to_end_proofs() {
     witness::JsonMaskType::Object("name".as_bytes().to_vec()),
   );
 
+  let mut header_list = vec!["0".to_string(); NUMBER_OF_HEADERS];
+  header_list[1] =
+    BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_header_1_hash.to_bytes()).to_str_radix(10);
+
   rom.extend([
     InstructionConfig {
       name:          String::from("HTTP_NIVC"),
@@ -244,22 +273,7 @@ fn test_end_to_end_proofs() {
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
             .to_str_radix(10)]),
         ),
-        (
-          String::from("header_hashes"),
-          json!([
-            "0".to_string(),
-            BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_header_1_hash.to_bytes())
-              .to_str_radix(10),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-          ]),
-        ),
+        (String::from("header_hashes"), json!(header_list)),
         (
           String::from("body_hash"),
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
@@ -350,7 +364,7 @@ fn test_end_to_end_proofs() {
 
   let recursive_snark = program::run(&program_data).unwrap();
 
-  let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
+  // let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
 
   let val = "\"Taylor Swift\"".as_bytes();
   let mut final_value = [0; MAX_VALUE_LENGTH];
@@ -358,14 +372,25 @@ fn test_end_to_end_proofs() {
 
   assert_eq!(*recursive_snark.zi_primary().first().unwrap(), data_hasher(&final_value));
 
-  // TODO (autoparallel): This is redundant, we call the setup inside compress_proof. We should
-  // likely just store the vk and pk
-  let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
+  // // TODO (autoparallel): This is redundant, we call the setup inside compress_proof. We should
+  // // likely just store the vk and pk
+  // let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
+
+  // Now use the offline generated keys
+  let prover_key: ProverKey = bincode::deserialize(PROVER_KEY).unwrap();
+  let verifier_key: VerifierKey = bincode::deserialize(VERIFIER_KEY).unwrap();
+
+  let proof = CompressedSNARK::<E1, S1, S2>::prove(
+    &program_data.public_params,
+    &prover_key,
+    &recursive_snark,
+  )
+  .unwrap();
 
   let (z0_primary, _) = program_data.extend_public_inputs().unwrap();
 
   let z0_secondary = vec![F::<G2>::ZERO];
-  proof.0.verify(&program_data.public_params, &vk, &z0_primary, &z0_secondary).unwrap();
+  proof.verify(&program_data.public_params, &verifier_key, &z0_primary, &z0_secondary).unwrap();
 }
 
 #[test]
