@@ -3,6 +3,7 @@ use std::{
   collections::HashMap,
   fs,
   io::{self},
+  ops::{Deref, DerefMut},
   sync::{Arc, Mutex},
   time::SystemTime,
 };
@@ -28,7 +29,7 @@ use tokio::{
   io::AsyncWriteExt,
   net::{TcpListener, TcpStream},
 };
-use tokio_rustls::{client::TlsStream, LazyConfigAcceptor, TlsAcceptor};
+use tokio_rustls::{server::TlsStream, LazyConfigAcceptor, TlsAcceptor};
 use tokio_stream::StreamExt;
 use tower_http::cors::CorsLayer;
 use tower_service::Service;
@@ -87,12 +88,11 @@ async fn main() {
     .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
     .route("/v1/origo", get(origo::proxy))
     .route("/v1/origo/sign", post(origo::sign))
-    .route(
-      "/v1/tee/attestation",
-      get(tee::attestation).layer(axum::middleware::from_fn(export_key_material_middleware)),
-    )
+    .route("/v1/tee/attestation", get(tee::attestation))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
+
+  // .layer(axum::middleware::from_fn(export_key_material_middleware)),
 
   if &c.server_cert != "" || &c.server_key != "" {
     listen(listener, router, &c.server_cert, &c.server_key).await;
@@ -176,16 +176,21 @@ async fn listen(
     tokio::spawn(async move {
       match tls_acceptor.accept(tcp_stream).await {
         Ok(tls_stream) => {
-          let io = TokioIo::new(tls_stream);
-
-          // TODO: error: `tls_stream` does not live long enough
-          let rustls_conn = tls_stream.get_ref().1;
+          // TODO add feature flag
+          // export key material
+          // let context: Option<&[u8]> = Some(b"optional-context");
+          let key_material =
+            match export_key_material_middleware(&tls_stream, 32, b"TODO_LABEL", None) {
+              Ok(key_material) => key_material,
+              Err(err) => panic!("{:?}", err), // TODO panic here?!
+            };
 
           let hyper_service = hyper::service::service_fn(move |mut request: Request<Incoming>| {
-            request.extensions_mut().insert(rustls_conn);
+            request.extensions_mut().insert(key_material.clone());
             tower_service.clone().call(request)
           });
 
+          let io = TokioIo::new(tls_stream);
           // TODO should we check returned Result here?
           let _ = protocol.serve_connection(io, hyper_service).with_upgrades().await;
         },
@@ -222,29 +227,22 @@ pub fn load_origo_signing_key(private_key_pem_path: &str) -> Secp256k1SigningKey
   Secp256k1SigningKey::from_pkcs8_pem(&raw).unwrap()
 }
 
-pub async fn export_key_material_middleware(
-  mut req: Request,
-  next: Next,
-) -> Result<Response, StatusCode> {
-  let tls_stream = req.extensions_mut().get_mut::<TlsStream<TcpStream>>().unwrap();
+fn export_key_material_middleware(
+  tls_stream: &TlsStream<TcpStream>,
+  length: usize,
+  label: &[u8],
+  context: Option<&[u8]>,
+) -> Result<Vec<u8>, io::Error> {
   let rustls_conn = tls_stream.get_ref().1;
 
   if rustls_conn.is_handshaking() {
-    panic!("todo: tls connection is still handshaking")
-  }
-  // rustls_conn.export_keying_material(output, label, context)
-  let mut key_material = vec![0u8; 32]; // Length of keying material
-  let label = b"EXPORTER-LABEL";
-  let context: Option<&[u8]> = Some(b"optional-context");
-
-  match rustls_conn.export_keying_material(&mut key_material, label, context) {
-    Ok(_) => {
-      info!("Keying Material: {:?}", key_material);
-    },
-    Err(err) => {
-      panic!("Failed to export keying material: {err}");
-    },
+    return Err(io::Error::new(io::ErrorKind::Other, "TLS connection is still handshaking"));
   }
 
-  Ok(next.run(req).await)
+  let mut output = vec![0u8; length];
+  rustls_conn.export_keying_material(&mut output, label, context).map_err(|err| {
+    io::Error::new(io::ErrorKind::Other, format!("Failed to export keying material: {err}"))
+  })?;
+
+  Ok(output)
 }
