@@ -2,7 +2,7 @@ use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
 use client_side_prover::{
   supernova::{NonUniformCircuit, RecursiveSNARK, StepCircuit},
-  traits::snark::default_ck_hint,
+  traits::snark::{default_ck_hint, BatchedRelaxedR1CSSNARKTrait},
 };
 use data::Expanded;
 use proof::Proof;
@@ -96,7 +96,7 @@ pub fn setup(setup_data: &SetupData) -> PublicParams<E1> {
   // ever and it seems like it may get used more frequently.
   let circuits = initialize_circuit_list(setup_data).unwrap(); // TODO, change the type signature of trait to use arbitrary error types.
   let memory = Memory { circuits, rom: vec![0; setup_data.max_rom_length] }; // Note, `rom` here is not used in setup, only `circuits`
-  let public_params = PublicParams::setup(&memory, &*default_ck_hint(), &*default_ck_hint());
+  let public_params = PublicParams::setup(&memory, &*S1::ck_floor(), &*S2::ck_floor());
 
   #[cfg(feature = "timing")]
   trace!("`PublicParams::setup()` elapsed: {:?}", time.elapsed());
