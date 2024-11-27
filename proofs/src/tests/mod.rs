@@ -152,6 +152,36 @@ const VERIFIER_KEY: &[u8] =
 
 #[test]
 #[tracing_test::traced_test]
+fn test_setup_backend() {
+  let setup_data = SetupData {
+    r1cs_types:              vec![
+      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
+      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+    ],
+    witness_generator_types: vec![
+      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
+    ],
+    max_rom_length:          JSON_MAX_ROM_LENGTH,
+  };
+
+  let BackendData { aux_params, prover_key, verifier_key } = setup_backend(&setup_data).unwrap();
+  let serialized_aux_params = bincode::serialize(&aux_params).unwrap();
+  dbg!(serialized_aux_params.len());
+  let serialized_prover_key = bincode::serialize(&prover_key).unwrap();
+  dbg!(serialized_prover_key.len());
+  let serialized_verifier_key = bincode::serialize(&verifier_key).unwrap();
+  dbg!(serialized_verifier_key.len());
+}
+
+#[test]
+#[tracing_test::traced_test]
 fn test_end_to_end_proofs() {
   // HTTP/1.1 200 OK
   // content-type: application/json; charset=utf-8
@@ -193,11 +223,17 @@ fn test_end_to_end_proofs() {
   // `into_online` which does not admit a nice API for this, honestly.
   let start = Instant::now();
   let aux_params: AuxParams = bincode::deserialize(AUX_PARAMS).unwrap();
+  println!("AuxParams::deserialize elapsed: {:?}", start.elapsed());
+  let start = Instant::now();
   let circuits = initialize_circuit_list(&setup_data).unwrap();
+  println!("initialize_circuit_list elapsed: {:?}", start.elapsed());
+  let start = Instant::now();
   let memory = Memory { circuits, rom: vec![0; JSON_MAX_ROM_LENGTH] }; // Note, `rom` here is not used in setup, only `circuits`
   let circuit_shapes = get_circuit_shapes(&memory);
+  println!("get_circuit_shapes elapsed: {:?}", start.elapsed());
+  let start = Instant::now();
   let public_params = PublicParams::<E1>::from_parts(circuit_shapes, aux_params);
-  println!("ELAPSED TIME FOR OFFLINE BACKENDPARAMS: {:?}", start.elapsed());
+  println!("PublicParams::from_parts elapsed: {:?}", start.elapsed());
 
   // let public_params = program::setup(&setup_data);
   debug!("Creating ROM");
@@ -377,8 +413,12 @@ fn test_end_to_end_proofs() {
   // let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
 
   // Now use the offline generated keys
+  let start = Instant::now();
   let prover_key: ProverKey = bincode::deserialize(PROVER_KEY).unwrap();
+  println!("ProverKey::deserialize elapsed {:?}", start.elapsed());
+  let start = Instant::now();
   let verifier_key: VerifierKey = bincode::deserialize(VERIFIER_KEY).unwrap();
+  println!("VerifierKey::deserialize elapsed {:?}", start.elapsed());
 
   let proof = CompressedSNARK::<E1, S1, S2>::prove(
     &program_data.public_params,

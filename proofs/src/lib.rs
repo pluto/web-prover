@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf, str::FromStr};
 use circom::CircomCircuit;
 use client_side_prover::{
   provider::GrumpkinEngine,
-  spartan::batched::BatchedRelaxedR1CSSNARK,
+  spartan::batched_ppsnark::BatchedRelaxedR1CSSNARK,
   supernova::{snark::CompressedSNARK, PublicParams, TrivialCircuit},
   traits::{Engine, Group},
 };
@@ -25,15 +25,14 @@ pub mod proof;
 #[cfg(test)] mod tests;
 pub mod witness;
 
-pub type E1 = client_side_prover::provider::Bn256EngineKZG;
-// pub type E1 = Bn256EngineIPA;
+// pub type E1 = client_side_prover::provider::Bn256EngineKZG;
+pub type E1 = client_side_prover::provider::Bn256EngineIPA;
 pub type E2 = GrumpkinEngine;
 pub type G1 = <E1 as Engine>::GE;
 pub type G2 = <E2 as Engine>::GE;
-pub type EE1 =
-  client_side_prover::provider::hyperkzg::EvaluationEngine<halo2curves::bn256::Bn256, E1>;
-// pub type EE1 = client_side_prover::provider::hyperkzg::EvaluationEngine<E1>;l
-// pub type EE1 = client_side_prover::provider::ipa_pc::EvaluationEngine<E1>;
+// pub type EE1 =
+//   client_side_prover::provider::hyperkzg::EvaluationEngine<halo2curves::bn256::Bn256, E1>;
+pub type EE1 = client_side_prover::provider::ipa_pc::EvaluationEngine<E1>;
 pub type EE2 = client_side_prover::provider::ipa_pc::EvaluationEngine<E2>;
 pub type S1 = BatchedRelaxedR1CSSNARK<E1, EE1>;
 pub type S2 = BatchedRelaxedR1CSSNARK<E2, EE2>;
@@ -93,8 +92,8 @@ pub struct BackendData {
 /// # Arguments
 /// - `setup_data`: the data that defines what types of supernova programs can be run, i.e.,
 ///   specified by a list of circuit R1CS and max ROM length.
-pub fn setup_backend(setup_data: SetupData) -> Result<BackendData, ProofError> {
-  let public_params = program::setup(&setup_data);
+pub fn setup_backend(setup_data: &SetupData) -> Result<BackendData, ProofError> {
+  let public_params = program::setup(setup_data);
   let (prover_key, verifier_key) = CompressedSNARK::<E1, S1, S2>::setup(&public_params)?;
   Ok(BackendData { aux_params: public_params.aux_params(), prover_key, verifier_key })
 }
