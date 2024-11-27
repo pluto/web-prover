@@ -360,6 +360,7 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
     info!("public params from parts");
     let public_params = PublicParams::<E1>::from_parts(circuit_shapes, aux_params);
     let Self { setup_data, rom, initial_nivc_input, inputs, witnesses, rom_data, .. } = self;
+    
     Ok(ProgramData {
       public_params,
       setup_data,

@@ -67,10 +67,9 @@ async fn generate_program_data(
   let (request_inputs, _response_inputs) = decrypt_tls_ciphertext(witness)?;
 
   let setup_data = construct_setup_data_512();
-
   let (request_rom_data, request_rom, request_fold_inputs) =
     proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);
-
+    
   // // pad AES response ciphertext
   // let (response_rom_data, response_rom, response_fold_inputs) =
   // proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
@@ -105,16 +104,6 @@ async fn generate_program_data(
     witnesses,
   }
   .into_online();
-
-  // let pd = ProgramData::<Online, NotExpanded> {
-  //   public_params,
-  //   setup_data,
-  //   rom,
-  //   rom_data,
-  //   initial_nivc_input: final_input.to_vec(),
-  //   inputs,
-  //   witnesses,
-  // };
 
   debug!("online -> expanded");
   Ok(pd?.into_expanded()?)

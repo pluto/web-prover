@@ -10,10 +10,6 @@ use proofs::program::data::{R1CSType, SetupData, WitnessGeneratorType};
 pub const JSON_MAX_ROM_LENGTH: usize = 45;
 pub const JSON_MAX_ROM_1024B_LENGTH: usize = 80;
 
-#[cfg(target_arch = "wasm32")]
-pub const SERIALIZED_AUX_PARAMS: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/serialized_setup_aes.bin");
-
 // Circuit 0
 pub const AES_GCM_R1CS: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_512b/aes_gctr_nivc_512b.r1cs");
@@ -72,6 +68,7 @@ pub const EXTRACT_VALUE_1024_R1CS: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_1024b/json_extract_value_1024b.r1cs");
 pub const EXTRACT_VALUE_1024_GRAPH: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_1024b/json_extract_value_1024b.bin");
+
 #[cfg(not(target_arch = "wasm32"))]
 /// construct [`SetupData`] with all the required circuits for 512B inputs
 pub fn construct_setup_data_512() -> SetupData {
