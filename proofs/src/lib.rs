@@ -1,9 +1,8 @@
-#![feature(internal_output_capture)]
 use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use circom::CircomCircuit;
 use client_side_prover::{
-  provider::{Bn256EngineIPA, GrumpkinEngine},
+  provider::GrumpkinEngine,
   spartan::batched::BatchedRelaxedR1CSSNARK,
   supernova::{snark::CompressedSNARK, PublicParams, TrivialCircuit},
   traits::{Engine, Group},
@@ -68,4 +67,34 @@ pub fn compute_web_proof(
   let proof = program::compress_proof(&recursive_snark, &program_data.public_params)?;
   let serialized_proof = proof.serialize_and_compress();
   Ok(serialized_proof.0)
+}
+
+/// Represents the params needed to create `PublicParams` alongside the circuits' R1CSs.
+/// Specifically typed to the `proofs` crate choices of curves and engines.
+pub type AuxParams = client_side_prover::supernova::AuxParams<E1>;
+/// The `ProverKey` needed to create a `CompressedSNARK` using the `proofs` crate choices of curves
+/// and engines.
+pub type ProverKey = client_side_prover::supernova::snark::ProverKey<E1, S1, S2>;
+/// The `VerifierKey` needed to create a `CompressedSNARK` using the `proofs` crate choices of
+/// curves and engines.
+pub type VerifierKey = client_side_prover::supernova::snark::VerifierKey<E1, S1, S2>;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BackendData {
+  pub aux_params:   AuxParams,
+  pub prover_key:   ProverKey,
+  pub verifier_key: VerifierKey,
+}
+
+/// Method used externally to setup all the backend data needed to create a verifiable proof with
+/// [`client_side_prover`] and `proofs` crate. Intended to be used to create these values offline
+/// and then be loaded at or before proof creation or verification.
+///
+/// # Arguments
+/// - `setup_data`: the data that defines what types of supernova programs can be run, i.e.,
+///   specified by a list of circuit R1CS and max ROM length.
+pub fn setup_backend(setup_data: SetupData) -> Result<BackendData, ProofError> {
+  let public_params = program::setup(&setup_data);
+  let (prover_key, verifier_key) = CompressedSNARK::<E1, S1, S2>::setup(&public_params)?;
+  Ok(BackendData { aux_params: public_params.aux_params(), prover_key, verifier_key })
 }

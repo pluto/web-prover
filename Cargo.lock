@@ -1298,7 +1298,7 @@ dependencies = [
 [[package]]
 name = "client-side-prover"
 version = "0.1.0"
-source = "git+https://github.com/pluto/client-side-prover?rev=316912f#316912f90ffb83456adc7a0112c4fd268016bb8d"
+source = "git+https://github.com/pluto/client-side-prover?rev=2585467#2585467ea4c7edfcc09e4f14eee8344c5a09e453"
 dependencies = [
  "bellpepper",
  "bellpepper-core",
