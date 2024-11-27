@@ -201,6 +201,7 @@ pub fn compress_proof(
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
   let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(public_params)?;
+  debug!("Done setting up `CompressedSNARK`");
   #[cfg(feature = "timing")]
   trace!("`CompressedSNARK::setup` elapsed: {:?}", time.elapsed());
 
