@@ -1,3 +1,4 @@
+use core::panic;
 use std::{
   collections::HashMap,
   fs,
@@ -168,6 +169,27 @@ async fn listen(
     tokio::spawn(async move {
       match tls_acceptor.accept(tcp_stream).await {
         Ok(tls_stream) => {
+
+          // ----
+          let rustls_conn = tls_stream.get_ref().1;
+          if rustls_conn.is_handshaking() {
+            panic!("todo: tls connection is still handshaking")
+          }
+          // rustls_conn.export_keying_material(output, label, context)
+          let mut key_material = vec![0u8; 32]; // Length of keying material
+          let label = b"EXPORTER-LABEL";
+          let context: Option<&[u8]> = Some(b"optional-context");
+
+          match rustls_conn.export_keying_material(&mut key_material, label, context) {
+            Ok(_) => {
+              info!("Keying Material: {:?}", key_material);
+            },
+            Err(err) => {
+              panic!("Failed to export keying material: {err}");
+            },
+          }
+          // ----
+
           let io = TokioIo::new(tls_stream);
           let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
             tower_service.clone().call(request)
