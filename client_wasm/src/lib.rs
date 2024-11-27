@@ -27,29 +27,42 @@ use ws_stream_wasm::WsMeta;
 // package.
 #[wasm_bindgen(getter_with_clone)]
 pub struct ByteParamsWasm {
-  pub powers_of_g: Vec<u8>,
-  pub powers_of_h: Vec<u8>,
+  pub powers_of_g: js_sys::Uint8Array,
+  pub powers_of_h: js_sys::Uint8Array,
+  pub witnesses:   Vec<js_sys::Uint8Array>,
 }
 
 #[wasm_bindgen]
 impl ByteParamsWasm {
   #[wasm_bindgen(constructor)]
-  pub fn new(g: Vec<u8>, h: Vec<u8>) -> ByteParamsWasm { Self { powers_of_g: g, powers_of_h: h } }
+  pub fn new(
+    g: js_sys::Uint8Array,
+    h: js_sys::Uint8Array,
+    w: Vec<js_sys::Uint8Array>,
+  ) -> ByteParamsWasm {
+    Self { powers_of_g: g, powers_of_h: h, witnesses: w }
+  }
 }
 
 #[wasm_bindgen]
 pub async fn prover(config: JsValue, byte_params: ByteParamsWasm) -> Result<String, JsValue> {
-  debug!("prover: pre-serde, received byte_params={:?}", byte_params.powers_of_g.len());
+  debug!("prover: pre-serde");
   panic::set_hook(Box::new(console_error_panic_hook::hook));
-  let config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
+  let mut config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
   debug!("prover: post-serde");
 
-  let bp =
-    ByteParams { powers_of_g: byte_params.powers_of_g, powers_of_h: byte_params.powers_of_h };
+  // TODO: Refactor this object to remove witnesses from here.
+  config.proving.witnesses = Some(byte_params.witnesses.iter().map(|w| w.to_vec()).collect());
 
-  let proof = client::prover_inner(config, Some(bp))
-    .await
-    .map_err(|e| JsValue::from_str(&format!("Could not produce proof: {:?}", e)))?;
+  let proof = client::prover_inner(
+    config,
+    Some(ByteParams {
+      powers_of_g: byte_params.powers_of_g.to_vec(),
+      powers_of_h: byte_params.powers_of_h.to_vec(),
+    }),
+  )
+  .await
+  .map_err(|e| JsValue::from_str(&format!("Could not produce proof: {:?}", e)))?;
 
   serde_json::to_string_pretty(&proof)
     .map_err(|e| JsValue::from_str(&format!("Could not serialize proof: {:?}", e)))

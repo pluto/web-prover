@@ -58,11 +58,12 @@ self.onmessage = async function (e) {
         sharedMemory = memory;
         await initializeWasm(sharedMemory);
         start();
-        console.log("byte data", byte_data);
         var byte_params = new ByteParamsWasm(
             new Uint8Array(byte_data.primary_powers_g), 
-            new Uint8Array(byte_data.primary_powers_h)
+            new Uint8Array(byte_data.primary_powers_h),
+            byte_data.witnesses, 
         );
+        console.log("byte data", byte_data);
         const proof = await prover(proverConfig, byte_params);
         console.log("sending proof back to main thread");
         end();

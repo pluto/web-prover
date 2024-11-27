@@ -18,21 +18,25 @@ await init(undefined, memory);
 setup_tracing("debug,tlsn_extension_rs=debug");
 await initThreadPool(numConcurrency);
 
-var startTime, endTime;
+var startTime, endTime, startPreWitgenTime;
 
 function start() {
   startTime = performance.now();
 }
+function startPreWitgen() {
+  startPreWitgenTime = performance.now();
+}
 
 function end() {
   endTime = performance.now();
-  var timeDiff = endTime - startTime; //in ms
-  // strip the ms
+  var timeDiff = endTime - startTime;
   timeDiff /= 1000;
 
-  // get seconds
-  var seconds = Math.round(timeDiff);
-  console.log(seconds + " seconds");
+  var timeDiffWitgen = endTime - startPreWitgenTime;
+  timeDiffWitgen /= 1000;
+
+  console.log(Math.round(timeDiff) + " seconds");
+  console.log(Math.round(timeDiffWitgen) + " seconds (including witness)");
 }
 
 const _snarkjs = import("snarkjs");
@@ -420,6 +424,8 @@ var inputs = [{
 ];
 
 // TODO: Configurable identifiers
+startPreWitgen();
+
 var circuits = ["aes_gctr_nivc_512b", "http_nivc_512b", "json_mask_object_512b", "json_mask_array_index_512b", "json_extract_value_512b"];
 var witnesses = await generateWitnessBytesForRequest(circuits, inputs);
 console.log("witness", witnesses);
@@ -429,7 +435,8 @@ var cp = await getSerializedCircuitParams("serialized_setup_aes");
 var byte_data = {
   primary_powers_g: await getByteParams("serialized_setup_aes", "powers_of_g.bytes"),
   primary_powers_h: await getByteParams("serialized_setup_aes", "powers_of_h.bytes"),
-}
+  witnesses: witnesses,
+};
 
 start();
 
@@ -444,7 +451,7 @@ let proverConfig = {
   max_sent_data: 10000,
   max_recv_data: 10000,
   proving: {
-    witnesses: witnesses,
+    witnesses: [],
     params: {
       circuit_params: cp,
       hash_params: hp,
@@ -554,8 +561,8 @@ proofWorker.onmessage = (event) => {
 //   max_recv_data: 10000,
 // });
 
-end();
 // console.log(proof);
+end();
 
 // ./fixture/cets/notary.pub
 const pubkey =
