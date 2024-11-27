@@ -11,8 +11,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-
-	"github.com/google/go-attestation/attest"
 )
 
 const (
@@ -38,29 +36,11 @@ func main() {
 	}
 
 	// ---
-
-	config := &attest.OpenConfig{
-		// TPMVersion: attest.TPMVersion20,
-	}
-	tpm, err := attest.OpenTPM(config)
-	if err != nil {
-		panic(err)
-	}
-	defer tpm.Close()
-
-	eks, err := tpm.EKs()
-	if err != nil {
-		panic(eks)
-	}
-
-	// ---
 	// debug out
 	out := struct {
 		CustomToken string
-		EKS         []attest.EK
 	}{
 		CustomToken: string(customToken),
-		EKS:         eks,
 	}
 
 	var buf bytes.Buffer
@@ -101,23 +81,3 @@ func getCustomTokenBytes(request CustomTokenRequest) ([]byte, error) {
 
 	return bytes.TrimSpace(tokenbytes), nil
 }
-
-// ------
-
-// EK is a burned-in endorcement key bound to a TPM. This optionally contains
-// a certificate that can chain to the TPM manufacturer.
-// type EK struct {
-// 	// Public key of the EK.
-// 	Public crypto.PublicKey
-
-// 	// Certificate is the EK certificate for TPMs that provide it.
-// 	Certificate *x509.Certificate
-
-// 	// For Intel TPMs, Intel hosts certificates at a public URL derived from the
-// 	// Public key. Clients or servers can perform an HTTP GET to this URL, and
-// 	// use ParseEKCertificate on the response body.
-// 	CertificateURL string
-
-// 	// The EK persistent handle.
-// 	handle tpmutil.Handle
-// }
