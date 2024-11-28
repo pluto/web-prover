@@ -78,20 +78,20 @@ pub(crate) fn decrypt_tls_ciphertext(
   witness: &WitnessData,
 ) -> Result<(AESEncryptionInput, AESEncryptionInput), ClientErrors> {
   // - get AES key, IV, request ciphertext, request plaintext, and AAD -
-  let (key, cipher_suite) = match witness.request.aes_key.len() {
+  let (key, cipher_suite) = match witness.request.aead_key.len() {
     // chacha has 32 byte keys
     32 => (
-      CipherSuiteKey::CHACHA20POLY1305(witness.request.aes_key[..32].try_into()?),
+      CipherSuiteKey::CHACHA20POLY1305(witness.request.aead_key[..32].try_into()?),
       CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
     ),
     // aes has 16 byte keys
     16 => (
-      CipherSuiteKey::AES128GCM(witness.request.aes_key[..16].try_into()?),
+      CipherSuiteKey::AES128GCM(witness.request.aead_key[..16].try_into()?),
       CipherSuite::TLS13_AES_128_GCM_SHA256,
     ),
     _ => panic!("Unsupported key length"),
   };
-  let iv: [u8; 12] = witness.request.aes_iv[..12].try_into()?;
+  let iv: [u8; 12] = witness.request.aead_iv[..12].try_into()?;
 
   // Get the request ciphertext, request plaintext, and AAD
   let request_ciphertext = hex::decode(witness.request.ciphertext[0].as_bytes())?;
@@ -136,20 +136,20 @@ pub(crate) fn decrypt_tls_ciphertext(
   // response preparation
   let mut response_plaintext = vec![];
   let mut response_ciphertext = vec![];
-  let (response_key, cipher_suite) = match witness.response.aes_key.len() {
+  let (response_key, cipher_suite) = match witness.response.aead_key.len() {
     // chacha has 32 byte keys
     32 => (
-      CipherSuiteKey::CHACHA20POLY1305(witness.response.aes_key[..32].try_into()?),
+      CipherSuiteKey::CHACHA20POLY1305(witness.response.aead_key[..32].try_into()?),
       CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
     ),
     // aes has 16 byte keys
     16 => (
-      CipherSuiteKey::AES128GCM(witness.response.aes_key[..16].try_into()?),
+      CipherSuiteKey::AES128GCM(witness.response.aead_key[..16].try_into()?),
       CipherSuite::TLS13_AES_128_GCM_SHA256,
     ),
     _ => panic!("Unsupported key length"),
   };
-  let response_iv: [u8; 12] = witness.response.aes_iv[..12].try_into().unwrap();
+  let response_iv: [u8; 12] = witness.response.aead_iv[..12].try_into().unwrap();
   let response_dec = Decrypter::new(response_key.clone(), response_iv, cipher_suite);
 
   for (i, ct_chunk) in witness.response.ciphertext.iter().enumerate() {
