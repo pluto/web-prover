@@ -10,7 +10,7 @@ use proofs::{
   program::{
     self,
     data::{
-      ByteParams, Expanded, NotExpanded, Offline, Online, ProgramData, R1CSType, SetupData,
+      Expanded, NotExpanded, Offline, Online, ProgramData, R1CSType, RawProvingParams, SetupData,
       WitnessGeneratorType,
     },
   },
@@ -30,7 +30,7 @@ use crate::{
 
 pub async fn proxy_and_sign(
   mut config: config::Config,
-  byte_params: Option<ByteParams>,
+  proving_params: Option<RawProvingParams>,
 ) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
   let (sb, witness) = proxy(config.clone(), session_id.clone()).await?;
@@ -38,7 +38,7 @@ pub async fn proxy_and_sign(
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
 
   debug!("generating NIVC program data!");
-  let program_data = generate_program_data(&witness, config.proving, byte_params).await?;
+  let program_data = generate_program_data(&witness, config.proving, proving_params).await?;
 
   debug!("starting proof generation!");
   let program_output = program::run(&program_data)?;
@@ -62,40 +62,28 @@ pub async fn proxy_and_sign(
 async fn generate_program_data(
   witness: &WitnessData,
   proving: ProvingData,
-  byte_params: Option<ByteParams>,
+  proving_params: Option<RawProvingParams>,
 ) -> Result<ProgramData<Online, Expanded>, errors::ClientErrors> {
   let (request_inputs, _response_inputs) = decrypt_tls_ciphertext(witness)?;
 
   let setup_data = construct_setup_data_512();
   let (request_rom_data, request_rom, request_fold_inputs) =
     proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);
-    
+
   // // pad AES response ciphertext
   // let (response_rom_data, response_rom, response_fold_inputs) =
   // proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
 
-  debug!("start loading witnesses from json into objects");
+  // TODO: Unravel this insanity further.
+  debug!("serializing witness objects");
   let mut witnesses = Vec::new();
   for w in proving.witnesses.unwrap() {
     witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w)))?);
   }
-  debug!("done loading witnesses from json into objects");
 
-  debug!("generating public params");
-  // let public_params = program::setup(&setup_data);
-
-  // TODO: Very jankily override the invalid byte_params
-  // We should construct this elsewhere.
-  use proofs::program::data::SerializedParams;
-  let inbound = proving.params.unwrap();
-  let serialized_params = SerializedParams {
-    circuit_params: inbound.circuit_params,
-    hash_params:    inbound.hash_params,
-    byte_params:    byte_params.unwrap(),
-  };
-
+  debug!("initializing public params");
   let pd = ProgramData::<Offline, NotExpanded> {
-    public_params: serialized_params,
+    public_params: proving_params.unwrap(),
     setup_data,
     rom: request_rom,
     rom_data: request_rom_data,

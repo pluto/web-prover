@@ -1,7 +1,6 @@
 import init, {
   setup_tracing,
-  initThreadPool,
-  ByteParamsWasm
+  initThreadPool
 } from "../pkg/client_wasm.js";
 import { poseidon2 } from "poseidon-lite";
 import { toByte, computeHttpWitnessBody, computeHttpWitnessHeader, computeHttpWitnessStartline, compute_json_witness, byteArrayToString } from "./witness.js";
@@ -359,12 +358,12 @@ var circuits = ["aes_gctr_nivc_512b", "http_nivc_512b", "json_mask_object_512b",
 var witnesses = await generateWitnessBytesForRequest(circuits, inputs);
 console.log("witness", witnesses);
 
-var hp = await getSerializedHashParams("serialized_setup_aes");
-var cp = await getSerializedCircuitParams("serialized_setup_aes");
-var byte_data = {
+var proving_params = {
   primary_powers_g: await getByteParams("serialized_setup_aes", "powers_of_g.bytes"),
   primary_powers_h: await getByteParams("serialized_setup_aes", "powers_of_h.bytes"),
   witnesses: witnesses,
+  circuit_params: await getSerializedCircuitParams("serialized_setup_aes"),
+  hash_params: await getSerializedHashParams("serialized_setup_aes")
 };
 
 start();
@@ -381,11 +380,6 @@ let proverConfig = {
   max_recv_data: 10000,
   proving: {
     witnesses: [],
-    params: {
-      circuit_params: cp,
-      hash_params: hp,
-      byte_params: {powers_of_g: [], powers_of_h: []},
-    },
     manifest: {
       "manifestVersion": "1",
       "id": "reddit-user-karma",
@@ -434,7 +428,7 @@ let proverConfig = {
 
 const proofWorker = new Worker(new URL("./proof.js", import.meta.url), { type: "module" });
 console.log("sending message to worker");
-proofWorker.postMessage({ proverConfig, byte_data, memory });
+proofWorker.postMessage({ proverConfig, proving_params, memory });
 
 proofWorker.onmessage = (event) => {
   if (event.data.error) {

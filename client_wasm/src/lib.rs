@@ -5,7 +5,6 @@ use client::config::{self, Config};
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::Full;
 use hyper::{body::Bytes, Body, Request};
-use proofs::program::data::ByteParams;
 use serde::{Deserialize, Serialize};
 use tlsn_core::{commitment::CommitmentKind, proof::TlsProof};
 use tlsn_prover::tls::{Prover, ProverConfig};
@@ -23,46 +22,66 @@ use wasm_bindgen_futures::spawn_local;
 pub use wasm_bindgen_rayon::init_thread_pool;
 use ws_stream_wasm::WsMeta;
 
-// TODO: Possibly add a `inner` type to the client
-// package.
+/// ProvingParamsWasm interface is for efficiently moving data between
+/// the javascript and wasm runtime. Using wasm_bindgen creates a
+/// mirrored representation in javascript.
+///
+/// This allows us to directly read javascript runtime memory from rust,
+/// saving the overhead of serde incurred by using techniques
+/// like json or bincode.
 #[wasm_bindgen(getter_with_clone)]
-pub struct ByteParamsWasm {
-  pub powers_of_g: js_sys::Uint8Array,
-  pub powers_of_h: js_sys::Uint8Array,
-  pub witnesses:   Vec<js_sys::Uint8Array>,
+pub struct ProvingParamsWasm {
+  pub powers_of_g:    js_sys::Uint8Array, // Custom byte parser to G1Affine
+  pub powers_of_h:    js_sys::Uint8Array, // Custom byte parser to G2Affine
+  pub hash_params:    js_sys::Uint8Array, // Deserialized via bincode, expects list of bytes.
+  pub witnesses:      Vec<js_sys::Uint8Array>, // Custom byte parser
+  pub circuit_params: JsValue,            // Deserialized via JSON
 }
 
 #[wasm_bindgen]
-impl ByteParamsWasm {
+impl ProvingParamsWasm {
   #[wasm_bindgen(constructor)]
   pub fn new(
     g: js_sys::Uint8Array,
     h: js_sys::Uint8Array,
+    hp: js_sys::Uint8Array,
     w: Vec<js_sys::Uint8Array>,
-  ) -> ByteParamsWasm {
-    Self { powers_of_g: g, powers_of_h: h, witnesses: w }
+    cp: JsValue,
+  ) -> ProvingParamsWasm {
+    Self {
+      powers_of_g:    g,
+      powers_of_h:    h,
+      hash_params:    hp,
+      witnesses:      w,
+      circuit_params: cp,
+    }
   }
 }
 
 #[wasm_bindgen]
-pub async fn prover(config: JsValue, byte_params: ByteParamsWasm) -> Result<String, JsValue> {
-  debug!("prover: pre-serde");
+pub async fn prover(config: JsValue, proving_params: ProvingParamsWasm) -> Result<String, JsValue> {
   panic::set_hook(Box::new(console_error_panic_hook::hook));
+
+  debug!("prover: pre-serde");
   let mut config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
   debug!("prover: post-serde");
 
   // TODO: Refactor this object to remove witnesses from here.
-  config.proving.witnesses = Some(byte_params.witnesses.iter().map(|w| w.to_vec()).collect());
+  config.proving.witnesses = Some(proving_params.witnesses.iter().map(|w| w.to_vec()).collect());
 
-  let proof = client::prover_inner(
-    config,
-    Some(ByteParams {
-      powers_of_g: byte_params.powers_of_g.to_vec(),
-      powers_of_h: byte_params.powers_of_h.to_vec(),
-    }),
-  )
-  .await
-  .map_err(|e| JsValue::from_str(&format!("Could not produce proof: {:?}", e)))?;
+  // TODO: Add into impls to convert our wasm object to this
+  // TODO: Add into impls to transformed these raw params into aux params
+  use proofs::program::data::RawProvingParams;
+  let raw_pp = RawProvingParams {
+    circuit_params: serde_wasm_bindgen::from_value(proving_params.circuit_params).unwrap(),
+    hash_params:    proving_params.hash_params.to_vec(),
+    powers_of_g:    proving_params.powers_of_g.to_vec(),
+    powers_of_h:    proving_params.powers_of_h.to_vec(),
+  };
+
+  let proof = client::prover_inner(config, Some(raw_pp))
+    .await
+    .map_err(|e| JsValue::from_str(&format!("Could not produce proof: {:?}", e)))?;
 
   serde_json::to_string_pretty(&proof)
     .map_err(|e| JsValue::from_str(&format!("Could not serialize proof: {:?}", e)))

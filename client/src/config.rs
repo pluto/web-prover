@@ -8,7 +8,6 @@ use hyper::{
   Request,
 };
 use proofs::program::manifest::Manifest;
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -23,12 +22,10 @@ pub enum NotaryMode {
   TLSN,
 }
 
-use proofs::program::data::SerializedParams;
-
+/// Proving data containing [`Manifest`] and serialized witnesses used for WASM
 #[derive(Deserialize, Clone, Debug)]
 pub struct ProvingData {
   pub witnesses: Option<Vec<Vec<u8>>>,
-  pub params:    Option<SerializedParams>,
   pub manifest:  Option<Manifest>,
 }
 

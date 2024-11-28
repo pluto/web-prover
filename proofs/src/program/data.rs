@@ -80,24 +80,14 @@ pub enum WitnessGeneratorType {
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
 }
 
+/// Different data components are more efficiently/easily serialized in different
+/// formats. To achieve that efficiency, chunk them into parts.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ByteParams {
-  pub powers_of_g: Vec<u8>,
-  pub powers_of_h: Vec<u8>,
-}
-
-// TODO (tracy): If we want to extend this to additional parameters
-// we should create a simple binary file representation
-//
-// Format: header, num_fields, field_name, len, bytes, field_name, len, bytes,...
-//
-// Before we do that, let's prove the byte encoding is much more efficient.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SerializedParams {
+pub struct RawProvingParams {
   pub circuit_params: AuxParamsCircuit<E1>,
-  #[serde(with = "serde_bytes")]
   pub hash_params:    Vec<u8>,
-  pub byte_params:    ByteParams,
+  pub powers_of_g:    Vec<u8>,
+  pub powers_of_h:    Vec<u8>,
 }
 
 // Note, the below are typestates that prevent misuse of our current API.
@@ -110,7 +100,7 @@ impl SetupStatus for Online {
 }
 pub struct Offline;
 impl SetupStatus for Offline {
-  type PublicParams = SerializedParams;
+  type PublicParams = RawProvingParams;
 }
 
 pub trait WitnessStatus {
@@ -300,8 +290,8 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
     //
 
     // Commitment Type: KZG
-    let powers_of_g = self.public_params.byte_params.powers_of_g;
-    let powers_of_h = self.public_params.byte_params.powers_of_h;
+    let powers_of_g = self.public_params.powers_of_g;
+    let powers_of_h = self.public_params.powers_of_h;
 
     debug!(
       "begin loading commitment key, g_len={:?}, h_len={:?}",
@@ -360,7 +350,7 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
     info!("public params from parts");
     let public_params = PublicParams::<E1>::from_parts(circuit_shapes, aux_params);
     let Self { setup_data, rom, initial_nivc_input, inputs, witnesses, rom_data, .. } = self;
-    
+
     Ok(ProgramData {
       public_params,
       setup_data,
@@ -482,10 +472,11 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
 
     let Self { setup_data, rom_data, rom, initial_nivc_input, inputs, witnesses, .. } = self;
     Ok(ProgramData {
-      public_params: SerializedParams {
+      public_params: RawProvingParams {
         circuit_params,
         hash_params: serialized_bin,
-        byte_params: ByteParams { powers_of_g: powers_g, powers_of_h: powers_h },
+        powers_of_g: powers_g,
+        powers_of_h: powers_h,
       },
       setup_data,
       rom_data,
@@ -680,10 +671,11 @@ mod tests {
 
     let mock_inputs: MockInputs = serde_json::from_str(JSON).unwrap();
     let program_data = ProgramData::<Offline, NotExpanded> {
-      public_params: SerializedParams {
+      public_params: RawProvingParams {
         circuit_params,
         hash_params: vec![],
-        byte_params: ByteParams { powers_of_g: vec![], powers_of_h: vec![] },
+        powers_of_g: vec![],
+        powers_of_h: vec![],
       },
       setup_data,
       rom_data: HashMap::from([
