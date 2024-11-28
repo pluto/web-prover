@@ -8,8 +8,5 @@
 	"target_body": "",
 	"max_sent_data": 10000,
 	"max_recv_data": 10000,
-	"proving": {
-		"r1cs": [],
-		"params": null
-	}
+	"proving": {}
 }

@@ -130,7 +130,6 @@ struct ContentView: View {
                                         "val": []
                                     }
                                 ],
-                                "params": null,
                                 "manifest": {
                                     "manifestVersion": "1",
                                     "id": "reddit-user-karma",
