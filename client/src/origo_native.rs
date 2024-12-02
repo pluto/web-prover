@@ -6,8 +6,7 @@ use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
   program::{
     self,
-    data::{Expanded, NotExpanded, Online, ProgramData, R1CSType, SetupData, WitnessGeneratorType},
-    manifest::AESEncryptionInput,
+    data::{Expanded, NotExpanded, Online, ProgramData},
   },
   F, G1,
 };
@@ -111,6 +110,8 @@ async fn generate_program_data(
   Ok((request_program_data?, response_program_data?))
 }
 
+/// we want to be able to specify somewhere in here what cipher suite to use.
+/// Perhapse the config object should have this information.
 async fn proxy(
   config: config::Config,
   session_id: String,
@@ -214,9 +215,9 @@ async fn proxy(
   client_socket.close().await?;
 
   let server_aes_iv =
-    origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_iv").unwrap().clone();
+    origo_conn.lock().unwrap().secret_map.get("Handshake:server_iv").unwrap().clone();
   let server_aes_key =
-    origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_key").unwrap().clone();
+    origo_conn.lock().unwrap().secret_map.get("Handshake:server_key").unwrap().clone();
 
   let witness = origo_conn.lock().unwrap().to_witness_data();
   let sb = SignBody {

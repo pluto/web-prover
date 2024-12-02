@@ -1,7 +1,7 @@
 #[cfg(feature = "logging")]
 use crate::log::{debug, error, trace, warn};
 use crate::{
-    backend::{Backend, RustCryptoBackend},
+    backend::{Backend, RustCryptoBackend13},
     client::ClientConnectionData,
     error::Error,
     record_layer,
@@ -869,7 +869,7 @@ impl CommonState {
         // Close connection once we start to run out of
         // sequence space.
         if self.record_layer.wants_close_before_encrypt() {
-            debug!("Sending warning alert {:?}", AlertDescription::CloseNotify);
+            debug!("Sending warning alert {:?}", AlertDescription::CloseNotify); 
             let m = Message::build_alert(AlertLevel::Warning, AlertDescription::CloseNotify);
             self.send_single_fragment(m.into()).await?;
         }

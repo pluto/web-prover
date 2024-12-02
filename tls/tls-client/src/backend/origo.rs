@@ -13,9 +13,9 @@ use tls_parser::{TlsHandshakeType, TlsRecordType};
 /// TLS transcript message encryption inputs used to decrypt the ciphertext
 pub struct DecryptTarget {
   /// AES IV
-  pub aes_iv:     Vec<u8>,
+  pub aead_iv:     Vec<u8>,
   /// AES key
-  pub aes_key:    Vec<u8>,
+  pub aead_key:    Vec<u8>,
   /// multipe ciphertext chunks each with its own authentication tag
   pub ciphertext: Vec<String>,
 }
@@ -129,13 +129,13 @@ impl OrigoConnection {
 
     WitnessData {
       request:  DecryptTarget {
-        aes_iv:     self.secret_map.get("Application:client_aes_iv").unwrap().to_vec(),
-        aes_key:    self.secret_map.get("Application:client_aes_key").unwrap().to_vec(),
+        aead_iv:     self.secret_map.get("Application:client_iv").unwrap().to_vec(),
+        aead_key:    self.secret_map.get("Application:client_key").unwrap().to_vec(),
         ciphertext: vec![self.record_map.get(&req_key).unwrap().ciphertext.clone()],
       },
       response: DecryptTarget {
-        aes_iv:     self.secret_map.get("Application:server_aes_iv").unwrap().to_vec(),
-        aes_key:    self.secret_map.get("Application:server_aes_key").unwrap().to_vec(),
+        aead_iv:     self.secret_map.get("Application:server_iv").unwrap().to_vec(),
+        aead_key:    self.secret_map.get("Application:server_key").unwrap().to_vec(),
         ciphertext: ciphertext_chunks,
       },
     }

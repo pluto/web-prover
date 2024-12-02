@@ -7,6 +7,7 @@ name = "tls_core"
 
 [features]
 default = ["logging", "tls12", "prf"]
+chacha20 = []
 serde = ["dep:serde"]
 tls12 = []
 handshake = []

@@ -1,10 +1,9 @@
 mod hmac;
-mod standard;
-mod standard13;
+pub mod standard13;
 mod tls13;
 pub mod origo;
 
-pub use standard::RustCryptoBackend;
-pub use standard13::RustCryptoBackend13;
+// pub use standard::RustCryptoBackend;
+pub use standard13::{RustCryptoBackend13, CipherSuiteKey};
 pub use tls_backend::{Backend, BackendError, DecryptMode, EncryptMode};
-pub use standard13::Decrypter as Decrypter2;
+pub use standard13::Decrypter;

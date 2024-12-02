@@ -5,12 +5,21 @@ use std::{
 };
 
 use aes_gcm::{
-  aead::{generic_array::GenericArray, Aead, NewAead, Payload},
+  aead::{generic_array::{GenericArray, typenum::{U12, U5}}, Aead, NewAead, Payload},
   Aes128Gcm,
 };
+
+use chacha20poly1305::{
+  aead::{Aead as ChachaAead , Payload as ChaChaPayload},
+  ChaCha20Poly1305,
+  Nonce,
+  Key,
+  KeyInit,
+};
+
 use async_trait::async_trait;
-use base64::{prelude::BASE64_STANDARD, Engine};
-use log::{debug, error, info, kv::ToValue, trace, warn, Record};
+use base64::{prelude::BASE64_STANDARD, write, Engine};
+use log::{debug, error, info, trace, warn, Record};
 use p256::{ecdh::EphemeralSecret, EncodedPoint, PublicKey as ECDHPublicKey};
 use rand::{rngs::OsRng, thread_rng, Rng};
 use ring::hkdf::Okm;
@@ -30,7 +39,7 @@ use tls_core::{
 };
 
 use super::{
-  origo::{Direction, OrigoConnection, RecordKey, RecordMeta},
+  origo::{RecordMeta, Direction, OrigoConnection, RecordKey},
   Backend, BackendError,
 };
 use crate::{backend::tls13::AeadKey, DecryptMode, EncryptMode, Error};
@@ -53,7 +62,7 @@ pub struct RustCryptoBackend13 {
   protocol_version:   Option<ProtocolVersion>,
   cipher_suite:       Option<SupportedCipherSuite>,
   curve:              Option<NamedGroup>,
-  implemented_suites: [CipherSuite; 1],
+  implemented_suites: [CipherSuite; 2],
   encrypter:          Option<Encrypter>,
   decrypter:          Option<Decrypter>,
   decrypt_mode:       DecryptMode,
@@ -222,7 +231,7 @@ impl RustCryptoBackend13 {
       protocol_version:   None,
       cipher_suite:       None,
       curve:              Some(NamedGroup::secp256r1),
-      implemented_suites: [CipherSuite::TLS13_AES_128_GCM_SHA256],
+      implemented_suites: [CipherSuite::TLS13_AES_128_GCM_SHA256, CipherSuite::TLS13_CHACHA20_POLY1305_SHA256],
       hkdf_provider:      &super::tls13::HkdfUsingHmac(&super::hmac::Sha256Hmac),
       encrypter:          None,
       decrypter:          None,
@@ -310,7 +319,6 @@ impl RustCryptoBackend13 {
         (k0_secret, b"c hs traffic", b"s hs traffic")
       };
 
-    // todo(debug target) - context?
     // Expand the master secret into two labeled secrets
     // expect: context / handshake hash = h3 at handshake layer
     let context = self.ems_seed.clone().unwrap();
@@ -340,78 +348,139 @@ impl RustCryptoBackend13 {
     debug!("intermediate witness set during encrypt_mode: {:?}", self.encrypt_mode);
 
     // Finally, derive the actual AES key and IV for each secret.
-    let e = self.hkdf_provider.expander_for_okm(&client_secret);
-    let client_aes_key = hkdf_expand_label_aead_key(e.as_ref(), 16, b"key", &[]);
-    let client_aes_iv = hkdf_expand_label_aead_key(e.as_ref(), 12, b"iv", &[]);
+    let client_expander = self.hkdf_provider.expander_for_okm(&client_secret);
+    let server_expander = self.hkdf_provider.expander_for_okm(&server_secret);
+    let client_iv = hkdf_expand_label_aead_key(client_expander.as_ref(), 12, b"iv", &[]);
+    let server_iv = hkdf_expand_label_aead_key(server_expander.as_ref(), 12, b"iv", &[]);
+    debug!("CipherSuite={:?}", self.cipher_suite.unwrap().suite());
+    let (client_key, server_key) = match self.cipher_suite.unwrap().suite() {
+      CipherSuite::TLS13_AES_128_GCM_SHA256 => {
+        let client_key = hkdf_expand_label_aead_key(client_expander.as_ref(), 16, b"key", &[]);
+        self.logger.lock().unwrap().set_secret(
+          format!("{:?}:client_key", self.encrypt_mode).to_string(),
+          client_key.buf[..16].to_vec(),
+        );
+        let server_key = hkdf_expand_label_aead_key(server_expander.as_ref(), 16, b"key", &[]);
+        self.logger.lock().unwrap().set_secret(
+          format!("{:?}:server_key", self.encrypt_mode).to_string(),
+          server_key.buf[..16].to_vec(),
+        );
+        debug!("client_key={:?}", client_key.buf.len());
+        (
+          client_key,
+          server_key,
+        )
+      },
+      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
+        let client_key = hkdf_expand_label_aead_key(client_expander.as_ref(), 32, b"key", &[]);
+        self.logger.lock().unwrap().set_secret(
+          format!("{:?}:client_key", self.encrypt_mode).to_string(),
+          client_key.buf.into(),
+        );
+        let server_key = hkdf_expand_label_aead_key(server_expander.as_ref(), 32, b"key", &[]);
+        self.logger.lock().unwrap().set_secret(
+          format!("{:?}:server_key", self.encrypt_mode).to_string(),
+          server_key.buf.into(),
+        );
+        debug!("client_key={:?}", client_key.buf.len());
+        (
+          client_key,
+          server_key,
+        )
 
-    let e = self.hkdf_provider.expander_for_okm(&server_secret);
-    let server_aes_key = hkdf_expand_label_aead_key(e.as_ref(), 16, b"key", &[]);
-    let server_aes_iv = hkdf_expand_label_aead_key(e.as_ref(), 12, b"iv", &[]);
+      },
+      _ => panic!("unsupported ciphersuite"),
+    };
+
 
     trace!(
-      "client_aes_iv={:?}, iv_len={:?}",
-      hex::encode(client_aes_iv.buf),
-      client_aes_iv.buf.len()
+      "client_iv={:?}, iv_len={:?}",
+      hex::encode(client_iv.buf),
+      client_iv.buf.len()
     );
     self.logger.lock().unwrap().set_secret(
-      format!("{:?}:client_aes_iv", self.encrypt_mode).to_string(),
-      client_aes_iv.buf.into(),
+      format!("{:?}:client_iv", self.encrypt_mode).to_string(),
+      client_iv.buf.into(),
     );
 
     trace!(
-      "client_aes_key={:?}, iv_len={:?}",
-      hex::encode(client_aes_key.buf),
-      client_aes_iv.buf.len()
-    );
-    self.logger.lock().unwrap().set_secret(
-      format!("{:?}:client_aes_key", self.encrypt_mode).to_string(),
-      client_aes_key.buf.into(),
+      "client_key={:?}, iv_len={:?}",
+      hex::encode(client_key.buf),
+      client_iv.buf.len()
     );
 
     trace!(
-      "server_aes_iv={:?}, iv_len={:?}",
-      hex::encode(server_aes_iv.buf),
-      server_aes_iv.buf.len()
+      "server_iv={:?}, iv_len={:?}",
+      hex::encode(server_iv.buf),
+      server_iv.buf.len()
     );
     self.logger.lock().unwrap().set_secret(
-      format!("{:?}:server_aes_iv", self.encrypt_mode).to_string(),
-      server_aes_iv.buf.into(),
+      format!("{:?}:server_iv", self.encrypt_mode).to_string(),
+      server_iv.buf.into(),
     );
 
     trace!(
-      "server_aes_key={:?}, iv_len={:?}",
-      hex::encode(server_aes_key.buf),
-      server_aes_key.buf.len()
-    );
-    self.logger.lock().unwrap().set_secret(
-      format!("{:?}:server_aes_key", self.encrypt_mode).to_string(),
-      server_aes_key.buf.into(),
+      "server_key={:?}, iv_len={:?}",
+      hex::encode(server_key.buf),
+      server_key.buf.len()
     );
 
     TlsKeys {
-      client_key: client_aes_key,
-      client_iv:  client_aes_iv,
-      server_key: server_aes_key,
-      server_iv:  server_aes_iv,
+      client_key,
+      client_iv,
+      server_key,
+      server_iv,
     }
   }
 
   /// Derive an encrypter from the given keys
   pub fn get_encrypter(&self, keys: &TlsKeys) -> Encrypter {
-    Encrypter::new(
-      keys.client_key.buf[..16].try_into().unwrap(),
-      keys.client_iv.buf[..12].try_into().unwrap(),
-      self.cipher_suite.unwrap().suite(),
-    )
+    match self.cipher_suite.unwrap().suite() {
+      CipherSuite::TLS13_AES_128_GCM_SHA256 => {
+        let mut key = [0u8; 16];
+        key.copy_from_slice(&keys.client_key.buf[..16]);
+        debug!("Got Encrypter with key length: {:?}", key.len());
+        Encrypter::new(
+        CipherSuiteKey::AES128GCM(key),
+        keys.client_iv.buf[..12].try_into().unwrap(),
+        self.cipher_suite.unwrap().suite(),
+      )},
+      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&keys.client_key.buf[..32]);
+        debug!("Got Encrypter with key length: {:?}", key.len());
+        Encrypter::new(
+        CipherSuiteKey::CHACHA20POLY1305(key),
+        keys.client_iv.buf[..12].try_into().unwrap(),
+        self.cipher_suite.unwrap().suite(),
+      )},
+      _ => panic!("unsupported ciphersuite"),
+    }
   }
 
   /// Derive an decrypter from the given keys
   pub fn get_decrypter(&self, keys: &TlsKeys) -> Decrypter {
-    Decrypter::new(
-      keys.server_key.buf[..16].try_into().unwrap(),
+    match self.cipher_suite.unwrap().suite() {
+      CipherSuite::TLS13_AES_128_GCM_SHA256 => {
+        let mut key = [0u8; 16];
+        key.copy_from_slice(&keys.server_key.buf[..16]);
+        debug!("Got Decrypter with key length: {:?}", key.len());
+        Decrypter::new(
+        CipherSuiteKey::AES128GCM(key),
+        keys.server_iv.buf[..12].try_into().unwrap(),
+        self.cipher_suite.unwrap().suite(),
+      )},
+      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => {
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&keys.server_key.buf[..32]);
+        debug!("Got Decrypter with key length: {:?}", key.len());
+         Decrypter::new(
+      CipherSuiteKey::CHACHA20POLY1305(key),
       keys.server_iv.buf[..12].try_into().unwrap(),
       self.cipher_suite.unwrap().suite(),
-    )
+      )},
+      _ => panic!("unsupported ciphersuite"),
+    }
   }
 }
 
@@ -454,6 +523,7 @@ impl Backend for RustCryptoBackend13 {
     Ok(())
   }
 
+  // TODO(WJ 2024-11-21): this is unused
   // NOTE: For now only support the bare minimum. Extend to more in the future.
   async fn get_suite(&mut self) -> Result<SupportedCipherSuite, BackendError> {
     Ok(suites::tls13::TLS13_AES_128_GCM_SHA256)
@@ -535,6 +605,17 @@ impl Backend for RustCryptoBackend13 {
           return Err(BackendError::UnsupportedProtocolVersion(version));
         },
       },
+      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => match msg.version{
+        ProtocolVersion::TLSv1_3 | ProtocolVersion::TLSv1_2  => {
+          let (cipher_msg, meta) = enc.encrypt_tls13_chacha20_poly1305(&msg, seq)?;
+
+          self.insert_record(Direction::Sent, seq, msg.typ, msg.payload.0[0], meta);
+          return Ok(cipher_msg);
+        },
+        version => {
+          return Err(BackendError::UnsupportedProtocolVersion(version));
+        },
+      },
       suite => {
         return Err(BackendError::UnsupportedCiphersuite(suite));
       },
@@ -548,7 +629,8 @@ impl Backend for RustCryptoBackend13 {
       .ok_or(BackendError::DecryptionError("Decrypter not ready".to_string()))?;
 
     match dec.cipher_suite {
-      CipherSuite::TLS13_AES_128_GCM_SHA256 => match msg.version {
+      CipherSuite::TLS13_AES_128_GCM_SHA256
+       => match msg.version {
         // NOTE: Must support both because cipher messages are labeled 1.2
         ProtocolVersion::TLSv1_3 | ProtocolVersion::TLSv1_2 => {
           let (plain_message, record_meta) = dec.decrypt_tls13_aes(&msg, seq)?;
@@ -565,6 +647,22 @@ impl Backend for RustCryptoBackend13 {
           return Err(BackendError::UnsupportedProtocolVersion(version));
         },
       },
+      CipherSuite::TLS13_CHACHA20_POLY1305_SHA256 => match msg.version {
+        ProtocolVersion::TLSv1_3 | ProtocolVersion::TLSv1_2 => {
+          let (plain_message, record_meta) = dec.decrypt_tls13_chacha20(&msg, seq)?;
+          self.insert_record(
+            Direction::Received,
+            seq,
+            plain_message.typ,
+            plain_message.payload.0[0],
+            record_meta,
+          );
+          return Ok(plain_message);
+        },
+        version => {
+          return Err(BackendError::UnsupportedProtocolVersion(version));
+        },
+            }
       suite => {
         return Err(BackendError::UnsupportedCiphersuite(suite));
       },
@@ -712,15 +810,112 @@ fn make_tls13_aad(len: usize) -> [u8; 5] {
   ]
 }
 
+#[derive(Clone)]
+pub enum CipherSuiteKey{
+    AES128GCM([u8; 16]), // 128-bit key
+    CHACHA20POLY1305([u8; 32]), // 256-bit key
+}
+
+impl AsRef<[u8]> for CipherSuiteKey {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            CipherSuiteKey::AES128GCM(key) => key,
+            CipherSuiteKey::CHACHA20POLY1305(key) => key,
+        }
+    }
+}
+
 pub struct Encrypter {
-  write_key:    [u8; 16],
-  write_iv:     [u8; 12],
-  cipher_suite: CipherSuite,
+    write_key: CipherSuiteKey,
+    write_iv: [u8; 12],
+    cipher_suite: CipherSuite,
 }
 
 impl Encrypter {
-  pub fn new(write_key: [u8; 16], write_iv: [u8; 12], cipher_suite: CipherSuite) -> Self {
+  pub fn new(write_key: CipherSuiteKey, write_iv: [u8; 12], cipher_suite: CipherSuite) -> Self {
     Self { write_key, write_iv, cipher_suite }
+  }
+
+/// Encrypts a TLS 1.3 message using ChaCha20-Poly1305 AEAD cipher.
+///
+/// This function performs TLS 1.3 record layer encryption using ChaCha20-Poly1305:
+/// - Appends the content type to the plaintext (as required by TLS 1.3)
+/// - Generates the additional authenticated data (AAD)
+/// - Encrypts using ChaCha20-Poly1305 with the configured key and nonce
+/// - Returns an opaque message suitable for transmission
+///
+/// # Security Considerations
+/// 
+/// - The sequence number must not repeat for a given key
+/// - The write key must be exactly 32 bytes 
+/// - The initialization vector must be 12 bytes
+///
+/// # Arguments
+///
+/// * `m` - The plaintext message to encrypt
+/// * `seq` - The record sequence number used for nonce generation
+///
+/// # Returns
+///
+/// Returns a tuple containing:
+/// - An `OpaqueMessage` with the encrypted payload
+/// - A `RecordMeta` containing encryption metadata for debugging/verification
+///
+/// # Errors
+///
+/// Returns `BackendError` if:
+/// - Encryption fails
+/// - Wrong key type is used (must be CHACHA20POLY1305)
+///
+/// # Panics
+///
+/// Panics if the write key is not a CHACHA20POLY1305 key
+///
+  fn encrypt_tls13_chacha20_poly1305(
+    &self,
+    m: &PlainMessage,
+    seq: u64,
+  ) -> Result<(OpaqueMessage, RecordMeta), BackendError> {
+    let total_len = m.payload.0.len() + 1 + 16;
+    let aad = make_tls13_aad(total_len);
+    let mut payload = Vec::with_capacity(total_len);
+    payload.extend_from_slice(&m.payload.0);
+    payload.push(m.typ.get_u8()); // Very important, encrypted messages must have the type appended.
+
+    let write_key = match self.write_key {
+      CipherSuiteKey::CHACHA20POLY1305(key) => key,
+      _ => unreachable!("wrong key type"),
+    };
+    let write_key = Key::from_slice(&write_key);
+    let cipher = ChaCha20Poly1305::new(write_key);
+    let init_nonce = Nonce::from(make_nonce(self.write_iv, seq));
+    let payload = ChaChaPayload { msg: &payload, aad: &aad };
+    let ciphertext = cipher
+      .encrypt(&init_nonce, payload)
+      .map_err(|e| BackendError::EncryptionError(e.to_string()))?;
+
+    trace!("ENC: cipher={:?}", hex::encode(ciphertext.clone()));
+    trace!("ENC: plain_text={:?}", hex::encode(m.payload.0.clone()));
+    debug!(
+      "ENC: cipher_len={:?}, plain_len={:?}, seq={:?}, iv={:?}, dec_key={:?}, nonce={:?}, aad={:?}",
+      ciphertext.len(),
+      m.payload.0.len(),
+      seq,
+      hex::encode(self.write_iv),
+      hex::encode(write_key),
+      hex::encode(init_nonce),
+      hex::encode(aad),
+    );
+
+    Ok((
+      OpaqueMessage {
+        typ:     ContentType::ApplicationData, // Always send Application Data label
+        version: ProtocolVersion::TLSv1_2,     // Opaque Messages lie.
+        payload: TLSPayload::new(ciphertext.clone()),
+      },
+      RecordMeta::new(&aad, &m.payload.0, &ciphertext, &init_nonce ),
+    ))
+    
   }
 
   fn encrypt_tls13_aes(
@@ -730,7 +925,7 @@ impl Encrypter {
   ) -> Result<(OpaqueMessage, RecordMeta), BackendError> {
     let total_len = m.payload.0.len() + 1 + 16;
     let aad = make_tls13_aad(total_len);
-    let init_nonce = make_nonce(self.write_iv, seq);
+    let init_nonce =  make_nonce(self.write_iv, seq);
 
     let mut payload = Vec::with_capacity(total_len);
     payload.extend_from_slice(&m.payload.0);
@@ -738,8 +933,13 @@ impl Encrypter {
 
     let aes_payload = Payload { msg: &payload, aad: &aad };
 
-    let cipher = Aes128Gcm::new_from_slice(&self.write_key).unwrap();
-    let nonce = GenericArray::from_slice(&init_nonce);
+    let write_key = match self.write_key {
+      CipherSuiteKey::AES128GCM(key) => key,
+      _ => unreachable!("wrong key type"),
+    };
+
+    let cipher = Aes128Gcm::new((&write_key).into());
+    let nonce = GenericArray::<u8, U12>::from_slice(&init_nonce);
     let ciphertext = cipher
       .encrypt(nonce, aes_payload)
       .map_err(|e| BackendError::EncryptionError(e.to_string()))?;
@@ -752,9 +952,9 @@ impl Encrypter {
       m.payload.0.len(),
       seq,
       hex::encode(self.write_iv),
-      hex::encode(self.write_key),
-      hex::encode(init_nonce.as_ref()),
-      hex::encode(aad.as_ref()),
+      hex::encode(write_key),
+      hex::encode(nonce),
+      hex::encode(aad),
     );
 
     Ok((
@@ -769,14 +969,103 @@ impl Encrypter {
 }
 
 pub struct Decrypter {
-  write_key:    [u8; 16],
+  // Keys are symetric for us right now
+  write_key:   CipherSuiteKey,
   write_iv:     [u8; 12],
   cipher_suite: CipherSuite,
 }
 
 impl Decrypter {
-  pub fn new(write_key: [u8; 16], write_iv: [u8; 12], cipher_suite: CipherSuite) -> Self {
+  pub fn new(write_key: CipherSuiteKey, write_iv: [u8; 12], cipher_suite: CipherSuite) -> Self {
     Self { write_key, write_iv, cipher_suite }
+  }
+
+  /// Decrypts a TLS 1.3 message using ChaCha20-Poly1305 AEAD cipher.
+  ///
+  /// This function performs TLS 1.3 record layer decryption using ChaCha20-Poly1305:
+  /// - Generates additional authenticated data (AAD) from message length
+  /// - Decrypts using ChaCha20-Poly1305 with the configured key and nonce
+  /// - Removes padding and extracts the true content type
+  /// - Returns the decrypted plaintext message and metadata
+  ///
+  /// # Security Considerations
+  ///
+  /// - The sequence number must not repeat for a given key
+  /// - The write key must be exactly 32 bytes
+  /// - The initialization vector must be 12 bytes
+  /// - Message authentication tag is verified during decryption
+  ///
+  /// # Arguments
+  ///
+  /// * `m` - The encrypted opaque message to decrypt
+  /// * `seq` - The record sequence number used for nonce generation
+  ///
+  /// # Returns
+  ///
+  /// Returns a tuple containing:
+  /// - A `PlainMessage` with the decrypted payload and true content type
+  /// - A `RecordMeta` containing decryption metadata for debugging/verification 
+  ///
+  /// # Errors
+  ///
+  /// Returns `BackendError` if:
+  /// - Decryption fails (invalid tag, corrupted message)
+  /// - Wrong key type is used (must be CHACHA20POLY1305)
+  /// - Message contains invalid padding or content type
+  ///
+  /// # Panics
+  ///
+  /// Panics if the write key is not a CHACHA20POLY1305 key
+  ///
+  pub fn decrypt_tls13_chacha20(
+    &self,
+    m: &OpaqueMessage,
+    seq: u64,
+  ) -> Result<(PlainMessage, RecordMeta), BackendError> {
+
+    let aad = make_tls13_aad(m.payload.0.len());
+    // let init_nonce = make_nonce(self.write_iv, seq);
+
+
+    let write_key = match self.write_key {
+      CipherSuiteKey::CHACHA20POLY1305(key) => key,
+      _ => unreachable!("wrong key"),};
+
+    let write_key = Key::from_slice(&write_key);
+    let cipher = ChaCha20Poly1305::new(write_key);
+    let init_nonce = Nonce::from(make_nonce(self.write_iv, seq));
+    let chacha_payload = ChaChaPayload { msg: &m.payload.0, aad: &aad };
+
+    let mut plaintext = cipher
+      .decrypt(&init_nonce, chacha_payload)
+      .map_err(|e| BackendError::DecryptionError(e.to_string()))?;
+
+    let typ = unpad_tls13(&mut plaintext);
+    if typ == ContentType::Unknown(0) {
+      return Err(BackendError::InternalError("peer sent bad TLSInnerPlaintext".to_string()));
+    }
+    trace!("DEC: cipher={:?}", hex::encode(m.payload.0.clone()));
+    trace!("DEC: plain_text={:?}", hex::encode(plaintext.clone()));
+    debug!(
+      "DEC: cipher_len={:?}, plain_len={:?}, seq={:?}, iv={:?}, dec_key={:?}, nonce={:?}, aad={:?}",
+      m.payload.0.len(),
+      plaintext.len(),
+      seq,
+      hex::encode(self.write_iv),
+      hex::encode(write_key),
+      hex::encode(init_nonce),
+      hex::encode(aad)
+    );
+
+    Ok((
+      PlainMessage {
+        typ,
+        version: ProtocolVersion::TLSv1_3,
+        payload: TLSPayload(plaintext.clone()),
+      },
+      RecordMeta::new(&aad, &plaintext, &m.payload.0, &init_nonce),
+    ))
+
   }
 
   pub fn decrypt_tls13_aes(
@@ -789,8 +1078,13 @@ impl Decrypter {
 
     let aes_payload = Payload { msg: &m.payload.0, aad: &aad };
 
-    let cipher = Aes128Gcm::new_from_slice(&self.write_key).unwrap();
-    let nonce = GenericArray::from_slice(&init_nonce);
+    let write_key = match self.write_key {
+      CipherSuiteKey::AES128GCM(key) => key,
+      _ => unreachable!("wrong key"),};
+
+    let cipher = Aes128Gcm::new_from_slice(&write_key).unwrap();
+    let nonce = GenericArray::<u8, U12>::from_slice(&init_nonce);
+    debug!("Attempting to aes decrypt with key: {:?}", write_key);
     let mut plaintext = cipher
       .decrypt(nonce, aes_payload)
       .map_err(|e| BackendError::DecryptionError(e.to_string()))?; // error in invalid here
@@ -808,9 +1102,9 @@ impl Decrypter {
       plaintext.len(),
       seq,
       hex::encode(self.write_iv),
-      hex::encode(self.write_key),
-      hex::encode(init_nonce.as_ref()),
-      hex::encode(aad.as_ref())
+      hex::encode(write_key),
+      hex::encode(nonce),
+      hex::encode(aad)
     );
 
     Ok((
