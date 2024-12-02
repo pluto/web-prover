@@ -10,7 +10,7 @@ const ADD_EXTERNAL_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/ad
 const SQUARE_ZEROTH_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/square_zeroth.bin");
 const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/swap_memory.bin");
 
-const TEST_OFFLINE_PATH: &str = "src/tests/test_run_serialized_verify.bin";
+const TEST_OFFLINE_PATH: &str = "src/tests/test_run_serialized_verify.bytes";
 
 fn get_setup_data() -> SetupData {
   SetupData {
