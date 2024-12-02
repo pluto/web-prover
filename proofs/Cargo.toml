@@ -7,7 +7,7 @@ edition="2021"
 name="test-prove"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-circom_witnesscalc={ git="https://github.com/pluto/circom-witnesscalc" } # Fork is needed apparently??
+circom_witnesscalc={ git="https://github.com/iden3/circom-witnesscalc" } # Fork is needed apparently??
 
 [dependencies]
 serde     ="1.0"
@@ -40,6 +40,7 @@ light-poseidon={ git="https://github.com/pluto/light-poseidon" }
 ark-bn254     ="=0.4.0"
 
 [dev-dependencies]
+chacha20    ="0.9.1"
 tracing-test="0.2.5"
 
 [build-dependencies]
