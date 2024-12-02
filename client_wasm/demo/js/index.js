@@ -47,20 +47,6 @@ const getWitnessGenerator = async function (circuit) {
   return wasm;
 }
 
-const getSerializedHashParams = async function (setupFile) {
-  const ppUrl = new URL(`${setupFile}.bin`, "https://localhost:8090/build/").toString();
-  const pp = await fetch(ppUrl).then((r) => r.arrayBuffer());
-  console.log("hash_params", pp);
-  return pp;
-}
-
-const getSerializedCircuitParams = async function (setupFile) {
-  const ppUrl = new URL(`${setupFile}.json`, "https://localhost:8090/build/").toString();
-  const pp = await fetch(ppUrl).then((r) => r.json());
-  console.log("circuit_params", pp);
-  return pp;
-}
-
 const getByteParams = async function (setupFile, additionalPath) {
   const ppUrl = new URL(`${setupFile}.${additionalPath}`, "https://localhost:8090/build/").toString();
   const pp = await fetch(ppUrl).then((r) => r.arrayBuffer());
@@ -359,11 +345,8 @@ var witnesses = await generateWitnessBytesForRequest(circuits, inputs);
 console.log("witness", witnesses);
 
 var proving_params = {
-  primary_powers_g: await getByteParams("serialized_setup_aes", "powers_of_g.bytes"),
-  primary_powers_h: await getByteParams("serialized_setup_aes", "powers_of_h.bytes"),
+  aux_params: await getByteParams("serialized_setup_aes", "bytes"),
   witnesses: witnesses,
-  circuit_params: await getSerializedCircuitParams("serialized_setup_aes"),
-  hash_params: await getSerializedHashParams("serialized_setup_aes")
 };
 
 start();

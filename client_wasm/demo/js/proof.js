@@ -59,11 +59,8 @@ self.onmessage = async function (e) {
         await initializeWasm(sharedMemory);
         start();
         var pp = new ProvingParamsWasm(
-            new Uint8Array(proving_params.primary_powers_g), 
-            new Uint8Array(proving_params.primary_powers_h),
-            new Uint8Array(proving_params.hash_params),
+            new Uint8Array(proving_params.aux_params),
             proving_params.witnesses,
-            proving_params.circuit_params,
         );
         console.log("proving params", proving_params);
         const proof = await prover(proverConfig, pp);

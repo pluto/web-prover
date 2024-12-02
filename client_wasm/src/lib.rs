@@ -27,34 +27,18 @@ use ws_stream_wasm::WsMeta;
 /// mirrored representation in javascript.
 ///
 /// This allows us to directly read javascript runtime memory from rust,
-/// saving the overhead of serde incurred by using techniques
-/// like json or bincode.
+/// enabling more efficient serde.
 #[wasm_bindgen(getter_with_clone)]
 pub struct ProvingParamsWasm {
-  pub powers_of_g:    js_sys::Uint8Array, // Custom byte parser to G1Affine
-  pub powers_of_h:    js_sys::Uint8Array, // Custom byte parser to G2Affine
-  pub hash_params:    js_sys::Uint8Array, // Deserialized via bincode, expects list of bytes.
-  pub witnesses:      Vec<js_sys::Uint8Array>, // Custom byte parser
-  pub circuit_params: JsValue,            // Deserialized via JSON
+  pub aux_params: js_sys::Uint8Array, // Custom byte parser for aux_params
+  pub witnesses:  Vec<js_sys::Uint8Array>, // Custom byte parser
 }
 
 #[wasm_bindgen]
 impl ProvingParamsWasm {
   #[wasm_bindgen(constructor)]
-  pub fn new(
-    g: js_sys::Uint8Array,
-    h: js_sys::Uint8Array,
-    hp: js_sys::Uint8Array,
-    w: Vec<js_sys::Uint8Array>,
-    cp: JsValue,
-  ) -> ProvingParamsWasm {
-    Self {
-      powers_of_g:    g,
-      powers_of_h:    h,
-      hash_params:    hp,
-      witnesses:      w,
-      circuit_params: cp,
-    }
+  pub fn new(ap: js_sys::Uint8Array, w: Vec<js_sys::Uint8Array>) -> ProvingParamsWasm {
+    Self { aux_params: ap, witnesses: w }
   }
 }
 
@@ -62,24 +46,14 @@ impl ProvingParamsWasm {
 pub async fn prover(config: JsValue, proving_params: ProvingParamsWasm) -> Result<String, JsValue> {
   panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-  debug!("prover: pre-serde");
+  debug!("start config serde");
   let mut config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
-  debug!("prover: post-serde");
+  debug!("end config serde");
 
   // TODO: Refactor this object to remove witnesses from here.
   config.proving.witnesses = Some(proving_params.witnesses.iter().map(|w| w.to_vec()).collect());
 
-  // TODO: Add into impls to convert our wasm object to this
-  // TODO: Add into impls to transformed these raw params into aux params
-  use proofs::program::data::RawProvingParams;
-  let raw_pp = RawProvingParams {
-    circuit_params: serde_wasm_bindgen::from_value(proving_params.circuit_params).unwrap(),
-    hash_params:    proving_params.hash_params.to_vec(),
-    powers_of_g:    proving_params.powers_of_g.to_vec(),
-    powers_of_h:    proving_params.powers_of_h.to_vec(),
-  };
-
-  let proof = client::prover_inner(config, Some(raw_pp))
+  let proof = client::prover_inner(config, Some(proving_params.aux_params.to_vec()))
     .await
     .map_err(|e| JsValue::from_str(&format!("Could not produce proof: {:?}", e)))?;
 

@@ -4,35 +4,12 @@ use std::{
 };
 
 use client_side_prover::{
-  supernova::{get_circuit_shapes, AuxParams, SuperNovaAugmentedCircuitParams},
-  traits::{CurveCycleEquipped, Dual, ROConstants, ROConstantsCircuit},
-  CommitmentKey, R1CSWithArity,
+  fast_serde::FastSerde,
+  supernova::{get_circuit_shapes, AuxParams},
 };
 use serde_json::json;
 
 use super::*;
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(bound = "")]
-pub struct AuxParamsCircuit<E1>
-where E1: CurveCycleEquipped {
-  // ck_primary: Arc<CommitmentKey<E1>>, // This is shared between all circuit params
-  augmented_circuit_params_primary: SuperNovaAugmentedCircuitParams,
-  ck_secondary: Arc<CommitmentKey<Dual<E1>>>,
-  circuit_shape_secondary: R1CSWithArity<Dual<E1>>,
-  augmented_circuit_params_secondary: SuperNovaAugmentedCircuitParams,
-  digest: E1::Scalar,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(bound = "")]
-pub struct AuxParamsHash<E1>
-where E1: CurveCycleEquipped {
-  ro_consts_primary:           ROConstants<E1>,
-  ro_consts_circuit_primary:   ROConstantsCircuit<Dual<E1>>,
-  ro_consts_secondary:         ROConstants<Dual<E1>>,
-  ro_consts_circuit_secondary: ROConstantsCircuit<E1>,
-}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FoldInput {
@@ -80,16 +57,6 @@ pub enum WitnessGeneratorType {
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
 }
 
-/// Different data components are more efficiently/easily serialized in different
-/// formats. To achieve that efficiency, chunk them into parts.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct RawProvingParams {
-  pub circuit_params: AuxParamsCircuit<E1>,
-  pub hash_params:    Vec<u8>,
-  pub powers_of_g:    Vec<u8>,
-  pub powers_of_h:    Vec<u8>,
-}
-
 // Note, the below are typestates that prevent misuse of our current API.
 pub trait SetupStatus {
   type PublicParams;
@@ -100,7 +67,7 @@ impl SetupStatus for Online {
 }
 pub struct Offline;
 impl SetupStatus for Offline {
-  type PublicParams = RawProvingParams;
+  type PublicParams = Vec<u8>;
 }
 
 pub trait WitnessStatus {
@@ -227,12 +194,11 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
   /// deserializing the public parameters and reconstructing the circuit shapes.
   ///
   /// This method performs the following steps:
-  /// 1. Decompresses the stored zlib-compressed public parameters
-  /// 2. Deserializes the auxiliary parameters using bincode
-  /// 3. Initializes the circuit list from setup data
-  /// 4. Generates circuit shapes from the initialized memory
-  /// 5. Reconstructs full public parameters from circuit shapes and auxiliary parameters
-  /// 6. Constructs a new online program data instance
+  /// 1. Deserializes raw bytes into an AuxParams object
+  /// 2. Initializes the circuit list from setup data
+  /// 3. Generates circuit shapes from the initialized memory
+  /// 4. Reconstructs full public parameters from circuit shapes and auxiliary parameters
+  /// 5. Constructs a new online program data instance
   ///
   /// # Arguments
   ///
@@ -265,75 +231,9 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
   ///
   /// # Example
   pub fn into_online(self) -> Result<ProgramData<Online, W>, ProofError> {
-    let cp = self.public_params.circuit_params;
-    let hp: AuxParamsHash<E1> = bincode::deserialize(&self.public_params.hash_params).unwrap();
-
-    use halo2curves::{
-      bn256::{G1Affine, G2Affine},
-      group::cofactor::CofactorCurveAffine,
-      serde::SerdeObject,
-    };
-
-    // Commitment Type: Pedersen
-    //
-    // let in_len = self.public_params.ck_primary.len();
-    // debug!("begin loading ck_primary key, len={:?}", in_len);
-    // let mut ck = Vec::new();
-    // let size = G1Affine::identity().to_raw_bytes().len();
-    // for b in self.public_params.ck_primary.chunks(size).into_iter() {
-    //   let p = G1Affine::from_raw_bytes(b).unwrap();
-    //   ck.push(p);
-    // }
-    // let ck_len = ck.len();
-    // let key = Arc::new(CommitmentKey::<E1> { ck });
-    // debug!("done loading ck_primary key len={:?}", ck_len);
-    //
-
-    // Commitment Type: KZG
-    let powers_of_g = self.public_params.powers_of_g;
-    let powers_of_h = self.public_params.powers_of_h;
-
-    debug!(
-      "begin loading commitment key, g_len={:?}, h_len={:?}",
-      powers_of_g.len(),
-      powers_of_h.len()
-    );
-    let mut g_ck = Vec::new();
-    let size = G1Affine::identity().to_raw_bytes().len();
-    for b in powers_of_g.chunks(size).into_iter() {
-      let p = G1Affine::from_raw_bytes(b).unwrap();
-      g_ck.push(p);
-    }
-
-    let mut h_ck = Vec::new();
-    let size = G2Affine::identity().to_raw_bytes().len();
-    for b in powers_of_h.chunks(size).into_iter() {
-      let p = G2Affine::from_raw_bytes(b).unwrap();
-      h_ck.push(p);
-    }
-    let key = Arc::new(CommitmentKey::<E1> { powers_of_g: g_ck, powers_of_h: h_ck });
-    debug!("done loading commitment key");
-
-    let aux_params = AuxParams {
-      ck_primary: key,
-      ck_secondary: cp.ck_secondary,
-      augmented_circuit_params_primary: cp.augmented_circuit_params_primary,
-      circuit_shape_secondary: cp.circuit_shape_secondary,
-      augmented_circuit_params_secondary: cp.augmented_circuit_params_secondary,
-      digest: cp.digest,
-
-      ro_consts_primary:           hp.ro_consts_primary,
-      ro_consts_circuit_primary:   hp.ro_consts_circuit_primary,
-      ro_consts_secondary:         hp.ro_consts_secondary,
-      ro_consts_circuit_secondary: hp.ro_consts_circuit_secondary,
-    };
-
-    #[cfg(feature = "timing")]
-    let aux_params_duration = {
-      let aux_params_duration = time.elapsed();
-      trace!("Reading in `AuxParams` elapsed: {:?}", aux_params_duration);
-      aux_params_duration
-    };
+    debug!("loading proving params, proving_param_bytes={:?}", self.public_params.len());
+    let aux_params = AuxParams::<E1>::from_bytes(&self.public_params).unwrap();
+    debug!("done loading proving params");
 
     // TODO: get the circuit shapes needed
     info!("circuit list");
@@ -364,15 +264,14 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
 }
 
 impl<W: WitnessStatus> ProgramData<Online, W> {
-  /// Converts an online program data instance into an offline version by serializing and
-  /// compressing the public parameters to disk.
+  /// Converts an online program data instance into an offline version by serializing
+  /// the public parameters to disk.
   ///
   /// This method performs the following steps:
   /// 1. Extracts auxiliary parameters from the public parameters
-  /// 2. Serializes the auxiliary parameters using bincode
-  /// 3. Compresses the serialized data using zlib compression
-  /// 4. Writes the compressed data to the specified path
-  /// 5. Constructs a new offline program data instance
+  /// 2. Serializes the auxiliary parameters to bytes
+  /// 3. Writes the compressed data to the specified path
+  /// 4. Constructs a new offline program data instance
   ///
   /// # Arguments
   ///
@@ -388,8 +287,7 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   /// # Errors
   ///
   /// This function will return an error if:
-  /// * Bincode serialization fails
-  /// * Zlib compression fails
+  /// * Bytes serialization fails
   /// * File system operations fail (creating directories or writing file)
   ///
   /// # Type Parameters
@@ -398,86 +296,22 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   ///   program data
   pub fn into_offline(self, path: PathBuf) -> Result<ProgramData<Offline, W>, ProofError> {
     let (_, aux_params) = self.public_params.into_parts();
-
-    let sp = aux_params.clone();
-    use halo2curves::serde::SerdeObject;
-    // let mut out: Vec<u8> = vec![];
-    // for i in &sp.ck_primary.ck {
-    //   let mut bytes = i.to_raw_bytes().clone();
-    //   out.append(&mut bytes);
-    // }
-
-    let mut powers_g: Vec<u8> = vec![];
-    for i in &sp.ck_primary.powers_of_g {
-      let mut bytes = i.to_raw_bytes().clone();
-      powers_g.append(&mut bytes);
-    }
-
-    let mut powers_h: Vec<u8> = vec![];
-    for i in &sp.ck_primary.powers_of_h {
-      let mut bytes = i.to_raw_bytes().clone();
-      powers_h.append(&mut bytes);
-    }
-
-    let circuit_params = AuxParamsCircuit::<E1> {
-      ck_secondary: sp.ck_secondary,
-      augmented_circuit_params_primary: sp.augmented_circuit_params_primary,
-      circuit_shape_secondary: sp.circuit_shape_secondary,
-      augmented_circuit_params_secondary: sp.augmented_circuit_params_secondary,
-      digest: sp.digest,
-    };
-
-    let hash_params = AuxParamsHash::<E1> {
-      ro_consts_primary:           sp.ro_consts_primary,
-      ro_consts_circuit_primary:   sp.ro_consts_circuit_primary,
-      ro_consts_secondary:         sp.ro_consts_secondary,
-      ro_consts_circuit_secondary: sp.ro_consts_circuit_secondary,
-    };
-
-    let serialized_json = serde_json::to_string(&circuit_params)?;
-    let serialized_bin = bincode::serialize(&hash_params)?;
-    dbg!(&serialized_json.len(), &serialized_bin.len());
+    let aux_param_bytes = aux_params.to_bytes();
 
     if let Some(parent) = path.parent() {
       std::fs::create_dir_all(parent)?;
     }
 
-    let stem = path.file_stem().unwrap();
-    let json_path =
-      format!("{}/{}.json", path.parent().unwrap().to_str().unwrap(), stem.to_str().unwrap());
-    let bin_path =
-      format!("{}/{}.bin", path.parent().unwrap().to_str().unwrap(), stem.to_str().unwrap());
-    let powers_of_g_path = format!(
-      "{}/{}.powers_of_g.bytes",
-      path.parent().unwrap().to_str().unwrap(),
-      stem.to_str().unwrap()
-    );
-    let powers_of_h_path = format!(
-      "{}/{}.powers_of_h.bytes",
-      path.parent().unwrap().to_str().unwrap(),
-      stem.to_str().unwrap()
-    );
-    debug!(
-      "json_path={:?}, bin_path={:?}, g_path={:?}, h_path={:?}",
-      json_path, bin_path, powers_of_g_path, powers_of_h_path
-    );
-    let mut json_file = std::fs::File::create(&json_path)?;
-    let mut bin_file = std::fs::File::create(&bin_path)?;
-    let mut powers_of_g_file = std::fs::File::create(&powers_of_g_path)?;
-    let mut powers_of_h_file = std::fs::File::create(&powers_of_h_path)?;
-    json_file.write_all(&serialized_json.as_bytes())?;
-    bin_file.write_all(&serialized_bin)?;
-    powers_of_g_file.write_all(&powers_g)?;
-    powers_of_h_file.write_all(&powers_h)?;
+    let stem = path.file_stem().unwrap().to_str().unwrap();
+    let root = path.parent().unwrap().to_str().unwrap();
+    let bytes_path = format!("{}/{}.bytes", root, stem);
+    debug!("bytes_path={:?}", bytes_path);
+    let mut bytes_file = std::fs::File::create(&bytes_path)?;
+    bytes_file.write_all(&aux_param_bytes)?;
 
     let Self { setup_data, rom_data, rom, initial_nivc_input, inputs, witnesses, .. } = self;
     Ok(ProgramData {
-      public_params: RawProvingParams {
-        circuit_params,
-        hash_params: serialized_bin,
-        powers_of_g: powers_g,
-        powers_of_h: powers_h,
-      },
+      public_params: aux_param_bytes,
       setup_data,
       rom_data,
       rom,
@@ -660,23 +494,10 @@ mod tests {
     };
     let public_params = program::setup(&setup_data);
     let ap = public_params.aux_params();
-    let circuit_params = AuxParamsCircuit::<E1> {
-      // ck_primary: ap.ck_primary,
-      ck_secondary: ap.ck_secondary,
-      augmented_circuit_params_primary: ap.augmented_circuit_params_primary,
-      circuit_shape_secondary: ap.circuit_shape_secondary,
-      augmented_circuit_params_secondary: ap.augmented_circuit_params_secondary,
-      digest: ap.digest,
-    };
 
     let mock_inputs: MockInputs = serde_json::from_str(JSON).unwrap();
     let program_data = ProgramData::<Offline, NotExpanded> {
-      public_params: RawProvingParams {
-        circuit_params,
-        hash_params: vec![],
-        powers_of_g: vec![],
-        powers_of_h: vec![],
-      },
+      public_params: vec![],
       setup_data,
       rom_data: HashMap::from([
         (String::from("CIRCUIT_1"), CircuitData { opcode: 0 }),

@@ -1333,7 +1333,7 @@ dependencies = [
 [[package]]
 name = "client-side-prover"
 version = "0.1.0"
-source = "git+https://github.com/pluto/client-side-prover?branch=tl-deserialize-try#9ca975755792e8b8adcfa94121afab51d69670c9"
+source = "git+https://github.com/pluto/client-side-prover?branch=tl-deserialize-try#03a5d676bf85d19662fb0d751f2a0dfef2a42020"
 dependencies = [
  "bellpepper",
  "bellpepper-core",
@@ -1363,6 +1363,7 @@ dependencies = [
  "rayon-scan",
  "ref-cast",
  "serde",
+ "serde_json",
  "sha3",
  "static_assertions",
  "subtle",

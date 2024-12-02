@@ -10,7 +10,6 @@ mod circuits;
 pub mod config;
 pub mod errors;
 mod tls;
-use proofs::program::data::RawProvingParams;
 use serde::Serialize;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
@@ -26,7 +25,7 @@ pub enum Proof {
 
 pub async fn prover_inner(
   config: config::Config,
-  proving_params: Option<RawProvingParams>,
+  proving_params: Option<Vec<u8>>,
 ) -> Result<Proof, errors::ClientErrors> {
   info!("GIT_HASH: {}", env!("GIT_HASH"));
   match config.mode {
@@ -69,7 +68,7 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, erro
 
 pub async fn prover_inner_origo(
   config: config::Config,
-  proving_params: Option<RawProvingParams>,
+  proving_params: Option<Vec<u8>>,
 ) -> Result<Proof, errors::ClientErrors> {
   #[cfg(target_arch = "wasm32")]
   return origo_wasm32::proxy_and_sign(config, proving_params).await;

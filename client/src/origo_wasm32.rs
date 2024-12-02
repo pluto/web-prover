@@ -10,7 +10,7 @@ use proofs::{
   program::{
     self,
     data::{
-      Expanded, NotExpanded, Offline, Online, ProgramData, R1CSType, RawProvingParams, SetupData,
+      Expanded, NotExpanded, Offline, Online, ProgramData, R1CSType, SetupData,
       WitnessGeneratorType,
     },
   },
@@ -30,7 +30,7 @@ use crate::{
 
 pub async fn proxy_and_sign(
   mut config: config::Config,
-  proving_params: Option<RawProvingParams>,
+  proving_params: Option<Vec<u8>>,
 ) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
   let (sb, witness) = proxy(config.clone(), session_id.clone()).await?;
@@ -62,7 +62,7 @@ pub async fn proxy_and_sign(
 async fn generate_program_data(
   witness: &WitnessData,
   proving: ProvingData,
-  proving_params: Option<RawProvingParams>,
+  proving_params: Option<Vec<u8>>,
 ) -> Result<ProgramData<Online, Expanded>, errors::ClientErrors> {
   let (request_inputs, _response_inputs) = decrypt_tls_ciphertext(witness)?;
 
