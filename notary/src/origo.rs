@@ -73,10 +73,6 @@ pub struct SignReply {
 pub struct SignBody {
   handshake_server_aes_iv:    String,
   handshake_server_aes_key:   String,
-  application_client_aes_iv:  String,
-  application_client_aes_key: String,
-  application_server_aes_iv:  String,
-  application_server_aes_key: String,
 }
 
 pub async fn sign(

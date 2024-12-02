@@ -11,10 +11,6 @@ use crate::errors;
 pub struct SignBody {
   pub handshake_server_aes_iv:    String,
   pub handshake_server_aes_key:   String,
-  pub application_client_aes_iv:  String,
-  pub application_client_aes_key: String,
-  pub application_server_aes_iv:  String,
-  pub application_server_aes_key: String,
 }
 
 pub async fn sign(
