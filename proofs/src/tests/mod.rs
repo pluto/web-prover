@@ -2,6 +2,8 @@
 
 // TODO: (Colin): I'm noticing this module could use some TLC. There's a lot of lint here!
 
+use chacha20::cipher::{KeyIvInit, StreamCipher};
+use circom::r1cs::R1CS;
 use client_side_prover::supernova::RecursiveSNARK;
 use halo2curves::bn256::Fr;
 use program::data::{CircuitData, InstructionConfig};
@@ -32,6 +34,12 @@ const AES_GCM_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/target_512b/aes_gctr_nivc_512b.r1cs");
 const AES_GCM_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/target_512b/aes_gctr_nivc_512b.bin");
+
+// New circit 0 bitch!!!!! old circuit 0 should have insecurities now!!!!!
+const CHACHA20_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/chacha20_nivc_512b.r1cs");
+const CHACHA20_GRAPH: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/chacha20_nivc_512b.bin");
 
 // Circuit 1
 const HTTP_NIVC_R1CS: &[u8] =
@@ -123,6 +131,27 @@ const AES_KEY: (&str, [u8; 16]) = ("key", [0; 16]);
 const AES_IV: (&str, [u8; 12]) = ("iv", [0; 12]);
 const AES_AAD: (&str, [u8; 16]) = ("aad", [0; 16]);
 
+const CHACHA20_CIPHERTEXT: (&str, [u8; 320]) = ("cipherText", [
+  2, 125, 219, 141, 140, 93, 49, 129, 95, 178, 135, 109, 48, 36, 194, 46, 239, 155, 160, 70, 208,
+  147, 37, 212, 17, 195, 149, 190, 38, 215, 23, 241, 84, 204, 167, 184, 179, 172, 187, 145, 38, 75,
+  123, 96, 81, 6, 149, 36, 135, 227, 226, 254, 177, 90, 241, 159, 0, 230, 183, 163, 210, 88, 133,
+  176, 9, 122, 225, 83, 171, 157, 185, 85, 122, 4, 110, 52, 2, 90, 36, 189, 145, 63, 122, 75, 94,
+  21, 163, 24, 77, 85, 110, 90, 228, 157, 103, 41, 59, 128, 233, 149, 57, 175, 121, 163, 185, 144,
+  162, 100, 17, 34, 9, 252, 162, 223, 59, 221, 106, 127, 104, 11, 121, 129, 154, 49, 66, 220, 65,
+  130, 171, 165, 43, 8, 21, 248, 12, 214, 33, 6, 109, 3, 144, 52, 124, 225, 206, 223, 213, 86, 186,
+  93, 170, 146, 141, 145, 140, 57, 152, 226, 218, 57, 30, 4, 131, 161, 0, 248, 172, 49, 206, 181,
+  47, 231, 87, 72, 96, 139, 145, 117, 45, 77, 134, 249, 71, 87, 178, 239, 30, 244, 156, 70, 118,
+  180, 176, 90, 92, 80, 221, 177, 86, 120, 222, 223, 244, 109, 150, 226, 142, 97, 171, 210, 38,
+  117, 143, 163, 204, 25, 223, 238, 209, 58, 59, 100, 1, 86, 241, 103, 152, 228, 37, 187, 79, 36,
+  136, 133, 171, 41, 184, 145, 146, 45, 192, 173, 219, 146, 133, 12, 246, 190, 5, 54, 99, 155, 8,
+  198, 156, 174, 99, 12, 210, 95, 5, 128, 166, 118, 50, 66, 26, 20, 3, 129, 232, 1, 192, 104, 23,
+  152, 212, 94, 97, 138, 162, 90, 185, 108, 221, 211, 247, 184, 253, 15, 16, 24, 32, 240, 240, 3,
+  148, 89, 30, 54, 161, 131, 230, 161, 217, 29, 229, 251, 33, 220, 230, 102, 131, 245, 27, 141,
+  220, 67, 16, 26,
+]);
+const CHACHA20_KEY: (&str, [u8; 32]) = ("key", [0; 32]);
+const CHACHA20_NONCE: (&str, [u8; 12]) = ("nonce", [0, 0, 0, 0, 0, 0, 0, 0x4a, 0, 0, 0, 0]);
+
 const JSON_MASK_KEY_DEPTH_1: (&str, [u8; 10]) = ("key", [100, 97, 116, 97, 0, 0, 0, 0, 0, 0]); // "data"
 const JSON_MASK_KEYLEN_DEPTH_1: (&str, [u8; 1]) = ("keyLen", [4]);
 const JSON_MASK_KEY_DEPTH_2: (&str, [u8; 10]) = ("key", [105, 116, 101, 109, 115, 0, 0, 0, 0, 0]); // "items"
@@ -134,6 +163,55 @@ const JSON_MASK_KEYLEN_DEPTH_4: (&str, [u8; 1]) = ("keyLen", [7]);
 const JSON_MASK_KEY_DEPTH_5: (&str, [u8; 10]) = ("key", [110, 97, 109, 101, 0, 0, 0, 0, 0, 0]); // "name"
 const JSON_MASK_KEYLEN_DEPTH_5: (&str, [u8; 1]) = ("keyLen", [4]);
 const MAX_VALUE_LENGTH: usize = 48;
+
+fn to_u32_array(input: &[u8]) -> Vec<u32> {
+  // Calculate padding needed to make length divisible by 4
+  let padding_needed = (4 - (input.len() % 4)) % 4;
+
+  // Create a new vector with padding
+  let padded_input =
+    input.iter().chain(std::iter::repeat(&0).take(padding_needed)).cloned().collect::<Vec<u8>>();
+
+  padded_input
+    .chunks(4)
+    .map(|chunk| {
+      // Convert 4 bytes to u32 (little-endian)
+      u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])
+    })
+    .collect()
+}
+
+fn u32_array_to_le_bits(input: &[u32]) -> Vec<Vec<u8>> {
+  input
+    .iter()
+    .map(|&num| {
+      // Convert each u32 to a vector of bits (0 or 1)
+      (0..32).map(|i| ((num >> (31 - i)) & 1) as u8).collect()
+    })
+    .collect()
+}
+
+fn to_chacha_input(input: &[u8]) -> Vec<Vec<u8>> { u32_array_to_le_bits(&to_u32_array(input)) }
+
+#[test]
+fn u32_array() {
+  let counter_u32 = [1];
+  let res = to_u32_array(&counter_u32);
+  assert_eq!(res, [1]);
+
+  let counter_back = u32_array_to_le_bits(&res);
+  assert_eq!(counter_back, vec![vec![
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+  ]]);
+
+  let http_u32 = "HTTP".as_bytes();
+  assert_eq!(to_u32_array(http_u32), [1347703880]);
+
+  let http_bits = u32_array_to_le_bits(&to_u32_array(http_u32));
+  assert_eq!(http_bits, [[
+    0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0
+  ]]);
+}
 
 #[test]
 #[tracing_test::traced_test]
@@ -158,14 +236,16 @@ fn test_end_to_end_proofs() {
 
   let setup_data = SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+      // R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+      R1CSType::Raw(CHACHA20_R1CS.to_vec()),
       R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(CHACHA20_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
@@ -177,7 +257,8 @@ fn test_end_to_end_proofs() {
   let public_params = program::setup(&setup_data);
   debug!("Creating ROM");
   let rom_data = HashMap::from([
-    (String::from("AES_GCM_1"), CircuitData { opcode: 0 }),
+    // (String::from("AES_GCM_1"), CircuitData { opcode: 0 }),
+    (String::from("CHACHA20"), CircuitData { opcode: 0 }),
     (String::from("HTTP_NIVC"), CircuitData { opcode: 1 }),
     (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 2 }),
     (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 2 }),
@@ -198,7 +279,31 @@ fn test_end_to_end_proofs() {
 
   debug!("Creating `private_inputs`...");
 
-  let mut rom = vec![aes_rom_opcode_config; HTTP_RESPONSE_PLAINTEXT.1.len() / BYTES_PER_FOLD];
+  let mut padded_plaintext = HTTP_RESPONSE_PLAINTEXT.1.to_vec();
+  padded_plaintext.extend(std::iter::repeat(0).take(512 - HTTP_RESPONSE_PLAINTEXT.1.len()));
+  assert_eq!(padded_plaintext.len(), 512);
+
+  let mut chacha = chacha20::ChaCha20::new(&CHACHA20_KEY.1.into(), &CHACHA20_NONCE.1.into());
+  let mut buffer = padded_plaintext.clone();
+  chacha.apply_keystream(&mut buffer);
+
+  let chacha20_key = to_chacha_input(&CHACHA20_KEY.1);
+  let chacha20_nonce = to_chacha_input(&CHACHA20_NONCE.1);
+  assert_eq!(chacha20_key.len(), 8);
+  assert_eq!(chacha20_nonce.len(), 3);
+
+  let chacha_rom_opcode_config = InstructionConfig {
+    name:          String::from("CHACHA20"),
+    private_input: HashMap::from([
+      (String::from(CHACHA20_KEY.0), json!(to_chacha_input(&CHACHA20_KEY.1))),
+      (String::from(CHACHA20_NONCE.0), json!(to_chacha_input(&CHACHA20_NONCE.1))),
+      (String::from("counter"), json!(to_chacha_input(&[1]))),
+      (String::from(CHACHA20_CIPHERTEXT.0), json!(to_chacha_input(&buffer))),
+      (String::from(HTTP_RESPONSE_PLAINTEXT.0), json!(to_chacha_input(&padded_plaintext))),
+    ]),
+  };
+  // let mut rom = vec![aes_rom_opcode_config; HTTP_RESPONSE_PLAINTEXT.1.len() / BYTES_PER_FOLD];
+  let mut rom = vec![chacha_rom_opcode_config];
 
   // After setting the AES config for the ROM, pad the plaintext to match what http_nivc_512b
   // requires
@@ -313,25 +418,26 @@ fn test_end_to_end_proofs() {
   ]);
 
   // Fold inputs are unique for each fold
-  let inputs = HashMap::from([
-    // AES_GCM_1 Inputs
-    (String::from("AES_GCM_1"), FoldInput {
-      value: HashMap::from([
-        (
-          String::from(HTTP_RESPONSE_PLAINTEXT.0),
-          HTTP_RESPONSE_PLAINTEXT.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-        ),
-        (
-          String::from(AES_CIPHER_TEXT.0),
-          AES_CIPHER_TEXT.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-        ),
-        (
-          String::from(AES_COUNTER.0),
-          AES_COUNTER.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-        ),
-      ]),
-    }),
-  ]);
+  // let inputs = HashMap::from([
+  //   // AES_GCM_1 Inputs
+  //   (String::from("AES_GCM_1"), FoldInput {
+  //     value: HashMap::from([
+  //       (
+  //         String::from(HTTP_RESPONSE_PLAINTEXT.0),
+  //         HTTP_RESPONSE_PLAINTEXT.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
+  //       ),
+  //       (
+  //         String::from(AES_CIPHER_TEXT.0),
+  //         AES_CIPHER_TEXT.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
+  //       ),
+  //       (
+  //         String::from(AES_COUNTER.0),
+  //         AES_COUNTER.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
+  //       ),
+  //     ]),
+  //   }),
+  // ]);
+  let inputs = HashMap::new();
 
   // should be zero
   let initial_nivc_input = vec![Fr::ZERO];
