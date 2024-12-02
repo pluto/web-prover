@@ -71,8 +71,8 @@ pub struct SignReply {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct SignBody {
-  handshake_server_aes_iv:    String,
-  handshake_server_aes_key:   String,
+  handshake_server_aes_iv:  String,
+  handshake_server_aes_key: String,
 }
 
 pub async fn sign(
