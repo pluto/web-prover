@@ -223,41 +223,38 @@ const generateWitnessBytesForRequest = async function (circuits, inputs) {
   let extendedHTTPInput = plaintext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
 
   // AES
-  console.log("AES");
-  let plaintext_length = plaintext.length;
-  let cipherText = inputs[0]["cipherText"].concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
-  let cached_wasm = {};
+  // console.log("AES");
+  // let plaintext_length = plaintext.length;
+  // let cipherText = inputs[0]["cipherText"].concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
+  // let cached_wasm = {};
 
+  // inputs[0]["step_in"] = 0;
+  // for (var i = 0; i < plaintext_length / 16; i++) {
+  //   inputs[0]["plainText"] = plaintext.slice(i * 16, (i + 1) * 16);
+  //   inputs[0]["cipherText"] = cipherText.slice(i * 16, (i + 1) * 16);
+  //   inputs[0]["ctr"] = [0, 0, 0, i + 1];
+  //   if (!(circuits[0] in cached_wasm)) {
+  //     const wasm = await getWitnessGenerator(circuits[0]);
+  //     cached_wasm[circuits[0]] = wasm;
+  //   }
+  //   let wtns = await generateWitness(circuits[0], inputs[0], cached_wasm[circuits[0]]);
+  //   witnesses.push(wtns.data);
+  //   inputs[0]["step_in"] = DataHasher(plaintext.slice(0, (i + 1) * 16));
+  // };
+
+  console.log("CHACHA");
+  const chacha = chacha20poly1305(new Uint8Array(CHACHA20_KEY), new Uint8Array(CHACHA20_NONCE));
+  let cipherText = chacha.encrypt(new Uint8Array(extendedHTTPInput));
+
+  inputs[0]["key"] = toInput(Buffer.from(inputs[0]["key"]));
+  inputs[0]["nonce"] = toInput(Buffer.from(inputs[0]["nonce"]));
+  inputs[0]["cipherText"] = toInput(Buffer.from(cipherText.slice(0, TOTAL_BYTES_ACROSS_NIVC)));
+  inputs[0]["plainText"] = toInput(Buffer.from(extendedHTTPInput));
+  inputs[0]["counter"] = uintArray32ToBits([1])[0];
   inputs[0]["step_in"] = 0;
-  for (var i = 0; i < plaintext_length / 16; i++) {
-    inputs[0]["plainText"] = plaintext.slice(i * 16, (i + 1) * 16);
-    inputs[0]["cipherText"] = cipherText.slice(i * 16, (i + 1) * 16);
-    inputs[0]["ctr"] = [0, 0, 0, i + 1];
-    if (!(circuits[0] in cached_wasm)) {
-      const wasm = await getWitnessGenerator(circuits[0]);
-      cached_wasm[circuits[0]] = wasm;
-    }
-    let wtns = await generateWitness(circuits[0], inputs[0], cached_wasm[circuits[0]]);
-    witnesses.push(wtns.data);
-    inputs[0]["step_in"] = DataHasher(plaintext.slice(0, (i + 1) * 16));
-  };
 
-  // console.log("CHACHA");
-  // const chacha = chacha20poly1305(new Uint8Array(CHACHA20_KEY), new Uint8Array(CHACHA20_NONCE));
-  // console.log("encrypt");
-  // let cipherText = chacha.encrypt(new Uint8Array(extendedHTTPInput));
-  // console.log("key to input");
-  // inputs[0]["key"] = toInput(Buffer.from(inputs[0]["key"]));
-  // console.log("nonce to input");
-  // inputs[0]["nonce"] = toInput(Buffer.from(inputs[0]["nonce"]));
-  // console.log("ciphertext to input");
-  // inputs[0]["cipherText"] = toInput(Buffer.from(cipherText.slice(0, TOTAL_BYTES_ACROSS_NIVC)));
-  // console.log("plaintext to input");
-  // inputs[0]["plainText"] = toInput(Buffer.from(extendedHTTPInput));
-  // console.log("uint array 32");
-  // inputs[0]["counter"] = uintArray32ToBits([1])[0];
-  // let chachaWtns = await generateWitness(circuits[0], inputs[0]);
-  // witnesses.push(chachaWtns.data);
+  let chachaWtns = await generateWitness(circuits[0], inputs[0], await getWitnessGenerator(circuits[0]));
+  witnesses.push(chachaWtns.data);
 
   // HTTP
   let http_start_line = computeHttpWitnessStartline(extendedHTTPInput);
@@ -337,7 +334,7 @@ const generateWitnessBytesForRequest = async function (circuits, inputs) {
 const TOTAL_BYTES_ACROSS_NIVC = 512;
 
 // 256 bytes
-const AES_PLAINTEXT = [
+const PLAINTEXT = [
   72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101, 110,
   116, 45, 116, 121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106,
   115, 111, 110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13, 10, 99,
@@ -349,11 +346,12 @@ const AES_PLAINTEXT = [
   32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34, 65, 114, 116, 105, 115,
   116, 34, 44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 112, 114,
   111, 102, 105, 108, 101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-  32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34
+  32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121, 108, 111, 114, 32, 83, 119,
+  105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13,
+  10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 93, 13,
+  10, 32, 32, 32, 125, 13, 10, 125,
 ];
 
-
-// 256 bytes
 const AES_CIPHER_TEXT = [
   75, 220, 142, 158, 79, 135, 141, 163, 211, 26, 242, 137, 81, 253, 181, 117, 253, 246, 197, 197,
   61, 46, 55, 87, 218, 137, 240, 143, 241, 177, 225, 129, 80, 114, 125, 72, 45, 18, 224, 179, 79,
@@ -367,7 +365,10 @@ const AES_CIPHER_TEXT = [
   30, 214, 88, 83, 42, 33, 112, 61, 4, 197, 75, 134, 149, 22, 228, 24, 95, 131, 35, 44, 181, 135,
   31, 173, 36, 23, 192, 177, 127, 156, 199, 167, 212, 66, 235, 194, 102, 61, 144, 121, 59, 187,
   179, 212, 34, 117, 47, 96, 3, 169, 73, 204, 88, 36, 48, 158, 220, 237, 198, 180, 105, 7, 188,
-  109, 24, 201, 217, 186, 191
+  109, 24, 201, 217, 186, 191, 232, 63, 93, 153, 118, 214, 157, 167, 15, 216, 191, 152, 41, 106,
+  24, 127, 8, 144, 78, 218, 133, 125, 89, 97, 10, 246, 8, 244, 112, 169, 190, 206, 14, 217, 109,
+  147, 130, 61, 214, 237, 143, 77, 14, 14, 70, 56, 94, 97, 207, 214, 106, 249, 37, 7, 186, 95, 174,
+  146, 203, 148, 173, 172, 13, 113,
 ];
 
 const CHACHA20_CIPHERTEXT = [
