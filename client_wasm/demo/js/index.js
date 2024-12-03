@@ -3,7 +3,9 @@ import init, {
   initThreadPool
 } from "../pkg/client_wasm.js";
 import { poseidon2 } from "poseidon-lite";
+import { chacha20poly1305 } from "@noble/ciphers/chacha";
 import { toByte, computeHttpWitnessBody, computeHttpWitnessHeader, computeHttpWitnessStartline, compute_json_witness, byteArrayToString } from "./witness.js";
+import { Buffer } from "buffer";
 const numConcurrency = navigator.hardwareConcurrency;
 
 // Create a WebAssembly.Memory object
@@ -109,7 +111,7 @@ const generateWitnessBytesForResponse = async function (circuits, inputs) {
     inputs[0]["cipherText"] = cipherText.slice(i * 16, (i + 1) * 16);
     inputs[0]["ctr"] = [0, 0, 0, i + 1];
     console.log("inputs[0]", inputs[0]);
-    if(!(circuits[0] in cached_wasm)) {
+    if (!(circuits[0] in cached_wasm)) {
       const wasm = await getWitnessGenerator(circuits[0]);
       cached_wasm[circuits[0]] = wasm;
     }
@@ -180,23 +182,58 @@ const generateWitnessBytesForResponse = async function (circuits, inputs) {
   return witnesses;
 };
 
+function toUint32Array(buf) {
+  const arr = new Uint32Array(buf.length / 4)
+  const arrView = new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
+  for (let i = 0; i < arr.length; i++) {
+    arr[i] = arrView.getUint32(i * 4, true)
+  }
+  return arr
+}
+
+function uintArray32ToBits(uintArray) {
+  const bits = []
+  for (let i = 0; i < uintArray.length; i++) {
+    const uint = uintArray[i]
+    bits.push(numToBitsNumerical(uint))
+  }
+
+  return bits
+}
+
+export function numToBitsNumerical(num, bitCount = 32) {
+  const bits = []
+  for (let i = 2 ** (bitCount - 1); i >= 1; i /= 2) {
+    const bit = num >= i ? 1 : 0
+    bits.push(bit)
+    num -= bit * i
+  }
+
+  return bits
+}
+
+function toInput(bytes) {
+  return uintArray32ToBits(toUint32Array(bytes))
+}
+
 const generateWitnessBytesForRequest = async function (circuits, inputs) {
   let witnesses = [];
 
   let plaintext = inputs[0]["plainText"];
   let extendedHTTPInput = plaintext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
-  let cached_wasm = {};
 
   // AES
   console.log("AES");
   let plaintext_length = plaintext.length;
   let cipherText = inputs[0]["cipherText"].concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
+  let cached_wasm = {};
+
   inputs[0]["step_in"] = 0;
   for (var i = 0; i < plaintext_length / 16; i++) {
     inputs[0]["plainText"] = plaintext.slice(i * 16, (i + 1) * 16);
     inputs[0]["cipherText"] = cipherText.slice(i * 16, (i + 1) * 16);
     inputs[0]["ctr"] = [0, 0, 0, i + 1];
-    if(!(circuits[0] in cached_wasm)) {
+    if (!(circuits[0] in cached_wasm)) {
       const wasm = await getWitnessGenerator(circuits[0]);
       cached_wasm[circuits[0]] = wasm;
     }
@@ -204,7 +241,24 @@ const generateWitnessBytesForRequest = async function (circuits, inputs) {
     witnesses.push(wtns.data);
     inputs[0]["step_in"] = DataHasher(plaintext.slice(0, (i + 1) * 16));
   };
-  
+
+  // console.log("CHACHA");
+  // const chacha = chacha20poly1305(new Uint8Array(CHACHA20_KEY), new Uint8Array(CHACHA20_NONCE));
+  // console.log("encrypt");
+  // let cipherText = chacha.encrypt(new Uint8Array(extendedHTTPInput));
+  // console.log("key to input");
+  // inputs[0]["key"] = toInput(Buffer.from(inputs[0]["key"]));
+  // console.log("nonce to input");
+  // inputs[0]["nonce"] = toInput(Buffer.from(inputs[0]["nonce"]));
+  // console.log("ciphertext to input");
+  // inputs[0]["cipherText"] = toInput(Buffer.from(cipherText.slice(0, TOTAL_BYTES_ACROSS_NIVC)));
+  // console.log("plaintext to input");
+  // inputs[0]["plainText"] = toInput(Buffer.from(extendedHTTPInput));
+  // console.log("uint array 32");
+  // inputs[0]["counter"] = uintArray32ToBits([1])[0];
+  // let chachaWtns = await generateWitness(circuits[0], inputs[0]);
+  // witnesses.push(chachaWtns.data);
+
   // HTTP
   let http_start_line = computeHttpWitnessStartline(extendedHTTPInput);
   let http_header_0 = computeHttpWitnessHeader(extendedHTTPInput, toByte("content-type"));
@@ -316,18 +370,48 @@ const AES_CIPHER_TEXT = [
   109, 24, 201, 217, 186, 191
 ];
 
-var inputs = [{
-  "key": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  "iv": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  "plainText": AES_PLAINTEXT,
-  "cipherText": AES_CIPHER_TEXT,
-  "ctr": [0, 0, 0, 0],
-  "aad": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  "step_in": 0,
-},
-{
-  "data": AES_PLAINTEXT,
-},
+const CHACHA20_CIPHERTEXT = [
+  2, 125, 219, 141, 140, 93, 49, 129, 95, 178, 135, 109, 48, 36, 194, 46, 239, 155, 160, 70, 208,
+  147, 37, 212, 17, 195, 149, 190, 38, 215, 23, 241, 84, 204, 167, 184, 179, 172, 187, 145, 38, 75,
+  123, 96, 81, 6, 149, 36, 135, 227, 226, 254, 177, 90, 241, 159, 0, 230, 183, 163, 210, 88, 133,
+  176, 9, 122, 225, 83, 171, 157, 185, 85, 122, 4, 110, 52, 2, 90, 36, 189, 145, 63, 122, 75, 94,
+  21, 163, 24, 77, 85, 110, 90, 228, 157, 103, 41, 59, 128, 233, 149, 57, 175, 121, 163, 185, 144,
+  162, 100, 17, 34, 9, 252, 162, 223, 59, 221, 106, 127, 104, 11, 121, 129, 154, 49, 66, 220, 65,
+  130, 171, 165, 43, 8, 21, 248, 12, 214, 33, 6, 109, 3, 144, 52, 124, 225, 206, 223, 213, 86, 186,
+  93, 170, 146, 141, 145, 140, 57, 152, 226, 218, 57, 30, 4, 131, 161, 0, 248, 172, 49, 206, 181,
+  47, 231, 87, 72, 96, 139, 145, 117, 45, 77, 134, 249, 71, 87, 178, 239, 30, 244, 156, 70, 118,
+  180, 176, 90, 92, 80, 221, 177, 86, 120, 222, 223, 244, 109, 150, 226, 142, 97, 171, 210, 38,
+  117, 143, 163, 204, 25, 223, 238, 209, 58, 59, 100, 1, 86, 241, 103, 152, 228, 37, 187, 79, 36,
+  136, 133, 171, 41, 184, 145, 146, 45, 192, 173, 219, 146, 133, 12, 246, 190, 5, 54, 99, 155, 8,
+  198, 156, 174, 99, 12, 210, 95, 5, 128, 166, 118, 50, 66, 26, 20, 3, 129, 232, 1, 192, 104, 23,
+  152, 212, 94, 97, 138, 162, 90, 185, 108, 221, 211, 247, 184, 253, 15, 16, 24, 32, 240, 240, 3,
+  148, 89, 30, 54, 161, 131, 230, 161, 217, 29, 229, 251, 33, 220, 230, 102, 131, 245, 27, 141,
+  220, 67, 16, 26,
+];
+const CHACHA20_KEY = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+const CHACHA20_NONCE = [0, 0, 0, 0, 0, 0, 0, 0x4a, 0, 0, 0, 0];
+
+
+var inputs = [
+  // {
+  //   "key": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  //   "iv": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  //   "plainText": AES_PLAINTEXT,
+  //   "cipherText": AES_CIPHER_TEXT,
+  //   "ctr": [0, 0, 0, 0],
+  //   "aad": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  //   "step_in": 0,
+  // },
+  {
+    "key": CHACHA20_KEY,
+    "nonce": CHACHA20_NONCE,
+    "plainText": PLAINTEXT,
+    "cipherText": CHACHA20_CIPHERTEXT,
+    "counter": [1],
+  },
+  {
+    "data": PLAINTEXT,
+  },
   // { "key": [100, 97, 116, 97, 0, 0, 0, 0, 0, 0], "keyLen": [4] },
   // { "key": [105, 116, 101, 109, 115, 0, 0, 0, 0, 0], "keyLen": [5] },
   // { "index": [0] },
@@ -340,7 +424,7 @@ var inputs = [{
 startPreWitgen();
 
 // TODO: Configurable identifiers
-var circuits = ["aes_gctr_nivc_512b", "http_nivc_512b", "json_mask_object_512b", "json_mask_array_index_512b", "json_extract_value_512b"];
+var circuits = ["chacha20_nivc_512b", "http_nivc_512b", "json_mask_object_512b", "json_mask_array_index_512b", "json_extract_value_512b"];
 var witnesses = await generateWitnessBytesForRequest(circuits, inputs);
 console.log("witness", witnesses);
 

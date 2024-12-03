@@ -429,7 +429,8 @@ fn test_end_to_end_proofs() {
 fn test_offline_proofs() {
   let setup_data = SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+      // R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+      R1CSType::Raw(CHACHA20_R1CS.to_vec()),
       R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
@@ -437,15 +438,11 @@ fn test_offline_proofs() {
     ],
     witness_generator_types: vec![
       WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "../proofs/web_proof_circuits/target_512b/aes_gctr_nivc_512b_js/aes_gctr_nivc_512b.wasm",
-        ),
+        path:      String::from("../proofs"),
         wtns_path: String::from("witness.wtns"),
       },
       WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "../proofs/web_proof_circuits/target_512b/http_nivc_512b_js/http_nivc_512b.wasm",
-        ),
+        path:      String::from("../proofs"),
         wtns_path: String::from("witness.wtns"),
       },
       WitnessGeneratorType::Wasm {
