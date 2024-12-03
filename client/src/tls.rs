@@ -1,5 +1,5 @@
 // TODO many root_stores ... this could use some cleanup where possible
-use proofs::program::manifest::AESEncryptionInput;
+use proofs::program::manifest::EncryptionInput;
 use tls_client2::{origo::WitnessData, CipherSuite, CipherSuiteKey, Decrypter, ProtocolVersion};
 use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
 use tracing::{debug, trace};
@@ -76,7 +76,7 @@ pub fn tls_client_default_root_store() -> tls_client::RootCertStore {
 /// Decrypt plaintext from TLS transcript ciphertext using [`WitnessData`]
 pub(crate) fn decrypt_tls_ciphertext(
   witness: &WitnessData,
-) -> Result<(AESEncryptionInput, AESEncryptionInput), ClientErrors> {
+) -> Result<(EncryptionInput, EncryptionInput), ClientErrors> {
   // - get AES key, IV, request ciphertext, request plaintext, and AAD -
   let key = parse_cipher_key(&witness.request.aead_key)?;
   let iv: [u8; 12] = witness.request.aead_iv[..12].try_into()?;
@@ -177,32 +177,22 @@ pub(crate) fn decrypt_tls_ciphertext(
   trace!("response plaintext: {:?}", response_plaintext);
   assert_eq!(response_plaintext.len(), response_ciphertext.len());
 
-  let destructured_key = extract_aes_key(key)?;
-  let destructured_response_key = extract_aes_key(response_key)?;
-
   Ok((
-    AESEncryptionInput {
-      key: destructured_key,
+    EncryptionInput {
+      key,
       iv,
       aad: padded_aad.clone(),
       plaintext: request_plaintext,
       ciphertext: request_ciphertext,
     },
-    AESEncryptionInput {
-      key:        destructured_response_key,
+    EncryptionInput {
+      key:        response_key,
       iv:         response_iv,
       aad:        padded_aad, // TODO: use response's AAD
       plaintext:  response_plaintext,
       ciphertext: response_ciphertext,
     },
   ))
-}
-
-fn extract_aes_key(key: CipherSuiteKey) -> Result<[u8; 16], ClientErrors> {
-  match key {
-    CipherSuiteKey::AES128GCM(key) => Ok(key),
-    _ => Err(ClientErrors::TlsCrypto("Unsupported cipher suite key".to_string())),
-  }
 }
 
 fn parse_cipher_key(key: &[u8]) -> Result<CipherSuiteKey, ClientErrors> {

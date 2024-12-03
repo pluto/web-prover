@@ -77,10 +77,10 @@ async fn generate_program_data(
 ) -> Result<(ProgramData<Online, Expanded>, ProgramData<Online, Expanded>), ClientErrors> {
   let (request_inputs, response_inputs) = decrypt_tls_ciphertext(witness)?;
 
-  // - construct private inputs and program layout for AES proof for request -
+  // - construct private inputs and program layout for circuits for TLS request -
   let (request_rom_data, request_rom, request_fold_inputs) =
     proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);
-
+  // - construct private inputs and program layout for circuits for TLS response -
   let (response_rom_data, response_rom, response_fold_inputs) =
     proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
 

@@ -16,6 +16,12 @@ pub const AES_GCM_R1CS: &[u8] =
 pub const AES_GCM_GRAPH: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_512b/aes_gctr_nivc_512b.bin");
 
+// New circit 0 bitch!!!!! old circuit 0 should have insecurities now!!!!!
+const CHACHA20_R1CS: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/target_512b/chacha20_nivc_512b.r1cs");
+const CHACHA20_GRAPH: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/target_512b/chacha20_nivc_512b.bin");
+
 // Circuit 1
 pub const HTTP_NIVC_R1CS: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_512b/http_nivc_512b.r1cs");
@@ -48,6 +54,11 @@ pub const AES_GCM_1024_R1CS: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_1024b/aes_gctr_nivc_1024b.r1cs");
 pub const AES_GCM_1024_GRAPH: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_1024b/aes_gctr_nivc_1024b.bin");
+const CHACHA20_1024_R1CS: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/target_1024b/chacha20_nivc_1024b.r1cs");
+const CHACHA20_1024_GRAPH: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/target_1024b/chacha20_nivc_1024b.bin");
+
 // CIRCUIT 2
 pub const HTTP_NIVC_1024_GRAPH: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_1024b/http_nivc_1024b.bin");
