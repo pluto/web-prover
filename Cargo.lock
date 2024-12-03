@@ -1187,7 +1187,7 @@ dependencies = [
 [[package]]
 name = "circom_witnesscalc"
 version = "0.2.0"
-source = "git+https://github.com/iden3/circom-witnesscalc#d92d6ddeb64cfa4b142692e78e80d3a6931ad99b"
+source = "git+https://github.com/pluto/circom-witnesscalc#67b1b693d9684fde9a0fa1dc5cd79508a9cc82bf"
 dependencies = [
  "ark-bn254",
  "ark-ff 0.4.2",
