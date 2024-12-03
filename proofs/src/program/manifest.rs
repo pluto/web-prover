@@ -145,7 +145,9 @@ pub struct EncryptionInput {
 }
 
 /// ideal circuit size to used for a plaintext with a minimum size of 512 bytes
-fn circuit_size(plaintext_length: usize) -> usize { plaintext_length.next_power_of_two().max(512) }
+pub fn circuit_size(plaintext_length: usize) -> usize {
+  plaintext_length.next_power_of_two().max(512)
+}
 
 fn to_u32_array(input: &[u8]) -> Vec<u32> {
   // Calculate padding needed to make length divisible by 4
@@ -290,9 +292,15 @@ impl Manifest {
 
     // TODO(Sambhav): find a better way to prevent this code duplication for request and response
     // compute hashes http start line and headers signals
+    let http_max_header = match circuit_size(inputs.plaintext.len()) {
+      512 => HTTP_MAX_HEADER_512,
+      1024 => HTTP_MAX_HEADER_1024,
+      _ => panic!("plaintext length > 1KB not supported!"),
+    };
+
     let http_start_line_hash =
       data_hasher(&compute_http_witness(&plaintext, crate::witness::HttpMaskType::StartLine));
-    let mut http_header_hashes = vec!["0".to_string(); HTTP_MAX_HEADER_512];
+    let mut http_header_hashes = vec!["0".to_string(); http_max_header];
     for header_name in self.request.headers.keys() {
       let (index, masked_header) = compute_http_header_witness(&plaintext, header_name.as_bytes());
       http_header_hashes[index] =

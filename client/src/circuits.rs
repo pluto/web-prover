@@ -5,7 +5,10 @@
 //! - JSON_MASK_OBJECT: Mask object at depth 0
 //! - JSON_MASK_ARRAY: Mask array at depth 0
 //! - EXTRACT_VALUE: extract final value
-use proofs::program::data::{R1CSType, SetupData, WitnessGeneratorType};
+use proofs::program::{
+  data::{R1CSType, SetupData, WitnessGeneratorType},
+  manifest::circuit_size,
+};
 
 pub const JSON_MAX_ROM_LENGTH: usize = 45;
 pub const JSON_MAX_ROM_1024B_LENGTH: usize = 80;
@@ -82,17 +85,21 @@ pub const EXTRACT_VALUE_1024_GRAPH: &[u8] =
 
 #[cfg(not(target_arch = "wasm32"))]
 /// construct [`SetupData`] with all the required circuits for 512B inputs
-pub fn construct_setup_data_512() -> SetupData {
+pub fn construct_setup_data_512(cipher_suite_key: &tls_client2::CipherSuiteKey) -> SetupData {
+  let (encryption_circuit_r1cs, encryption_circuit_graph) = match cipher_suite_key {
+    tls_client2::CipherSuiteKey::AES128GCM(_) => (AES_GCM_R1CS, AES_GCM_GRAPH),
+    tls_client2::CipherSuiteKey::CHACHA20POLY1305(_) => (CHACHA20_R1CS, CHACHA20_GRAPH),
+  };
   SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+      R1CSType::Raw(encryption_circuit_r1cs.to_vec()),
       R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(encryption_circuit_graph.to_vec()),
       WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
@@ -104,23 +111,38 @@ pub fn construct_setup_data_512() -> SetupData {
 
 #[cfg(not(target_arch = "wasm32"))]
 /// construct [`SetupData`] with all the required inputs for 1024B inputs
-pub fn construct_setup_data_1024() -> SetupData {
+pub fn construct_setup_data_1024(cipher_suite_key: &tls_client2::CipherSuiteKey) -> SetupData {
+  let (encryption_circuit_r1cs, encryption_circuit_graph) = match cipher_suite_key {
+    tls_client2::CipherSuiteKey::AES128GCM(_) => (AES_GCM_1024_R1CS, AES_GCM_1024_GRAPH),
+    tls_client2::CipherSuiteKey::CHACHA20POLY1305(_) => (CHACHA20_1024_R1CS, CHACHA20_1024_GRAPH),
+  };
   SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_1024_R1CS.to_vec()),
+      R1CSType::Raw(encryption_circuit_r1cs.to_vec()),
       R1CSType::Raw(HTTP_NIVC_1024_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_1024_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_1024_R1CS.to_vec()),
       R1CSType::Raw(EXTRACT_VALUE_1024_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      WitnessGeneratorType::Raw(AES_GCM_1024_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(encryption_circuit_graph.to_vec()),
       WitnessGeneratorType::Raw(HTTP_NIVC_1024_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_OBJECT_1024_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_1024_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(EXTRACT_VALUE_1024_GRAPH.to_vec()),
     ],
     max_rom_length:          JSON_MAX_ROM_1024B_LENGTH,
+  }
+}
+
+pub fn construct_setup_data(
+  cipher_suite_key: &tls_client2::CipherSuiteKey,
+  plaintext_length: usize,
+) -> SetupData {
+  match circuit_size(plaintext_length) {
+    512 => construct_setup_data_512(&cipher_suite_key),
+    1024 => construct_setup_data_1024(&cipher_suite_key),
+    _ => panic!("not supported plaintext length > 1KB"),
   }
 }
 
