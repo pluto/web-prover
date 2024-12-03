@@ -74,7 +74,9 @@ async fn generate_program_data(
   // let (response_rom_data, response_rom, response_fold_inputs) =
   // proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
 
-  // TODO: Unravel this insanity further.
+  // TODO (tracy): Today we are carrying witness data on the proving object,
+  // it's not obviously the right place for it. This code path needs a larger
+  // refactor.
   debug!("serializing witness objects");
   let mut witnesses = Vec::new();
   for w in proving.witnesses.unwrap() {
@@ -82,7 +84,7 @@ async fn generate_program_data(
   }
 
   debug!("initializing public params");
-  let pd = ProgramData::<Offline, NotExpanded> {
+  let program_data = ProgramData::<Offline, NotExpanded> {
     public_params: proving_params.unwrap(),
     setup_data,
     rom: request_rom,
@@ -94,7 +96,7 @@ async fn generate_program_data(
   .into_online();
 
   debug!("online -> expanded");
-  Ok(pd?.into_expanded()?)
+  Ok(program_data?.into_expanded()?)
 }
 
 async fn proxy(

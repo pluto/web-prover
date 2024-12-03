@@ -1,7 +1,4 @@
-use std::{
-  io::{Read, Write},
-  sync::Arc,
-};
+use std::io::Write;
 
 use client_side_prover::{
   fast_serde::FastSerde,
