@@ -13,10 +13,7 @@ use serde_json::json;
 use witness::{compute_http_witness, compute_json_witness};
 
 use super::*;
-use crate::{
-  program::data::{FoldInput, NotExpanded},
-  witness::data_hasher,
-};
+use crate::{program::data::NotExpanded, witness::data_hasher};
 
 mod witnesscalc;
 
@@ -66,8 +63,6 @@ const EXTRACT_VALUE_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/target_512b/json_extract_value_512b.r1cs");
 const EXTRACT_VALUE_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/target_512b/json_extract_value_512b.bin");
-
-const BYTES_PER_FOLD: usize = 16;
 
 // HTTP/1.1 200 OK
 // content-type: application/json; charset=utf-8
@@ -168,54 +163,7 @@ const JSON_MASK_KEY_DEPTH_5: (&str, [u8; 10]) = ("key", [110, 97, 109, 101, 0, 0
 const JSON_MASK_KEYLEN_DEPTH_5: (&str, [u8; 1]) = ("keyLen", [4]);
 const MAX_VALUE_LENGTH: usize = 48;
 
-fn to_u32_array(input: &[u8]) -> Vec<u32> {
-  // Calculate padding needed to make length divisible by 4
-  let padding_needed = (4 - (input.len() % 4)) % 4;
-
-  // Create a new vector with padding
-  let padded_input =
-    input.iter().chain(std::iter::repeat(&0).take(padding_needed)).cloned().collect::<Vec<u8>>();
-
-  padded_input
-    .chunks(4)
-    .map(|chunk| {
-      // Convert 4 bytes to u32 (little-endian)
-      u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])
-    })
-    .collect()
-}
-
-fn u32_array_to_le_bits(input: &[u32]) -> Vec<Vec<u8>> {
-  input
-    .iter()
-    .map(|&num| {
-      // Convert each u32 to a vector of bits (0 or 1)
-      (0..32).map(|i| ((num >> (31 - i)) & 1) as u8).collect()
-    })
-    .collect()
-}
-
-fn to_chacha_input(input: &[u8]) -> Vec<Vec<u8>> { u32_array_to_le_bits(&to_u32_array(input)) }
-
-#[test]
-fn u32_array() {
-  let counter_u32 = [1];
-  let res = to_u32_array(&counter_u32);
-  assert_eq!(res, [1]);
-
-  let counter_back = u32_array_to_le_bits(&res);
-  assert_eq!(counter_back, vec![vec![
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
-  ]]);
-
-  let http_u32 = "HTTP".as_bytes();
-  assert_eq!(to_u32_array(http_u32), [1347703880]);
-
-  let http_bits = u32_array_to_le_bits(&to_u32_array(http_u32));
-  assert_eq!(http_bits, [[
-    0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0
-  ]]);
-}
+use crate::program::manifest::{make_nonce, to_chacha_input};
 
 #[test]
 #[tracing_test::traced_test]
@@ -248,12 +196,6 @@ fn test_end_to_end_proofs() {
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      // WitnessGeneratorType::Wasm {
-      //   path:
-      // "web_proof_circuits/target_512b/chacha20_nivc_512b_js/chacha20_nivc_512b.wasm"
-      //     .to_string(),
-      //   wtns_path: "chacha20.wtns".to_string(),
-      // },
       // WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(CHACHA20_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
@@ -277,15 +219,6 @@ fn test_end_to_end_proofs() {
     (String::from("JSON_MASK_OBJECT_5"), CircuitData { opcode: 2 }),
     (String::from("EXTRACT_VALUE"), CircuitData { opcode: 4 }),
   ]);
-
-  let aes_rom_opcode_config = InstructionConfig {
-    name:          String::from("AES_GCM_1"),
-    private_input: HashMap::from([
-      (String::from(AES_KEY.0), json!(AES_KEY.1)),
-      (String::from(AEAD_IV.0), json!(AEAD_IV.1)),
-      (String::from(AEAD_AAD.0), json!(AEAD_AAD.1)),
-    ]),
-  };
 
   debug!("Creating `private_inputs`...");
 
@@ -543,15 +476,4 @@ fn test_offline_proofs() {
   };
   let _ = program_data
     .into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup_aes.bin").unwrap());
-}
-
-pub fn make_nonce(iv: [u8; 12], seq: u64) -> [u8; 12] {
-  let mut nonce = [0u8; 12];
-  nonce[4..].copy_from_slice(&seq.to_be_bytes());
-
-  nonce.iter_mut().zip(iv.iter()).for_each(|(nonce, iv)| {
-    *nonce ^= *iv;
-  });
-
-  nonce
 }
