@@ -12,12 +12,13 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 )
 
 const (
 	TOKEN_TYPE_OIDC        string = "OIDC"
+	TOKEN_TYPE_PKI         string = "PKI"
 	TOKEN_TYPE_UNSPECIFIED string = "UNSPECIFIED"
-	// TODO: PKI?
 )
 
 type CustomTokenRequest struct {
@@ -33,32 +34,29 @@ func main() {
 	flag.StringVar(&audience, "audience", "https://notary.pluto.xyz", "specify audience")
 	flag.Parse()
 
-	customToken, err := getCustomTokenBytes(CustomTokenRequest{
+	jwt, err := getCustomTokenBytes(CustomTokenRequest{
 		Audience:  audience,
 		Nonces:    nonces,
-		TokenType: TOKEN_TYPE_OIDC,
+		TokenType: TOKEN_TYPE_PKI,
 	})
 	if err != nil {
-		panic(err)
+		panic(err) // prints to stderr
 	}
 
-	// ---
-	// debug out
 	out := struct {
-		CustomToken string
+		JWT string `json:"jwt"`
 	}{
-		CustomToken: string(customToken),
+		JWT: string(jwt),
 	}
-
 	var buf bytes.Buffer
 	e := json.NewEncoder(&buf)
 	e.SetEscapeHTML(false)
 	e.SetIndent("", "  ")
 	if err := e.Encode(out); err != nil {
-		panic(err)
+		panic(err) // prints to stderr
 	}
 
-	fmt.Println(buf.String())
+	os.Stdout.Write(buf.Bytes())
 }
 
 func getCustomTokenBytes(request CustomTokenRequest) ([]byte, error) {

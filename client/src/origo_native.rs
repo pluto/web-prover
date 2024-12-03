@@ -205,12 +205,10 @@ pub async fn proxy(
 
   let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
 
-  dbg!(1);
   let (mut request_sender, connection) =
     hyper::client::conn::http1::handshake(notary_tls_socket).await?;
   let connection_task = tokio::spawn(connection.without_shutdown());
 
-  dbg!(2);
   // TODO build sanitized query
   let request: Request<Full<Bytes>> = hyper::Request::builder()
     .uri(format!(
@@ -228,15 +226,12 @@ pub async fn proxy(
     .body(http_body_util::Full::default())
     .unwrap();
 
-  dbg!(3);
   let response = request_sender.send_request(request).await.unwrap();
 
-  dbg!(4);
   // TODO: get the attestion token from response header (or body?)
   dbg!(response.headers().get("x-pluto-notary-tee-token"));
   // TODO: verify token and key_material which is part of nonce
 
-  dbg!(5);
   assert!(response.status() == hyper::StatusCode::SWITCHING_PROTOCOLS);
 
   // Claim back the TLS socket after the HTTP to TCP upgrade is done

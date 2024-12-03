@@ -5,13 +5,13 @@ use std::{
   time::SystemTime,
 };
 
-use base64::prelude::*;
 use alloy_primitives::utils::keccak256;
 use axum::{
   extract::{self, Query, State},
   response::Response,
   Extension, Json,
 };
+use base64::prelude::*;
 use hex;
 use http::HeaderValue;
 use hyper::upgrade::Upgraded;
@@ -49,7 +49,7 @@ use ws_stream_tungstenite::WsStream;
 use crate::{
   axum_websocket::WebSocket,
   errors::{NotaryServerError, ProxyError},
-  tee::run_tee_util,
+  tee::get_token,
   tlsn::ProtocolUpgrade,
   OrigoSession, SharedState,
 };
@@ -442,24 +442,18 @@ pub async fn proxy(
     }),
   };
 
-  // it's not a timeout problem
-  // tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-
-  // setting headers is not a problem either
-  // resp.headers_mut().insert("x-pluto-notary-tee-token", HeaderValue::from_str("my string
-  // here").unwrap());
-
-  // TODO tee mode:
-  match run_tee_util(vec![hex::encode(key_material)], None) {
-    Ok(stdout) => {
-      resp
-        .headers_mut()
-        .insert("x-pluto-notary-tee-token", HeaderValue::from_str(&BASE64_STANDARD.encode(stdout)).unwrap());
+  // TODO add runtime feature flag? via config?
+  match get_token(vec![hex::encode(key_material)], None) {
+    Ok(token) => {
+      resp.headers_mut().insert(
+        "x-pluto-notary-tee-token",
+        // HeaderValue::from_string(&BASE64_STANDARD.encode(token)).unwrap(),
+        HeaderValue::from_str(&token).unwrap(),
+      );
     },
     Err(e) => {
-      resp
-        .headers_mut()
-        .insert("x-pluto-notary-tee-token", HeaderValue::from_str(&BASE64_STANDARD.encode(&format!("{:?}", e))).unwrap());
+      panic!("{:?}", e); // TODO handle this a bit more gracefully? like log error and return resp
+                         // status 500 or something?
     },
   }
 
