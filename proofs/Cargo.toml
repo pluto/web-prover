@@ -13,10 +13,6 @@ circom_witnesscalc={ git="https://github.com/iden3/circom-witnesscalc" } # Fork 
 serde     ="1.0"
 serde_json="1.0"
 
-rust-witness={ git="https://github.com/chancehudson/rust-witness" }
-paste       ="1.0"
-
-# client-side-prover={ path="../../client-side-prover" }
 client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="9576f74208cd64e10d5159471ba7c71a2292ed2f" }
 ff                ={ version="0.13", default-features=false, features=["derive"] }
 bellpepper-core   ="0.4"
@@ -39,14 +35,16 @@ thiserror="1.0"
 light-poseidon={ git="https://github.com/pluto/light-poseidon" }
 ark-bn254     ="=0.4.0"
 
-[dev-dependencies]
+# ChaCha20-Poly1305 for circuit inputs
 chacha20poly1305="0.10.1"
+
+tls-client2={ path="../tls/tls-client", package="tls-client" }
+
+[dev-dependencies]
 tracing-test="0.2.5"
 
 [build-dependencies]
-anyhow      ="1.0"
-rust-witness={ git="https://github.com/chancehudson/rust-witness" }
-paste       ="1.0"
+anyhow="1.0"
 
 [features]
 verify-steps=[]

@@ -4450,11 +4450,10 @@ dependencies = [
  "light-poseidon",
  "num-bigint 0.4.6",
  "num-traits",
- "paste",
- "rust-witness",
  "serde",
  "serde_json",
  "thiserror 1.0.65",
+ "tls-client",
  "tracing",
  "tracing-subscriber",
  "tracing-test",
@@ -4979,19 +4978,6 @@ checksum = "3e0698206bcb8882bf2a9ecb4c1e7785db57ff052297085a6efd4fe42302068a"
 dependencies = [
  "cfg-if",
  "ordered-multimap",
-]
-
-[[package]]
-name = "rust-witness"
-version = "0.1.0"
-source = "git+https://github.com/chancehudson/rust-witness#d1112024889abcb09267eac9d4b302304caea0b8"
-dependencies = [
- "cc",
- "fnv",
- "num-bigint 0.4.6",
- "num-traits",
- "paste",
- "walkdir",
 ]
 
 [[package]]
