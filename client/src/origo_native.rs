@@ -191,20 +191,26 @@ pub async fn proxy(
     .connect(rustls::ServerName::try_from(config.notary_host.as_str())?, notary_socket)
     .await?;
 
-  let key_material =
-    match export_key_material_middleware(&notary_tls_socket, 32, b"EXPORTER-pluto-notary", Some(b"tee")) {
-      Ok(key_material) => key_material,
-      Err(err) => panic!("{:?}", err), // TODO panic here?!
-    };
+  let key_material = match export_key_material_middleware(
+    &notary_tls_socket,
+    32,
+    b"EXPORTER-pluto-notary",
+    Some(b"tee"),
+  ) {
+    Ok(key_material) => key_material,
+    Err(err) => panic!("{:?}", err), // TODO panic here?!
+  };
 
   dbg!(hex::encode(key_material));
 
   let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
 
+  dbg!(1);
   let (mut request_sender, connection) =
     hyper::client::conn::http1::handshake(notary_tls_socket).await?;
   let connection_task = tokio::spawn(connection.without_shutdown());
 
+  dbg!(2);
   // TODO build sanitized query
   let request: Request<Full<Bytes>> = hyper::Request::builder()
     .uri(format!(
@@ -222,12 +228,15 @@ pub async fn proxy(
     .body(http_body_util::Full::default())
     .unwrap();
 
-  let response = request_sender.send_request(request).await?;
+  dbg!(3);
+  let response = request_sender.send_request(request).await.unwrap();
 
+  dbg!(4);
   // TODO: get the attestion token from response header (or body?)
   dbg!(response.headers().get("x-pluto-notary-tee-token"));
   // TODO: verify token and key_material which is part of nonce
 
+  dbg!(5);
   assert!(response.status() == hyper::StatusCode::SWITCHING_PROTOCOLS);
 
   // Claim back the TLS socket after the HTTP to TCP upgrade is done
@@ -309,21 +318,19 @@ fn export_key_material_middleware(
 struct SkipServerVerification;
 
 impl SkipServerVerification {
-    fn new() -> std::sync::Arc<Self> {
-        std::sync::Arc::new(Self)
-    }
+  fn new() -> std::sync::Arc<Self> { std::sync::Arc::new(Self) }
 }
 
 impl rustls::client::ServerCertVerifier for SkipServerVerification {
-    fn verify_server_cert(
-        &self,
-        _end_entity: &rustls::Certificate,
-        _intermediates: &[rustls::Certificate],
-        _server_name: &rustls::ServerName,
-        _scts: &mut dyn Iterator<Item = &[u8]>,
-        _ocsp_response: &[u8],
-        _now: std::time::SystemTime,
-    ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
-        Ok(rustls::client::ServerCertVerified::assertion())
-    }
+  fn verify_server_cert(
+    &self,
+    _end_entity: &rustls::Certificate,
+    _intermediates: &[rustls::Certificate],
+    _server_name: &rustls::ServerName,
+    _scts: &mut dyn Iterator<Item = &[u8]>,
+    _ocsp_response: &[u8],
+    _now: std::time::SystemTime,
+  ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
+    Ok(rustls::client::ServerCertVerified::assertion())
+  }
 }

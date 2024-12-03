@@ -16,8 +16,9 @@ use crate::{errors::ProxyError, SharedState};
 
 #[derive(Serialize)]
 pub struct AttestationReply {
-  token: String,
-  error: String,
+  key_material: String,
+  token:        String,
+  error:        String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -35,7 +36,13 @@ pub async fn attestation(
   Extension(key_material): Extension<Vec<u8>>,
   extract::Json(payload): extract::Json<AttestationBody>,
 ) -> Result<Json<AttestationReply>, ProxyError> {
-  let mut response = AttestationReply { token: Default::default(), error: Default::default() };
+  let mut response = AttestationReply {
+    key_material: Default::default(),
+    token:        Default::default(),
+    error:        Default::default(),
+  };
+
+  response.key_material = hex::encode(key_material.clone());
 
   match run_tee_util(vec![hex::encode(key_material)], None) {
     Ok(stdout) => response.token = stdout,
@@ -70,13 +77,13 @@ pub fn run_tee_util(nonces: Vec<String>, audience: Option<String>) -> Result<Str
     command.arg("-nonce").arg(nonce);
   }
 
-  let output: Output = command.stderr(Stdio::piped()).stdout(Stdio::piped()).output()?;
+  let output: Output = command.stderr(Stdio::piped()).stdout(Stdio::piped()).output().unwrap();
 
   if !output.status.success() {
-    let stderr = String::from_utf8(output.stderr)?;
+    let stderr = String::from_utf8(output.stderr).unwrap();
     return Err(TeeUtilError::CommandFailed { exit_code: output.status.code(), stderr });
   }
 
-  let stdout = String::from_utf8(output.stdout)?;
+  let stdout = String::from_utf8(output.stdout).unwrap();
   Ok(stdout)
 }
