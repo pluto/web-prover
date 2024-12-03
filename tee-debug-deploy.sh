@@ -29,9 +29,8 @@ out=$(gcloud compute instances create --format=json \
 echo $out
 external_ip=$(echo $out | jq -r '.[0].networkInterfaces[0].accessConfigs[0].natIP')
 
-sleep 120
-
-curl https://$external_ip:7443/v1/tee/attestation -k -H "Content-type: application/json" -d '{"handshake_server_aes_iv": "", "handshake_server_aes_key": "", "application_client_aes_iv": "", "application_client_aes_key": "", "application_server_aes_iv": "", "application_server_aes_key": ""}'
-
-# gcloud compute ssh --zone "us-central1-a" "$instance_name" --project "tee-test-1"
+echo gcloud compute ssh --zone "us-central1-a" "$instance_name" --project "tee-test-1"
 # sudo ctr task exec -t --exec-id shell tee-container bash
+
+sleep 120
+curl https://$external_ip:7443/v1/tee/attestation -k -H "Content-type: application/json" -d '{"handshake_server_aes_iv": "", "handshake_server_aes_key": "", "application_client_aes_iv": "", "application_client_aes_key": "", "application_server_aes_iv": "", "application_server_aes_key": ""}'

@@ -445,15 +445,12 @@ pub async fn proxy(
   // TODO add runtime feature flag? via config?
   match get_token(vec![hex::encode(key_material)], None) {
     Ok(token) => {
-      resp.headers_mut().insert(
-        "x-pluto-notary-tee-token",
-        // HeaderValue::from_string(&BASE64_STANDARD.encode(token)).unwrap(),
-        HeaderValue::from_str(&token).unwrap(),
-      );
+      resp.headers_mut().insert("x-pluto-notary-tee-token", HeaderValue::from_str(&token).unwrap());
     },
     Err(e) => {
-      panic!("{:?}", e); // TODO handle this a bit more gracefully? like log error and return resp
-                         // status 500 or something?
+      // TODO handle this a bit more gracefully? like log error and return resp
+      // status 500 or something?
+      panic!("{:?}", e);
     },
   }
 
