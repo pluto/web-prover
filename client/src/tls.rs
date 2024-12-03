@@ -5,6 +5,10 @@ use tracing::debug; // do not remove
 #[cfg(feature = "notary_ca_cert")]
 pub const NOTARY_CA_CERT: &[u8] = include_bytes!(env!("NOTARY_CA_CERT_PATH"));
 
+// TODO remove
+// pub const DEBUG_SERVER_CERT: &[u8] =
+//   include_bytes!("/home/matt/dev/69-web-prover/web-prover/fixture/certs/server-key.pem");
+
 pub fn tls_client2_default_root_store() -> tls_client2::RootCertStore {
   let mut root_store = tls_client2::RootCertStore::empty();
   root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
@@ -14,6 +18,13 @@ pub fn tls_client2_default_root_store() -> tls_client2::RootCertStore {
       ta.name_constraints.as_ref().map(|nc| nc.as_ref()),
     )
   }));
+
+  // TODO remove
+  // {
+  //   let certificate = pki_types::CertificateDer::from(DEBUG_SERVER_CERT.to_vec());
+  //   let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]);
+  //   assert_eq!(added, 1); 
+  // }
 
   #[cfg(feature = "notary_ca_cert")]
   {

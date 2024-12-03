@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -26,9 +27,15 @@ type CustomTokenRequest struct {
 }
 
 func main() {
+	var nonces nonceSlice
+	var audience string
+	flag.Var(&nonces, "nonce", "specify one or more nonces")
+	flag.StringVar(&audience, "audience", "https://notary.pluto.xyz", "specify audience")
+	flag.Parse()
+
 	customToken, err := getCustomTokenBytes(CustomTokenRequest{
-		Audience:  "http://audience",                                      // TODO
-		Nonces:    []string{"0000000000000000000", "0000000000000000001"}, // TODO
+		Audience:  audience,
+		Nonces:    nonces,
 		TokenType: TOKEN_TYPE_OIDC,
 	})
 	if err != nil {
@@ -80,4 +87,15 @@ func getCustomTokenBytes(request CustomTokenRequest) ([]byte, error) {
 	}
 
 	return bytes.TrimSpace(tokenbytes), nil
+}
+
+type nonceSlice []string
+
+func (n *nonceSlice) String() string {
+	return fmt.Sprintf("%v", *n)
+}
+
+func (n *nonceSlice) Set(value string) error {
+	*n = append(*n, value)
+	return nil
 }

@@ -7,7 +7,7 @@ use std::{
 use axum::{
   extract::{self, Query, State},
   response::Response,
-  Json,
+  Extension, Json,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -21,21 +21,25 @@ pub struct AttestationReply {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct AttestationBody {}
+pub struct AttestationBody {
+  handshake_server_aes_iv:    String,
+  handshake_server_aes_key:   String,
+  application_client_aes_iv:  String,
+  application_client_aes_key: String,
+  application_server_aes_iv:  String,
+  application_server_aes_key: String,
+}
 
 pub async fn attestation(
   State(state): State<Arc<SharedState>>,
+  Extension(key_material): Extension<Vec<u8>>,
   extract::Json(payload): extract::Json<AttestationBody>,
 ) -> Result<Json<AttestationReply>, ProxyError> {
-  let mut response = AttestationReply { token: "".to_string(), error: "".to_string() };
+  let mut response = AttestationReply { token: Default::default(), error: Default::default() };
 
-  match run_tee_util() {
-    Ok(stdout) => {
-		response.token = stdout
-	},
-    Err(e) => {
-		response.error = format!("{:?}", e)
-    },
+  match run_tee_util(vec![hex::encode(key_material)], None) {
+    Ok(stdout) => response.token = stdout,
+    Err(e) => response.error = format!("{:?}", e),
   }
 
   Ok(Json(response))
@@ -53,9 +57,20 @@ pub enum TeeUtilError {
   Utf8Error(#[from] std::string::FromUtf8Error),
 }
 
-fn run_tee_util() -> Result<String, TeeUtilError> {
-  let output: Output =
-    Command::new("/app/tee-util").stderr(Stdio::piped()).stdout(Stdio::piped()).output()?;
+pub fn run_tee_util(nonces: Vec<String>, audience: Option<String>) -> Result<String, TeeUtilError> {
+  // return Ok("dummy string".to_string()); // TODO
+
+  let mut command = Command::new("/app/tee-util");
+
+  if let Some(aud) = audience {
+    command.arg("-audience").arg(aud);
+  }
+
+  for nonce in nonces {
+    command.arg("-nonce").arg(nonce);
+  }
+
+  let output: Output = command.stderr(Stdio::piped()).stdout(Stdio::piped()).output()?;
 
   if !output.status.success() {
     let stderr = String::from_utf8(output.stderr)?;

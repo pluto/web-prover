@@ -11,17 +11,18 @@ pub mod config;
 pub mod errors;
 mod tls;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
 use tracing::info;
 
 use crate::errors::ClientErrors;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Proof {
   TLSN(TlsProof),
   Origo(Vec<u8>),
+  TEE(Vec<u8>),
 }
 
 pub async fn prover_inner(config: config::Config) -> Result<Proof, errors::ClientErrors> {
@@ -29,6 +30,7 @@ pub async fn prover_inner(config: config::Config) -> Result<Proof, errors::Clien
   match config.mode {
     config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
     config::NotaryMode::Origo => prover_inner_origo(config).await,
+    config::NotaryMode::TEE => prover_inner_tee(config).await,
   }
 }
 
@@ -70,4 +72,53 @@ pub async fn prover_inner_origo(config: config::Config) -> Result<Proof, errors:
 
   #[cfg(not(target_arch = "wasm32"))]
   return origo_native::proxy_and_sign(config).await;
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct AttestationBody {
+  handshake_server_aes_iv:    String,
+  handshake_server_aes_key:   String,
+  application_client_aes_iv:  String,
+  application_client_aes_key: String,
+  application_server_aes_iv:  String,
+  application_server_aes_key: String,
+}
+
+pub async fn prover_inner_tee(config: config::Config) -> Result<Proof, errors::ClientErrors> {
+  let session_id = config.clone().session_id();
+  // let manifest = config.proving.manifest; // TODO
+
+
+  // TODO create TLS connection 
+
+  // We are re-using origo networking for TEE
+
+  #[cfg(target_arch = "wasm32")]
+  let origo_conn = origo_wasm32::proxy(config, session_id).await;
+
+  #[cfg(not(target_arch = "wasm32"))]
+  let origo_conn = origo_native::proxy(config, session_id).await;
+
+  // let ab = AttestationBody {
+  //   handshake_server_aes_iv:    hex::encode(
+  //     origo_conn.secret_map.get("Handshake:server_aes_iv").unwrap().clone().to_vec(),
+  //   ),
+  //   handshake_server_aes_key:   hex::encode(
+  //     origo_conn.secret_map.get("Handshake:server_aes_key").unwrap().clone().to_vec(),
+  //   ),
+  //   application_client_aes_iv:  hex::encode(
+  //     origo_conn.secret_map.get("Application:client_aes_iv").unwrap().clone().to_vec(),
+  //   ),
+  //   application_client_aes_key: hex::encode(
+  //     origo_conn.secret_map.get("Application:client_aes_key").unwrap().clone().to_vec(),
+  //   ),
+  //   application_server_aes_iv:  hex::encode(
+  //     origo_conn.secret_map.get("Application:server_aes_iv").unwrap().clone().to_vec(),
+  //   ),
+  //   application_server_aes_key: hex::encode(
+  //     origo_conn.secret_map.get("Application:server_aes_key").unwrap().clone().to_vec(),
+  //   ),
+  // };
+
+  todo!("reached TEE end")
 }

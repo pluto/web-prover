@@ -255,7 +255,7 @@ async fn generate_program_data(
   Ok(pd?.into_expanded()?)
 }
 
-async fn proxy(
+pub async fn proxy(
   config: config::Config,
   session_id: String,
 ) -> Result<(SignBody, WitnessData), errors::ClientErrors> {

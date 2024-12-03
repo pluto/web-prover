@@ -1,5 +1,6 @@
 use std::{
   io::Cursor,
+  str::FromStr,
   sync::{Arc, Mutex},
   time::SystemTime,
 };
@@ -8,9 +9,10 @@ use alloy_primitives::utils::keccak256;
 use axum::{
   extract::{self, Query, State},
   response::Response,
-  Json,
+  Extension, Json,
 };
 use hex;
+use http::HeaderValue;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use nom::{bytes::streaming::take, IResult};
@@ -46,6 +48,7 @@ use ws_stream_tungstenite::WsStream;
 use crate::{
   axum_websocket::WebSocket,
   errors::{NotaryServerError, ProxyError},
+  tee::run_tee_util,
   tlsn::ProtocolUpgrade,
   OrigoSession, SharedState,
 };
@@ -68,8 +71,8 @@ pub struct SignReply {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct SignBody {
-  hs_server_aes_iv:  String,
-  hs_server_aes_key: String,
+  handshake_server_aes_iv:  String,
+  handshake_server_aes_key: String,
 }
 
 pub async fn sign(
@@ -230,8 +233,8 @@ fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
 }
 
 fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>, ProxyError> {
-  let server_aes_key = hex::decode(payload.hs_server_aes_key).unwrap();
-  let server_aes_iv = hex::decode(payload.hs_server_aes_iv).unwrap();
+  let server_aes_key = hex::decode(payload.handshake_server_aes_key).unwrap();
+  let server_aes_iv = hex::decode(payload.handshake_server_aes_iv).unwrap();
 
   let mut cursor = Cursor::new(bytes);
   let mut messages: Vec<Message> = vec![];
@@ -417,12 +420,13 @@ pub async fn proxy(
   protocol_upgrade: ProtocolUpgrade,
   query: Query<NotarizeQuery>,
   State(state): State<Arc<SharedState>>,
+  Extension(key_material): Extension<Vec<u8>>,
 ) -> Response {
   let session_id = query.session_id.clone();
 
   info!("Starting notarize with ID: {}", session_id);
 
-  match protocol_upgrade {
+  let mut resp = match protocol_upgrade {
     ProtocolUpgrade::Ws(ws) => ws.on_upgrade(move |socket| {
       websocket_notarize(
         socket,
@@ -435,7 +439,19 @@ pub async fn proxy(
     ProtocolUpgrade::Tcp(tcp) => tcp.on_upgrade(move |stream| {
       tcp_notarize(stream, session_id, query.target_host.clone(), query.target_port.clone(), state)
     }),
+  };
+
+  // TODO tee mode:
+  match run_tee_util(vec![hex::encode(key_material)], None) {
+    Ok(stdout) => {
+      resp
+        .headers_mut()
+        .insert("x-pluto-notary-tee-token", HeaderValue::from_str(&stdout).unwrap());
+    },
+    Err(e) => panic!("{:?}", e),
   }
+
+  resp
 }
 
 pub async fn websocket_notarize(

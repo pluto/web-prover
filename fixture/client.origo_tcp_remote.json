@@ -1,6 +1,6 @@
 {
-	"mode": "TEE",
-	"notary_host": "34.41.222.104",
+	"mode": "Origo",
+	"notary_host": "104.198.201.213",
 	"notary_port": 7443,
 	"target_method": "GET",
 	"target_url": "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json",

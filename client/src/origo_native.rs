@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, io, sync::Arc};
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
@@ -21,6 +21,8 @@ use tls_client2::{
   CipherSuite, Decrypter2, ProtocolVersion,
 };
 use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
+use tokio::net::TcpStream;
+use tokio_rustls::client::TlsStream;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
@@ -154,7 +156,7 @@ async fn generate_program_data(
   )
 }
 
-async fn proxy(
+pub async fn proxy(
   config: config::Config,
   session_id: String,
 ) -> Result<(SignBody, WitnessData), ClientErrors> {
@@ -174,7 +176,8 @@ async fn proxy(
 
   let client_notary_config = rustls::ClientConfig::builder()
     .with_safe_defaults()
-    .with_root_certificates(crate::tls::rustls_default_root_store())
+    .with_custom_certificate_verifier(SkipServerVerification::new())
+    // .with_root_certificates(crate::tls::rustls_default_root_store())
     .with_no_client_auth();
 
   let notary_connector =
@@ -187,6 +190,14 @@ async fn proxy(
   let notary_tls_socket = notary_connector
     .connect(rustls::ServerName::try_from(config.notary_host.as_str())?, notary_socket)
     .await?;
+
+  let key_material =
+    match export_key_material_middleware(&notary_tls_socket, 32, b"EXPORTER-pluto-notary", Some(b"tee")) {
+      Ok(key_material) => key_material,
+      Err(err) => panic!("{:?}", err), // TODO panic here?!
+    };
+
+  dbg!(hex::encode(key_material));
 
   let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
 
@@ -212,6 +223,11 @@ async fn proxy(
     .unwrap();
 
   let response = request_sender.send_request(request).await?;
+
+  // TODO: get the attestion token from response header (or body?)
+  dbg!(response.headers().get("x-pluto-notary-tee-token"));
+  // TODO: verify token and key_material which is part of nonce
+
   assert!(response.status() == hyper::StatusCode::SWITCHING_PROTOCOLS);
 
   // Claim back the TLS socket after the HTTP to TCP upgrade is done
@@ -268,4 +284,46 @@ async fn proxy(
   };
 
   Ok((sb, witness))
+}
+
+fn export_key_material_middleware(
+  tls_stream: &TlsStream<TcpStream>,
+  length: usize,
+  label: &[u8],
+  context: Option<&[u8]>,
+) -> Result<Vec<u8>, io::Error> {
+  let rustls_conn = tls_stream.get_ref().1;
+
+  if rustls_conn.is_handshaking() {
+    return Err(io::Error::new(io::ErrorKind::Other, "TLS connection is still handshaking"));
+  }
+
+  let mut output = vec![0u8; length];
+  rustls_conn.export_keying_material(&mut output, label, context).map_err(|err| {
+    io::Error::new(io::ErrorKind::Other, format!("Failed to export keying material: {err}"))
+  })?;
+
+  Ok(output)
+}
+
+struct SkipServerVerification;
+
+impl SkipServerVerification {
+    fn new() -> std::sync::Arc<Self> {
+        std::sync::Arc::new(Self)
+    }
+}
+
+impl rustls::client::ServerCertVerifier for SkipServerVerification {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &rustls::Certificate,
+        _intermediates: &[rustls::Certificate],
+        _server_name: &rustls::ServerName,
+        _scts: &mut dyn Iterator<Item = &[u8]>,
+        _ocsp_response: &[u8],
+        _now: std::time::SystemTime,
+    ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
+        Ok(rustls::client::ServerCertVerified::assertion())
+    }
 }
