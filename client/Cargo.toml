@@ -16,9 +16,11 @@ notary_ca_cert=[]
 # TLSN
 tls-client={ workspace=true }
 tls-client2={ path="../tls/tls-client", package="tls-client" }
-tls-client-async2={ path="../tls/tls-client-async", package="tls-client-async", features=[
-  "tracing",
-] }
+# tls-client-async2={ path="../tls/tls-client-async", package="tls-client-async", features=[
+#   "tracing",
+# ] }
+
+bytes = "1"
 tls-core={ path="../tls/tls-core", package="tls-core" }
 proofs={ path="../proofs", package="proofs" }
 

@@ -2,7 +2,7 @@ use super::{client_conn::ClientConnectionData, hs::ClientContext};
 #[cfg(feature = "logging")]
 use crate::log::{debug, trace, warn};
 use crate::{
-    backend::{DecryptMode, EncryptMode},
+    backend::mode::{DecryptMode, EncryptMode},
     check::inappropriate_handshake_message,
     client::{
         common::{ClientAuthDetails, ClientHelloDetails, ServerCertDetails},

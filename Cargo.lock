@@ -1274,6 +1274,7 @@ dependencies = [
  "anyhow",
  "async-tungstenite 0.25.1",
  "base64 0.22.1",
+ "bytes",
  "cfg-if",
  "chrono",
  "clap",
@@ -1306,7 +1307,6 @@ dependencies = [
  "thiserror 1.0.65",
  "time",
  "tls-client",
- "tls-client-async",
  "tls-core",
  "tlsn-core",
  "tlsn-prover",
@@ -3779,7 +3779,6 @@ dependencies = [
  "serde_json",
  "sha1",
  "thiserror 1.0.65",
- "tls-backend",
  "tls-client",
  "tls-parser",
  "tlsn-verifier",
@@ -4633,7 +4632,7 @@ dependencies = [
  "rustc-hash 2.0.0",
  "rustls 0.23.16",
  "socket2",
- "thiserror 2.0.3",
+ "thiserror 2.0.4",
  "tokio",
  "tracing",
 ]
@@ -4652,7 +4651,7 @@ dependencies = [
  "rustls 0.23.16",
  "rustls-pki-types",
  "slab",
- "thiserror 2.0.3",
+ "thiserror 2.0.4",
  "tinyvec",
  "tracing",
  "web-time 1.1.0",
@@ -5012,19 +5011,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b241d2e59b74ef9e98d94c78c47623d04c8392abaf82014dfd372a16041128f"
 dependencies = [
  "sha2",
-]
-
-[[package]]
-name = "rstest"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d912f35156a3f99a66ee3e11ac2e0b3f34ac85a07e05263d05a7e2c8810d616f"
-dependencies = [
- "cfg-if",
- "proc-macro2",
- "quote",
- "rustc_version 0.4.1",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -5850,11 +5836,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.3"
+version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c006c85c7651b3cf2ada4584faa36773bd07bac24acfb39f3c431b36d7e667aa"
+checksum = "2f49a1853cf82743e3b7950f77e0f4d622ca36cf4317cba00c767838bac8d490"
 dependencies = [
- "thiserror-impl 2.0.3",
+ "thiserror-impl 2.0.4",
 ]
 
 [[package]]
@@ -5870,9 +5856,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.3"
+version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f077553d607adc1caf65430528a576c757a71ed73944b66ebb58ef2bbd243568"
+checksum = "8381894bb3efe0c4acac3ded651301ceee58a15d47c2e34885ed1908ad667061"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5967,16 +5953,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
-name = "tls-backend"
-version = "0.0.0"
-dependencies = [
- "async-trait",
- "futures",
- "thiserror 1.0.65",
- "tls-core",
-]
-
-[[package]]
 name = "tls-client"
 version = "0.1.0-alpha.5"
 dependencies = [
@@ -6002,7 +5978,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "strum_macros",
- "tls-backend",
+ "thiserror 2.0.4",
  "tls-core",
  "tls-parser",
  "tokio",
@@ -6010,23 +5986,6 @@ dependencies = [
  "webpki",
  "webpki-roots 0.26.6",
  "zeroize",
-]
-
-[[package]]
-name = "tls-client-async"
-version = "0.1.0-alpha.5"
-dependencies = [
- "bytes",
- "futures",
- "hyper 0.14.31",
- "rstest",
- "thiserror 1.0.65",
- "tls-client",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "webpki-roots 0.26.6",
 ]
 
 [[package]]

@@ -1,11 +1,6 @@
 [workspace]
 members = [
-    "server/",
-    "client/",
-    "client-rs/",
     "tls/tls-client",
-    "tls/tls-backend",
-    "tls/tls-client-async",
     "tls/tls-core"
 ]
 resolver = "2"

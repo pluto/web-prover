@@ -1,7 +1,7 @@
 #[cfg(feature = "logging")]
 use crate::log::{debug, error, trace, warn};
 use crate::{
-    backend::{Backend, RustCryptoBackend13},
+    backend::{mode::Backend, RustCryptoBackend13},
     client::ClientConnectionData,
     error::Error,
     record_layer,
@@ -15,7 +15,7 @@ use std::{
     io, mem,
     ops::{Deref, DerefMut},
 };
-use tls_backend::BackendNotify;
+use crate::backend::notify::BackendNotify;
 use tls_core::{
     msgs::{
         alert::AlertMessagePayload,

@@ -40,7 +40,7 @@ use tls_core::{
 
 use super::{
   origo::{RecordMeta, Direction, OrigoConnection, RecordKey},
-  Backend, BackendError,
+  mode::BackendError, mode::Backend,
 };
 use crate::{backend::tls13::AeadKey, DecryptMode, EncryptMode, Error};
 

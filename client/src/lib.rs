@@ -9,6 +9,7 @@ pub mod origo;
 mod circuits;
 pub mod config;
 pub mod errors;
+pub mod tls_client_async2;
 mod tls;
 use serde::Serialize;
 pub use tlsn_core::proof::TlsProof;

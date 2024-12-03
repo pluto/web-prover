@@ -18,10 +18,11 @@ rustversion = { version = "1", optional = true }
 
 [dependencies]
 hex = "0.4"
-tls-backend = { path = "../tls-backend" }
 tls-core = { path = "../tls-core" }
 zeroize = "1.7"
 sha2 = { version = "0.10", default-features = false }
+
+thiserror = "2.0.4"
 
 # async-trait.workspace = true
 async-trait = "0.1"
