@@ -17,10 +17,7 @@ proofs/circuits/main/*
 proofs/ir_log/*
 proofs/log_input_signals.txt
 proofs/**/*.wtns
-proofs/web_proof_circuits/**/*.r1cs
-proofs/web_proof_circuits/*.r1cs
-proofs/web_proof_circuits/**/*_js/*
-proofs/web_proof_circuits/**/*.bin
+proofs/web_proof_circuits/
 client/.rustc_info.json
 
 # exclude ios/wasm build files

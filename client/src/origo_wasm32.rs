@@ -18,14 +18,13 @@ use proofs::{
 };
 use serde_json::{json, Value};
 use tls_client2::origo::WitnessData;
-use tls_client_async2::bind_client;
 use tracing::debug;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
 use crate::{
   circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
-  Proof,
+  tls_client_async2::bind_client, Proof,
 };
 
 pub async fn proxy_and_sign(
