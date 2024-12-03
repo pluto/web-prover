@@ -2,8 +2,14 @@
 
 // TODO: (Colin): I'm noticing this module could use some TLC. There's a lot of lint here!
 
-use chacha20::cipher::{KeyIvInit, StreamCipher};
-use circom::r1cs::R1CS;
+use chacha20poly1305::{
+  aead::{Aead, Payload},
+  ChaCha20Poly1305,
+  Nonce,
+  Key,
+  KeyInit,
+};
+
 use client_side_prover::supernova::RecursiveSNARK;
 use halo2curves::bn256::Fr;
 use program::data::{CircuitData, InstructionConfig};
@@ -128,8 +134,10 @@ const AES_COUNTER: (&str, [u8; 80]) = ("ctr", [
 ]);
 
 const AES_KEY: (&str, [u8; 16]) = ("key", [0; 16]);
-const AES_IV: (&str, [u8; 12]) = ("iv", [0; 12]);
-const AES_AAD: (&str, [u8; 16]) = ("aad", [0; 16]);
+
+// these should be the same for both AES and CHACHA20 since they are both AEADs
+const AEAD_IV: (&str, [u8; 12]) = ("iv", [0; 12]);
+const AEAD_AAD: (&str, [u8; 16]) = ("aad", [0; 16]);
 
 const CHACHA20_CIPHERTEXT: (&str, [u8; 320]) = ("cipherText", [
   2, 125, 219, 141, 140, 93, 49, 129, 95, 178, 135, 109, 48, 36, 194, 46, 239, 155, 160, 70, 208,
@@ -272,8 +280,8 @@ fn test_end_to_end_proofs() {
     name:          String::from("AES_GCM_1"),
     private_input: HashMap::from([
       (String::from(AES_KEY.0), json!(AES_KEY.1)),
-      (String::from(AES_IV.0), json!(AES_IV.1)),
-      (String::from(AES_AAD.0), json!(AES_AAD.1)),
+      (String::from(AEAD_IV.0), json!(AEAD_IV.1)),
+      (String::from(AEAD_AAD.0), json!(AEAD_AAD.1)),
     ]),
   };
 
@@ -283,22 +291,29 @@ fn test_end_to_end_proofs() {
   padded_plaintext.extend(std::iter::repeat(0).take(512 - HTTP_RESPONSE_PLAINTEXT.1.len()));
   assert_eq!(padded_plaintext.len(), 512);
 
-  let mut chacha = chacha20::ChaCha20::new(&CHACHA20_KEY.1.into(), &CHACHA20_NONCE.1.into());
-  let mut buffer = padded_plaintext.clone();
-  chacha.apply_keystream(&mut buffer);
+  
+  let write_key = Key::from_slice(&CHACHA20_KEY.1);
+  let cipher = ChaCha20Poly1305::new(write_key);
+  let init_nonce = Nonce::from(make_nonce(AEAD_IV.1, 0));
+  let payload = Payload { msg: &padded_plaintext, aad: &AEAD_AAD.1 };
+  let ct = cipher
+    .encrypt(&init_nonce, payload)
+    .unwrap();
 
-  let chacha20_key = to_chacha_input(&CHACHA20_KEY.1);
-  let chacha20_nonce = to_chacha_input(&CHACHA20_NONCE.1);
-  assert_eq!(chacha20_key.len(), 8);
-  assert_eq!(chacha20_nonce.len(), 3);
+  let tag_begins = ct.len() - 16;
+  let sliced_ct = &ct[..tag_begins];
+
+  assert_eq!(sliced_ct.len(), 512);
+  assert_eq!(write_key.len(), 8);
+  assert_eq!(make_nonce(AEAD_IV.1, 0).len(), 3);
 
   let chacha_rom_opcode_config = InstructionConfig {
     name:          String::from("CHACHA20"),
     private_input: HashMap::from([
-      (String::from(CHACHA20_KEY.0), json!(to_chacha_input(&CHACHA20_KEY.1))),
-      (String::from(CHACHA20_NONCE.0), json!(to_chacha_input(&CHACHA20_NONCE.1))),
+      (String::from(CHACHA20_KEY.0), json!(to_chacha_input(write_key))),
+      (String::from(CHACHA20_NONCE.0), json!(to_chacha_input(&init_nonce))),
       (String::from("counter"), json!(to_chacha_input(&[1]))),
-      (String::from(CHACHA20_CIPHERTEXT.0), json!(to_chacha_input(&buffer))),
+      (String::from(CHACHA20_CIPHERTEXT.0), json!(to_chacha_input(sliced_ct))),
       (String::from(HTTP_RESPONSE_PLAINTEXT.0), json!(to_chacha_input(&padded_plaintext))),
     ]),
   };
@@ -437,6 +452,7 @@ fn test_end_to_end_proofs() {
   //     ]),
   //   }),
   // ]);
+  // NOTE(WJ 2024-12-02): I think our fold inputs are wrong here.
   let inputs = HashMap::new();
 
   // should be zero
@@ -527,4 +543,15 @@ fn test_offline_proofs() {
   };
   let _ = program_data
     .into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup_aes.bin").unwrap());
+}
+
+pub fn make_nonce(iv: [u8; 12], seq: u64) -> [u8; 12] {
+  let mut nonce = [0u8; 12];
+  nonce[4..].copy_from_slice(&seq.to_be_bytes());
+
+  nonce.iter_mut().zip(iv.iter()).for_each(|(nonce, iv)| {
+    *nonce ^= *iv;
+  });
+
+  nonce
 }

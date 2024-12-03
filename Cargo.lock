@@ -4440,7 +4440,7 @@ dependencies = [
  "bellpepper-core",
  "bincode",
  "byteorder",
- "chacha20",
+ "chacha20poly1305",
  "circom_witnesscalc",
  "clap",
  "client-side-prover",
