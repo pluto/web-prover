@@ -1333,7 +1333,7 @@ dependencies = [
 [[package]]
 name = "client-side-prover"
 version = "0.1.0"
-source = "git+https://github.com/pluto/client-side-prover?rev=2585467#2585467ea4c7edfcc09e4f14eee8344c5a09e453"
+source = "git+https://github.com/pluto/client-side-prover?rev=9576f74208cd64e10d5159471ba7c71a2292ed2f#9576f74208cd64e10d5159471ba7c71a2292ed2f"
 dependencies = [
  "bellpepper",
  "bellpepper-core",
@@ -1646,15 +1646,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "608697df725056feaccfa42cffdaeeec3fccc4ffc38358ecd19b243e716a78e0"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "crc32fast"
-version = "1.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a97769d94ddab943e4510d138150169a2758b5ef3eb191a9ee688de3e23ef7b3"
-dependencies = [
- "cfg-if",
 ]
 
 [[package]]
@@ -2295,16 +2286,6 @@ name = "fixedbitset"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
-
-[[package]]
-name = "flate2"
-version = "1.0.35"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c936bfdafb507ebbf50b8074c54fa31c5be9a1e7e5f467dd659697041407d07c"
-dependencies = [
- "crc32fast",
- "miniz_oxide",
-]
 
 [[package]]
 name = "fnv"
@@ -4522,7 +4503,6 @@ dependencies = [
  "clap",
  "client-side-prover",
  "ff",
- "flate2",
  "halo2curves",
  "itertools 0.13.0",
  "light-poseidon",

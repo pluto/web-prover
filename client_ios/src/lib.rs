@@ -35,7 +35,7 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let start = Instant::now();
     debug!("starting proving");
-    let proof = rt.block_on(client::prover_inner(config)).unwrap();
+    let proof = rt.block_on(client::prover_inner(config, None)).unwrap();
     debug!("done proving: {:?}", Instant::now() - start);
     serde_json::to_string_pretty(&proof).unwrap()
   }));

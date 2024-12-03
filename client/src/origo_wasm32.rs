@@ -28,14 +28,17 @@ use crate::{
   Proof,
 };
 
-pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
+pub async fn proxy_and_sign(
+  mut config: config::Config,
+  proving_params: Option<Vec<u8>>,
+) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
   let (sb, witness) = proxy(config.clone(), session_id.clone()).await?;
 
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
 
   debug!("generating NIVC program data!");
-  let program_data = generate_program_data(&witness, config.proving).await?;
+  let program_data = generate_program_data(&witness, config.proving, proving_params).await?;
 
   debug!("starting proof generation!");
   let program_output = program::run(&program_data)?;
@@ -59,11 +62,11 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
 async fn generate_program_data(
   witness: &WitnessData,
   proving: ProvingData,
+  proving_params: Option<Vec<u8>>,
 ) -> Result<ProgramData<Online, Expanded>, errors::ClientErrors> {
   let (request_inputs, _response_inputs) = decrypt_tls_ciphertext(witness)?;
 
   let setup_data = construct_setup_data_512();
-
   let (request_rom_data, request_rom, request_fold_inputs) =
     proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);
 
@@ -71,16 +74,18 @@ async fn generate_program_data(
   // let (response_rom_data, response_rom, response_fold_inputs) =
   // proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
 
+  // TODO (tracy): Today we are carrying witness data on the proving object,
+  // it's not obviously the right place for it. This code path needs a larger
+  // refactor.
+  debug!("serializing witness objects");
   let mut witnesses = Vec::new();
   for w in proving.witnesses.unwrap() {
     witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w)))?);
   }
 
-  debug!("generating public params");
-  // let public_params = program::setup(&setup_data);
-
-  let pd = ProgramData::<Offline, NotExpanded> {
-    public_params: SERIALIZED_AUX_PARAMS.to_vec(),
+  debug!("initializing public params");
+  let program_data = ProgramData::<Offline, NotExpanded> {
+    public_params: proving_params.unwrap(),
     setup_data,
     rom: request_rom,
     rom_data: request_rom_data,
@@ -90,18 +95,8 @@ async fn generate_program_data(
   }
   .into_online();
 
-  // let pd = ProgramData::<Online, NotExpanded> {
-  //   public_params,
-  //   setup_data,
-  //   rom,
-  //   rom_data,
-  //   initial_nivc_input: final_input.to_vec(),
-  //   inputs,
-  //   witnesses,
-  // };
-
   debug!("online -> expanded");
-  Ok(pd?.into_expanded()?)
+  Ok(program_data?.into_expanded()?)
 }
 
 async fn proxy(
@@ -165,9 +160,9 @@ async fn proxy(
   client_socket.close().await.unwrap();
 
   let server_aes_iv =
-    origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_iv").unwrap().clone();
+    origo_conn.lock().unwrap().secret_map.get("Handshake:server_iv").unwrap().clone();
   let server_aes_key =
-    origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_key").unwrap().clone();
+    origo_conn.lock().unwrap().secret_map.get("Handshake:server_key").unwrap().clone();
 
   let witness = origo_conn.lock().unwrap().to_witness_data();
   let sb = SignBody {

@@ -1,6 +1,6 @@
 import init, {
   setup_tracing,
-  initThreadPool,
+  initThreadPool
 } from "../pkg/client_wasm.js";
 import { poseidon2 } from "poseidon-lite";
 import { toByte, computeHttpWitnessBody, computeHttpWitnessHeader, computeHttpWitnessStartline, compute_json_witness, byteArrayToString } from "./witness.js";
@@ -17,21 +17,25 @@ await init(undefined, memory);
 setup_tracing("debug,tlsn_extension_rs=debug");
 await initThreadPool(numConcurrency);
 
-var startTime, endTime;
+var startTime, endTime, startPreWitgenTime;
 
 function start() {
   startTime = performance.now();
 }
+function startPreWitgen() {
+  startPreWitgenTime = performance.now();
+}
 
 function end() {
   endTime = performance.now();
-  var timeDiff = endTime - startTime; //in ms
-  // strip the ms
+  var timeDiff = endTime - startTime;
   timeDiff /= 1000;
 
-  // get seconds
-  var seconds = Math.round(timeDiff);
-  console.log(seconds + " seconds");
+  var timeDiffWitgen = endTime - startPreWitgenTime;
+  timeDiffWitgen /= 1000;
+
+  console.log(Math.round(timeDiff) + " seconds");
+  console.log(Math.round(timeDiffWitgen) + " seconds (including witness)");
 }
 
 const _snarkjs = import("snarkjs");
@@ -43,9 +47,14 @@ const getWitnessGenerator = async function (circuit) {
   return wasm;
 }
 
-async function generateWitness(circuit, input) {
-  const wasm = await getWitnessGenerator(circuit);
+const getByteParams = async function (setupFile, additionalPath) {
+  const ppUrl = new URL(`${setupFile}.${additionalPath}`, "https://localhost:8090/build/").toString();
+  const pp = await fetch(ppUrl).then((r) => r.arrayBuffer());
+  console.log("byte_params", pp);
+  return pp;
+}
 
+async function generateWitness(circuit, input, wasm) {
   const witStart = +Date.now();
   let wtns = { type: "mem" };
   await snarkjs.wtns.calculate(input, new Uint8Array(wasm), wtns);
@@ -92,12 +101,19 @@ const generateWitnessBytesForResponse = async function (circuits, inputs) {
   console.log("AES");
   let plaintext_length = plaintext.length;
   let cipherText = inputs[0]["cipherText"].concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
+  let cached_wasm = {};
+
   inputs[0]["step_in"] = 0;
   for (var i = 0; i < plaintext_length / 16; i++) {
     inputs[0]["plainText"] = plaintext.slice(i * 16, (i + 1) * 16);
     inputs[0]["cipherText"] = cipherText.slice(i * 16, (i + 1) * 16);
     inputs[0]["ctr"] = [0, 0, 0, i + 1];
-    let wtns = await generateWitness(circuits[0], inputs[0]);
+    console.log("inputs[0]", inputs[0]);
+    if(!(circuits[0] in cached_wasm)) {
+      const wasm = await getWitnessGenerator(circuits[0]);
+      cached_wasm[circuits[0]] = wasm;
+    }
+    let wtns = await generateWitness(circuits[0], inputs[0], cached_wasm[circuits[0]]);
     witnesses.push(wtns.data);
     inputs[0]["step_in"] = DataHasher(plaintext.slice(0, (i + 1) * 16));
   };
@@ -115,48 +131,49 @@ const generateWitnessBytesForResponse = async function (circuits, inputs) {
   inputs[1]["body_hash"] = DataHasher(http_body);
   inputs[1]["step_in"] = DataHasher(extendedHTTPInput);
   inputs[1]["data"] = extendedHTTPInput;
-  let wtns = await generateWitness(circuits[1], inputs[1]);
+  let wtns = await generateWitness(circuits[1], inputs[1], await getWitnessGenerator(circuits[1]));
   witnesses.push(wtns.data);
 
   console.log("json mask object");
   inputs[2]["data"] = http_body;
   inputs[2]["step_in"] = DataHasher(http_body);
-  let wtnsJsonKey1 = await generateWitness(circuits[2], inputs[2]);
+  let json_wasm = await getWitnessGenerator(circuits[2])
+  let wtnsJsonKey1 = await generateWitness(circuits[2], inputs[2], json_wasm);
   witnesses.push(wtnsJsonKey1.data);
 
   console.log("json mask object");
   let jsonWitnessKey1 = compute_json_witness(http_body, byteArrayToString(inputs[2]["key"].slice(0, inputs[2]["keyLen"])));
   inputs[3]["data"] = jsonWitnessKey1;
   inputs[3]["step_in"] = DataHasher(jsonWitnessKey1);
-  let wtnsJsonKey2 = await generateWitness(circuits[2], inputs[3]);
+  let wtnsJsonKey2 = await generateWitness(circuits[2], inputs[3], json_wasm);
   witnesses.push(wtnsJsonKey2.data);
 
   console.log("json mask array");
   let jsonWitnessKey2 = compute_json_witness(jsonWitnessKey1, byteArrayToString(inputs[3]["key"].slice(0, inputs[3]["keyLen"])));
   inputs[4]["data"] = jsonWitnessKey2;
   inputs[4]["step_in"] = DataHasher(jsonWitnessKey2);
-  let wtnsJsonKey3 = await generateWitness(circuits[3], inputs[4]);
+  let wtnsJsonKey3 = await generateWitness(circuits[3], inputs[4], await getWitnessGenerator(circuits[3]));
   witnesses.push(wtnsJsonKey3.data);
 
   console.log("json mask object");
   let jsonWitnessKey3 = compute_json_witness(jsonWitnessKey2, inputs[4]["index"]);
   inputs[5]["data"] = jsonWitnessKey3;
   inputs[5]["step_in"] = DataHasher(jsonWitnessKey3);
-  let wtnsJsonKey4 = await generateWitness(circuits[2], inputs[5]);
+  let wtnsJsonKey4 = await generateWitness(circuits[2], inputs[5], json_wasm);
   witnesses.push(wtnsJsonKey4.data);
 
   console.log("json mask object");
   let jsonWitnessKey4 = compute_json_witness(jsonWitnessKey3, byteArrayToString(inputs[5]["key"].slice(0, inputs[5]["keyLen"])));
   inputs[6]["data"] = jsonWitnessKey4;
   inputs[6]["step_in"] = DataHasher(jsonWitnessKey4);
-  let wtnsJsonKey5 = await generateWitness(circuits[2], inputs[6]);
+  let wtnsJsonKey5 = await generateWitness(circuits[2], inputs[6], json_wasm);
   witnesses.push(wtnsJsonKey5.data);
 
   console.log("json extract value");
   let jsonWitnessKey5 = compute_json_witness(jsonWitnessKey4, byteArrayToString(inputs[6]["key"].slice(0, inputs[6]["keyLen"])));
   inputs[7]["data"] = jsonWitnessKey5
   inputs[7]["step_in"] = DataHasher(jsonWitnessKey5);
-  let wtnsFinal = await generateWitness(circuits[4], inputs[7]);
+  let wtnsFinal = await generateWitness(circuits[4], inputs[7], await getWitnessGenerator(circuits[4]));
   console.log("wtnsFinal", wtnsFinal);
   witnesses.push(wtnsFinal.data);
 
@@ -168,6 +185,7 @@ const generateWitnessBytesForRequest = async function (circuits, inputs) {
 
   let plaintext = inputs[0]["plainText"];
   let extendedHTTPInput = plaintext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
+  let cached_wasm = {};
 
   // AES
   console.log("AES");
@@ -178,11 +196,15 @@ const generateWitnessBytesForRequest = async function (circuits, inputs) {
     inputs[0]["plainText"] = plaintext.slice(i * 16, (i + 1) * 16);
     inputs[0]["cipherText"] = cipherText.slice(i * 16, (i + 1) * 16);
     inputs[0]["ctr"] = [0, 0, 0, i + 1];
-    let wtns = await generateWitness(circuits[0], inputs[0]);
+    if(!(circuits[0] in cached_wasm)) {
+      const wasm = await getWitnessGenerator(circuits[0]);
+      cached_wasm[circuits[0]] = wasm;
+    }
+    let wtns = await generateWitness(circuits[0], inputs[0], cached_wasm[circuits[0]]);
     witnesses.push(wtns.data);
     inputs[0]["step_in"] = DataHasher(plaintext.slice(0, (i + 1) * 16));
   };
-
+  
   // HTTP
   let http_start_line = computeHttpWitnessStartline(extendedHTTPInput);
   let http_header_0 = computeHttpWitnessHeader(extendedHTTPInput, toByte("content-type"));
@@ -195,8 +217,10 @@ const generateWitnessBytesForRequest = async function (circuits, inputs) {
   inputs[1]["header_hashes"] = [http_header_0_hash, http_header_1_hash, 0, 0, 0, 0, 0, 0, 0, 0];
   inputs[1]["body_hash"] = DataHasher(http_body);
   inputs[1]["step_in"] = DataHasher(extendedHTTPInput);
+  console.log("extended http input", extendedHTTPInput);
   inputs[1]["data"] = extendedHTTPInput;
-  let wtns = await generateWitness(circuits[1], inputs[1]);
+
+  let wtns = await generateWitness(circuits[1], inputs[1], await getWitnessGenerator(circuits[1]));
   witnesses.push(wtns.data);
 
   // console.log("json mask object");
@@ -257,6 +281,8 @@ const generateWitnessBytesForRequest = async function (circuits, inputs) {
 };
 
 const TOTAL_BYTES_ACROSS_NIVC = 512;
+
+// 256 bytes
 const AES_PLAINTEXT = [
   72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101, 110,
   116, 45, 116, 121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106,
@@ -269,11 +295,11 @@ const AES_PLAINTEXT = [
   32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34, 65, 114, 116, 105, 115,
   116, 34, 44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 112, 114,
   111, 102, 105, 108, 101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-  32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121, 108, 111, 114, 32, 83, 119,
-  105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13,
-  10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 93, 13,
-  10, 32, 32, 32, 125, 13, 10, 125];
+  32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34
+];
 
+
+// 256 bytes
 const AES_CIPHER_TEXT = [
   75, 220, 142, 158, 79, 135, 141, 163, 211, 26, 242, 137, 81, 253, 181, 117, 253, 246, 197, 197,
   61, 46, 55, 87, 218, 137, 240, 143, 241, 177, 225, 129, 80, 114, 125, 72, 45, 18, 224, 179, 79,
@@ -287,10 +313,7 @@ const AES_CIPHER_TEXT = [
   30, 214, 88, 83, 42, 33, 112, 61, 4, 197, 75, 134, 149, 22, 228, 24, 95, 131, 35, 44, 181, 135,
   31, 173, 36, 23, 192, 177, 127, 156, 199, 167, 212, 66, 235, 194, 102, 61, 144, 121, 59, 187,
   179, 212, 34, 117, 47, 96, 3, 169, 73, 204, 88, 36, 48, 158, 220, 237, 198, 180, 105, 7, 188,
-  109, 24, 201, 217, 186, 191, 232, 63, 93, 153, 118, 214, 157, 167, 15, 216, 191, 152, 41, 106,
-  24, 127, 8, 144, 78, 218, 133, 125, 89, 97, 10, 246, 8, 244, 112, 169, 190, 206, 14, 217, 109,
-  147, 130, 61, 214, 237, 143, 77, 14, 14, 70, 56, 94, 97, 207, 214, 106, 249, 37, 7, 186, 95, 174,
-  146, 203, 148, 173, 172, 13, 113
+  109, 24, 201, 217, 186, 191
 ];
 
 var inputs = [{
@@ -313,9 +336,18 @@ var inputs = [{
   // {},
 ];
 
+
+startPreWitgen();
+
 // TODO: Configurable identifiers
 var circuits = ["aes_gctr_nivc_512b", "http_nivc_512b", "json_mask_object_512b", "json_mask_array_index_512b", "json_extract_value_512b"];
 var witnesses = await generateWitnessBytesForRequest(circuits, inputs);
+console.log("witness", witnesses);
+
+var proving_params = {
+  aux_params: await getByteParams("serialized_setup_aes", "bytes"),
+  witnesses: witnesses,
+};
 
 start();
 
@@ -330,7 +362,7 @@ let proverConfig = {
   max_sent_data: 10000,
   max_recv_data: 10000,
   proving: {
-    witnesses: witnesses,
+    witnesses: [],
     manifest: {
       "manifestVersion": "1",
       "id": "reddit-user-karma",
@@ -379,7 +411,7 @@ let proverConfig = {
 
 const proofWorker = new Worker(new URL("./proof.js", import.meta.url), { type: "module" });
 console.log("sending message to worker");
-proofWorker.postMessage({ proverConfig, memory });
+proofWorker.postMessage({ proverConfig, proving_params, memory });
 
 proofWorker.onmessage = (event) => {
   if (event.data.error) {
@@ -403,7 +435,7 @@ proofWorker.onmessage = (event) => {
 //   proving: {
 //     r1cs: r1cs,
 //     witnesses: witnesses,
-//     serialized_pp: pp,
+//     params: pp,
 //   }
 // });
 
@@ -435,8 +467,8 @@ proofWorker.onmessage = (event) => {
 //   max_recv_data: 10000,
 // });
 
-end();
 // console.log(proof);
+end();
 
 // ./fixture/cets/notary.pub
 const pubkey =

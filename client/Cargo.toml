@@ -13,7 +13,6 @@ notary_ca_cert=[]
 
 # Shared dependencies for all targets
 [dependencies]
-
 # TLSN
 tls-client={ workspace=true }
 tls-client2={ path="../tls/tls-client", package="tls-client" }

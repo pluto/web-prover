@@ -1,7 +1,7 @@
-use std::panic;
+use std::{collections::HashMap, panic};
 
 use base64::prelude::*;
-use client::config::Config;
+use client::config::{self, Config};
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::Full;
 use hyper::{body::Bytes, Body, Request};
@@ -22,13 +22,38 @@ use wasm_bindgen_futures::spawn_local;
 pub use wasm_bindgen_rayon::init_thread_pool;
 use ws_stream_wasm::WsMeta;
 
+/// ProvingParamsWasm interface is for efficiently moving data between
+/// the javascript and wasm runtime. Using wasm_bindgen creates a
+/// mirrored representation in javascript.
+///
+/// This allows us to directly read javascript runtime memory from rust,
+/// enabling more efficient serde.
+#[wasm_bindgen(getter_with_clone)]
+pub struct ProvingParamsWasm {
+  pub aux_params: js_sys::Uint8Array, // Custom byte parser for aux_params
+  pub witnesses:  Vec<js_sys::Uint8Array>, // Custom byte parser
+}
+
 #[wasm_bindgen]
-pub async fn prover(config: JsValue) -> Result<String, JsValue> {
+impl ProvingParamsWasm {
+  #[wasm_bindgen(constructor)]
+  pub fn new(ap: js_sys::Uint8Array, w: Vec<js_sys::Uint8Array>) -> ProvingParamsWasm {
+    Self { aux_params: ap, witnesses: w }
+  }
+}
+
+#[wasm_bindgen]
+pub async fn prover(config: JsValue, proving_params: ProvingParamsWasm) -> Result<String, JsValue> {
   panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-  let config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
+  debug!("start config serde");
+  let mut config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
+  debug!("end config serde");
 
-  let proof = client::prover_inner(config)
+  // TODO: Refactor this object to remove witnesses from here.
+  config.proving.witnesses = Some(proving_params.witnesses.iter().map(|w| w.to_vec()).collect());
+
+  let proof = client::prover_inner(config, Some(proving_params.aux_params.to_vec()))
     .await
     .map_err(|e| JsValue::from_str(&format!("Could not produce proof: {:?}", e)))?;
 

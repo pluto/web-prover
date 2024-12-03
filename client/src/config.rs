@@ -8,7 +8,6 @@ use hyper::{
   Request,
 };
 use proofs::program::manifest::Manifest;
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -26,7 +25,6 @@ pub enum NotaryMode {
 /// Proving data containing [`Manifest`] and serialized witnesses used for WASM
 #[derive(Deserialize, Clone, Debug)]
 pub struct ProvingData {
-  // TODO(sambhav): remove witnesses after wasm witness generation works
   pub witnesses: Option<Vec<Vec<u8>>>,
   pub manifest:  Option<Manifest>,
 }

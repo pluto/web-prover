@@ -1,7 +1,9 @@
-use std::io::{Read, Write};
+use std::io::Write;
 
-use client_side_prover::supernova::{get_circuit_shapes, AuxParams};
-use flate2::{read::ZlibDecoder, write::ZlibEncoder};
+use client_side_prover::{
+  fast_serde::FastSerde,
+  supernova::{get_circuit_shapes, AuxParams},
+};
 use serde_json::json;
 
 use super::*;
@@ -62,7 +64,6 @@ impl SetupStatus for Online {
 }
 pub struct Offline;
 impl SetupStatus for Offline {
-  // type PublicParams = PathBuf;
   type PublicParams = Vec<u8>;
 }
 
@@ -190,12 +191,11 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
   /// deserializing the public parameters and reconstructing the circuit shapes.
   ///
   /// This method performs the following steps:
-  /// 1. Decompresses the stored zlib-compressed public parameters
-  /// 2. Deserializes the auxiliary parameters using bincode
-  /// 3. Initializes the circuit list from setup data
-  /// 4. Generates circuit shapes from the initialized memory
-  /// 5. Reconstructs full public parameters from circuit shapes and auxiliary parameters
-  /// 6. Constructs a new online program data instance
+  /// 1. Deserializes raw bytes into an AuxParams object
+  /// 2. Initializes the circuit list from setup data
+  /// 3. Generates circuit shapes from the initialized memory
+  /// 4. Reconstructs full public parameters from circuit shapes and auxiliary parameters
+  /// 5. Constructs a new online program data instance
   ///
   /// # Arguments
   ///
@@ -228,22 +228,9 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
   ///
   /// # Example
   pub fn into_online(self) -> Result<ProgramData<Online, W>, ProofError> {
-    #[cfg(feature = "timing")]
-    let time = std::time::Instant::now();
-
-    let file = self.public_params;
-    let mut decoder = ZlibDecoder::new(&file[..]);
-    let mut decompressed = Vec::new();
-    decoder.read_to_end(&mut decompressed)?;
-    info!("starting deserializing");
-    let aux_params: AuxParams<E1> = bincode::deserialize(&decompressed)?;
-
-    #[cfg(feature = "timing")]
-    let aux_params_duration = {
-      let aux_params_duration = time.elapsed();
-      trace!("Reading in `AuxParams` elapsed: {:?}", aux_params_duration);
-      aux_params_duration
-    };
+    debug!("loading proving params, proving_param_bytes={:?}", self.public_params.len());
+    let aux_params = AuxParams::<E1>::from_bytes(&self.public_params).unwrap();
+    debug!("done loading proving params");
 
     // TODO: get the circuit shapes needed
     info!("circuit list");
@@ -260,6 +247,7 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
     info!("public params from parts");
     let public_params = PublicParams::<E1>::from_parts(circuit_shapes, aux_params);
     let Self { setup_data, rom, initial_nivc_input, inputs, witnesses, rom_data, .. } = self;
+
     Ok(ProgramData {
       public_params,
       setup_data,
@@ -273,15 +261,14 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
 }
 
 impl<W: WitnessStatus> ProgramData<Online, W> {
-  /// Converts an online program data instance into an offline version by serializing and
-  /// compressing the public parameters to disk.
+  /// Converts an online program data instance into an offline version by serializing
+  /// the public parameters to disk.
   ///
   /// This method performs the following steps:
   /// 1. Extracts auxiliary parameters from the public parameters
-  /// 2. Serializes the auxiliary parameters using bincode
-  /// 3. Compresses the serialized data using zlib compression
-  /// 4. Writes the compressed data to the specified path
-  /// 5. Constructs a new offline program data instance
+  /// 2. Serializes the auxiliary parameters to bytes
+  /// 3. Writes the compressed data to the specified path
+  /// 4. Constructs a new offline program data instance
   ///
   /// # Arguments
   ///
@@ -297,8 +284,7 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   /// # Errors
   ///
   /// This function will return an error if:
-  /// * Bincode serialization fails
-  /// * Zlib compression fails
+  /// * Bytes serialization fails
   /// * File system operations fail (creating directories or writing file)
   ///
   /// # Type Parameters
@@ -307,23 +293,22 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   ///   program data
   pub fn into_offline(self, path: PathBuf) -> Result<ProgramData<Offline, W>, ProofError> {
     let (_, aux_params) = self.public_params.into_parts();
-    let serialized = bincode::serialize(&aux_params)?;
-    dbg!(&serialized.len());
-    // TODO: May not need to do flate2 compression. Need to test this actually shrinks things
-    // meaningfully -- otherwise remove.
-    let mut encoder = ZlibEncoder::new(Vec::new(), flate2::Compression::best());
-    encoder.write_all(&serialized)?;
-    let compressed = encoder.finish()?;
-    dbg!(&compressed.len());
+    let aux_param_bytes = aux_params.to_bytes();
+
     if let Some(parent) = path.parent() {
       std::fs::create_dir_all(parent)?;
     }
-    let mut file = std::fs::File::create(&path)?;
-    file.write_all(&compressed)?;
+
+    let stem = path.file_stem().unwrap().to_str().unwrap();
+    let root = path.parent().unwrap().to_str().unwrap();
+    let bytes_path = format!("{}/{}.bytes", root, stem);
+    debug!("bytes_path={:?}", bytes_path);
+    let mut bytes_file = std::fs::File::create(&bytes_path)?;
+    bytes_file.write_all(&aux_param_bytes)?;
 
     let Self { setup_data, rom_data, rom, initial_nivc_input, inputs, witnesses, .. } = self;
     Ok(ProgramData {
-      public_params: compressed,
+      public_params: aux_param_bytes,
       setup_data,
       rom_data,
       rom,
@@ -499,20 +484,24 @@ mod tests {
   #[test]
   #[tracing_test::traced_test]
   fn test_expand_private_inputs() {
+    let setup_data = SetupData {
+      r1cs_types:              vec![R1CSType::Raw(vec![])],
+      witness_generator_types: vec![WitnessGeneratorType::Raw(vec![])],
+      max_rom_length:          3,
+    };
+    let public_params = program::setup(&setup_data);
+    let ap = public_params.aux_params();
+
     let mock_inputs: MockInputs = serde_json::from_str(JSON).unwrap();
     let program_data = ProgramData::<Offline, NotExpanded> {
-      public_params:      vec![],
-      setup_data:         SetupData {
-        r1cs_types:              vec![R1CSType::Raw(vec![])],
-        witness_generator_types: vec![WitnessGeneratorType::Raw(vec![])],
-        max_rom_length:          3,
-      },
-      rom_data:           HashMap::from([
+      public_params: vec![],
+      setup_data,
+      rom_data: HashMap::from([
         (String::from("CIRCUIT_1"), CircuitData { opcode: 0 }),
         (String::from("CIRCUIT_2"), CircuitData { opcode: 1 }),
         (String::from("CIRCUIT_3"), CircuitData { opcode: 2 }),
       ]),
-      rom:                vec![
+      rom: vec![
         InstructionConfig {
           name:          String::from("CIRCUIT_1"),
           private_input: HashMap::new(),
@@ -527,8 +516,8 @@ mod tests {
         },
       ],
       initial_nivc_input: vec![],
-      inputs:             mock_inputs.input,
-      witnesses:          vec![],
+      inputs: mock_inputs.input,
+      witnesses: vec![],
     };
     let program_data = program_data.into_expanded().unwrap();
     dbg!(&program_data.inputs);

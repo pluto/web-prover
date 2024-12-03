@@ -137,7 +137,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
     memory.circuits[op_code as usize].circuit.witness =
       if wit_type == WitnessGeneratorType::Browser {
         // When running in browser, the witness is passed as input.
-        Some(program_data.witnesses[op_code as usize].clone())
+        Some(program_data.witnesses[idx as usize].clone())
       } else {
         let arity = memory.circuits[op_code as usize].circuit.arity();
         let nivc_io =
@@ -201,10 +201,10 @@ pub fn compress_proof(
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
   let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(public_params)?;
+  debug!("Done setting up `CompressedSNARK`");
   #[cfg(feature = "timing")]
   trace!("`CompressedSNARK::setup` elapsed: {:?}", time.elapsed());
 
-  // Optionally time the `CompressedSNARK` creation
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
 

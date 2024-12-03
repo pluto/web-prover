@@ -1,4 +1,4 @@
-import init, { prover, setup_tracing, initThreadPool } from "../pkg/client_wasm";
+import init, { prover, setup_tracing, initThreadPool, ProvingParamsWasm } from "../pkg/client_wasm";
 
 let wasmInitialized = false;
 let sharedMemory = null;
@@ -13,7 +13,6 @@ async function initializeWasm(memory) {
             shared: true, // Enable shared memory
         });
         await init(undefined, memory);
-        // await init();
         setup_tracing("debug,tlsn_extension_rs=debug");
         await initThreadPool(numConcurrency);
         wasmInitialized = true;
@@ -55,11 +54,16 @@ function end() {
 
 self.onmessage = async function (e) {
     try {
-        const { proverConfig, memory } = e.data;
+        const { proverConfig, proving_params, memory } = e.data;
         sharedMemory = memory;
         await initializeWasm(sharedMemory);
         start();
-        const proof = await prover(proverConfig);
+        var pp = new ProvingParamsWasm(
+            new Uint8Array(proving_params.aux_params),
+            proving_params.witnesses,
+        );
+        console.log("proving params", proving_params);
+        const proof = await prover(proverConfig, pp);
         console.log("sending proof back to main thread");
         end();
         postMessage({ type: 'proof', data: proof });
