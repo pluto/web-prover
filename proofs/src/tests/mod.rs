@@ -4,12 +4,8 @@
 
 use chacha20poly1305::{
   aead::{Aead, Payload},
-  ChaCha20Poly1305,
-  Nonce,
-  Key,
-  KeyInit,
+  ChaCha20Poly1305, Key, KeyInit, Nonce,
 };
-
 use client_side_prover::supernova::RecursiveSNARK;
 use halo2curves::bn256::Fr;
 use program::data::{CircuitData, InstructionConfig};
@@ -252,6 +248,12 @@ fn test_end_to_end_proofs() {
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
+      // WitnessGeneratorType::Wasm {
+      //   path:
+      // "web_proof_circuits/target_512b/chacha20_nivc_512b_js/chacha20_nivc_512b.wasm"
+      //     .to_string(),
+      //   wtns_path: "chacha20.wtns".to_string(),
+      // },
       // WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(CHACHA20_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
@@ -291,27 +293,25 @@ fn test_end_to_end_proofs() {
   padded_plaintext.extend(std::iter::repeat(0).take(512 - HTTP_RESPONSE_PLAINTEXT.1.len()));
   assert_eq!(padded_plaintext.len(), 512);
 
-  
   let write_key = Key::from_slice(&CHACHA20_KEY.1);
   let cipher = ChaCha20Poly1305::new(write_key);
-  let init_nonce = Nonce::from(make_nonce(AEAD_IV.1, 0));
+  let nonce = make_nonce(AEAD_IV.1, 0);
+  let init_nonce = Nonce::from(nonce.clone());
   let payload = Payload { msg: &padded_plaintext, aad: &AEAD_AAD.1 };
-  let ct = cipher
-    .encrypt(&init_nonce, payload)
-    .unwrap();
+  let ct = cipher.encrypt(&init_nonce, payload).unwrap();
 
   let tag_begins = ct.len() - 16;
   let sliced_ct = &ct[..tag_begins];
 
+  assert!(padded_plaintext.len() == sliced_ct.len());
   assert_eq!(sliced_ct.len(), 512);
-  assert_eq!(write_key.len(), 8);
-  assert_eq!(make_nonce(AEAD_IV.1, 0).len(), 3);
+  assert_eq!(nonce.len(), 12);
 
   let chacha_rom_opcode_config = InstructionConfig {
     name:          String::from("CHACHA20"),
     private_input: HashMap::from([
-      (String::from(CHACHA20_KEY.0), json!(to_chacha_input(write_key))),
-      (String::from(CHACHA20_NONCE.0), json!(to_chacha_input(&init_nonce))),
+      (String::from(CHACHA20_KEY.0), json!(to_chacha_input(&CHACHA20_KEY.1))),
+      (String::from(CHACHA20_NONCE.0), json!(to_chacha_input(&nonce))),
       (String::from("counter"), json!(to_chacha_input(&[1]))),
       (String::from(CHACHA20_CIPHERTEXT.0), json!(to_chacha_input(sliced_ct))),
       (String::from(HTTP_RESPONSE_PLAINTEXT.0), json!(to_chacha_input(&padded_plaintext))),
