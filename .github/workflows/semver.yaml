@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        crate: [proofs, notary, client, client_ios, client_wasm]
+        crate: [proofs, client, client_ios, client_wasm]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
