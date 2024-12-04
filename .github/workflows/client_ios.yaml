@@ -44,6 +44,13 @@ jobs:
           make ios
           make ios-sim
 
+      - name: Check semver for client_ios
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: client_ios
+          manifest-path: client_ios/Cargo.toml
+          baseline-root: "."
+
       - uses: actions/upload-artifact@v4
         with:
           name: "libclient_ios.a"

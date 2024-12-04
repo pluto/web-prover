@@ -59,6 +59,13 @@ jobs:
         run: |
           cd proofs && make web-prover-circuits
 
+      - name: Check semver for client_wasm
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: client_wasm
+          manifest-path: client_wasm/Cargo.toml
+          baseline-root: "."
+
       # TODO run automated tests?
       #      wasm-pack test --firefox
       #      docs: https://rustwasm.github.io/docs/wasm-pack/tutorials/npm-browser-packages/testing-your-project.html

@@ -46,6 +46,13 @@ jobs:
         run: |
           cd proofs && make web-prover-circuits
 
+      - name: Check semver for client
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: client
+          manifest-path: client/Cargo.toml
+          baseline-root: "."
+
       - run: |
           RUST_LOG=DEBUG cargo +nightly-2024-10-28 run --release -p notary -- --config ./fixture/notary-config.toml &
           sleep 30
