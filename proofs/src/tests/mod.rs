@@ -29,12 +29,6 @@ const MAX_ROM_LENGTH: usize = 10;
 const JSON_MAX_ROM_LENGTH: usize = 45;
 
 // Circuit 0
-const AES_GCM_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/aes_gctr_nivc_512b.r1cs");
-const AES_GCM_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/aes_gctr_nivc_512b.bin");
-
-// New circit 0 bitch!!!!! old circuit 0 should have insecurities now!!!!!
 const CHACHA20_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/target_512b/chacha20_nivc_512b.r1cs");
 const CHACHA20_GRAPH: &[u8] =
@@ -99,33 +93,6 @@ const HTTP_RESPONSE_PLAINTEXT: (&str, [u8; 320]) = ("plainText", [
   10, 32, 32, 32, 125, 13, 10, 125,
 ]);
 
-const AES_CIPHER_TEXT: (&str, [u8; 320]) = ("cipherText", [
-  75, 220, 142, 158, 79, 135, 141, 163, 211, 26, 242, 137, 81, 253, 181, 117, 253, 246, 197, 197,
-  61, 46, 55, 87, 218, 137, 240, 143, 241, 177, 225, 129, 80, 114, 125, 72, 45, 18, 224, 179, 79,
-  231, 153, 198, 163, 252, 197, 219, 233, 46, 202, 120, 99, 253, 76, 9, 70, 11, 200, 218, 228, 251,
-  133, 248, 233, 177, 19, 241, 205, 128, 65, 76, 10, 31, 71, 198, 177, 78, 108, 246, 175, 152, 42,
-  97, 255, 182, 157, 245, 123, 95, 130, 101, 129, 138, 236, 146, 47, 22, 22, 13, 125, 1, 109, 158,
-  189, 131, 44, 43, 203, 118, 79, 181, 86, 33, 235, 186, 75, 20, 7, 147, 102, 75, 90, 222, 255,
-  140, 94, 52, 191, 145, 192, 71, 239, 245, 247, 175, 117, 136, 173, 235, 250, 189, 74, 155, 103,
-  25, 164, 187, 22, 26, 39, 37, 113, 248, 170, 146, 73, 75, 45, 208, 125, 49, 101, 11, 120, 215,
-  93, 160, 14, 147, 129, 181, 150, 59, 167, 197, 230, 122, 77, 245, 247, 215, 136, 98, 1, 180, 213,
-  30, 214, 88, 83, 42, 33, 112, 61, 4, 197, 75, 134, 149, 22, 228, 24, 95, 131, 35, 44, 181, 135,
-  31, 173, 36, 23, 192, 177, 127, 156, 199, 167, 212, 66, 235, 194, 102, 61, 144, 121, 59, 187,
-  179, 212, 34, 117, 47, 96, 3, 169, 73, 204, 88, 36, 48, 158, 220, 237, 198, 180, 105, 7, 188,
-  109, 24, 201, 217, 186, 191, 232, 63, 93, 153, 118, 214, 157, 167, 15, 216, 191, 152, 41, 106,
-  24, 127, 8, 144, 78, 218, 133, 125, 89, 97, 10, 246, 8, 244, 112, 169, 190, 206, 14, 217, 109,
-  147, 130, 61, 214, 237, 143, 77, 14, 14, 70, 56, 94, 97, 207, 214, 106, 249, 37, 7, 186, 95, 174,
-  146, 203, 148, 173, 172, 13, 113,
-]);
-
-const AES_COUNTER: (&str, [u8; 80]) = ("ctr", [
-  0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 6, 0, 0, 0, 7, 0, 0, 0, 8,
-  0, 0, 0, 9, 0, 0, 0, 10, 0, 0, 0, 11, 0, 0, 0, 12, 0, 0, 0, 13, 0, 0, 0, 14, 0, 0, 0, 15, 0, 0,
-  0, 16, 0, 0, 0, 17, 0, 0, 0, 18, 0, 0, 0, 19, 0, 0, 0, 20,
-]);
-
-const AES_KEY: (&str, [u8; 16]) = ("key", [0; 16]);
-
 // these should be the same for both AES and CHACHA20 since they are both AEADs
 const AEAD_IV: (&str, [u8; 12]) = ("iv", [0; 12]);
 const AEAD_AAD: (&str, [u8; 16]) = ("aad", [0; 16]);
@@ -188,7 +155,6 @@ fn test_end_to_end_proofs() {
 
   let setup_data = SetupData {
     r1cs_types:              vec![
-      // R1CSType::Raw(AES_GCM_R1CS.to_vec()),
       R1CSType::Raw(CHACHA20_R1CS.to_vec()),
       R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
@@ -196,7 +162,6 @@ fn test_end_to_end_proofs() {
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      // WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(CHACHA20_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
@@ -209,7 +174,6 @@ fn test_end_to_end_proofs() {
   let public_params = program::setup(&setup_data);
   debug!("Creating ROM");
   let rom_data = HashMap::from([
-    // (String::from("AES_GCM_1"), CircuitData { opcode: 0 }),
     (String::from("CHACHA20"), CircuitData { opcode: 0 }),
     (String::from("HTTP_NIVC"), CircuitData { opcode: 1 }),
     (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 2 }),
@@ -250,24 +214,16 @@ fn test_end_to_end_proofs() {
       (String::from(HTTP_RESPONSE_PLAINTEXT.0), json!(to_chacha_input(&padded_plaintext))),
     ]),
   };
-  // let mut rom = vec![aes_rom_opcode_config; HTTP_RESPONSE_PLAINTEXT.1.len() / BYTES_PER_FOLD];
   let mut rom = vec![chacha_rom_opcode_config];
 
-  // After setting the AES config for the ROM, pad the plaintext to match what http_nivc_512b
+  // After setting the encryption config for the ROM, pad the plaintext to match what http_nivc_512b
   // requires
-  let mut padded_http_response_plaintext = HTTP_RESPONSE_PLAINTEXT.1.to_vec();
-  padded_http_response_plaintext.resize(512, 0);
 
-  let http_start_line_hash = data_hasher(&compute_http_witness(
-    &padded_http_response_plaintext,
-    witness::HttpMaskType::StartLine,
-  ));
-  let http_header_1_hash = data_hasher(&compute_http_witness(
-    &padded_http_response_plaintext,
-    witness::HttpMaskType::Header(1),
-  ));
-  let http_body =
-    compute_http_witness(&padded_http_response_plaintext, witness::HttpMaskType::Body);
+  let http_start_line_hash =
+    data_hasher(&compute_http_witness(&padded_plaintext, witness::HttpMaskType::StartLine));
+  let http_header_1_hash =
+    data_hasher(&compute_http_witness(&padded_plaintext, witness::HttpMaskType::Header(1)));
+  let http_body = compute_http_witness(&padded_plaintext, witness::HttpMaskType::Body);
   let http_body_hash = data_hasher(&http_body);
 
   let masked_json_key_1 =
@@ -291,7 +247,7 @@ fn test_end_to_end_proofs() {
     InstructionConfig {
       name:          String::from("HTTP_NIVC"),
       private_input: HashMap::from([
-        (String::from("data"), json!(padded_http_response_plaintext)),
+        (String::from("data"), json!(padded_plaintext)),
         (
           String::from("start_line_hash"),
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
@@ -365,29 +321,6 @@ fn test_end_to_end_proofs() {
     },
   ]);
 
-  // Fold inputs are unique for each fold
-  // let inputs = HashMap::from([
-  //   // AES_GCM_1 Inputs
-  //   (String::from("AES_GCM_1"), FoldInput {
-  //     value: HashMap::from([
-  //       (
-  //         String::from(HTTP_RESPONSE_PLAINTEXT.0),
-  //         HTTP_RESPONSE_PLAINTEXT.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-  //       ),
-  //       (
-  //         String::from(AES_CIPHER_TEXT.0),
-  //         AES_CIPHER_TEXT.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-  //       ),
-  //       (
-  //         String::from(AES_COUNTER.0),
-  //         AES_COUNTER.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-  //       ),
-  //     ]),
-  //   }),
-  // ]);
-  // NOTE(WJ 2024-12-02): I think our fold inputs are wrong here.
-  let inputs = HashMap::new();
-
   // should be zero
   let initial_nivc_input = vec![Fr::ZERO];
 
@@ -397,7 +330,7 @@ fn test_end_to_end_proofs() {
     rom_data: rom_data.clone(),
     rom: rom.clone(),
     initial_nivc_input,
-    inputs,
+    inputs: HashMap::new(),
     witnesses: vec![],
   }
   .into_expanded()
@@ -429,7 +362,6 @@ fn test_end_to_end_proofs() {
 fn test_offline_proofs() {
   let setup_data = SetupData {
     r1cs_types:              vec![
-      // R1CSType::Raw(AES_GCM_R1CS.to_vec()),
       R1CSType::Raw(CHACHA20_R1CS.to_vec()),
       R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),

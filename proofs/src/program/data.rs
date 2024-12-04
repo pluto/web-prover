@@ -79,21 +79,30 @@ impl WitnessStatus for NotExpanded {
   type PrivateInputs = HashMap<String, FoldInput>;
 }
 
+/// Circuit setup data containing r1cs and witness generators along with max NIVC ROM length
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SetupData {
+  /// vector of all circuits' r1cs
   pub r1cs_types:              Vec<R1CSType>,
+  /// vector of all circuits' witness generator
   pub witness_generator_types: Vec<WitnessGeneratorType>,
+  /// NIVC max ROM length
   pub max_rom_length:          usize,
 }
 
+/// Auxillary circuit data required to execute the ROM
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CircuitData {
+  /// circuit instruction opcode in [`SetupData`]
   pub opcode: u64,
 }
 
+/// Circuit instruction config
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InstructionConfig {
+  /// opcode label
   pub name:          String,
+  /// circuit private input
   pub private_input: HashMap<String, Value>,
 }
 
@@ -228,9 +237,17 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
   ///
   /// # Example
   pub fn into_online(self) -> Result<ProgramData<Online, W>, ProofError> {
+    #[cfg(feature = "timing")]
+    let time = std::time::Instant::now();
     debug!("loading proving params, proving_param_bytes={:?}", self.public_params.len());
     let aux_params = AuxParams::<E1>::from_bytes(&self.public_params).unwrap();
     debug!("done loading proving params");
+    #[cfg(feature = "timing")]
+    let aux_params_duration = {
+      let aux_params_duration = time.elapsed();
+      trace!("Reading in `AuxParams` elapsed: {:?}", aux_params_duration);
+      aux_params_duration
+    };
 
     // TODO: get the circuit shapes needed
     info!("circuit list");
@@ -490,7 +507,7 @@ mod tests {
       max_rom_length:          3,
     };
     let public_params = program::setup(&setup_data);
-    let ap = public_params.aux_params();
+    let _ap = public_params.aux_params();
 
     let mock_inputs: MockInputs = serde_json::from_str(JSON).unwrap();
     let program_data = ProgramData::<Offline, NotExpanded> {
