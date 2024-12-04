@@ -88,9 +88,6 @@ pub async fn prover_inner_tee(config: config::Config) -> Result<Proof, errors::C
   let session_id = config.clone().session_id();
   // let manifest = config.proving.manifest; // TODO
 
-
-  // TODO create TLS connection 
-
   // We are re-using origo networking for TEE
 
   #[cfg(target_arch = "wasm32")]

@@ -138,19 +138,8 @@ async fn acme_listen(listener: TcpListener, router: Router, domain: &str, email:
         tls.shutdown().await.unwrap();
       } else {
         let tls = start_handshake.into_stream(Arc::new(rustls_config)).await.unwrap();
-
-        // TODO can't use acme anyway!!!
-        // TODO add feature flag
-        // export key material
-        // let context: Option<&[u8]> = Some(b"optional-context");
-        // let key_material = match export_key_material_middleware(&tls, 32, b"TODO_LABEL", None) {
-        //   Ok(key_material) => key_material,
-        //   Err(err) => panic!("{:?}", err), // TODO panic here?!
-        // };
-
         let io = TokioIo::new(tls);
         let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
-          // request.extensions_mut().insert(key_material.clone());
           tower_service.clone().call(request)
         });
         let _ = protocol.serve_connection(io, hyper_service).with_upgrades().await;
@@ -187,11 +176,15 @@ async fn listen(
         Ok(tls_stream) => {
           // TODO add feature flag
           // export key material
-          let key_material =
-            match export_key_material_middleware(&tls_stream, 32, b"EXPORTER-pluto-notary", Some(b"tee")) {
-              Ok(key_material) => key_material,
-              Err(err) => panic!("{:?}", err), // TODO panic here?!
-            };
+          let key_material = match export_key_material_middleware(
+            &tls_stream,
+            32,
+            b"EXPORTER-pluto-notary",
+            Some(b"tee"),
+          ) {
+            Ok(key_material) => key_material,
+            Err(err) => panic!("{:?}", err), // TODO panic here?!
+          };
 
           dbg!(hex::encode(key_material.clone()));
 
