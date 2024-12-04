@@ -10,6 +10,7 @@ mod circuits;
 pub mod config;
 pub mod errors;
 mod tls;
+pub mod tls_client_async2;
 use serde::Serialize;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;

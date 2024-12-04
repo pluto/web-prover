@@ -15,7 +15,7 @@ pub enum ProxyError {
   Base64Decode(#[from] base64::DecodeError),
 
   #[error(transparent)]
-  TlsBackend(#[from] tls_backend::BackendError),
+  TlsBackend(#[from] tls_client2::BackendError),
 
   #[error("unable to parse record! position={position:?}, remaining={remaining:?}, e={e:?}")]
   TlsParser { position: u64, remaining: usize, e: String },

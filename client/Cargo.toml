@@ -15,11 +15,10 @@ notary_ca_cert=[]
 [dependencies]
 # TLSN
 tls-client={ workspace=true }
-tls-client2={ path="../tls/tls-client", package="tls-client" }
-tls-client-async2={ path="../tls/tls-client-async", package="tls-client-async", features=[
-  "tracing",
-] }
-tls-core={ path="../tls/tls-core", package="tls-core" }
+tls-client2={ git = "https://github.com/pluto/tls-origo-legacy", package="tls-client" }
+
+bytes = "1"
+tls-core={ git = "https://github.com/pluto/tls-origo-legacy", package="tls-core" }
 proofs={ path="../proofs", package="proofs" }
 
 webpki-roots="0.26.1"

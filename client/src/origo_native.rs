@@ -179,7 +179,7 @@ async fn proxy(
   let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
 
   let (client_tls_conn, tls_fut) =
-    tls_client_async2::bind_client(notary_tls_socket.compat(), client);
+    crate::tls_client_async2::bind_client(notary_tls_socket.compat(), client);
 
   // TODO: What do with tls_fut? what do with tls_receiver?
   let (tls_sender, _tls_receiver) = oneshot::channel();
