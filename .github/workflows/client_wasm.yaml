@@ -11,7 +11,12 @@ on:
     branches: [ "main" ]
 
 jobs:
+  setup:
+    uses: ./.github/workflows/download-circuits.yaml
+    with:
+      version: "v0.5.7"  # Optional, defaults to v0.5.7
   build:
+    needs: setup
     strategy:
       fail-fast: false
       matrix:
@@ -55,9 +60,11 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt install unzip -y
 
-      - name: Download prebuilt web-prover-circuits artifact
-        run: |
-          cd proofs && make web-prover-circuits
+      - name: Restore circuit artifacts
+        uses: actions/cache@v3
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ needs.setup.outputs.cache-key }}
 
       # TODO run automated tests?
       #      wasm-pack test --firefox

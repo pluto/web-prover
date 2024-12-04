@@ -11,7 +11,12 @@ on:
     branches: [ "main" ]
 
 jobs:
+  setup:
+    uses: ./.github/workflows/download-circuits.yaml
+    with:
+      version: "v0.5.7"  # Optional, defaults to v0.5.7
   build:
+    needs: setup
     name: client_ios
     runs-on: macos-latest
 
@@ -35,9 +40,11 @@ jobs:
           echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
           brew install protobuf
 
-      - name: Download prebuilt web-prover-circuits artifact
-        run: |
-          cd proofs && make web-prover-circuits
+      - name: Restore circuit artifacts
+        uses: actions/cache@v3
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ needs.setup.outputs.cache-key }}
 
       - name: Compile iOS
         run: |

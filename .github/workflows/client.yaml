@@ -11,7 +11,12 @@ on:
     branches: [ "main" ]
 
 jobs:
+  setup:
+    uses: ./.github/workflows/download-circuits.yaml
+    with:
+      version: "v0.5.7"  # Optional, defaults to v0.5.7
   test:
+    needs: setup
     strategy:
       fail-fast: false
       matrix:
@@ -42,9 +47,11 @@ jobs:
         if: matrix.os == 'self-hosted'
         run: sudo apt install unzip -y
 
-      - name: Download prebuilt web-prover-circuits artifact
-        run: |
-          cd proofs && make web-prover-circuits
+      - name: Restore circuit artifacts
+        uses: actions/cache@v3
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ needs.setup.outputs.cache-key }}
 
       - run: |
           RUST_LOG=DEBUG cargo +nightly-2024-10-28 run --release -p notary -- --config ./fixture/notary-config.toml &
