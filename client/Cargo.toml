@@ -14,6 +14,8 @@ notary_ca_cert=[]
 # Shared dependencies for all targets
 [dependencies]
 
+jsonwebtoken="9"
+
 # TLSN
 tls-client={ workspace=true }
 tls-client2={ path="../tls/tls-client", package="tls-client" }
@@ -22,8 +24,8 @@ tls-client-async2={ path="../tls/tls-client-async", package="tls-client-async", 
 ] }
 tls-core={ path="../tls/tls-core", package="tls-core" }
 proofs={ path="../proofs", package="proofs" }
-arecibo = { git = "https://github.com/argumentcomputer/arecibo", default-features = false, features = [
-    "portable",
+arecibo={ git="https://github.com/argumentcomputer/arecibo", default-features=false, features=[
+  "portable",
 ] }
 
 webpki-roots="0.26.1"
@@ -32,9 +34,9 @@ cfg-if      ="1.0.0"
 # Serde
 serde.workspace     =true
 serde_json.workspace=true
-serde_bytes = "0.11"
+serde_bytes         ="0.11"
 # Web
-hex = "0.4"
+hex           ="0.4"
 url           ="2.5"
 hyper         ={ version="1.4", features=["client", "http1"] }
 http-body-util="0.1"
@@ -68,7 +70,7 @@ hyper-util={ version="0.1", features=["full"] }
 # Async
 tokio-rustls={ version="0.24", default-features=false, features=["logging", "tls12"] }
 tokio       ={ version="1", features=["rt", "rt-multi-thread", "macros", "net", "io-std", "fs"] }
-rustls      ={ version="0.21", default-features=false, features = ["dangerous_configuration"] }
+rustls      ={ version="0.21", default-features=false, features=["dangerous_configuration"] }
 # TLSN
 tlsn-prover          ={ workspace=true }
 tlsn-core            ={ workspace=true }

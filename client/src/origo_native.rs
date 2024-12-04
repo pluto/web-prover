@@ -3,6 +3,9 @@ use std::{collections::HashMap, io, sync::Arc};
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
+use jsonwebtoken::{
+  decode, decode_header, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation,
+};
 use proofs::{
   program::{
     self,
@@ -15,6 +18,7 @@ use proofs::{
   F, G1,
 };
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tls_client2::{
   origo::{OrigoConnection, WitnessData},
@@ -176,7 +180,7 @@ pub async fn proxy(
 
   let client_notary_config = rustls::ClientConfig::builder()
     .with_safe_defaults()
-    .with_custom_certificate_verifier(SkipServerVerification::new())
+    .with_custom_certificate_verifier(SkipServerVerification::new()) // TODO
     // .with_root_certificates(crate::tls::rustls_default_root_store())
     .with_no_client_auth();
 
@@ -229,7 +233,41 @@ pub async fn proxy(
   let response = request_sender.send_request(request).await.unwrap();
 
   // TODO: get the attestion token from response header (or body?)
-  dbg!(response.headers().get("x-pluto-notary-tee-token"));
+  let tee_token = response.headers().get("x-pluto-notary-tee-token").unwrap().to_str().unwrap();
+  println!("--{}---", tee_token);
+
+  #[derive(Debug, Serialize, Deserialize)]
+  struct Claims {
+    sub: String,
+  }
+
+  let header = decode_header(tee_token).unwrap();
+  let alg = header.alg;
+  if alg != Algorithm::RS256 {
+    panic!("unsupported JWT alg")
+  }
+
+  let mut validation = Validation::new(Algorithm::RS256);
+  validation.validate_exp = true;
+
+  // key:
+  // https://confidentialcomputing.googleapis.com/.well-known/attestation-pki-root
+  // https://confidentialcomputing.googleapis.com/.well-known/confidential_space_root.crt
+  // https://github.com/GoogleCloudPlatform/confidential-space/blob/main/codelabs/health_data_analysis_codelab/src/uwear/workload.go#L84
+
+  let cert_request = reqwest::get(
+    "https://confidentialcomputing.googleapis.com/.well-known/confidential_space_root.crt",
+  )
+  .await
+  .unwrap();
+
+  let cert = cert_request.bytes().await.unwrap();
+
+  let decoding_key = &DecodingKey::from_rsa_pem(&cert).unwrap();
+
+  let token_data = decode::<Claims>(tee_token, decoding_key, &validation).unwrap();
+  dbg!(token_data);
+
   // TODO: verify token and key_material which is part of nonce
 
   assert!(response.status() == hyper::StatusCode::SWITCHING_PROTOCOLS);
