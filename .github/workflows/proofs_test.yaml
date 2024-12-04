@@ -38,7 +38,7 @@ jobs:
     - name: Restore circuit artifacts
       uses: actions/cache@v3
       with:
-        path: web_proof_circuits
+        path: proofs/web_proof_circuits
         key: ${{ needs.setup.outputs.cache-key }}
 
     - name: Run tests
