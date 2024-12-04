@@ -19,6 +19,8 @@ jobs:
     outputs:
       cache-key: ${{ steps.set-cache-key.outputs.key }}
     steps:
+      - uses: actions/checkout@v4 
+
       - name: Generate cache key
         id: set-cache-key
         run: |
@@ -28,7 +30,7 @@ jobs:
         id: cache-circuits
         uses: actions/cache@v3
         with:
-          path: web_proof_circuits
+          path: proofs/web_proof_circuits
           key: ${{ steps.set-cache-key.outputs.key }}
 
       - uses: actions/checkout@v4
