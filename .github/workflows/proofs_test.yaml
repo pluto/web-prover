@@ -11,7 +11,7 @@ on:
     branches: [ "main" ]
 jobs:
   setup:
-    uses: ./.github/workflows/download-circuits.yml
+    uses: ./.github/workflows/download-circuits.yaml
     with:
       version: "v0.5.7"  # Optional, defaults to v0.5.7
   build:
