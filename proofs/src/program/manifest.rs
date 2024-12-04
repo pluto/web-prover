@@ -149,6 +149,7 @@ pub fn circuit_size(plaintext_length: usize) -> usize {
   plaintext_length.next_power_of_two().max(512)
 }
 
+/// convert bytes to u32
 fn to_u32_array(input: &[u8]) -> Vec<u32> {
   // Calculate padding needed to make length divisible by 4
   let padding_needed = (4 - (input.len() % 4)) % 4;
@@ -166,6 +167,7 @@ fn to_u32_array(input: &[u8]) -> Vec<u32> {
     .collect()
 }
 
+/// converts array of u32 to array of bits in little endian order
 fn u32_array_to_le_bits(input: &[u32]) -> Vec<Vec<u8>> {
   input
     .iter()
@@ -176,6 +178,7 @@ fn u32_array_to_le_bits(input: &[u32]) -> Vec<Vec<u8>> {
     .collect()
 }
 
+/// convert bytes to 32 bit array and then little endian bits
 pub fn to_chacha_input(input: &[u8]) -> Vec<Vec<u8>> { u32_array_to_le_bits(&to_u32_array(input)) }
 
 pub fn make_nonce(iv: [u8; 12], seq: u64) -> [u8; 12] {
@@ -189,15 +192,31 @@ pub fn make_nonce(iv: [u8; 12], seq: u64) -> [u8; 12] {
   nonce
 }
 
+/// create ROM circuit data for encryption circuit from TLS inputs
+///
+/// # Arguments
+/// - `inputs`: [`EncryptionInput`] containing TLS key, iv, aad for encryption circuit
+///
+/// # Returns
+/// - `plaintext`: padded plaintext depending on the TLS [`CipherSuiteKey`]
+/// - `rom`: NIVC ROM with each instruction's [`InstructionConfig`] depicting how the program will
+///   behave and it's inputs
+/// - `rom_data`: circuit's [`CircuitData`]
+/// - `fold_inputs`: any input that will be distributed across folds. For AES: plaintext/ciphertext
+///   is divided into 16B chunks across each fold.
+///
+/// **Note**: MAC is ignored from the ciphertext because circuit doesn't verify auth tag.
 fn handle_encryption_circuit_inputs(
   inputs: &EncryptionInput,
 ) -> (Vec<u8>, Vec<InstructionConfig>, HashMap<String, CircuitData>, HashMap<String, FoldInput>) {
+  // handle different cipher suite, currently AES-GCM-128 & ChaCha20-Poly1305
   match inputs.key {
     CipherSuiteKey::AES128GCM(key) => {
       debug!("Padding plaintext and ciphertext to nearest 16...");
       let remainder = inputs.plaintext.len() % 16;
       let mut plaintext = inputs.plaintext.to_vec();
       let mut ciphertext = inputs.ciphertext.to_vec();
+      // TODO (Sambhav): this padding is incorrect
       if remainder != 0 {
         let padding = 16 - remainder;
         // TODO(Sambhav): remove padding from 0
@@ -207,8 +226,10 @@ fn handle_encryption_circuit_inputs(
 
       assert_eq!(plaintext.len() % AES_INPUT_LENGTH, 0);
 
+      // create rom_data for AES circuit
       let aes_instr = String::from("AES_GCM_1");
       let rom_data = HashMap::from([(aes_instr.clone(), CircuitData { opcode: 0 })]);
+      // AES instruction config containing private inputs to the circuit
       let aes_rom_opcode_config = InstructionConfig {
         name:          aes_instr.clone(),
         private_input: HashMap::from([
@@ -244,12 +265,14 @@ fn handle_encryption_circuit_inputs(
       (plaintext, rom, rom_data, fold_inputs)
     },
     CipherSuiteKey::CHACHA20POLY1305(key) => {
+      // pad plaintext ciphertext to nearest circuit size
       let mut plaintext = inputs.plaintext.to_vec();
       let mut ciphertext = inputs.ciphertext.to_vec();
       plaintext.resize(circuit_size(plaintext.len()), 0);
       ciphertext.resize(circuit_size(ciphertext.len()), 0);
 
       // TODO (Sambhav): computing ciphertext for padded plaintext again is incorrect
+      // compute ciphertext again
       let write_key = Key::from_slice(&key);
       let cipher = ChaCha20Poly1305::new(write_key);
       let nonce = make_nonce(inputs.iv, 0);
@@ -259,9 +282,11 @@ fn handle_encryption_circuit_inputs(
       let ct = cipher.encrypt(&init_nonce, payload).unwrap();
       let sliced_ct = &ct[..ct.len() - 16];
 
+      // create CHACHA instruction config
       let chacha_instr_label = String::from("CHACHA20");
       let rom_data = HashMap::from([(chacha_instr_label.clone(), CircuitData { opcode: 0 })]);
 
+      // CHACHA rom opcode with private inputs
       let chacha_rom_opcode_config = InstructionConfig {
         name:          chacha_instr_label,
         private_input: HashMap::from([

@@ -8,14 +8,18 @@ use serde_json::json;
 
 use super::*;
 
+/// Fold input for any circuit containing signals name and vector of values. Inputs are distributed
+/// evenly across folds after the ROM is finalised by the prover.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FoldInput {
+  /// circuit name and consolidated values
   #[serde(flatten)]
   pub value: HashMap<String, Vec<Value>>,
 }
 
 impl FoldInput {
-  pub fn split_values(&self, freq: usize) -> Vec<HashMap<String, Value>> {
+  /// splits the inputs evenly across folds as per instruction frequency
+  pub fn split(&self, freq: usize) -> Vec<HashMap<String, Value>> {
     let mut res = vec![HashMap::new(); freq];
 
     for (key, value) in self.value.clone().into_iter() {
@@ -32,10 +36,13 @@ impl FoldInput {
   }
 }
 
+/// R1CS file type
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum R1CSType {
+  /// file path
   #[serde(rename = "file")]
   File { path: PathBuf },
+  /// raw bytes
   #[serde(rename = "raw")]
   Raw(Vec<u8>),
 }
@@ -176,7 +183,7 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
         None =>
           Err(ProofError::Other(format!("Circuit label '{}' not found in rom", circuit_label)))?,
       };
-      let split_inputs = fold_inputs.split_values(inputs.len());
+      let split_inputs = fold_inputs.split(inputs.len());
       for (idx, input) in inputs.iter().zip(split_inputs) {
         private_inputs[*idx].extend(input);
       }
