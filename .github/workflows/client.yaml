@@ -51,8 +51,7 @@ jobs:
         with:
           package: client
           manifest-path: client/Cargo.toml
-          baseline-root: .
-          baseline-ref: "origin/main"
+          baseline-ref: origin/main
 
       - run: |
           RUST_LOG=DEBUG cargo +nightly-2024-10-28 run --release -p notary -- --config ./fixture/notary-config.toml &

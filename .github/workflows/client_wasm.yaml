@@ -64,8 +64,7 @@ jobs:
         with:
           package: client_wasm
           manifest-path: client_wasm/Cargo.toml
-          baseline-root: .
-          baseline-ref: "origin/main"
+          baseline-ref: origin/main
 
       # TODO run automated tests?
       #      wasm-pack test --firefox

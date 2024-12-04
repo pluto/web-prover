@@ -41,8 +41,7 @@ jobs:
       with:
         package: proofs
         manifest-path: proofs/Cargo.toml
-        baseline-root: .
-        baseline-ref: "origin/main"
+        baseline-ref: origin/main
 
     - name: Run tests
       run: |
