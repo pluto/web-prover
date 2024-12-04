@@ -1,10 +1,13 @@
+use core::str;
 use std::{collections::HashMap, io, sync::Arc};
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use jsonwebtoken::{
-  decode, decode_header, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation,
+  decode, decode_header, encode,
+  jwk::{AlgorithmParameters, JwkSet},
+  Algorithm, DecodingKey, EncodingKey, Header, Validation,
 };
 use proofs::{
   program::{
@@ -234,7 +237,7 @@ pub async fn proxy(
 
   // TODO: get the attestion token from response header (or body?)
   let tee_token = response.headers().get("x-pluto-notary-tee-token").unwrap().to_str().unwrap();
-  println!("--{}---", tee_token);
+  dbg!(tee_token);
 
   #[derive(Debug, Serialize, Deserialize)]
   struct Claims {
@@ -250,23 +253,60 @@ pub async fn proxy(
   let mut validation = Validation::new(Algorithm::RS256);
   validation.validate_exp = true;
 
+  // OIDC flow ...
+  // https://confidentialcomputing.googleapis.com/.well-known/openid-configuration
+  // https://www.googleapis.com/service_accounts/v1/metadata/jwk/signer@confidentialspace-sign.iam.gserviceaccount.com
+  let jwks_request = reqwest::get(
+    "https://www.googleapis.com/service_accounts/v1/metadata/jwk/signer@confidentialspace-sign.iam.gserviceaccount.com",
+  )
+  .await
+  .unwrap();
+  let jwks = jwks_request.bytes().await.unwrap();
+
+  let jwks: JwkSet = serde_json::from_str(str::from_utf8(&jwks).unwrap()).unwrap();
+  let header = decode_header(tee_token).unwrap();
+
+  let Some(kid) = header.kid else {
+    panic!("Token doesn't have a `kid` header field");
+  };
+
+  let Some(jwk) = jwks.find(&kid) else {
+    panic!("No matching JWK found for the given kid");
+  };
+
+  let decoding_key = match &jwk.algorithm {
+    AlgorithmParameters::RSA(rsa) => DecodingKey::from_rsa_components(&rsa.n, &rsa.e).unwrap(),
+    _ => unreachable!("algorithm should be a RSA in this example"),
+  };
+
+  let validation = {
+    let mut validation = Validation::new(header.alg);
+    validation.set_audience(&["https://notary.pluto.xyz"]);
+    validation.validate_exp = true;
+    validation
+  };
+
+  let decoded_token = decode::<Claims>(tee_token, &decoding_key, &validation).unwrap();
+
+  dbg!(decoded_token);
+
+  // PKI flow...
   // key:
   // https://confidentialcomputing.googleapis.com/.well-known/attestation-pki-root
   // https://confidentialcomputing.googleapis.com/.well-known/confidential_space_root.crt
   // https://github.com/GoogleCloudPlatform/confidential-space/blob/main/codelabs/health_data_analysis_codelab/src/uwear/workload.go#L84
 
-  let cert_request = reqwest::get(
-    "https://confidentialcomputing.googleapis.com/.well-known/confidential_space_root.crt",
-  )
-  .await
-  .unwrap();
+  // let cert_request = reqwest::get(
+  //   "https://confidentialcomputing.googleapis.com/.well-known/confidential_space_root.crt",
+  // )
+  // .await
+  // .unwrap();
+  // let cert = cert_request.bytes().await.unwrap();
 
-  let cert = cert_request.bytes().await.unwrap();
+  // let decoding_key = &DecodingKey::from_rsa_pem(&cert).unwrap();
 
-  let decoding_key = &DecodingKey::from_rsa_pem(&cert).unwrap();
-
-  let token_data = decode::<Claims>(tee_token, decoding_key, &validation).unwrap();
-  dbg!(token_data);
+  // let token_data = decode::<Claims>(tee_token, decoding_key, &validation).unwrap();
+  // dbg!(token_data);
 
   // TODO: verify token and key_material which is part of nonce
 

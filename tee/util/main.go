@@ -37,7 +37,7 @@ func main() {
 	jwt, err := getCustomTokenBytes(CustomTokenRequest{
 		Audience:  audience,
 		Nonces:    nonces,
-		TokenType: TOKEN_TYPE_PKI,
+		TokenType: TOKEN_TYPE_OIDC,
 	})
 	if err != nil {
 		panic(err) // prints to stderr
