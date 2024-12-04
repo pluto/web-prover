@@ -30,7 +30,8 @@ jobs:
         with:
           path: web_proof_circuits
           key: ${{ steps.set-cache-key.outputs.key }}
-
+          
+      - uses: actions/checkout@v4
       - name: Download and extract circuits
         if: steps.cache-circuits.outputs.cache-hit != 'true'
         run: |
