@@ -48,7 +48,7 @@ pub async fn proxy_and_sign(
 
   debug!("generating NIVC program data!");
   let witness = origo_conn.to_witness_data();
-  let program_data = generate_program_data(&witness, config.proving).await?;
+  let program_data = generate_program_data(&witness, config.proving, proving_params).await?;
 
   debug!("starting proof generation!");
   let program_output = program::run(&program_data)?;
