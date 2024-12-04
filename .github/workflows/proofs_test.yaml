@@ -16,6 +16,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+      fetch-depth: 0 
 
     - name: Install Protocol Buffers
       run: |
@@ -33,12 +35,14 @@ jobs:
     - name: Download prebuilt web-prover-circuits artifact
       run: |
         cd proofs && make web-prover-circuits-512
+
     - name: Check semver for proofs
       uses: obi1kenobi/cargo-semver-checks-action@v2
       with:
         package: proofs
         manifest-path: proofs/Cargo.toml
-        baseline-root: "."
+        baseline-root: .
+        baseline-ref: "origin/main"
 
     - name: Run tests
       run: |
