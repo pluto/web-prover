@@ -81,12 +81,10 @@ async fn generate_program_data(
   // TODO (Sambhav): this will result in duplicate program setups. eliminate this.
   // TODO (Sambhav): request and response proving can be easily parallelised. evaluate this using
   // rayon.
-  let request_setup_data =
-    construct_setup_data(&request_inputs.key, request_inputs.plaintext.len());
+  let request_setup_data = construct_setup_data(request_inputs.plaintext.len());
   let request_public_params = program::setup(&request_setup_data);
 
-  let response_setup_data =
-    construct_setup_data(&response_inputs.key, response_inputs.plaintext.len());
+  let response_setup_data = construct_setup_data(response_inputs.plaintext.len());
   let response_public_params = program::setup(&response_setup_data);
 
   debug!("Created `PublicParams`!");
@@ -98,7 +96,6 @@ async fn generate_program_data(
   let (response_rom_data, response_rom, response_fold_inputs) =
     proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
 
-  // TODO (sambhav): handle response input in a better manner, what if response is 512B
   let request_program_data = ProgramData::<Online, NotExpanded> {
     public_params:      request_public_params,
     setup_data:         request_setup_data,

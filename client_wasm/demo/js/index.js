@@ -222,26 +222,6 @@ const generateWitnessBytesForRequest = async function (circuits, inputs) {
   let plaintext = inputs[0]["plainText"];
   let extendedHTTPInput = plaintext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
 
-  // AES
-  // console.log("AES");
-  // let plaintext_length = plaintext.length;
-  // let cipherText = inputs[0]["cipherText"].concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
-  // let cached_wasm = {};
-
-  // inputs[0]["step_in"] = 0;
-  // for (var i = 0; i < plaintext_length / 16; i++) {
-  //   inputs[0]["plainText"] = plaintext.slice(i * 16, (i + 1) * 16);
-  //   inputs[0]["cipherText"] = cipherText.slice(i * 16, (i + 1) * 16);
-  //   inputs[0]["ctr"] = [0, 0, 0, i + 1];
-  //   if (!(circuits[0] in cached_wasm)) {
-  //     const wasm = await getWitnessGenerator(circuits[0]);
-  //     cached_wasm[circuits[0]] = wasm;
-  //   }
-  //   let wtns = await generateWitness(circuits[0], inputs[0], cached_wasm[circuits[0]]);
-  //   witnesses.push(wtns.data);
-  //   inputs[0]["step_in"] = DataHasher(plaintext.slice(0, (i + 1) * 16));
-  // };
-
   console.log("CHACHA");
   const chacha = chacha20poly1305(new Uint8Array(CHACHA20_KEY), new Uint8Array(CHACHA20_NONCE));
   let cipherText = chacha.encrypt(new Uint8Array(extendedHTTPInput));
@@ -352,25 +332,6 @@ const PLAINTEXT = [
   10, 32, 32, 32, 125, 13, 10, 125,
 ];
 
-const AES_CIPHER_TEXT = [
-  75, 220, 142, 158, 79, 135, 141, 163, 211, 26, 242, 137, 81, 253, 181, 117, 253, 246, 197, 197,
-  61, 46, 55, 87, 218, 137, 240, 143, 241, 177, 225, 129, 80, 114, 125, 72, 45, 18, 224, 179, 79,
-  231, 153, 198, 163, 252, 197, 219, 233, 46, 202, 120, 99, 253, 76, 9, 70, 11, 200, 218, 228, 251,
-  133, 248, 233, 177, 19, 241, 205, 128, 65, 76, 10, 31, 71, 198, 177, 78, 108, 246, 175, 152, 42,
-  97, 255, 182, 157, 245, 123, 95, 130, 101, 129, 138, 236, 146, 47, 22, 22, 13, 125, 1, 109, 158,
-  189, 131, 44, 43, 203, 118, 79, 181, 86, 33, 235, 186, 75, 20, 7, 147, 102, 75, 90, 222, 255,
-  140, 94, 52, 191, 145, 192, 71, 239, 245, 247, 175, 117, 136, 173, 235, 250, 189, 74, 155, 103,
-  25, 164, 187, 22, 26, 39, 37, 113, 248, 170, 146, 73, 75, 45, 208, 125, 49, 101, 11, 120, 215,
-  93, 160, 14, 147, 129, 181, 150, 59, 167, 197, 230, 122, 77, 245, 247, 215, 136, 98, 1, 180, 213,
-  30, 214, 88, 83, 42, 33, 112, 61, 4, 197, 75, 134, 149, 22, 228, 24, 95, 131, 35, 44, 181, 135,
-  31, 173, 36, 23, 192, 177, 127, 156, 199, 167, 212, 66, 235, 194, 102, 61, 144, 121, 59, 187,
-  179, 212, 34, 117, 47, 96, 3, 169, 73, 204, 88, 36, 48, 158, 220, 237, 198, 180, 105, 7, 188,
-  109, 24, 201, 217, 186, 191, 232, 63, 93, 153, 118, 214, 157, 167, 15, 216, 191, 152, 41, 106,
-  24, 127, 8, 144, 78, 218, 133, 125, 89, 97, 10, 246, 8, 244, 112, 169, 190, 206, 14, 217, 109,
-  147, 130, 61, 214, 237, 143, 77, 14, 14, 70, 56, 94, 97, 207, 214, 106, 249, 37, 7, 186, 95, 174,
-  146, 203, 148, 173, 172, 13, 113,
-];
-
 const CHACHA20_CIPHERTEXT = [
   2, 125, 219, 141, 140, 93, 49, 129, 95, 178, 135, 109, 48, 36, 194, 46, 239, 155, 160, 70, 208,
   147, 37, 212, 17, 195, 149, 190, 38, 215, 23, 241, 84, 204, 167, 184, 179, 172, 187, 145, 38, 75,
@@ -394,15 +355,6 @@ const CHACHA20_NONCE = [0, 0, 0, 0, 0, 0, 0, 0x4a, 0, 0, 0, 0];
 
 
 var inputs = [
-  // {
-  //   "key": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  //   "iv": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  //   "plainText": AES_PLAINTEXT,
-  //   "cipherText": AES_CIPHER_TEXT,
-  //   "ctr": [0, 0, 0, 0],
-  //   "aad": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  //   "step_in": 0,
-  // },
   {
     "key": CHACHA20_KEY,
     "nonce": CHACHA20_NONCE,
