@@ -208,7 +208,7 @@ pub async fn proxy(
     Err(err) => panic!("{:?}", err), // TODO panic here?!
   };
 
-  dbg!(hex::encode(key_material));
+  dbg!(hex::encode(key_material.clone()));
 
   let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
 
@@ -241,7 +241,8 @@ pub async fn proxy(
 
   #[derive(Debug, Serialize, Deserialize)]
   struct Claims {
-    sub: String,
+    sub:       String,
+    eat_nonce: String, // Actually, should be string array
   }
 
   let header = decode_header(tee_token).unwrap();
@@ -286,29 +287,26 @@ pub async fn proxy(
     validation
   };
 
-  let decoded_token = decode::<Claims>(tee_token, &decoding_key, &validation).unwrap();
+  let decoded_token = decode::<JwtPayload>(tee_token, &decoding_key, &validation).unwrap();
+  dbg!(decoded_token.clone());
 
-  dbg!(decoded_token);
+  assert_eq!(decoded_token.claims.eat_nonce, hex::encode(key_material.clone()));
 
-  // PKI flow...
+  // PKI flow... (broken)
   // key:
   // https://confidentialcomputing.googleapis.com/.well-known/attestation-pki-root
   // https://confidentialcomputing.googleapis.com/.well-known/confidential_space_root.crt
   // https://github.com/GoogleCloudPlatform/confidential-space/blob/main/codelabs/health_data_analysis_codelab/src/uwear/workload.go#L84
-
+  //
   // let cert_request = reqwest::get(
   //   "https://confidentialcomputing.googleapis.com/.well-known/confidential_space_root.crt",
   // )
   // .await
   // .unwrap();
   // let cert = cert_request.bytes().await.unwrap();
-
   // let decoding_key = &DecodingKey::from_rsa_pem(&cert).unwrap();
-
   // let token_data = decode::<Claims>(tee_token, decoding_key, &validation).unwrap();
   // dbg!(token_data);
-
-  // TODO: verify token and key_material which is part of nonce
 
   assert!(response.status() == hyper::StatusCode::SWITCHING_PROTOCOLS);
 
@@ -406,4 +404,61 @@ impl rustls::client::ServerCertVerifier for SkipServerVerification {
   ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
     Ok(rustls::client::ServerCertVerified::assertion())
   }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct JwtPayload {
+  aud:                     String,
+  exp:                     u64,
+  iat:                     u64,
+  iss:                     String,
+  nbf:                     u64,
+  sub:                     String,
+  eat_nonce:               String,
+  eat_profile:             String,
+  secboot:                 bool,
+  oemid:                   u32,
+  hwmodel:                 String,
+  swname:                  String,
+  swversion:               Vec<String>,
+  attester_tcb:            Vec<String>,
+  dbgstat:                 String,
+  submods:                 SubModules,
+  google_service_accounts: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SubModules {
+  confidential_space: ConfidentialSpace,
+  container:          Container,
+  gce:                Gce,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ConfidentialSpace {
+  monitoring_enabled: MonitoringEnabled,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct MonitoringEnabled {
+  memory: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Container {
+  image_reference: String,
+  image_digest:    String,
+  restart_policy:  String,
+  image_id:        String,
+  env:             HashMap<String, String>,
+  args:            Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Gce {
+  zone:           String,
+  project_id:     String,
+  project_number: String,
+  instance_name:  String,
+  instance_id:    String,
 }
