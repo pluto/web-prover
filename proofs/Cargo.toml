@@ -43,9 +43,6 @@ tls-client2={ path="../tls/tls-client", package="tls-client" }
 [dev-dependencies]
 tracing-test="0.2.5"
 
-[build-dependencies]
-anyhow="1.0"
-
 [features]
 verify-steps=[]
 timing      =[]

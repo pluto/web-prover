@@ -1268,7 +1268,6 @@ checksum = "afb84c814227b90d6895e01398aee0d8033c00e7466aca416fb6a8e0eb19d8a7"
 name = "client"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-tungstenite 0.25.1",
  "base64 0.22.1",
  "bytes",
@@ -4435,7 +4434,6 @@ dependencies = [
 name = "proofs"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "ark-bn254",
  "bellpepper-core",
  "bincode",
