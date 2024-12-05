@@ -9,15 +9,13 @@ target/
 rustls_acme_cache
 
 # Circom junk files
+proofs/**/*.bin
+proofs/**/*.wtns
+proofs/**/*.r1cs
+proofs/web_proof_circuits/
 proofs/node_modules/*
-proofs/build/*
-proofs/ptau/*
-proofs/circuits/test/*.circom
-proofs/circuits/main/*
 proofs/ir_log/*
 proofs/log_input_signals.txt
-proofs/**/*.wtns
-proofs/web_proof_circuits/
 client/.rustc_info.json
 
 # exclude ios/wasm build files
