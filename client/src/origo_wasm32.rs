@@ -37,10 +37,10 @@ pub async fn proxy_and_sign(
 
   let sb = SignBody {
     handshake_server_aes_iv:  hex::encode(
-      origo_conn.secret_map.get("Handshake:server_aes_iv").unwrap().clone().to_vec(),
+      origo_conn.secret_map.get("Handshake:server_iv").unwrap().clone().to_vec(),
     ),
     handshake_server_aes_key: hex::encode(
-      origo_conn.secret_map.get("Handshake:server_aes_key").unwrap().clone().to_vec(),
+      origo_conn.secret_map.get("Handshake:server_key").unwrap().clone().to_vec(),
     ),
   };
 
