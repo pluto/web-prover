@@ -198,6 +198,12 @@ pub async fn proxy(
     .connect(rustls::ServerName::try_from(config.notary_host.as_str())?, notary_socket)
     .await?;
 
+  let certs = notary_tls_socket.get_ref().1.peer_certificates().unwrap();
+
+  use sha2::{Digest, Sha256};
+  let certs_fingerprints: Vec<String> = certs.into_iter().map(|cert| hex::encode(Sha256::digest(&cert))).collect();
+  dbg!(certs_fingerprints);
+
   let key_material = match export_key_material_middleware(
     &notary_tls_socket,
     32,

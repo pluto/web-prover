@@ -160,6 +160,11 @@ async fn listen(
   let certs = load_certs(server_cert_path).unwrap();
   let key = load_private_key(server_key_path).unwrap();
 
+  use sha2::{Digest, Sha256};
+  let certs_fingerprints: Vec<String> =
+    certs.clone().into_iter().map(|cert| hex::encode(Sha256::digest(&cert))).collect();
+  dbg!(certs_fingerprints.clone());
+
   let mut server_config =
     ServerConfig::builder().with_no_client_auth().with_single_cert(certs, key).unwrap();
   server_config.alpn_protocols = vec![b"http/1.1".to_vec()];
@@ -170,6 +175,7 @@ async fn listen(
     let tls_acceptor = tls_acceptor.clone();
     let tower_service = router.clone();
     let protocol = protocol.clone();
+    let certs_fingerprints = certs_fingerprints.clone();
 
     tokio::spawn(async move {
       match tls_acceptor.accept(tcp_stream).await {
@@ -190,6 +196,7 @@ async fn listen(
 
           let hyper_service = hyper::service::service_fn(move |mut request: Request<Incoming>| {
             request.extensions_mut().insert(key_material.clone());
+            request.extensions_mut().insert(certs_fingerprints.clone());
             tower_service.clone().call(request)
           });
 

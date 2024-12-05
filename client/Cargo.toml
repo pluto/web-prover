@@ -15,6 +15,7 @@ notary_ca_cert=[]
 [dependencies]
 
 jsonwebtoken="9"
+sha2 = "0.10"
 
 # TLSN
 tls-client={ workspace=true }

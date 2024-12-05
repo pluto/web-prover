@@ -36,6 +36,7 @@ p256            ="0.13"
 base64          ="0.21.0"
 http            ="1.1"
 sha1            ="0.10"
+sha2            ="0.10"
 config          ="0.14.0"
 clap            ={ version="4.5", features=["derive"] }
 clap_derive     ="4.5"
