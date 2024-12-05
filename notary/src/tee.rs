@@ -32,12 +32,14 @@ pub struct AttestationBody {
 pub async fn attestation(
   State(state): State<Arc<SharedState>>,
   Extension(key_material): Extension<Vec<u8>>,
+  Extension(certs_fingerprint): Extension<String>,
   extract::Json(payload): extract::Json<AttestationBody>,
 ) -> Result<Json<AttestationReply>, ProxyError> {
   let mut response = AttestationReply { token: Default::default(), error: Default::default() };
 
   match get_tee_token("https://notary.pluto.xyz".to_string(), "OIDC".to_string(), vec![
     hex::encode(key_material),
+    certs_fingerprint,
   ])
   .await
   {

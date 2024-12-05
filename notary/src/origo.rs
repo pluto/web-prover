@@ -415,6 +415,7 @@ pub struct NotarizeQuery {
   session_id:  String,
   target_host: String,
   target_port: u16,
+  mode:        String,
 }
 
 pub async fn proxy(
@@ -425,8 +426,9 @@ pub async fn proxy(
   Extension(certs_fingerprint): Extension<String>,
 ) -> Response {
   let session_id = query.session_id.clone();
+  let query_mode = query.mode.clone();
 
-  info!("Starting notarize with ID: {}", session_id);
+  info!("Starting notarize with ID {} and mode {}", session_id, query_mode);
 
   let mut resp = match protocol_upgrade {
     ProtocolUpgrade::Ws(ws) => ws.on_upgrade(move |socket| {
@@ -443,21 +445,24 @@ pub async fn proxy(
     }),
   };
 
-  // TODO add runtime feature flag? via config?
-  match get_tee_token("https://notary.pluto.xyz".to_string(), "OIDC".to_string(), vec![
-    hex::encode(key_material),
-    certs_fingerprint,
-  ])
-  .await
-  {
-    Ok(token) => {
-      resp.headers_mut().insert("x-pluto-notary-tee-token", HeaderValue::from_str(&token).unwrap());
-    },
-    Err(e) => {
-      // TODO handle this a bit more gracefully? like log error and return resp
-      // status 500 or something?
-      panic!("{:?}", e);
-    },
+  if query_mode == "tee" {
+    match get_tee_token("https://notary.pluto.xyz".to_string(), "OIDC".to_string(), vec![
+      hex::encode(key_material),
+      certs_fingerprint,
+    ])
+    .await
+    {
+      Ok(token) => {
+        resp
+          .headers_mut()
+          .insert("x-pluto-notary-tee-token", HeaderValue::from_str(&token).unwrap());
+      },
+      Err(e) => {
+        // TODO handle this a bit more gracefully? like log error and return resp
+        // status 500 or something?
+        panic!("{:?}", e);
+      },
+    }
   }
 
   resp

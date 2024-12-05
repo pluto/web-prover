@@ -69,7 +69,7 @@ const JSON_MASK_KEYLEN_DEPTH_1: (&str, [u8; 1]) = ("keyLen", [4]);
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
-  let (sb, witness) = proxy(config.clone(), session_id.clone()).await?;
+  let (sb, witness) = proxy(config.clone(), session_id.clone(), false).await?;
 
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
 

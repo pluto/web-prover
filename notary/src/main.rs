@@ -3,7 +3,6 @@ use std::{
   collections::HashMap,
   fs,
   io::{self},
-  ops::{Deref, DerefMut},
   sync::{Arc, Mutex},
   time::SystemTime,
 };
@@ -11,10 +10,9 @@ use std::{
 use axum::{
   extract::Request,
   http::StatusCode,
-  middleware::Next,
-  response::{IntoResponse, Response},
+  response::IntoResponse,
   routing::{get, post},
-  RequestExt, Router,
+  Router,
 };
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
@@ -26,6 +24,7 @@ use rustls::{
   ServerConfig,
 };
 use rustls_acme::{caches::DirCache, AcmeConfig};
+use sha2::{Digest, Sha256};
 use tokio::{
   io::AsyncWriteExt,
   net::{TcpListener, TcpStream},
@@ -160,9 +159,7 @@ async fn listen(
   info!("Using {} and {}", server_cert_path, server_key_path);
   let certs = load_certs(server_cert_path).unwrap();
   let key = load_private_key(server_key_path).unwrap();
-
   let certs_fingerprint = stable_certs_fingerprint(&certs);
-  dbg!(certs_fingerprint.clone());
 
   let mut server_config =
     ServerConfig::builder().with_no_client_auth().with_single_cert(certs, key).unwrap();
@@ -179,8 +176,6 @@ async fn listen(
     tokio::spawn(async move {
       match tls_acceptor.accept(tcp_stream).await {
         Ok(tls_stream) => {
-          // TODO add feature flag
-          // export key material
           let key_material = match export_key_material_middleware(
             &tls_stream,
             32,
@@ -190,8 +185,6 @@ async fn listen(
             Ok(key_material) => key_material,
             Err(err) => panic!("{:?}", err), // TODO panic here?!
           };
-
-          dbg!(hex::encode(key_material.clone()));
 
           let hyper_service = hyper::service::service_fn(move |mut request: Request<Incoming>| {
             request.extensions_mut().insert(key_material.clone());
@@ -256,8 +249,7 @@ fn export_key_material_middleware(
   Ok(output)
 }
 
-use sha2::{Digest, Sha256};
-
+// stable_certs_fingerprints returns a sha256 hash over sorted certificates
 fn stable_certs_fingerprint(certs: &[CertificateDer]) -> String {
   let mut sorted_certs: Vec<&CertificateDer> = certs.iter().collect();
   sorted_certs.sort_by(|a, b| a.as_bytes().cmp(&b.as_bytes()));

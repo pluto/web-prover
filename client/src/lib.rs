@@ -9,6 +9,7 @@ pub mod origo;
 mod circuits;
 pub mod config;
 pub mod errors;
+mod tee;
 mod tls;
 
 use serde::{Deserialize, Serialize};
@@ -91,10 +92,10 @@ pub async fn prover_inner_tee(config: config::Config) -> Result<Proof, errors::C
   // We are re-using origo networking for TEE
 
   #[cfg(target_arch = "wasm32")]
-  let origo_conn = origo_wasm32::proxy(config, session_id).await;
+  let origo_conn = origo_wasm32::proxy(config, session_id, true).await;
 
   #[cfg(not(target_arch = "wasm32"))]
-  let origo_conn = origo_native::proxy(config, session_id).await;
+  let origo_conn = origo_native::proxy(config, session_id, true).await;
 
   // let ab = AttestationBody {
   //   handshake_server_aes_iv:    hex::encode(

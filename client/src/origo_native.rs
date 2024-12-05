@@ -1,14 +1,8 @@
-use core::str;
-use std::{collections::HashMap, io, ops::Deref, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
-use jsonwebtoken::{
-  decode, decode_header, encode,
-  jwk::{AlgorithmParameters, JwkSet},
-  Algorithm, DecodingKey, EncodingKey, Header, Validation,
-};
 use proofs::{
   program::{
     self,
@@ -20,28 +14,31 @@ use proofs::{
   },
   F, G1,
 };
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tls_client2::{
   origo::{OrigoConnection, WitnessData},
   CipherSuite, Decrypter2, ProtocolVersion,
 };
-use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
-use tokio::net::TcpStream;
-use tokio_rustls::client::TlsStream;
+use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
 use crate::{
-  circuits::*, config, config::ProvingData, errors, errors::ClientErrors, origo::SignBody, Proof,
+  circuits::*,
+  config::{self, ProvingData},
+  errors::{self, ClientErrors},
+  origo::SignBody,
+  tee::{
+    export_key_material, is_valid_tee_token, stable_certs_fingerprint, SkipServerVerification,
+  },
+  Proof,
 };
 
 const JSON_MAX_ROM_LENGTH: usize = 35;
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
-  let (sb, witness) = proxy(config.clone(), session_id.clone()).await?;
+  let (sb, witness) = proxy(config.clone(), session_id.clone(), false).await?;
 
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
 
@@ -166,6 +163,7 @@ async fn generate_program_data(
 pub async fn proxy(
   config: config::Config,
   session_id: String,
+  enable_tee: bool,
 ) -> Result<(SignBody, WitnessData), ClientErrors> {
   let root_store = crate::tls::tls_client2_default_root_store();
 
@@ -181,11 +179,18 @@ pub async fn proxy(
     tls_client2::ServerName::try_from(config.target_host()?.as_str()).unwrap(),
   )?;
 
-  let client_notary_config = rustls::ClientConfig::builder()
-    .with_safe_defaults()
-    .with_custom_certificate_verifier(SkipServerVerification::new()) // TODO
-    // .with_root_certificates(crate::tls::rustls_default_root_store())
-    .with_no_client_auth();
+  let client_notary_config = if enable_tee {
+    // In TEE mode we rely on a self-signed server cert
+    rustls::ClientConfig::builder()
+      .with_safe_defaults()
+      .with_custom_certificate_verifier(SkipServerVerification::new())
+      .with_no_client_auth()
+  } else {
+    rustls::ClientConfig::builder()
+      .with_safe_defaults()
+      .with_root_certificates(crate::tls::rustls_default_root_store())
+      .with_no_client_auth()
+  };
 
   let notary_connector =
     tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));
@@ -198,21 +203,14 @@ pub async fn proxy(
     .connect(rustls::ServerName::try_from(config.notary_host.as_str())?, notary_socket)
     .await?;
 
-  let certs = notary_tls_socket.get_ref().1.peer_certificates().unwrap();
+  // TEE mode requires certs_fingerprint and key_material later
+  let certs = notary_tls_socket.get_ref().1.peer_certificates().unwrap(); // TODO unwrap
   let certs_fingerprint = stable_certs_fingerprint(&certs);
-  dbg!(certs_fingerprint.clone());
-
-  let key_material = match export_key_material_middleware(
-    &notary_tls_socket,
-    32,
-    b"EXPORTER-pluto-notary",
-    Some(b"tee"),
-  ) {
-    Ok(key_material) => key_material,
-    Err(err) => panic!("{:?}", err), // TODO panic here?!
-  };
-
-  dbg!(hex::encode(key_material.clone()));
+  let key_material =
+    match export_key_material(&notary_tls_socket, 32, b"EXPORTER-pluto-notary", Some(b"tee")) {
+      Ok(key_material) => key_material,
+      Err(err) => panic!("{:?}", err), // TODO panic here?!
+    };
 
   let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
 
@@ -223,12 +221,13 @@ pub async fn proxy(
   // TODO build sanitized query
   let request: Request<Full<Bytes>> = hyper::Request::builder()
     .uri(format!(
-      "https://{}:{}/v1/origo?session_id={}&target_host={}&target_port={}",
+      "https://{}:{}/v1/origo?session_id={}&target_host={}&target_port={}&mode={}",
       config.notary_host.clone(),
       config.notary_port.clone(),
       session_id.clone(),
       config.target_host()?,
       config.target_port()?,
+      if enable_tee { "tee" } else { "origo" }
     ))
     .method("GET")
     .header("Host", config.notary_host.clone())
@@ -239,79 +238,12 @@ pub async fn proxy(
 
   let response = request_sender.send_request(request).await.unwrap();
 
-  // TODO: get the attestion token from response header (or body?)
-  let tee_token = response.headers().get("x-pluto-notary-tee-token").unwrap().to_str().unwrap();
-  dbg!(tee_token);
-
-  #[derive(Debug, Serialize, Deserialize)]
-  struct Claims {
-    sub:       String,
-    eat_nonce: String, // Actually, should be string array
+  if enable_tee {
+    let tee_token = response.headers().get("x-pluto-notary-tee-token").unwrap().to_str().unwrap(); // TODO unwrap
+    if !is_valid_tee_token(tee_token, key_material, certs_fingerprint).await {
+      panic!("invalid TEE token"); // TODO abort request via 500 status code?
+    }
   }
-
-  let header = decode_header(tee_token).unwrap();
-  let alg = header.alg;
-  if alg != Algorithm::RS256 {
-    panic!("unsupported JWT alg")
-  }
-
-  let mut validation = Validation::new(Algorithm::RS256);
-  validation.validate_exp = true;
-
-  // OIDC flow ...
-  // https://confidentialcomputing.googleapis.com/.well-known/openid-configuration
-  // https://www.googleapis.com/service_accounts/v1/metadata/jwk/signer@confidentialspace-sign.iam.gserviceaccount.com
-  let jwks_request = reqwest::get(
-    "https://www.googleapis.com/service_accounts/v1/metadata/jwk/signer@confidentialspace-sign.iam.gserviceaccount.com",
-  )
-  .await
-  .unwrap();
-  let jwks = jwks_request.bytes().await.unwrap();
-
-  let jwks: JwkSet = serde_json::from_str(str::from_utf8(&jwks).unwrap()).unwrap();
-  let header = decode_header(tee_token).unwrap();
-
-  let Some(kid) = header.kid else {
-    panic!("Token doesn't have a `kid` header field");
-  };
-
-  let Some(jwk) = jwks.find(&kid) else {
-    panic!("No matching JWK found for the given kid");
-  };
-
-  let decoding_key = match &jwk.algorithm {
-    AlgorithmParameters::RSA(rsa) => DecodingKey::from_rsa_components(&rsa.n, &rsa.e).unwrap(),
-    _ => unreachable!("algorithm should be a RSA in this example"),
-  };
-
-  let validation = {
-    let mut validation = Validation::new(header.alg);
-    validation.set_audience(&["https://notary.pluto.xyz"]);
-    validation.validate_exp = true;
-    validation
-  };
-
-  let decoded_token = decode::<JwtPayload>(tee_token, &decoding_key, &validation).unwrap();
-  dbg!(decoded_token.clone());
-
-  assert_eq!(decoded_token.claims.eat_nonce[0], hex::encode(key_material.clone()));
-  assert_eq!(decoded_token.claims.eat_nonce[1], certs_fingerprint);
-
-  // PKI flow... (broken)
-  // key:
-  // https://confidentialcomputing.googleapis.com/.well-known/attestation-pki-root
-  // https://confidentialcomputing.googleapis.com/.well-known/confidential_space_root.crt
-  // https://github.com/GoogleCloudPlatform/confidential-space/blob/main/codelabs/health_data_analysis_codelab/src/uwear/workload.go#L84
-  //
-  // let cert_request = reqwest::get(
-  //   "https://confidentialcomputing.googleapis.com/.well-known/confidential_space_root.crt",
-  // )
-  // .await
-  // .unwrap();
-  // let cert = cert_request.bytes().await.unwrap();
-  // let decoding_key = &DecodingKey::from_rsa_pem(&cert).unwrap();
-  // let token_data = decode::<Claims>(tee_token, decoding_key, &validation).unwrap();
-  // dbg!(token_data);
 
   assert!(response.status() == hyper::StatusCode::SWITCHING_PROTOCOLS);
 
@@ -369,116 +301,4 @@ pub async fn proxy(
   };
 
   Ok((sb, witness))
-}
-
-fn export_key_material_middleware(
-  tls_stream: &TlsStream<TcpStream>,
-  length: usize,
-  label: &[u8],
-  context: Option<&[u8]>,
-) -> Result<Vec<u8>, io::Error> {
-  let rustls_conn = tls_stream.get_ref().1;
-
-  if rustls_conn.is_handshaking() {
-    return Err(io::Error::new(io::ErrorKind::Other, "TLS connection is still handshaking"));
-  }
-
-  let mut output = vec![0u8; length];
-  rustls_conn.export_keying_material(&mut output, label, context).map_err(|err| {
-    io::Error::new(io::ErrorKind::Other, format!("Failed to export keying material: {err}"))
-  })?;
-
-  Ok(output)
-}
-
-struct SkipServerVerification;
-
-impl SkipServerVerification {
-  fn new() -> std::sync::Arc<Self> { std::sync::Arc::new(Self) }
-}
-
-impl rustls::client::ServerCertVerifier for SkipServerVerification {
-  fn verify_server_cert(
-    &self,
-    _end_entity: &rustls::Certificate,
-    _intermediates: &[rustls::Certificate],
-    _server_name: &rustls::ServerName,
-    _scts: &mut dyn Iterator<Item = &[u8]>,
-    _ocsp_response: &[u8],
-    _now: std::time::SystemTime,
-  ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
-    // TODO check server name
-    Ok(rustls::client::ServerCertVerified::assertion())
-  }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct JwtPayload {
-  aud:                     String,
-  exp:                     u64,
-  iat:                     u64,
-  iss:                     String,
-  nbf:                     u64,
-  sub:                     String,
-  eat_nonce:               Vec<String>,
-  eat_profile:             String,
-  secboot:                 bool,
-  oemid:                   u32,
-  hwmodel:                 String,
-  swname:                  String,
-  swversion:               Vec<String>,
-  attester_tcb:            Vec<String>,
-  dbgstat:                 String,
-  submods:                 SubModules,
-  google_service_accounts: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct SubModules {
-  confidential_space: ConfidentialSpace,
-  container:          Container,
-  gce:                Gce,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ConfidentialSpace {
-  monitoring_enabled: MonitoringEnabled,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct MonitoringEnabled {
-  memory: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Container {
-  image_reference: String,
-  image_digest:    String,
-  restart_policy:  String,
-  image_id:        String,
-  env:             HashMap<String, String>,
-  args:            Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Gce {
-  zone:           String,
-  project_id:     String,
-  project_number: String,
-  instance_name:  String,
-  instance_id:    String,
-}
-
-use sha2::{Digest, Sha256};
-
-fn stable_certs_fingerprint(certs: &[rustls::Certificate]) -> String {
-  let mut sorted_certs: Vec<&rustls::Certificate> = certs.iter().collect();
-  sorted_certs.sort_by(|a, b| a.0.cmp(&b.0));
-
-  let mut hasher = Sha256::new();
-  for cert in sorted_certs {
-    hasher.update(&cert.0);
-  }
-
-  hex::encode(hasher.finalize())
 }
