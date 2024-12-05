@@ -1,5 +1,5 @@
 use core::str;
-use std::{collections::HashMap, io, sync::Arc};
+use std::{collections::HashMap, io, ops::Deref, sync::Arc};
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
@@ -199,10 +199,8 @@ pub async fn proxy(
     .await?;
 
   let certs = notary_tls_socket.get_ref().1.peer_certificates().unwrap();
-
-  use sha2::{Digest, Sha256};
-  let certs_fingerprints: Vec<String> = certs.into_iter().map(|cert| hex::encode(Sha256::digest(&cert))).collect();
-  dbg!(certs_fingerprints);
+  let certs_fingerprint = stable_certs_fingerprint(&certs);
+  dbg!(certs_fingerprint);
 
   let key_material = match export_key_material_middleware(
     &notary_tls_socket,
@@ -467,4 +465,18 @@ struct Gce {
   project_number: String,
   instance_name:  String,
   instance_id:    String,
+}
+
+use sha2::{Digest, Sha256};
+
+fn stable_certs_fingerprint(certs: &[rustls::Certificate]) -> String {
+  let mut sorted_certs: Vec<&rustls::Certificate> = certs.iter().collect();
+  sorted_certs.sort_by(|a, b| a.0.cmp(&b.0));
+
+  let mut hasher = Sha256::new();
+  for cert in sorted_certs {
+    hasher.update(&cert.0);
+  }
+
+  hex::encode(hasher.finalize())
 }
