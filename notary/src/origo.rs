@@ -422,6 +422,7 @@ pub async fn proxy(
   query: Query<NotarizeQuery>,
   State(state): State<Arc<SharedState>>,
   Extension(key_material): Extension<Vec<u8>>,
+  Extension(certs_fingerprint): Extension<String>,
 ) -> Response {
   let session_id = query.session_id.clone();
 
@@ -443,7 +444,7 @@ pub async fn proxy(
   };
 
   // TODO add runtime feature flag? via config?
-  match get_token(vec![hex::encode(key_material)], None) {
+  match get_token(vec![hex::encode(key_material), certs_fingerprint], None) {
     Ok(token) => {
       resp.headers_mut().insert("x-pluto-notary-tee-token", HeaderValue::from_str(&token).unwrap());
     },

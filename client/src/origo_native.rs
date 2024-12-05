@@ -200,7 +200,7 @@ pub async fn proxy(
 
   let certs = notary_tls_socket.get_ref().1.peer_certificates().unwrap();
   let certs_fingerprint = stable_certs_fingerprint(&certs);
-  dbg!(certs_fingerprint);
+  dbg!(certs_fingerprint.clone());
 
   let key_material = match export_key_material_middleware(
     &notary_tls_socket,
@@ -294,7 +294,8 @@ pub async fn proxy(
   let decoded_token = decode::<JwtPayload>(tee_token, &decoding_key, &validation).unwrap();
   dbg!(decoded_token.clone());
 
-  assert_eq!(decoded_token.claims.eat_nonce, hex::encode(key_material.clone()));
+  assert_eq!(decoded_token.claims.eat_nonce[0], hex::encode(key_material.clone()));
+  assert_eq!(decoded_token.claims.eat_nonce[1], certs_fingerprint);
 
   // PKI flow... (broken)
   // key:
@@ -406,6 +407,7 @@ impl rustls::client::ServerCertVerifier for SkipServerVerification {
     _ocsp_response: &[u8],
     _now: std::time::SystemTime,
   ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
+    // TODO check server name
     Ok(rustls::client::ServerCertVerified::assertion())
   }
 }
@@ -418,7 +420,7 @@ struct JwtPayload {
   iss:                     String,
   nbf:                     u64,
   sub:                     String,
-  eat_nonce:               String,
+  eat_nonce:               Vec<String>,
   eat_profile:             String,
   secboot:                 bool,
   oemid:                   u32,
