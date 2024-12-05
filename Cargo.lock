@@ -7118,7 +7118,6 @@ dependencies = [
 name = "webprover"
 version = "0.0.0"
 dependencies = [
- "form_urlencoded",
  "futures-util",
  "http-body-util",
  "hyper 1.5.0",
@@ -7130,7 +7129,6 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-rustls 0.26.0",
- "tokio-tungstenite 0.23.1",
 ]
 
 [[package]]
