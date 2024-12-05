@@ -3,6 +3,7 @@ set -ex
 
 # gcloud auth configure-docker us-central1-docker.pkg.dev
 docker build -t us-central1-docker.pkg.dev/tee-test-1/notary/notary:latest .
+sleep 1 # lol
 docker push us-central1-docker.pkg.dev/tee-test-1/notary/notary:latest
 
 # https://cloud.google.com/confidential-computing/confidential-space/docs/monitor-debug

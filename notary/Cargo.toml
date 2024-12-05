@@ -7,6 +7,9 @@ build  ="../build.rs"
 [dependencies]
 hyper={ version="1.1", features=["client", "http1", "server"] }
 hyper-util={ version="0.1", features=["full"] }
+hyper-client-sockets = {version = "0.4.0", features = ["unix", "tokio-backend"] }
+http-body-util = "0.1"
+bytes = "1.9"
 serde={ version="1.0", features=["derive"] }
 rustls={ version="0.23.11", default-features=false, features=["logging", "tls12", "std", "ring"] }
 tokio={ version="1.39.1", features=["full"] }

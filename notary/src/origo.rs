@@ -49,7 +49,7 @@ use ws_stream_tungstenite::WsStream;
 use crate::{
   axum_websocket::WebSocket,
   errors::{NotaryServerError, ProxyError},
-  tee::get_token,
+  tee::get_tee_token,
   tlsn::ProtocolUpgrade,
   OrigoSession, SharedState,
 };
@@ -444,7 +444,12 @@ pub async fn proxy(
   };
 
   // TODO add runtime feature flag? via config?
-  match get_token(vec![hex::encode(key_material), certs_fingerprint], None) {
+  match get_tee_token("https://notary.pluto.xyz".to_string(), "OIDC".to_string(), vec![
+    hex::encode(key_material),
+    certs_fingerprint,
+  ])
+  .await
+  {
     Ok(token) => {
       resp.headers_mut().insert("x-pluto-notary-tee-token", HeaderValue::from_str(&token).unwrap());
     },
