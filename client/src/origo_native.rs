@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
@@ -21,11 +21,21 @@ use crate::{
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
-  let (sb, witness) = proxy(config.clone(), session_id.clone()).await?;
+  let mut origo_conn = proxy(config.clone(), session_id.clone()).await?;
 
-  let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
+  let sb = SignBody {
+    handshake_server_iv:  hex::encode(
+      origo_conn.secret_map.get("Handshake:server_iv").unwrap().clone().to_vec(),
+    ),
+    handshake_server_key: hex::encode(
+      origo_conn.secret_map.get("Handshake:server_key").unwrap().clone().to_vec(),
+    ),
+  };
+
+  let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb).await;
 
   debug!("generating program data!");
+  let witness = origo_conn.to_witness_data();
   let (request_program_data, response_program_data) =
     generate_program_data(&witness, config.proving).await?;
 
@@ -115,7 +125,7 @@ async fn generate_program_data(
 async fn proxy(
   config: config::Config,
   session_id: String,
-) -> Result<(SignBody, WitnessData), ClientErrors> {
+) -> Result<tls_client2::origo::OrigoConnection, ClientErrors> {
   let root_store = crate::tls::tls_client2_default_root_store();
 
   let client_config = tls_client2::ClientConfig::builder()
@@ -214,16 +224,6 @@ async fn proxy(
   let mut client_socket = connection_receiver.await??.io.into_inner().into_inner();
   client_socket.close().await?;
 
-  let server_aes_iv =
-    origo_conn.lock().unwrap().secret_map.get("Handshake:server_iv").unwrap().clone();
-  let server_aes_key =
-    origo_conn.lock().unwrap().secret_map.get("Handshake:server_key").unwrap().clone();
-
-  let witness = origo_conn.lock().unwrap().to_witness_data();
-  let sb = SignBody {
-    hs_server_aes_iv:  hex::encode(server_aes_iv.to_vec()),
-    hs_server_aes_key: hex::encode(server_aes_key.to_vec()),
-  };
-
-  Ok((sb, witness))
+  let origo_conn = origo_conn.lock().unwrap().deref().clone();
+  Ok(origo_conn)
 }
