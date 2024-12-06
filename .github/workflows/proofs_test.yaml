@@ -1,4 +1,4 @@
-name: tests/proofs
+name: proofs
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -14,16 +14,17 @@ jobs:
   setup:
     uses: ./.github/workflows/download-circuits.yaml
 
-  setup-env:
-    uses: ./.github/workflows/protoc-install.yaml
-
   version-check:
-    needs: [setup, setup-env]
+    needs: setup
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - uses: ./.github/actions/setup-env
+        with:
+          rust-version: nightly-2024-06-10
 
       - name: Restore circuit artifacts
         uses: actions/cache@v3
@@ -37,26 +38,22 @@ jobs:
           package: proofs
           baseline-ref: origin/main
           
-  tests:
-    needs: [setup, setup-env]
+  build:
+    needs: setup
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
+    - uses: ./.github/actions/setup-env
       with:
-        toolchain: nightly-2024-06-10
-
-    - name: Install unzip
-      run: sudo apt install unzip -y
+        rust-version: nightly-2024-06-10
 
     - name: Restore circuit artifacts
       uses: actions/cache@v3
       with:
-        path: proofs/web_proof_circuits
-        key: ${{ needs.setup.outputs.cache-key }}
+          path: proofs/web_proof_circuits
+          key: ${{ needs.setup.outputs.cache-key }}
 
     - name: Run tests
       run: |
