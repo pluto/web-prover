@@ -1,0 +1,36 @@
+# .github/actions/setup-macos/action.yml
+name: 'Setup MacOS Environment'
+description: 'Installs LLVM, Clang, and Protobuf on MacOS'
+inputs:
+  rust-version:
+    description: 'Rust version to install'
+    required: false
+    default: 'nightly'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Cache LLVM and Protobuf
+      id: cache-llvm
+      uses: actions/cache@v3
+      with:
+        path: |
+          /opt/homebrew/opt/llvm@18
+          /opt/homebrew/opt/protobuf
+        key: ${{ runner.os }}-llvm18-protobuf-${{ hashFiles('/opt/homebrew/opt/llvm@18/**', '/opt/homebrew/opt/protobuf/**') }}
+
+    - name: Install LLVM and Clang
+      if: steps.cache-llvm.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        brew install llvm@18
+        brew install protobuf
+
+    - name: Set LLVM path
+      shell: bash
+      run: echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ inputs.rust-version }}
