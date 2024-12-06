@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [self-hosted, macos-latest]
+        os: [macos-latest]
 
     name: client on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -33,8 +33,8 @@ jobs:
         with:
           toolchain: nightly-2024-10-28
 
-      - run: sudo apt install -y protobuf-compiler
-        if: matrix.os == 'self-hosted'
+      # - run: sudo apt install -y protobuf-compiler
+      #   if: matrix.os == 'self-hosted'
 
       - name: Install LLVM and Clang to support 'ring' crate and protobuf
         if: matrix.os == 'macos-latest'
@@ -43,9 +43,9 @@ jobs:
           echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
           brew install protobuf
 
-      - name: Install unzip (linux)
-        if: matrix.os == 'self-hosted'
-        run: sudo apt install unzip -y
+      # - name: Install unzip (linux)
+      #   if: matrix.os == 'self-hosted'
+      #   run: sudo apt install unzip -y
 
       - name: Restore circuit artifacts
         uses: actions/cache@v3
