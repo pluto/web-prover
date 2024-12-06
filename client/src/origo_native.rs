@@ -11,10 +11,7 @@ use proofs::{
   F, G1,
 };
 use serde_json::{json, Value};
-use tls_client2::{
-  origo::{OrigoConnection, WitnessData},
-  CipherSuite, Decrypter2, ProtocolVersion,
-};
+use tls_client2::origo::{OrigoConnection, WitnessData};
 use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;

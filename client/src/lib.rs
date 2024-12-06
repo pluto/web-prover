@@ -12,7 +12,7 @@ pub mod errors;
 mod tee;
 mod tls;
 pub mod tls_client_async2;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
 use tracing::info;
@@ -22,7 +22,7 @@ use crate::errors::ClientErrors;
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Proof {
   TLSN(TlsProof),
-  Origo(Vec<u8>),
+  Origo((Vec<u8>, Vec<u8>)),
   TEE(Vec<u8>),
 }
 
@@ -33,7 +33,7 @@ pub async fn prover_inner(
   info!("GIT_HASH: {}", env!("GIT_HASH"));
   match config.mode {
     config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
-    config::NotaryMode::Origo => prover_inner_origo(config).await,
+    config::NotaryMode::Origo => prover_inner_origo(config, proving_params).await,
     config::NotaryMode::TEE => prover_inner_tee(config).await,
   }
 }

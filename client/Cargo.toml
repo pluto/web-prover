@@ -13,10 +13,6 @@ notary_ca_cert=[]
 
 # Shared dependencies for all targets
 [dependencies]
-
-jsonwebtoken="9"
-sha2 = "0.10"
-
 # TLSN
 tls-client={ workspace=true }
 tls-client2={ git = "https://github.com/pluto/tls-origo-legacy", package="tls-client" }
@@ -24,9 +20,6 @@ tls-client2={ git = "https://github.com/pluto/tls-origo-legacy", package="tls-cl
 bytes = "1"
 tls-core={ git = "https://github.com/pluto/tls-origo-legacy", package="tls-core" }
 proofs={ path="../proofs", package="proofs" }
-arecibo={ git="https://github.com/argumentcomputer/arecibo", default-features=false, features=[
-  "portable",
-] }
 
 webpki-roots="0.26.1"
 pki-types   ={ package="rustls-pki-types", version="1.7" }
@@ -35,9 +28,7 @@ cfg-if      ="1.0.0"
 serde.workspace     =true
 serde_json.workspace=true
 serde_bytes         ="0.11"
-serde_bytes         ="0.11"
 # Web
-hex           ="0.4"
 hex           ="0.4"
 url           ="2.5"
 hyper         ={ version="1.4", features=["client", "http1"] }
@@ -57,6 +48,8 @@ tokio-util={ version="0.7", features=[
 chrono="0.4"
 p256={ version="0.13", features=["pem", "ecdsa"] }
 num-bigint="0.4"
+jsonwebtoken="9"
+sha2 = "0.10"
 
 [dependencies.uuid]
 version         ="1.10.0"
