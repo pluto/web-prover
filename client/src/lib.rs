@@ -9,7 +9,7 @@ pub mod origo;
 mod circuits;
 pub mod config;
 pub mod errors;
-mod tee;
+#[cfg(not(target_arch = "wasm32"))] mod tee; // TODO only non-wasm for now
 mod tls;
 pub mod tls_client_async2;
 use serde::{Deserialize, Serialize};
