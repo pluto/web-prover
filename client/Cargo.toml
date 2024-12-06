@@ -15,7 +15,7 @@ notary_ca_cert=[]
 [dependencies]
 # TLSN
 tls-client ={ workspace=true }
-tls-client2={ git="https://github.com/pluto/tls-origo-legacy", package="tls-client", features = ["dangerous_configuration"]}
+tls-client2={ git="https://github.com/pluto/tls-origo-legacy", package="tls-client" }
 
 bytes   ="1"
 tls-core={ git="https://github.com/pluto/tls-origo-legacy", package="tls-core" }
@@ -86,7 +86,6 @@ ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wa
 # Serde
 serde-wasm-bindgen="0.6.5"
 reqwest           ={ version="0.12", features=["json"] }
-rustls            ={ version="0.21", default-features=false, features=["dangerous_configuration"] }
 
 # Other
 ring          ={ version="0.17", default-features=false, features=["wasm32_unknown_unknown_js"] }
