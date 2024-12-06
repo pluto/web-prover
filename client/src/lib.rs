@@ -19,7 +19,7 @@ use tracing::info;
 
 use crate::errors::ClientErrors;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 pub enum Proof {
   TLSN(TlsProof),
   Origo((Vec<u8>, Vec<u8>)),
@@ -81,15 +81,15 @@ pub async fn prover_inner_origo(
   return origo_native::proxy_and_sign(config).await;
 }
 
-#[derive(Deserialize, Debug, Clone)]
-pub struct AttestationBody {
-  handshake_server_aes_iv:    String,
-  handshake_server_aes_key:   String,
-  application_client_aes_iv:  String,
-  application_client_aes_key: String,
-  application_server_aes_iv:  String,
-  application_server_aes_key: String,
-}
+// #[derive(Deserialize, Debug, Clone)]
+// pub struct AttestationBody {
+//   handshake_server_aes_iv:    String,
+//   handshake_server_aes_key:   String,
+//   application_client_aes_iv:  String,
+//   application_client_aes_key: String,
+//   application_server_aes_iv:  String,
+//   application_server_aes_key: String,
+// }
 
 pub async fn prover_inner_tee(config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.clone().session_id();

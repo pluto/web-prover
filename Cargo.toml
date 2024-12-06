@@ -32,17 +32,17 @@ path="bin/mock_server.rs"
 
 [dependencies]
 # Dependancies for the binaries
-tokio            ={ version="1.39.0", features=["full"] }
-hyper            ={ version="1.4", features=["full"] }
-hyper-util       ={ version="0.1", features=["full"] }
-http-body-util   ="0.1"
-pki-types        ={ package="rustls-pki-types", version="1.7" }
-rustls           ={ version="0.23.11", default-features=false, features=["logging", "tls12", "std", "ring"] }
-rustls-pemfile   ={ version="2.0.0" }
-tokio-rustls     ={ version="0.26.0", default-features=false, features=["logging", "tls12"] }
-futures-util     ="0.3"
-serde            ={ version="1.0.204", features=["derive"] }
-serde_json       ="1.0.120"
+tokio         ={ version="1.39.0", features=["full"] }
+hyper         ={ version="1.4", features=["full"] }
+hyper-util    ={ version="0.1", features=["full"] }
+http-body-util="0.1"
+pki-types     ={ package="rustls-pki-types", version="1.7" }
+rustls        ={ version="0.23.11", default-features=false, features=["logging", "tls12", "std", "ring"] }
+rustls-pemfile={ version="2.0.0" }
+tokio-rustls  ={ version="0.26.0", default-features=false, features=["logging", "tls12"] }
+futures-util  ="0.3"
+serde         ={ version="1.0.204", features=["derive"] }
+serde_json    ="1.0.120"
 
 # More information here: https://doc.rust-lang.org/cargo/reference/profiles.html
 [profile.release]

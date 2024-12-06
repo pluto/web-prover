@@ -14,12 +14,12 @@ notary_ca_cert=[]
 # Shared dependencies for all targets
 [dependencies]
 # TLSN
-tls-client={ workspace=true }
-tls-client2={ git = "https://github.com/pluto/tls-origo-legacy", package="tls-client" }
+tls-client ={ workspace=true }
+tls-client2={ git="https://github.com/pluto/tls-origo-legacy", package="tls-client" }
 
-bytes = "1"
-tls-core={ git = "https://github.com/pluto/tls-origo-legacy", package="tls-core" }
-proofs={ path="../proofs", package="proofs" }
+bytes   ="1"
+tls-core={ git="https://github.com/pluto/tls-origo-legacy", package="tls-core" }
+proofs  ={ path="../proofs", package="proofs" }
 
 webpki-roots="0.26.1"
 pki-types   ={ package="rustls-pki-types", version="1.7" }
@@ -49,7 +49,7 @@ chrono="0.4"
 p256={ version="0.13", features=["pem", "ecdsa"] }
 num-bigint="0.4"
 jsonwebtoken="9"
-sha2 = "0.10"
+sha2="0.10"
 
 [dependencies.uuid]
 version         ="1.10.0"

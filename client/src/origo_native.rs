@@ -205,7 +205,7 @@ pub async fn proxy(
     .body(http_body_util::Full::default())
     .unwrap();
 
-  let response = request_sender.send_request(request).await.unwrap();
+  let response = request_sender.send_request(request).await?;
 
   if enable_tee {
     let tee_token = response.headers().get("x-pluto-notary-tee-token").unwrap().to_str().unwrap(); // TODO unwrap

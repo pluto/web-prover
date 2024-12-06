@@ -2,13 +2,13 @@
 name   ="client_wasm"
 version="0.1.0"
 edition="2021"
-build="../build.rs"
+build  ="../build.rs"
 
 [lib]
 crate-type=["cdylib", "rlib"]
 
 [dependencies]
-client={ path="../client", features=["websocket"] }
+client              ={ path="../client", features=["websocket"] }
 chrono              ="0.4"
 elliptic-curve      ={ version="0.13.5", features=["pkcs8"] }
 futures             ="0.3"
@@ -38,7 +38,7 @@ ring={ version="0.17", features=["wasm32_unknown_unknown_js"] }
 # Probably due to tokio's time feature is used in tlsn-prover?
 time={ version="0.3.34", features=["wasm-bindgen"] }
 # Used to calculate elapsed time.
-web-time="1.0"
+web-time   ="1.0"
 tlsn-prover={ workspace=true }
 tlsn-core  ={ workspace=true }
 
@@ -75,14 +75,14 @@ console_error_panic_hook={ version="0.1.7" }
 strum       ={ version="0.26.1" }
 strum_macros="0.26.1"
 
-base64="0.22.0"
+base64        ="0.22.0"
 http-body-util="0.1"
 
 [dev-dependencies]
 wasm-bindgen-test="0.3.34"
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = ["-Oz", "--enable-threads", "--enable-mutable-globals", "--enable-bulk-memory"]
+wasm-opt=["-Oz", "--enable-threads", "--enable-mutable-globals", "--enable-bulk-memory"]
 
 [package.metadata.wasm-pack.profile.dev.wasm-bindgen]
-dwarf-debug-info = true
+dwarf-debug-info=true

@@ -112,6 +112,7 @@ async fn generate_program_data(
 pub async fn proxy(
   config: config::Config,
   session_id: String,
+  enable_tee: bool,
 ) -> Result<tls_client2::origo::OrigoConnection, errors::ClientErrors> {
   // TODO build sanitized query
   let wss_url = format!(

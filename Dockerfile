@@ -1,7 +1,7 @@
 FROM rust:1.82-bookworm AS rust-builder
 WORKDIR /app
 COPY . /app
-# RUN cd /app/proofs && make web-prover-circuits-512
+RUN cd /app/proofs && make web-prover-circuits
 RUN cargo build --release -p notary
 
 FROM debian:bookworm
