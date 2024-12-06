@@ -13,17 +13,13 @@ on:
 jobs:
   setup:
     uses: ./.github/workflows/download-circuits.yaml
-    with:
-      version: "v0.5.7"  # Optional, defaults to v0.5.7
   test:
     needs: setup
     strategy:
       fail-fast: false
-      matrix:
-        os: [macos-latest]
 
-    name: client on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: client on macos-latest
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -33,19 +29,11 @@ jobs:
         with:
           toolchain: nightly-2024-10-28
 
-      # - run: sudo apt install -y protobuf-compiler
-      #   if: matrix.os == 'self-hosted'
-
       - name: Install LLVM and Clang to support 'ring' crate and protobuf
-        if: matrix.os == 'macos-latest'
         run: |
           brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
           echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
           brew install protobuf
-
-      # - name: Install unzip (linux)
-      #   if: matrix.os == 'self-hosted'
-      #   run: sudo apt install unzip -y
 
       - name: Restore circuit artifacts
         uses: actions/cache@v3

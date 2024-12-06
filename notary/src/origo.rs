@@ -545,7 +545,7 @@ fn process_session_id(session_id: Option<&[u8]>) -> Result<SessionID, ProxyError
   let mut sh_session_id = sh_session_id.to_vec();
   sh_session_id.insert(0, sh_session_id.len() as u8);
   SessionID::read_bytes(&sh_session_id)
-      .ok_or_else(|| ProxyError::InvalidSessionId("Failed to read session ID bytes".into()))
+    .ok_or_else(|| ProxyError::InvalidSessionId("Failed to read session ID bytes".into()))
 }
 
 /// Converts a raw key vector into a cipher suite-specific key format.
@@ -632,13 +632,7 @@ pub async fn proxy(
 
   match protocol_upgrade {
     ProtocolUpgrade::Ws(ws) => ws.on_upgrade(move |socket| {
-      websocket_notarize(
-        socket,
-        session_id,
-        query.target_host.clone(),
-        query.target_port,
-        state,
-      )
+      websocket_notarize(socket, session_id, query.target_host.clone(), query.target_port, state)
     }),
     ProtocolUpgrade::Tcp(tcp) => tcp.on_upgrade(move |stream| {
       tcp_notarize(stream, session_id, query.target_host.clone(), query.target_port, state)
