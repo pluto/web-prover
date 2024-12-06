@@ -9,9 +9,7 @@ target/
 rustls_acme_cache
 
 # Circom junk files
-proofs/**/*.bin
 proofs/**/*.wtns
-proofs/**/*.r1cs
 proofs/web_proof_circuits/
 proofs/node_modules/*
 proofs/ir_log/*

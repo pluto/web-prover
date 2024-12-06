@@ -47,10 +47,10 @@ pub const EXTRACT_VALUE_GRAPH: &[u8] =
 // -------------------------------------- 1024B circuits -------------------------------------- //
 
 // CIRCUIT 1
-const CHACHA20_1024_R1CS: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/target_1024b/chacha20_nivc_1024b.r1cs");
-const CHACHA20_1024_GRAPH: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/target_1024b/chacha20_nivc_1024b.bin");
+// const CHACHA20_1024_R1CS: &[u8] =
+//   include_bytes!("../../proofs/web_proof_circuits/target_1024b/chacha20_nivc_1024b.r1cs");
+// const CHACHA20_1024_GRAPH: &[u8] =
+//   include_bytes!("../../proofs/web_proof_circuits/target_1024b/chacha20_nivc_1024b.bin");
 
 // CIRCUIT 2
 pub const HTTP_NIVC_1024_GRAPH: &[u8] =
@@ -101,7 +101,7 @@ pub fn construct_setup_data_512() -> SetupData {
 pub fn construct_setup_data_1024() -> SetupData {
   SetupData {
     r1cs_types: vec![
-      R1CSType::Raw(CHACHA20_1024_R1CS.to_vec()),
+      // R1CSType::Raw(CHACHA20_1024_R1CS.to_vec()),
       R1CSType::Raw(HTTP_NIVC_1024_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_1024_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_1024_R1CS.to_vec()),
@@ -109,7 +109,7 @@ pub fn construct_setup_data_1024() -> SetupData {
     ],
     #[cfg(not(target_arch = "wasm32"))]
     witness_generator_types: vec![
-      WitnessGeneratorType::Raw(CHACHA20_1024_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(CHACHA20_1024_GRAPH.to_vec()),
       // WitnessGeneratorType::Wasm {
       //   path:      String::from(
       //     "proofs/web_proof_circuits/target_1024b/chacha20_nivc_1024_js/chacha20_nivc_1024.wasm"
