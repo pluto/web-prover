@@ -12,7 +12,7 @@ pub mod errors;
 mod tee;
 mod tls;
 pub mod tls_client_async2;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
 use tracing::info;
