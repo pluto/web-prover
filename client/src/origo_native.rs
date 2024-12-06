@@ -10,9 +10,7 @@ use proofs::{
   },
   F, G1,
 };
-use serde_json::{json, Value};
 use tls_client2::origo::{OrigoConnection, WitnessData};
-use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
@@ -21,10 +19,10 @@ use crate::{
   config::{self, ProvingData},
   errors::{self, ClientErrors},
   origo::SignBody,
-  tls::decrypt_tls_ciphertext,
   tee::{
     export_key_material, is_valid_tee_token, stable_certs_fingerprint, SkipServerVerification,
   },
+  tls::decrypt_tls_ciphertext,
   Proof,
 };
 
