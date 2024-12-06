@@ -24,10 +24,10 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
   let mut origo_conn = proxy(config.clone(), session_id.clone()).await?;
 
   let sb = SignBody {
-    handshake_server_aes_iv:  hex::encode(
+    handshake_server_iv:  hex::encode(
       origo_conn.secret_map.get("Handshake:server_iv").unwrap().clone().to_vec(),
     ),
-    handshake_server_aes_key: hex::encode(
+    handshake_server_key: hex::encode(
       origo_conn.secret_map.get("Handshake:server_key").unwrap().clone().to_vec(),
     ),
   };

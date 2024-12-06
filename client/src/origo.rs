@@ -9,8 +9,8 @@ use crate::errors;
 
 #[derive(Serialize)]
 pub struct SignBody {
-  pub handshake_server_aes_iv:  String,
-  pub handshake_server_aes_key: String,
+  pub handshake_server_iv:  String,
+  pub handshake_server_key: String,
 }
 
 pub async fn sign(
