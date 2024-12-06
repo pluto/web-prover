@@ -108,10 +108,7 @@ impl Config {
       Full::default()
     } else {
       let body = BASE64_STANDARD.decode(&self.target_body)?;
-      h.insert(
-        "Content-Length",
-        HeaderValue::try_from(body.len()).map_err(|e| ClientErrors::Other(e.to_string()))?,
-      );
+      h.insert("Content-Length", HeaderValue::from(body.len()));
       Full::from(body)
     };
 

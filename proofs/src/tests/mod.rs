@@ -10,7 +10,7 @@ use witness::{compute_http_witness, compute_json_witness};
 
 use super::*;
 use crate::{
-  program::data::{FoldInput, NotExpanded},
+  program::{data::NotExpanded, manifest::to_chacha_input},
   witness::data_hasher,
 };
 
@@ -28,10 +28,10 @@ const MAX_ROM_LENGTH: usize = 10;
 const JSON_MAX_ROM_LENGTH: usize = 45;
 
 // Circuit 0
-const AES_GCM_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/aes_gctr_nivc_512b.r1cs");
-const AES_GCM_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/aes_gctr_nivc_512b.bin");
+const CHACHA20_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/chacha20_nivc_512b.r1cs");
+const CHACHA20_GRAPH: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/chacha20_nivc_512b.bin");
 
 // Circuit 1
 const HTTP_NIVC_R1CS: &[u8] =
@@ -56,8 +56,6 @@ const EXTRACT_VALUE_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/target_512b/json_extract_value_512b.r1cs");
 const EXTRACT_VALUE_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/target_512b/json_extract_value_512b.bin");
-
-const BYTES_PER_FOLD: usize = 16;
 
 // HTTP/1.1 200 OK
 // content-type: application/json; charset=utf-8
@@ -94,34 +92,26 @@ const HTTP_RESPONSE_PLAINTEXT: (&str, [u8; 320]) = ("plainText", [
   10, 32, 32, 32, 125, 13, 10, 125,
 ]);
 
-const AES_CIPHER_TEXT: (&str, [u8; 320]) = ("cipherText", [
-  75, 220, 142, 158, 79, 135, 141, 163, 211, 26, 242, 137, 81, 253, 181, 117, 253, 246, 197, 197,
-  61, 46, 55, 87, 218, 137, 240, 143, 241, 177, 225, 129, 80, 114, 125, 72, 45, 18, 224, 179, 79,
-  231, 153, 198, 163, 252, 197, 219, 233, 46, 202, 120, 99, 253, 76, 9, 70, 11, 200, 218, 228, 251,
-  133, 248, 233, 177, 19, 241, 205, 128, 65, 76, 10, 31, 71, 198, 177, 78, 108, 246, 175, 152, 42,
-  97, 255, 182, 157, 245, 123, 95, 130, 101, 129, 138, 236, 146, 47, 22, 22, 13, 125, 1, 109, 158,
-  189, 131, 44, 43, 203, 118, 79, 181, 86, 33, 235, 186, 75, 20, 7, 147, 102, 75, 90, 222, 255,
-  140, 94, 52, 191, 145, 192, 71, 239, 245, 247, 175, 117, 136, 173, 235, 250, 189, 74, 155, 103,
-  25, 164, 187, 22, 26, 39, 37, 113, 248, 170, 146, 73, 75, 45, 208, 125, 49, 101, 11, 120, 215,
-  93, 160, 14, 147, 129, 181, 150, 59, 167, 197, 230, 122, 77, 245, 247, 215, 136, 98, 1, 180, 213,
-  30, 214, 88, 83, 42, 33, 112, 61, 4, 197, 75, 134, 149, 22, 228, 24, 95, 131, 35, 44, 181, 135,
-  31, 173, 36, 23, 192, 177, 127, 156, 199, 167, 212, 66, 235, 194, 102, 61, 144, 121, 59, 187,
-  179, 212, 34, 117, 47, 96, 3, 169, 73, 204, 88, 36, 48, 158, 220, 237, 198, 180, 105, 7, 188,
-  109, 24, 201, 217, 186, 191, 232, 63, 93, 153, 118, 214, 157, 167, 15, 216, 191, 152, 41, 106,
-  24, 127, 8, 144, 78, 218, 133, 125, 89, 97, 10, 246, 8, 244, 112, 169, 190, 206, 14, 217, 109,
-  147, 130, 61, 214, 237, 143, 77, 14, 14, 70, 56, 94, 97, 207, 214, 106, 249, 37, 7, 186, 95, 174,
-  146, 203, 148, 173, 172, 13, 113,
+const CHACHA20_CIPHERTEXT: (&str, [u8; 320]) = ("cipherText", [
+  2, 125, 219, 141, 140, 93, 49, 129, 95, 178, 135, 109, 48, 36, 194, 46, 239, 155, 160, 70, 208,
+  147, 37, 212, 17, 195, 149, 190, 38, 215, 23, 241, 84, 204, 167, 184, 179, 172, 187, 145, 38, 75,
+  123, 96, 81, 6, 149, 36, 135, 227, 226, 254, 177, 90, 241, 159, 0, 230, 183, 163, 210, 88, 133,
+  176, 9, 122, 225, 83, 171, 157, 185, 85, 122, 4, 110, 52, 2, 90, 36, 189, 145, 63, 122, 75, 94,
+  21, 163, 24, 77, 85, 110, 90, 228, 157, 103, 41, 59, 128, 233, 149, 57, 175, 121, 163, 185, 144,
+  162, 100, 17, 34, 9, 252, 162, 223, 59, 221, 106, 127, 104, 11, 121, 129, 154, 49, 66, 220, 65,
+  130, 171, 165, 43, 8, 21, 248, 12, 214, 33, 6, 109, 3, 144, 52, 124, 225, 206, 223, 213, 86, 186,
+  93, 170, 146, 141, 145, 140, 57, 152, 226, 218, 57, 30, 4, 131, 161, 0, 248, 172, 49, 206, 181,
+  47, 231, 87, 72, 96, 139, 145, 117, 45, 77, 134, 249, 71, 87, 178, 239, 30, 244, 156, 70, 118,
+  180, 176, 90, 92, 80, 221, 177, 86, 120, 222, 223, 244, 109, 150, 226, 142, 97, 171, 210, 38,
+  117, 143, 163, 204, 25, 223, 238, 209, 58, 59, 100, 1, 86, 241, 103, 152, 228, 37, 187, 79, 36,
+  136, 133, 171, 41, 184, 145, 146, 45, 192, 173, 219, 146, 133, 12, 246, 190, 5, 54, 99, 155, 8,
+  198, 156, 174, 99, 12, 210, 95, 5, 128, 166, 118, 50, 66, 26, 20, 3, 129, 232, 1, 192, 104, 23,
+  152, 212, 94, 97, 138, 162, 90, 185, 108, 221, 211, 247, 184, 253, 15, 16, 24, 32, 240, 240, 3,
+  148, 89, 30, 54, 161, 131, 230, 161, 217, 29, 229, 251, 33, 220, 230, 102, 131, 245, 27, 141,
+  220, 67, 16, 26,
 ]);
-
-const AES_COUNTER: (&str, [u8; 80]) = ("ctr", [
-  0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 6, 0, 0, 0, 7, 0, 0, 0, 8,
-  0, 0, 0, 9, 0, 0, 0, 10, 0, 0, 0, 11, 0, 0, 0, 12, 0, 0, 0, 13, 0, 0, 0, 14, 0, 0, 0, 15, 0, 0,
-  0, 16, 0, 0, 0, 17, 0, 0, 0, 18, 0, 0, 0, 19, 0, 0, 0, 20,
-]);
-
-const AES_KEY: (&str, [u8; 16]) = ("key", [0; 16]);
-const AES_IV: (&str, [u8; 12]) = ("iv", [0; 12]);
-const AES_AAD: (&str, [u8; 16]) = ("aad", [0; 16]);
+const CHACHA20_KEY: (&str, [u8; 32]) = ("key", [0; 32]);
+const CHACHA20_NONCE: (&str, [u8; 12]) = ("nonce", [0, 0, 0, 0, 0, 0, 0, 0x4a, 0, 0, 0, 0]);
 
 const JSON_MASK_KEY_DEPTH_1: (&str, [u8; 10]) = ("key", [100, 97, 116, 97, 0, 0, 0, 0, 0, 0]); // "data"
 const JSON_MASK_KEYLEN_DEPTH_1: (&str, [u8; 1]) = ("keyLen", [4]);
@@ -158,14 +148,14 @@ fn test_end_to_end_proofs() {
 
   let setup_data = SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+      R1CSType::Raw(CHACHA20_R1CS.to_vec()),
       R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(CHACHA20_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
@@ -177,7 +167,7 @@ fn test_end_to_end_proofs() {
   let public_params = program::setup(&setup_data);
   debug!("Creating ROM");
   let rom_data = HashMap::from([
-    (String::from("AES_GCM_1"), CircuitData { opcode: 0 }),
+    (String::from("CHACHA20"), CircuitData { opcode: 0 }),
     (String::from("HTTP_NIVC"), CircuitData { opcode: 1 }),
     (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 2 }),
     (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 2 }),
@@ -187,34 +177,39 @@ fn test_end_to_end_proofs() {
     (String::from("EXTRACT_VALUE"), CircuitData { opcode: 4 }),
   ]);
 
-  let aes_rom_opcode_config = InstructionConfig {
-    name:          String::from("AES_GCM_1"),
-    private_input: HashMap::from([
-      (String::from(AES_KEY.0), json!(AES_KEY.1)),
-      (String::from(AES_IV.0), json!(AES_IV.1)),
-      (String::from(AES_AAD.0), json!(AES_AAD.1)),
-    ]),
-  };
-
   debug!("Creating `private_inputs`...");
 
-  let mut rom = vec![aes_rom_opcode_config; HTTP_RESPONSE_PLAINTEXT.1.len() / BYTES_PER_FOLD];
+  let nonce = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4a, 0x00, 0x00, 0x00, 0x00];
 
-  // After setting the AES config for the ROM, pad the plaintext to match what http_nivc_512b
+  let mut padded_plaintext = HTTP_RESPONSE_PLAINTEXT.1.to_vec();
+  padded_plaintext.extend(std::iter::repeat(0).take(512 - HTTP_RESPONSE_PLAINTEXT.1.len()));
+
+  let mut padded_ciphertext = CHACHA20_CIPHERTEXT.1.to_vec();
+  padded_ciphertext.extend(std::iter::repeat(0).take(512 - CHACHA20_CIPHERTEXT.1.len()));
+
+  assert!(padded_plaintext.len() == padded_ciphertext.len());
+  assert_eq!(padded_ciphertext.len(), 512);
+
+  let chacha_rom_opcode_config = InstructionConfig {
+    name:          String::from("CHACHA20"),
+    private_input: HashMap::from([
+      (String::from(CHACHA20_KEY.0), json!(to_chacha_input(&CHACHA20_KEY.1))),
+      (String::from(CHACHA20_NONCE.0), json!(to_chacha_input(&nonce))),
+      (String::from("counter"), json!(to_chacha_input(&[1]))),
+      (String::from(CHACHA20_CIPHERTEXT.0), json!(&padded_ciphertext)),
+      (String::from(HTTP_RESPONSE_PLAINTEXT.0), json!(&padded_plaintext)),
+    ]),
+  };
+  let mut rom = vec![chacha_rom_opcode_config];
+
+  // After setting the encryption config for the ROM, pad the plaintext to match what http_nivc_512b
   // requires
-  let mut padded_http_response_plaintext = HTTP_RESPONSE_PLAINTEXT.1.to_vec();
-  padded_http_response_plaintext.resize(512, 0);
 
-  let http_start_line_hash = data_hasher(&compute_http_witness(
-    &padded_http_response_plaintext,
-    witness::HttpMaskType::StartLine,
-  ));
-  let http_header_1_hash = data_hasher(&compute_http_witness(
-    &padded_http_response_plaintext,
-    witness::HttpMaskType::Header(1),
-  ));
-  let http_body =
-    compute_http_witness(&padded_http_response_plaintext, witness::HttpMaskType::Body);
+  let http_start_line_hash =
+    data_hasher(&compute_http_witness(&padded_plaintext, witness::HttpMaskType::StartLine));
+  let http_header_1_hash =
+    data_hasher(&compute_http_witness(&padded_plaintext, witness::HttpMaskType::Header(1)));
+  let http_body = compute_http_witness(&padded_plaintext, witness::HttpMaskType::Body);
   let http_body_hash = data_hasher(&http_body);
 
   let masked_json_key_1 =
@@ -238,7 +233,7 @@ fn test_end_to_end_proofs() {
     InstructionConfig {
       name:          String::from("HTTP_NIVC"),
       private_input: HashMap::from([
-        (String::from("data"), json!(padded_http_response_plaintext)),
+        (String::from("data"), json!(padded_plaintext)),
         (
           String::from("start_line_hash"),
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
@@ -312,27 +307,6 @@ fn test_end_to_end_proofs() {
     },
   ]);
 
-  // Fold inputs are unique for each fold
-  let inputs = HashMap::from([
-    // AES_GCM_1 Inputs
-    (String::from("AES_GCM_1"), FoldInput {
-      value: HashMap::from([
-        (
-          String::from(HTTP_RESPONSE_PLAINTEXT.0),
-          HTTP_RESPONSE_PLAINTEXT.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-        ),
-        (
-          String::from(AES_CIPHER_TEXT.0),
-          AES_CIPHER_TEXT.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-        ),
-        (
-          String::from(AES_COUNTER.0),
-          AES_COUNTER.1.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-        ),
-      ]),
-    }),
-  ]);
-
   // should be zero
   let initial_nivc_input = vec![Fr::ZERO];
 
@@ -342,7 +316,7 @@ fn test_end_to_end_proofs() {
     rom_data: rom_data.clone(),
     rom: rom.clone(),
     initial_nivc_input,
-    inputs,
+    inputs: HashMap::new(),
     witnesses: vec![],
   }
   .into_expanded()
@@ -374,7 +348,7 @@ fn test_end_to_end_proofs() {
 fn test_offline_proofs() {
   let setup_data = SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
+      R1CSType::Raw(CHACHA20_R1CS.to_vec()),
       R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
@@ -382,15 +356,11 @@ fn test_offline_proofs() {
     ],
     witness_generator_types: vec![
       WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "../proofs/web_proof_circuits/target_512b/aes_gctr_nivc_512b_js/aes_gctr_nivc_512b.wasm",
-        ),
+        path:      String::from("../proofs"),
         wtns_path: String::from("witness.wtns"),
       },
       WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "../proofs/web_proof_circuits/target_512b/http_nivc_512b_js/http_nivc_512b.wasm",
-        ),
+        path:      String::from("../proofs"),
         wtns_path: String::from("witness.wtns"),
       },
       WitnessGeneratorType::Wasm {

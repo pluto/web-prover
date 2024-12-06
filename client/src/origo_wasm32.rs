@@ -10,14 +10,10 @@ use proofs::{
   circom::witness::load_witness_from_bin_reader,
   program::{
     self,
-    data::{
-      Expanded, NotExpanded, Offline, Online, ProgramData, R1CSType, SetupData,
-      WitnessGeneratorType,
-    },
+    data::{Expanded, NotExpanded, Offline, Online, ProgramData},
   },
   G1,
 };
-use serde_json::{json, Value};
 use tls_client2::origo::WitnessData;
 use tracing::debug;
 use wasm_bindgen_futures::spawn_local;
@@ -76,7 +72,9 @@ async fn generate_program_data(
 ) -> Result<ProgramData<Online, Expanded>, errors::ClientErrors> {
   let (request_inputs, _response_inputs) = decrypt_tls_ciphertext(witness)?;
 
-  let setup_data = construct_setup_data_512();
+  let request_setup_data = construct_setup_data(request_inputs.plaintext.len());
+
+  // - construct private inputs and program layout for circuits for TLS request -
   let (request_rom_data, request_rom, request_fold_inputs) =
     proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);
 
@@ -96,7 +94,7 @@ async fn generate_program_data(
   debug!("initializing public params");
   let program_data = ProgramData::<Offline, NotExpanded> {
     public_params: proving_params.unwrap(),
-    setup_data,
+    setup_data: request_setup_data,
     rom: request_rom,
     rom_data: request_rom_data,
     initial_nivc_input: vec![proofs::F::<G1>::from(0)],
