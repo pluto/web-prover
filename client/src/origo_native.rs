@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{ops::Deref, sync::Arc};
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
@@ -6,11 +6,7 @@ use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
   program::{
     self,
-    data::{
-      CircuitData, Expanded, FoldInput, InstructionConfig, NotExpanded, Online, ProgramData,
-      R1CSType, SetupData, WitnessGeneratorType,
-    },
-    manifest,
+    data::{Expanded, NotExpanded, Online, ProgramData},
   },
   F, G1,
 };
@@ -28,143 +24,119 @@ use crate::{
   config::{self, ProvingData},
   errors::{self, ClientErrors},
   origo::SignBody,
+  tls::decrypt_tls_ciphertext,
   tee::{
     export_key_material, is_valid_tee_token, stable_certs_fingerprint, SkipServerVerification,
   },
   Proof,
 };
 
-const JSON_MAX_ROM_LENGTH: usize = 35;
-
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
-  let (sb, witness) = proxy(config.clone(), session_id.clone(), false).await?;
+  let mut origo_conn = proxy(config.clone(), session_id.clone(), false).await?;
 
-  let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
+  let sb = SignBody {
+    handshake_server_iv:  hex::encode(
+      origo_conn.secret_map.get("Handshake:server_iv").unwrap().clone().to_vec(),
+    ),
+    handshake_server_key: hex::encode(
+      origo_conn.secret_map.get("Handshake:server_key").unwrap().clone().to_vec(),
+    ),
+  };
 
-  let program_data = generate_program_data(&witness, config.proving).await?;
-  let program_output = program::run(&program_data)?;
-  let compressed_verifier = program::compress_proof(&program_output, &program_data.public_params)?;
-  let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
+  let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb).await;
 
-  Ok(crate::Proof::Origo(serialized_compressed_verifier.0))
+  debug!("generating program data!");
+  let witness = origo_conn.to_witness_data();
+  let (request_program_data, response_program_data) =
+    generate_program_data(&witness, config.proving).await?;
+
+  debug!("starting request recursive proving");
+  let request_program_output = program::run(&request_program_data)?;
+
+  debug!("starting response recursive proving");
+  let response_program_output = program::run(&response_program_data)?;
+
+  debug!("starting request proof compression");
+  let request_compressed_verifier =
+    program::compress_proof(&request_program_output, &request_program_data.public_params)?;
+  let response_compressed_verifier =
+    program::compress_proof(&response_program_output, &response_program_data.public_params)?;
+
+  debug!("verification");
+  let request_serialized_compressed_verifier = request_compressed_verifier.serialize_and_compress();
+  let response_serialized_compressed_verifier =
+    response_compressed_verifier.serialize_and_compress();
+
+  // TODO(Sambhav): handle request and response into one proof
+  Ok(crate::Proof::Origo((
+    request_serialized_compressed_verifier.0,
+    response_serialized_compressed_verifier.0,
+  )))
 }
 
-// TODO: Dedup origo_native and origo_wasm. The difference is the witness/r1cs preparation.
+/// takes TLS transcripts and [`ProvingData`] and generates NIVC [`ProgramData`] for request and
+/// response separately
+/// - decrypts TLS ciphertext in [`WitnessData`]
+/// - generates NIVC ROM from [`Manifest`] config for request and response
+/// - get circuit [`SetupData`] containing circuit R1CS and witness generator files according to
+///   input sizes
+/// - create consolidate [`ProgramData`]
+/// - expand private inputs into fold inputs as per circuits
 async fn generate_program_data(
   witness: &WitnessData,
   proving: ProvingData,
-) -> Result<ProgramData<Online, Expanded>, ClientErrors> {
-  // ----------------------------------------------------------------------------------------------------------------------- //
-  // - get AES key, IV, request ciphertext, request plaintext, and AAD -
-  debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
-  debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
+) -> Result<(ProgramData<Online, Expanded>, ProgramData<Online, Expanded>), ClientErrors> {
+  let (request_inputs, response_inputs) = decrypt_tls_ciphertext(witness)?;
 
-  let key: [u8; 16] = witness.request.aes_key[..16].try_into()?;
-  let iv: [u8; 12] = witness.request.aes_iv[..12].try_into()?;
-  let ct: &[u8] = witness.request.ciphertext.as_bytes();
+  // - construct private inputs and program layout for AES proof for request -
+  let (request_rom_data, request_rom, request_fold_inputs) =
+    proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);
 
-  let dec = Decrypter2::new(key, iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
-  let (plaintext, meta) = dec.decrypt_tls13_aes(
-    &OpaqueMessage {
-      typ:     ContentType::ApplicationData,
-      version: ProtocolVersion::TLSv1_3,
-      payload: Payload::new(hex::decode(ct)?),
-    },
-    0,
-  )?;
-  let pt = plaintext.payload.0.to_vec();
-  let aad = hex::decode(meta.additional_data.to_owned())?;
-  let mut padded_aad = vec![0; 16 - aad.len()];
-  padded_aad.extend(aad);
-  // ----------------------------------------------------------------------------------------------------------------------- //
+  let (response_rom_data, response_rom, response_fold_inputs) =
+    proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
 
-  // TODO (Colin): ultimately we want to download the `AuxParams` here and deserialize to setup
-  // `PublicParams` alongside of calling `client_side_prover::supernova::get_circuit_shapes` for
-  // this next step
-  // ----------------------------------------------------------------------------------------------------------------------- //
-  // - create program setup (creating new `PublicParams` each time, for the moment) -
-  let setup_data = SetupData {
-    r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
-    ],
-    witness_generator_types: vec![
-      WitnessGeneratorType::Raw(AES_GCM_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_LOCK_HEADER_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_BODY_MASK_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
-    ],
-    max_rom_length:          JSON_MAX_ROM_LENGTH,
-  };
-
-  // ----------------------------------------------------------------------------------------------------------------------- //
-
-  // ----------------------------------------------------------------------------------------------------------------------- //
-  // - construct private inputs and program layout for AES proof -
-  let mut private_input = HashMap::new();
-  private_input.insert("key".to_string(), serde_json::to_value(&key)?);
-  private_input.insert("iv".to_string(), serde_json::to_value(&iv)?);
-
-  // TODO: Is padding the approach we want or change to support variable length?
-  let janky_padding = if pt.len() % 16 != 0 { 16 - pt.len() % 16 } else { 0 };
-  let mut janky_plaintext_padding = vec![0; janky_padding];
-  let rom_len = (pt.len() + janky_padding) / 16;
-  janky_plaintext_padding.extend(pt);
-
-  let (rom_data, rom) = proving.manifest.unwrap().rom_from_request(
-    &key,
-    &iv,
-    &padded_aad,
-    janky_plaintext_padding.len(),
-  );
-  let aes_instr = String::from("AES_GCM_1");
-
-  // TODO (Sambhav): update fold input from manifest
-  let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
-    value: HashMap::from([(
-      String::from("plainText"),
-      janky_plaintext_padding.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-    )]),
-  })]);
-
-  let mut initial_input = vec![];
-  initial_input.extend(janky_plaintext_padding.iter());
-  initial_input.resize(TOTAL_BYTES_ACROSS_NIVC, 0);
-  let final_input: Vec<u64> = initial_input.into_iter().map(u64::from).collect();
   // ----------------------------------------------------------------------------------------------------------------------- //
 
   debug!("Setting up `PublicParams`... (this may take a moment)");
-  let public_params = program::setup(&setup_data);
-  debug!("Created `PublicParams`!");
+  let setup_data_512 = construct_setup_data_512();
+  let public_params_512 = program::setup(&setup_data_512);
 
-  Ok(
-    ProgramData::<Online, NotExpanded> {
-      public_params,
-      setup_data,
-      rom,
-      rom_data,
-      initial_nivc_input: final_input.to_vec(),
-      inputs,
-      witnesses: vec![vec![F::<G1>::from(0)]],
-    }
-    .into_expanded()?,
-  )
+  let setup_data_1024 = construct_setup_data_1024();
+  let public_params_1024 = program::setup(&setup_data_1024);
+
+  debug!("Created `PublicParams`!");
+  // TODO (sambhav): handle response input in a better manner, what if response is 512B
+  let request_program_data = ProgramData::<Online, NotExpanded> {
+    public_params:      public_params_512,
+    setup_data:         setup_data_512,
+    rom:                request_rom,
+    rom_data:           request_rom_data,
+    initial_nivc_input: vec![proofs::F::<G1>::from(0)],
+    inputs:             request_fold_inputs,
+    witnesses:          vec![vec![F::<G1>::from(0)]],
+  }
+  .into_expanded();
+
+  let response_program_data = ProgramData::<Online, NotExpanded> {
+    public_params:      public_params_1024,
+    setup_data:         setup_data_1024,
+    rom:                response_rom,
+    rom_data:           response_rom_data,
+    initial_nivc_input: vec![proofs::F::<G1>::from(0)],
+    inputs:             response_fold_inputs,
+    witnesses:          vec![vec![F::<G1>::from(0)]],
+  }
+  .into_expanded();
+
+  Ok((request_program_data?, response_program_data?))
 }
 
 pub async fn proxy(
   config: config::Config,
   session_id: String,
   enable_tee: bool,
-) -> Result<(SignBody, WitnessData), ClientErrors> {
+) -> Result<tls_client2::origo::OrigoConnection, ClientErrors> {
   let root_store = crate::tls::tls_client2_default_root_store();
 
   let client_config = tls_client2::ClientConfig::builder()
@@ -254,7 +226,7 @@ pub async fn proxy(
   let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
 
   let (client_tls_conn, tls_fut) =
-    tls_client_async2::bind_client(notary_tls_socket.compat(), client);
+    crate::tls_client_async2::bind_client(notary_tls_socket.compat(), client);
 
   // TODO: What do with tls_fut? what do with tls_receiver?
   let (tls_sender, _tls_receiver) = oneshot::channel();
@@ -289,16 +261,6 @@ pub async fn proxy(
   let mut client_socket = connection_receiver.await??.io.into_inner().into_inner();
   client_socket.close().await?;
 
-  let server_aes_iv =
-    origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_iv").unwrap().clone();
-  let server_aes_key =
-    origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_key").unwrap().clone();
-
-  let witness = origo_conn.lock().unwrap().to_witness_data();
-  let sb = SignBody {
-    hs_server_aes_iv:  hex::encode(server_aes_iv.to_vec()),
-    hs_server_aes_key: hex::encode(server_aes_key.to_vec()),
-  };
-
-  Ok((sb, witness))
+  let origo_conn = origo_conn.lock().unwrap().deref().clone();
+  Ok(origo_conn)
 }

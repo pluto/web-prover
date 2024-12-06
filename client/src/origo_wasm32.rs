@@ -1,80 +1,54 @@
 use std::{
-  collections::HashMap,
   io::{BufReader, Cursor},
-  path::{Path, PathBuf},
+  ops::Deref,
   sync::Arc,
 };
 
 use futures::{channel::oneshot, AsyncWriteExt};
-use hyper::{body::Bytes, Request, StatusCode};
+use hyper::StatusCode;
 use proofs::{
   circom::witness::load_witness_from_bin_reader,
   program::{
     self,
     data::{
-      CircuitData, Expanded, FoldInput, InstructionConfig, NotExpanded, Offline, Online,
-      ProgramData, R1CSType, SetupData, WitnessGeneratorType,
+      Expanded, NotExpanded, Offline, Online, ProgramData, R1CSType, SetupData,
+      WitnessGeneratorType,
     },
   },
+  G1,
 };
-use serde::Serialize;
 use serde_json::{json, Value};
-use tls_client2::{
-  origo::WitnessData, CipherSuite, ClientConnection, Decrypter2, ProtocolVersion,
-  RustCryptoBackend, RustCryptoBackend13, ServerName,
-};
-use tls_client_async2::bind_client;
-use tls_core::msgs::{base::Payload, codec::Codec, enums::ContentType, message::OpaqueMessage};
+use tls_client2::origo::WitnessData;
 use tracing::debug;
-use url::Url;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
-use crate::{circuits::*, config, config::ProvingData, errors, origo::SignBody, Proof};
+use crate::{
+  circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
+  tls_client_async2::bind_client, Proof,
+};
 
-const HTTP_LOCK_VERSION: (&str, [u8; 50]) = ("beginning", [
-  72, 84, 84, 80, 47, 49, 46, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-]);
-const HTTP_BEGINNING_LENGTH: (&str, [u8; 1]) = ("beginning_length", [8]);
-const HTTP_LOCK_STATUS: (&str, [u8; 200]) = ("middle", [
-  50, 48, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0,
-]);
-const HTTP_MIDDLE_LENGTH: (&str, [u8; 1]) = ("middle_length", [3]);
-const HTTP_LOCK_MESSAGE: (&str, [u8; 50]) = ("final", [
-  79, 75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-]);
-const HTTP_FINAL_LENGTH: (&str, [u8; 1]) = ("final_length", [2]);
-const HTTP_LOCK_HEADER_NAME: (&str, [u8; 50]) = ("header", [
-  99, 111, 110, 116, 101, 110, 116, 45, 116, 121, 112, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-]);
-const HTTP_LOCK_HEADER_NAME_LENGTH: (&str, [u8; 1]) = ("headerNameLength", [12]);
-const HTTP_LOCK_HEADER_VALUE: (&str, [u8; 100]) = ("value", [
-  97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106, 115, 111, 110, 59, 32, 99, 104, 97,
-  114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-]);
-const HTTP_LOCK_HEADER_VALUE_LENGTH: (&str, [u8; 1]) = ("headerValueLength", [31]);
-const JSON_MASK_KEY_DEPTH_1: (&str, [u8; 10]) = ("key", [100, 97, 116, 97, 0, 0, 0, 0, 0, 0]); // "data"
-const JSON_MASK_KEYLEN_DEPTH_1: (&str, [u8; 1]) = ("keyLen", [4]);
-
-pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
+pub async fn proxy_and_sign(
+  mut config: config::Config,
+  proving_params: Option<Vec<u8>>,
+) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
-  let (sb, witness) = proxy(config.clone(), session_id.clone(), false).await?;
+  let mut origo_conn = proxy(config.clone(), session_id.clone(), false).await?;
 
-  let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb, &witness).await;
+  let sb = SignBody {
+    handshake_server_iv:  hex::encode(
+      origo_conn.secret_map.get("Handshake:server_iv").unwrap().clone().to_vec(),
+    ),
+    handshake_server_key: hex::encode(
+      origo_conn.secret_map.get("Handshake:server_key").unwrap().clone().to_vec(),
+    ),
+  };
+
+  let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb).await;
 
   debug!("generating NIVC program data!");
-  let program_data = generate_program_data(&witness, config.proving).await?;
+  let witness = origo_conn.to_witness_data();
+  let program_data = generate_program_data(&witness, config.proving, proving_params).await?;
 
   debug!("starting proof generation!");
   let program_output = program::run(&program_data)?;
@@ -85,180 +59,60 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
   debug!("running compressed verifier!");
   let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
 
-  Ok(crate::Proof::Origo(serialized_compressed_verifier.0))
+  Ok(crate::Proof::Origo((serialized_compressed_verifier.0, vec![])))
 }
-
+/// takes TLS transcripts and [`ProvingData`] and generates NIVC [`ProgramData`] for request and
+/// response separately
+/// - decrypts TLS ciphertext in [`WitnessData`]
+/// - generates NIVC ROM from [`Manifest`] config for request and response
+/// - get circuit [`SetupData`] containing circuit R1CS and witness generator files according to
+///   input sizes
+/// - create consolidate [`ProgramData`]
+/// - expand private inputs into fold inputs as per circuits
 async fn generate_program_data(
   witness: &WitnessData,
   proving: ProvingData,
+  proving_params: Option<Vec<u8>>,
 ) -> Result<ProgramData<Online, Expanded>, errors::ClientErrors> {
-  debug!("key_as_string: {:?}, length: {}", witness.request.aes_key, witness.request.aes_key.len());
-  debug!("iv_as_string: {:?}, length: {}", witness.request.aes_iv, witness.request.aes_iv.len());
+  let (request_inputs, _response_inputs) = decrypt_tls_ciphertext(witness)?;
 
-  let key: &[u8] = &witness.request.aes_key;
-  let iv: &[u8] = &witness.request.aes_iv;
+  let setup_data = construct_setup_data_512();
+  let (request_rom_data, request_rom, request_fold_inputs) =
+    proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);
 
-  let mut private_input = HashMap::new();
+  // // pad AES response ciphertext
+  // let (response_rom_data, response_rom, response_fold_inputs) =
+  // proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
 
-  let ct: &[u8] = witness.request.ciphertext.as_bytes();
-  let sized_key: [u8; 16] = key[..16].try_into()?;
-  let sized_iv: [u8; 12] = iv[..12].try_into()?;
-
-  private_input.insert("key".to_string(), serde_json::to_value(&sized_key)?);
-  private_input.insert("iv".to_string(), serde_json::to_value(&sized_iv)?);
-
-  let dec = Decrypter2::new(sized_key, sized_iv, CipherSuite::TLS13_AES_128_GCM_SHA256);
-  let (plaintext, meta) = dec.decrypt_tls13_aes(
-    &OpaqueMessage {
-      typ:     ContentType::ApplicationData,
-      version: ProtocolVersion::TLSv1_3,
-      payload: Payload::new(hex::decode(ct)?),
-    },
-    0,
-  )?;
-  let pt = plaintext.payload.0.to_vec();
-  let aad = hex::decode(meta.additional_data.to_owned())?;
-  let mut padded_aad = vec![0; 16 - aad.len()];
-  padded_aad.extend(aad);
-
-  // TODO: Is padding the approach we want or change to support variable length?
-  // let pt = AES_PLAINTEXT.1.to_vec();
-  let janky_padding = if pt.len() % 16 != 0 { 16 - pt.len() % 16 } else { 0 };
-  let mut janky_plaintext_padding = vec![0; janky_padding];
-  let rom_len = (pt.len() + janky_padding) / 16;
-  janky_plaintext_padding.extend(pt);
-
+  // TODO (tracy): Today we are carrying witness data on the proving object,
+  // it's not obviously the right place for it. This code path needs a larger
+  // refactor.
+  debug!("serializing witness objects");
   let mut witnesses = Vec::new();
-  for w in proving.witnesses {
-    witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w.val)))?);
+  for w in proving.witnesses.unwrap() {
+    witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w)))?);
   }
 
-  let setup_data = SetupData {
-    r1cs_types:              vec![
-      R1CSType::Raw(AES_GCM_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_PARSE_AND_LOCK_START_LINE_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_LOCK_HEADER_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_BODY_MASK_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
-    ],
-    witness_generator_types: vec![
-      WitnessGeneratorType::Browser,
-      WitnessGeneratorType::Browser,
-      WitnessGeneratorType::Browser,
-      WitnessGeneratorType::Browser,
-      WitnessGeneratorType::Browser,
-      WitnessGeneratorType::Browser,
-      WitnessGeneratorType::Browser,
-    ],
-    max_rom_length:          25,
-  };
-
-  let aes_instr = String::from("AES_GCM_1");
-  let rom_data = HashMap::from([
-    (aes_instr.clone(), CircuitData { opcode: 0 }),
-    (String::from("HTTP_PARSE_AND_LOCK_START_LINE"), CircuitData { opcode: 1 }),
-    (String::from("HTTP_LOCK_HEADER_1"), CircuitData { opcode: 2 }),
-    (String::from("HTTP_BODY_MASK"), CircuitData { opcode: 3 }),
-    (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 4 }),
-    (String::from("JSON_MASK_ARRAY_INDEX"), CircuitData { opcode: 5 }),
-    (String::from("EXTRACT_VALUE"), CircuitData { opcode: 6 }),
-  ]);
-
-  let aes_rom_opcode_config = InstructionConfig {
-    name:          aes_instr.clone(),
-    private_input: HashMap::from([
-      (String::from("key"), json!(sized_key)),
-      (String::from("iv"), json!(sized_iv)),
-      (String::from("aad"), json!(padded_aad)),
-    ]),
-  };
-
-  let mut rom = vec![aes_rom_opcode_config; rom_len];
-  rom.extend([
-    InstructionConfig {
-      name:          String::from("HTTP_PARSE_AND_LOCK_START_LINE"),
-      private_input: HashMap::from([
-        (String::from(HTTP_LOCK_VERSION.0), json!(HTTP_LOCK_VERSION.1.to_vec())),
-        (String::from(HTTP_BEGINNING_LENGTH.0), json!(HTTP_BEGINNING_LENGTH.1)),
-        (String::from(HTTP_LOCK_STATUS.0), json!(HTTP_LOCK_STATUS.1.to_vec())),
-        (String::from(HTTP_MIDDLE_LENGTH.0), json!(HTTP_MIDDLE_LENGTH.1)),
-        (String::from(HTTP_LOCK_MESSAGE.0), json!(HTTP_LOCK_MESSAGE.1.to_vec())),
-        (String::from(HTTP_FINAL_LENGTH.0), json!(HTTP_FINAL_LENGTH.1)),
-      ]),
-    },
-    InstructionConfig {
-      name:          String::from("HTTP_LOCK_HEADER_1"),
-      private_input: HashMap::from([
-        (String::from(HTTP_LOCK_HEADER_NAME_LENGTH.0), json!(HTTP_LOCK_HEADER_NAME_LENGTH.1)),
-        (String::from(HTTP_LOCK_HEADER_NAME.0), json!(HTTP_LOCK_HEADER_NAME.1.to_vec())),
-        (String::from(HTTP_LOCK_HEADER_VALUE_LENGTH.0), json!(HTTP_LOCK_HEADER_VALUE_LENGTH.1)),
-        (String::from(HTTP_LOCK_HEADER_VALUE.0), json!(HTTP_LOCK_HEADER_VALUE.1.to_vec())),
-      ]),
-    },
-    InstructionConfig {
-      name:          String::from("HTTP_BODY_MASK"),
-      private_input: HashMap::new(),
-    },
-    InstructionConfig {
-      name:          String::from("JSON_MASK_OBJECT_1"),
-      private_input: HashMap::from([
-        (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
-        (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
-      ]),
-    },
-    InstructionConfig {
-      name:          String::from("EXTRACT_VALUE"),
-      private_input: HashMap::new(),
-    },
-  ]);
-
-  let inputs = HashMap::from([(aes_instr.clone(), FoldInput {
-    value: HashMap::from([(
-      String::from("plainText"),
-      janky_plaintext_padding.iter().map(|val| json!(val)).collect::<Vec<Value>>(),
-    )]),
-  })]);
-
-  let mut initial_input = vec![0; 50]; // default number of step_in.
-  initial_input.extend(janky_plaintext_padding.iter());
-  initial_input.resize(516, 0); // TODO: This is currently the `TOTAL_BYTES` used in circuits
-  let final_input: Vec<u64> = initial_input.into_iter().map(u64::from).collect();
-
-  // TODO: Load this from a file. Run this in preprocessing step.
-  debug!("generating public params");
-  // let public_params = program::setup(&setup_data);
-
-  let pd = ProgramData::<Offline, NotExpanded> {
-    public_params: proving.serialized_pp,
+  debug!("initializing public params");
+  let program_data = ProgramData::<Offline, NotExpanded> {
+    public_params: proving_params.unwrap(),
     setup_data,
-    rom,
-    rom_data,
-    initial_nivc_input: vec![0; 516],
-    inputs,
+    rom: request_rom,
+    rom_data: request_rom_data,
+    initial_nivc_input: vec![proofs::F::<G1>::from(0)],
+    inputs: request_fold_inputs,
     witnesses,
   }
   .into_online();
 
-  // let pd = ProgramData::<Online, NotExpanded> {
-  //   public_params,
-  //   setup_data,
-  //   rom,
-  //   rom_data,
-  //   initial_nivc_input: final_input.to_vec(),
-  //   inputs,
-  //   witnesses,
-  // };
-
   debug!("online -> expanded");
-  Ok(pd?.into_expanded()?)
+  Ok(program_data?.into_expanded()?)
 }
 
 pub async fn proxy(
   config: config::Config,
   session_id: String,
-) -> Result<(SignBody, WitnessData), errors::ClientErrors> {
+) -> Result<tls_client2::origo::OrigoConnection, errors::ClientErrors> {
   // TODO build sanitized query
   let wss_url = format!(
     "wss://{}:{}/v1/origo?session_id={}&target_host={}&target_port={}",
@@ -315,18 +169,8 @@ pub async fn proxy(
   let mut client_socket = connection_receiver.await.unwrap()?.io.into_inner();
   client_socket.close().await.unwrap();
 
-  let server_aes_iv =
-    origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_iv").unwrap().clone();
-  let server_aes_key =
-    origo_conn.lock().unwrap().secret_map.get("Handshake:server_aes_key").unwrap().clone();
-
-  let witness = origo_conn.lock().unwrap().to_witness_data();
-  let sb = SignBody {
-    hs_server_aes_iv:  hex::encode(server_aes_iv.to_vec()),
-    hs_server_aes_key: hex::encode(server_aes_key.to_vec()),
-  };
-
-  Ok((sb, witness))
+  let origo_conn = origo_conn.lock().unwrap().deref().clone();
+  Ok(origo_conn)
 }
 
 use core::slice;

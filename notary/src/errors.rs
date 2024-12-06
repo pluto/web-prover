@@ -9,10 +9,13 @@ use tlsn_verifier::tls::{VerifierConfigBuilderError, VerifierError};
 #[derive(Debug, Error)]
 pub enum ProxyError {
   #[error(transparent)]
+  TryIntoError(#[from] std::array::TryFromSliceError),
+
+  #[error(transparent)]
   Base64Decode(#[from] base64::DecodeError),
 
   #[error(transparent)]
-  TlsBackend(#[from] tls_backend::BackendError),
+  TlsBackend(#[from] tls_client2::BackendError),
 
   #[error("unable to parse record! position={position:?}, remaining={remaining:?}, e={e:?}")]
   TlsParser { position: u64, remaining: usize, e: String },
@@ -22,6 +25,9 @@ pub enum ProxyError {
 
   #[error("Error occurred during Sign: {0}")]
   Sign(Box<dyn std::error::Error + Send + 'static>),
+
+  #[error("Session ID Error: {0}")]
+  InvalidSessionId(String),
 }
 
 impl IntoResponse for ProxyError {
@@ -39,14 +45,21 @@ impl IntoResponse for ProxyError {
 pub enum NotaryServerError {
   #[error(transparent)]
   Unexpected(#[from] Report),
-  #[error("Failed to connect to prover: {0}")]
-  Connection(String),
+
   #[error("Error occurred during notarization: {0}")]
   Notarization(Box<dyn std::error::Error + Send + 'static>),
+
   #[error("Invalid request from prover: {0}")]
   BadProverRequest(String),
-  #[error("Unauthorized request from prover: {0}")]
-  UnauthorizedProverRequest(String),
+
+  #[error(transparent)]
+  Io(#[from] std::io::Error),
+
+  #[error("Error occurred from reading certificates: {0}")]
+  CertificateError(String),
+
+  #[error("Error occurred from reasing server config: {0}")]
+  ServerConfigError(String),
 }
 
 impl From<VerifierError> for NotaryServerError {
@@ -63,8 +76,6 @@ impl IntoResponse for NotaryServerError {
     match self {
       bad_request_error @ NotaryServerError::BadProverRequest(_) =>
         (StatusCode::BAD_REQUEST, bad_request_error.to_string()).into_response(),
-      unauthorized_request_error @ NotaryServerError::UnauthorizedProverRequest(_) =>
-        (StatusCode::UNAUTHORIZED, unauthorized_request_error.to_string()).into_response(),
       _ => (StatusCode::INTERNAL_SERVER_ERROR, "Something wrong happened.").into_response(),
     }
   }

@@ -11,8 +11,8 @@ pub mod config;
 pub mod errors;
 mod tee;
 mod tls;
-
-use serde::{Deserialize, Serialize};
+pub mod tls_client_async2;
+use serde::Serialize;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
 use tracing::info;
@@ -26,7 +26,10 @@ pub enum Proof {
   TEE(Vec<u8>),
 }
 
-pub async fn prover_inner(config: config::Config) -> Result<Proof, errors::ClientErrors> {
+pub async fn prover_inner(
+  config: config::Config,
+  proving_params: Option<Vec<u8>>,
+) -> Result<Proof, errors::ClientErrors> {
   info!("GIT_HASH: {}", env!("GIT_HASH"));
   match config.mode {
     config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
@@ -67,9 +70,12 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, erro
   Ok(Proof::TLSN(p))
 }
 
-pub async fn prover_inner_origo(config: config::Config) -> Result<Proof, errors::ClientErrors> {
+pub async fn prover_inner_origo(
+  config: config::Config,
+  proving_params: Option<Vec<u8>>,
+) -> Result<Proof, errors::ClientErrors> {
   #[cfg(target_arch = "wasm32")]
-  return origo_wasm32::proxy_and_sign(config).await;
+  return origo_wasm32::proxy_and_sign(config, proving_params).await;
 
   #[cfg(not(target_arch = "wasm32"))]
   return origo_native::proxy_and_sign(config).await;

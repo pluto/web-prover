@@ -52,8 +52,6 @@ rs_merkle       ="1.4.2"
 alloy-primitives={ version="0.8.2", features=["k256"] }
 k256            ={ version="0.13.3", features=["ecdsa"] }
 
-tls-client2={ path="../tls/tls-client", package="tls-client" }
-tls-backend={ path="../tls/tls-backend", package="tls-backend" }
-
+tls-client2={ git = "https://github.com/pluto/tls-origo-legacy", package="tls-client" }
 [dev-dependencies]
 tower="0.4.13"

@@ -19,11 +19,10 @@ sha2 = "0.10"
 
 # TLSN
 tls-client={ workspace=true }
-tls-client2={ path="../tls/tls-client", package="tls-client" }
-tls-client-async2={ path="../tls/tls-client-async", package="tls-client-async", features=[
-  "tracing",
-] }
-tls-core={ path="../tls/tls-core", package="tls-core" }
+tls-client2={ git = "https://github.com/pluto/tls-origo-legacy", package="tls-client" }
+
+bytes = "1"
+tls-core={ git = "https://github.com/pluto/tls-origo-legacy", package="tls-core" }
 proofs={ path="../proofs", package="proofs" }
 arecibo={ git="https://github.com/argumentcomputer/arecibo", default-features=false, features=[
   "portable",
@@ -36,7 +35,9 @@ cfg-if      ="1.0.0"
 serde.workspace     =true
 serde_json.workspace=true
 serde_bytes         ="0.11"
+serde_bytes         ="0.11"
 # Web
+hex           ="0.4"
 hex           ="0.4"
 url           ="2.5"
 hyper         ={ version="1.4", features=["client", "http1"] }
@@ -55,6 +56,8 @@ tokio-util={ version="0.7", features=[
 ] } # compat is used to work with AsyncRead and AsyncWrite from other crates
 chrono="0.4"
 p256={ version="0.13", features=["pem", "ecdsa"] }
+num-bigint="0.4"
+
 [dependencies.uuid]
 version         ="1.10.0"
 default-features=false
@@ -151,6 +154,4 @@ tls-client ={ workspace=true }
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test="0.3.42"
 
-# [package.metadata.wasm-pack.profile.release]
-# wasm-opt=false
 #---------------------------------------------------------------------------------------------#

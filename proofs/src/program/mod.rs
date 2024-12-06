@@ -108,28 +108,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
   info!("Starting SuperNova program...");
 
   // Resize the rom to be the `max_rom_length` committed to in the `SetupData`
-  let mut rom = program_data
-    .rom
-    .iter()
-    .map(|opcode_config| {
-      program_data
-        .rom_data
-        .get(&opcode_config.name)
-        .ok_or_else(|| {
-          ProofError::Other(format!("Opcode config '{}' not found in rom_data", opcode_config.name))
-        })
-        .map(|config| config.opcode)
-    })
-    .collect::<Result<Vec<u64>, ProofError>>()?;
-
-  rom.resize(program_data.setup_data.max_rom_length, u64::MAX);
-
-  // Get the public inputs needed for circuits
-  let mut z0_primary: Vec<F<G1>> =
-    program_data.initial_nivc_input.iter().map(|val| F::<G1>::from(*val)).collect();
-  z0_primary.push(F::<G1>::ZERO); // rom_index = 0
-  z0_primary.extend(rom.iter().map(|opcode| <E1 as Engine>::Scalar::from(*opcode)));
-
+  let (z0_primary, resized_rom) = program_data.extend_public_inputs()?;
   let z0_secondary = vec![F::<G2>::ZERO];
 
   let mut recursive_snark_option = None;
@@ -138,11 +117,14 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
   // TODO (Colin): We are basically creating a `R1CS` for each circuit here, then also creating
   // `R1CSWithArity` for the circuits in the `PublicParams`. Surely we don't need both?
   let circuits = initialize_circuit_list(&program_data.setup_data)?; // TODO: AwK?
-  let mut memory = Memory { rom: rom.clone(), circuits };
+
+  let mut memory = Memory { rom: resized_rom.clone(), circuits };
 
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
-  for (idx, &op_code) in rom.iter().enumerate().take_while(|(_, &op_code)| op_code != u64::MAX) {
+  for (idx, &op_code) in
+    resized_rom.iter().enumerate().take_while(|(_, &op_code)| op_code != u64::MAX)
+  {
     info!("Step {} of ROM", idx);
     debug!("Opcode = {:?}", op_code);
     memory.circuits[op_code as usize].private_input = Some(program_data.inputs[idx].clone());
@@ -155,7 +137,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
     memory.circuits[op_code as usize].circuit.witness =
       if wit_type == WitnessGeneratorType::Browser {
         // When running in browser, the witness is passed as input.
-        Some(program_data.witnesses[op_code as usize].clone())
+        Some(program_data.witnesses[idx as usize].clone())
       } else {
         let arity = memory.circuits[op_code as usize].circuit.arity();
         let nivc_io =
@@ -215,10 +197,14 @@ pub fn compress_proof(
   recursive_snark: &RecursiveSNARK<E1>,
   public_params: &PublicParams<E1>,
 ) -> Result<Proof<CompressedSNARK<E1, S1, S2>>, ProofError> {
-  debug!("Generating `CompressedSNARK`");
+  debug!("Setting up `CompressedSNARK`");
+  #[cfg(feature = "timing")]
+  let time = std::time::Instant::now();
   let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(public_params)?;
+  debug!("Done setting up `CompressedSNARK`");
+  #[cfg(feature = "timing")]
+  trace!("`CompressedSNARK::setup` elapsed: {:?}", time.elapsed());
 
-  // Optionally time the `CompressedSNARK` creation
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
 
@@ -226,7 +212,7 @@ pub fn compress_proof(
   debug!("`CompressedSNARK::prove completed!");
 
   #[cfg(feature = "timing")]
-  trace!("`CompressedSNARK::prove` of `program::run()` elapsed: {:?}", time.elapsed());
+  trace!("`CompressedSNARK::prove` elapsed: {:?}", time.elapsed());
 
   Ok(proof)
 }

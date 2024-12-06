@@ -20,6 +20,9 @@ pub enum ClientErrors {
   #[error(transparent)]
   Io(#[from] std::io::Error),
 
+  #[error("TLS error: {0}")]
+  TlsCrypto(String),
+
   #[error(transparent)]
   SerdeJson(#[from] serde_json::Error),
 
