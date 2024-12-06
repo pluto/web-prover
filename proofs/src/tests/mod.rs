@@ -9,7 +9,10 @@ use serde_json::json;
 use witness::{compute_http_witness, compute_json_witness};
 
 use super::*;
-use crate::{program::data::NotExpanded, witness::data_hasher};
+use crate::{
+  program::{data::NotExpanded, manifest::to_chacha_input},
+  witness::data_hasher,
+};
 
 mod witnesscalc;
 
@@ -89,9 +92,6 @@ const HTTP_RESPONSE_PLAINTEXT: (&str, [u8; 320]) = ("plainText", [
   10, 32, 32, 32, 125, 13, 10, 125,
 ]);
 
-/// AEAD Initialisation vector
-const AEAD_IV: (&str, [u8; 12]) = ("iv", [0; 12]);
-
 const CHACHA20_CIPHERTEXT: (&str, [u8; 320]) = ("cipherText", [
   2, 125, 219, 141, 140, 93, 49, 129, 95, 178, 135, 109, 48, 36, 194, 46, 239, 155, 160, 70, 208,
   147, 37, 212, 17, 195, 149, 190, 38, 215, 23, 241, 84, 204, 167, 184, 179, 172, 187, 145, 38, 75,
@@ -124,8 +124,6 @@ const JSON_MASK_KEYLEN_DEPTH_4: (&str, [u8; 1]) = ("keyLen", [7]);
 const JSON_MASK_KEY_DEPTH_5: (&str, [u8; 10]) = ("key", [110, 97, 109, 101, 0, 0, 0, 0, 0, 0]); // "name"
 const JSON_MASK_KEYLEN_DEPTH_5: (&str, [u8; 1]) = ("keyLen", [4]);
 const MAX_VALUE_LENGTH: usize = 48;
-
-use crate::program::manifest::{make_nonce, to_chacha_input};
 
 #[test]
 #[tracing_test::traced_test]

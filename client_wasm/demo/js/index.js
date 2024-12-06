@@ -3,7 +3,6 @@ import init, {
   initThreadPool
 } from "../pkg/client_wasm.js";
 import { poseidon2 } from "poseidon-lite";
-import { chacha20poly1305 } from "@noble/ciphers/chacha";
 import { toByte, computeHttpWitnessBody, computeHttpWitnessHeader, computeHttpWitnessStartline, compute_json_witness, byteArrayToString } from "./witness.js";
 import { Buffer } from "buffer";
 const numConcurrency = navigator.hardwareConcurrency;
@@ -221,15 +220,13 @@ const generateWitnessBytesForRequest = async function (circuits, inputs) {
 
   let plaintext = inputs[0]["plainText"];
   let extendedHTTPInput = plaintext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
+  let paddedCiphertext = CHACHA20_CIPHERTEXT.concat(Array(TOTAL_BYTES_ACROSS_NIVC - CHACHA20_CIPHERTEXT.length).fill(0));
 
   console.log("CHACHA");
-  const chacha = chacha20poly1305(new Uint8Array(CHACHA20_KEY), new Uint8Array(CHACHA20_NONCE));
-  let cipherText = chacha.encrypt(new Uint8Array(extendedHTTPInput));
-
   inputs[0]["key"] = toInput(Buffer.from(inputs[0]["key"]));
   inputs[0]["nonce"] = toInput(Buffer.from(inputs[0]["nonce"]));
-  inputs[0]["cipherText"] = toInput(Buffer.from(cipherText.slice(0, TOTAL_BYTES_ACROSS_NIVC)));
-  inputs[0]["plainText"] = toInput(Buffer.from(extendedHTTPInput));
+  inputs[0]["cipherText"] = paddedCiphertext;
+  inputs[0]["plainText"] = extendedHTTPInput;
   inputs[0]["counter"] = uintArray32ToBits([1])[0];
   inputs[0]["step_in"] = 0;
 
