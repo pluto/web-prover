@@ -9,7 +9,17 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Cache Protocol Buffers
+      id: cache-protoc
+      uses: actions/cache@v3
+      with:
+        path: |
+          /usr/local/bin/protoc
+          /usr/local/include/google/protobuf
+        key: ${{ runner.os }}-protoc-${{ hashFiles('/usr/local/bin/protoc', '/usr/local/include/google/protobuf/**') }}
+
     - name: Install Protocol Buffers
+      if: steps.cache-protoc.outputs.cache-hit != 'true'
       shell: bash
       run: |
         sudo apt-get update
