@@ -9,23 +9,40 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+
 jobs:
   setup:
     uses: ./.github/workflows/download-circuits.yaml
-    with:
-      version: "v0.5.7"  # Optional, defaults to v0.5.7
-  build:
-    needs: setup
-    runs-on: ubuntu-latest
 
+  setup-env:
+    uses: ./.github/workflows/protoc-install.yaml
+
+  version-check:
+    needs: [setup, setup-env]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore circuit artifacts
+        uses: actions/cache@v3
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ needs.setup.outputs.cache-key }}
+      
+      - name: Check semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: proofs
+          baseline-ref: origin/main
+          
+  tests:
+    needs: [setup, setup-env]
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Install Protocol Buffers
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y protobuf-compiler libprotobuf-dev
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
