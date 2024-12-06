@@ -4438,7 +4438,6 @@ dependencies = [
  "bellpepper-core",
  "bincode",
  "byteorder",
- "chacha20poly1305",
  "circom_witnesscalc",
  "clap",
  "client-side-prover",
@@ -5849,7 +5848,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 [[package]]
 name = "tls-client"
 version = "0.1.0-alpha.5"
-source = "git+https://github.com/pluto/tls-origo-legacy#19d004cf50570b9212726853db2a423c0194ae10"
+source = "git+https://github.com/pluto/tls-origo-legacy#53657fa08d87b9b15b3578d769d5265b8548afcc"
 dependencies = [
  "aes-gcm",
  "async-trait",
@@ -5880,7 +5879,7 @@ dependencies = [
 [[package]]
 name = "tls-core"
 version = "0.0.0"
-source = "git+https://github.com/pluto/tls-origo-legacy#19d004cf50570b9212726853db2a423c0194ae10"
+source = "git+https://github.com/pluto/tls-origo-legacy#53657fa08d87b9b15b3578d769d5265b8548afcc"
 dependencies = [
  "futures",
  "hmac",

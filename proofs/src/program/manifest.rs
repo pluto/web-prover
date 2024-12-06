@@ -19,10 +19,6 @@
 
 use std::collections::HashMap;
 
-use chacha20poly1305::{
-  aead::{Aead, Payload},
-  ChaCha20Poly1305, Key, KeyInit, Nonce,
-};
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -271,16 +267,9 @@ fn handle_encryption_circuit_inputs(
       plaintext.resize(circuit_size(plaintext.len()), 0);
       ciphertext.resize(circuit_size(ciphertext.len()), 0);
 
-      // TODO (Sambhav): computing ciphertext for padded plaintext again is incorrect
-      // compute ciphertext again
-      let write_key = Key::from_slice(&key);
-      let cipher = ChaCha20Poly1305::new(write_key);
+      assert_eq!(plaintext.len(), ciphertext.len());
+
       let nonce = make_nonce(inputs.iv, 0);
-      let init_nonce = Nonce::from(nonce.clone());
-      let payload = Payload { msg: &plaintext, aad: &inputs.aad };
-      // TODO (Sambhav): make fn return result and remove unwrap
-      let ct = cipher.encrypt(&init_nonce, payload).unwrap();
-      let sliced_ct = &ct[..ct.len() - 16];
 
       // create CHACHA instruction config
       let chacha_instr_label = String::from("CHACHA20");
@@ -293,8 +282,8 @@ fn handle_encryption_circuit_inputs(
           (String::from(KEY_SIGNAL_LABEL), json!(to_chacha_input(&key))),
           (String::from(CHACHA_NONCE_SIGNAL_LABEL), json!(to_chacha_input(&nonce))),
           (String::from(CHACHA_COUNTER_SIGNAL_LABEL), json!(to_chacha_input(&[1]))),
-          (String::from(CIPHERTEXT_SIGNAL_LABEL), json!(to_chacha_input(sliced_ct))),
-          (String::from(PLAINTEXT_SIGNAL_LABEL), json!(to_chacha_input(&plaintext))),
+          (String::from(CIPHERTEXT_SIGNAL_LABEL), json!(&ciphertext)),
+          (String::from(PLAINTEXT_SIGNAL_LABEL), json!(&plaintext)),
         ]),
       };
       let rom = vec![chacha_rom_opcode_config];
@@ -643,7 +632,7 @@ mod tests {
     assert!(rom[http_instruction_len].private_input.contains_key("header_hashes"));
     assert!(rom[http_instruction_len].private_input.contains_key("body_hash"));
 
-    assert!(fold_input.get(&String::from("CHACHA20")).is_none());
+    assert!(!fold_input.contains_key(&String::from("CHACHA20")));
   }
 
   #[test]
@@ -680,7 +669,7 @@ mod tests {
     assert_eq!(rom[rom.len() - 1].name, String::from("EXTRACT_VALUE"));
     assert!(rom[rom.len() - 1].private_input.contains_key("data"));
 
-    assert!(fold_input.get(&String::from("CHACHA20")).is_none());
+    assert!(!fold_input.contains_key(&String::from("CHACHA20")));
   }
 
   #[test]

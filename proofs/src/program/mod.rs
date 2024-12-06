@@ -137,7 +137,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
     memory.circuits[op_code as usize].circuit.witness =
       if wit_type == WitnessGeneratorType::Browser {
         // When running in browser, the witness is passed as input.
-        Some(program_data.witnesses[idx as usize].clone())
+        Some(program_data.witnesses[idx].clone())
       } else {
         let arity = memory.circuits[op_code as usize].circuit.arity();
         let nivc_io =
