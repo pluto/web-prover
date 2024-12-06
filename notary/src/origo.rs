@@ -10,7 +10,6 @@ use axum::{
   response::Response,
   Json,
 };
-use hex;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use nom::{bytes::streaming::take, IResult};
@@ -115,7 +114,7 @@ pub async fn sign(
           match verify_tls13(
             &construct_tls13_server_verify_message(&transcript.get_current_hash()),
             &server_certificate,
-            &digitally_signed_struct,
+            digitally_signed_struct,
           ) {
             Ok(_) => (),
             Err(e) => return Err(ProxyError::Sign(Box::new(e))),
@@ -298,7 +297,7 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
         cursor.set_position(cursor.position() + 5 + record.hdr.len as u64);
       },
       Err(e) => {
-        let remaining = &cursor.get_ref().len() - (cursor.position() as usize);
+        let remaining = cursor.get_ref().len() - (cursor.position() as usize);
         return Err(ProxyError::TlsParser {
           position: cursor.position(),
           remaining,
@@ -308,7 +307,7 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
     }
   }
 
-  if messages.len() > 0 {
+  if !messages.is_empty() {
     Ok(messages)
   } else {
     Err(ProxyError::TlsHandshakeExtract(String::from("empty handshake messages")))
@@ -438,7 +437,7 @@ fn handle_client_hello(
   client_hello: TlsClientHelloContents,
   messages: &mut Vec<Message>,
 ) -> Result<(), ProxyError> {
-  let ch_random = process_random_bytes(&client_hello.random)?;
+  let ch_random = process_random_bytes(client_hello.random)?;
   let session_id = process_session_id(client_hello.session_id)?;
 
   let cipher_suites: Vec<CipherSuite> =
@@ -502,7 +501,7 @@ fn handle_server_hello(
   server_hello: TlsServerHelloContents,
   messages: &mut Vec<Message>,
 ) -> Result<(), ProxyError> {
-  let sh_random = process_random_bytes(&server_hello.random)?;
+  let sh_random = process_random_bytes(server_hello.random)?;
   let session_id = process_session_id(server_hello.session_id)?;
 
   let extension_byte: &[u8] =
@@ -545,10 +544,8 @@ fn process_session_id(session_id: Option<&[u8]>) -> Result<SessionID, ProxyError
     session_id.ok_or_else(|| ProxyError::InvalidSessionId("Missing session ID".into()))?;
   let mut sh_session_id = sh_session_id.to_vec();
   sh_session_id.insert(0, sh_session_id.len() as u8);
-  Ok(
-    SessionID::read_bytes(&sh_session_id)
-      .ok_or_else(|| ProxyError::InvalidSessionId("Failed to read session ID bytes".into()))?,
-  )
+  SessionID::read_bytes(&sh_session_id)
+      .ok_or_else(|| ProxyError::InvalidSessionId("Failed to read session ID bytes".into()))
 }
 
 /// Converts a raw key vector into a cipher suite-specific key format.
@@ -639,12 +636,12 @@ pub async fn proxy(
         socket,
         session_id,
         query.target_host.clone(),
-        query.target_port.clone(),
+        query.target_port,
         state,
       )
     }),
     ProtocolUpgrade::Tcp(tcp) => tcp.on_upgrade(move |stream| {
-      tcp_notarize(stream, session_id, query.target_host.clone(), query.target_port.clone(), state)
+      tcp_notarize(stream, session_id, query.target_host.clone(), query.target_port, state)
     }),
   }
 }

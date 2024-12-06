@@ -116,7 +116,7 @@ async fn main() -> Result<(), NotaryServerError> {
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
 
-  if &c.server_cert != "" || &c.server_key != "" {
+  if !c.server_cert.is_empty() || !c.server_key.is_empty() {
     let _ = listen(listener, router, &c.server_cert, &c.server_key).await;
   } else {
     let _ = acme_listen(listener, router, &c.acme_domain, &c.acme_email).await;
