@@ -13,6 +13,31 @@ on:
 jobs:
   setup:
     uses: ./.github/workflows/download-circuits.yaml
+
+  version-check:
+    needs: setup
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-macos
+        with:
+          rust-version: nightly-2024-10-28
+
+      - name: Restore circuit artifacts
+        uses: actions/cache@v3
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ needs.setup.outputs.cache-key }}
+      
+      - name: Check semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: client_ios
+          baseline-ref: origin/main
+  
   build:
     needs: setup
     name: client_ios

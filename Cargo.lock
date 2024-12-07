@@ -1266,7 +1266,7 @@ checksum = "afb84c814227b90d6895e01398aee0d8033c00e7466aca416fb6a8e0eb19d8a7"
 
 [[package]]
 name = "client"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-tungstenite 0.25.1",
  "base64 0.22.1",
@@ -1369,7 +1369,7 @@ dependencies = [
 
 [[package]]
 name = "client_ios"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "client",
  "proofs",
