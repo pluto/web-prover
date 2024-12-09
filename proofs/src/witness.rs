@@ -350,11 +350,7 @@ pub fn json_tree_hasher(
   for (idx, val_type) in key_sequence.iter().enumerate() {
     match val_type {
       JsonMaskType::Object(str_bytes) => {
-        // if idx == key_sequence.len() - 1 {
-        //   stack.push([F::<G1>::ONE, F::<G1>::ONE]);
-        // } else {
         stack.push([F::<G1>::ONE, F::<G1>::ONE]);
-        // }
         let mut string_hash = F::<G1>::ZERO;
         for byte in str_bytes {
           string_hash = poseidon_chainer(&[string_hash, F::<G1>::from(u64::from(*byte))]);
