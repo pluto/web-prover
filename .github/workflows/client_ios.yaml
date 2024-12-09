@@ -10,6 +10,9 @@ on:
   pull_request:
     branches: [ "main" ]
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   setup:
     uses: ./.github/workflows/download-circuits.yaml
@@ -22,7 +25,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/setup-macos
+      - uses: ./.github/actions/setup-ios
         with:
           rust-version: nightly-2024-10-28
 
@@ -43,25 +46,12 @@ jobs:
     name: client_ios
     runs-on: macos-latest
 
-    env:
-      CARGO_TERM_COLOR: always
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain and target
-        run: |
-          rustup toolchain install nightly-2024-10-28 --profile minimal --no-self-update
-          rustup component add rust-src --toolchain nightly-2024-10-28
-          rustup target add aarch64-apple-ios --toolchain nightly-2024-10-28
-          rustup target add aarch64-apple-ios-sim --toolchain nightly-2024-10-28
-
-      # TODO: do we need llvm for this?
-      - name: Install LLVM and Clang to support 'ring' crate and protobuf for witnesscalc
-        run: |
-          brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
-          echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
-          brew install protobuf
+      - uses: ./.github/actions/setup-ios
+        with:
+          rust-version: nightly-2024-10-28
 
       - name: Restore circuit artifacts
         uses: actions/cache@v3
