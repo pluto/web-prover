@@ -347,21 +347,31 @@ pub fn json_tree_hasher(
   assert!(key_sequence.len() < max_stack_height);
   let mut stack = Vec::new();
   let mut tree_hashes = Vec::new();
-  for val_type in key_sequence {
+  for (idx, val_type) in key_sequence.iter().enumerate() {
     match val_type {
       JsonMaskType::Object(str_bytes) => {
-        stack.push([F::<G1>::ONE, F::<G1>::ZERO]);
+        // if idx == key_sequence.len() - 1 {
+        //   stack.push([F::<G1>::ONE, F::<G1>::ONE]);
+        // } else {
+        stack.push([F::<G1>::ONE, F::<G1>::ONE]);
+        // }
         let mut string_hash = F::<G1>::ZERO;
         for byte in str_bytes {
-          string_hash = poseidon_chainer(&[string_hash, F::<G1>::from(byte as u64)]);
+          string_hash = poseidon_chainer(&[string_hash, F::<G1>::from(u64::from(*byte))]);
         }
         tree_hashes.push([string_hash, F::<G1>::ZERO]);
       },
       JsonMaskType::ArrayIndex(idx) => {
-        stack.push([F::<G1>::from(2), F::<G1>::ZERO]);
+        tree_hashes.push([F::<G1>::ZERO, F::<G1>::ZERO]);
+        stack.push([F::<G1>::from(2), F::<G1>::from(*idx as u64)]);
       },
     }
   }
+  let mut target_value_hash = F::<G1>::ZERO;
+  for byte in target_value {
+    target_value_hash = poseidon_chainer(&[target_value_hash, F::<G1>::from(u64::from(byte))]);
+  }
+  tree_hashes[key_sequence.len() - 1] = [tree_hashes[key_sequence.len() - 1][0], target_value_hash];
   (stack, tree_hashes)
 }
 
