@@ -40,6 +40,9 @@ jobs:
         with:
           package: client_ios
           baseline-ref: origin/main
+          manifest-path: ./Cargo.toml
+          check-only-explicit-features: true
+          public-api-crates: client_ios
   
   build:
     needs: setup

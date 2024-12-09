@@ -10,6 +10,10 @@ on:
   pull_request:
     branches: [ "main" ]
 
+env:
+  CARGO_TERM_COLOR: always
+  PROTOC: /opt/homebrew/opt/protobuf/bin/protoc
+
 jobs:
   setup:
     uses: ./.github/workflows/download-circuits.yaml
@@ -37,6 +41,10 @@ jobs:
         with:
           package: client
           baseline-ref: origin/main
+          release-type: minor
+          manifest-path: ./Cargo.toml
+          check-only-explicit-features: true
+          public-api-crates: client
 
   test:
     needs: setup
@@ -55,7 +63,8 @@ jobs:
           path: proofs/web_proof_circuits
           key: ${{ needs.setup.outputs.cache-key }}
 
-      - run: |
+      - name: Run tests
+        run: |
           RUST_LOG=DEBUG cargo +nightly-2024-10-28 run --release -p notary -- --config ./fixture/notary-config.toml &
           sleep 30
           NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer cargo +nightly-2024-10-28 run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
