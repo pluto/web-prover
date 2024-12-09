@@ -69,7 +69,7 @@ jobs:
         env: 
           NOTARY_CA_CERT_PATH: ../../fixture/certs/ca-cert.cer
         with:
-          package: client
+          package: client_wasm
           baseline-ref: origin/main
 
       # TODO run automated tests?

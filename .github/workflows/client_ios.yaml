@@ -51,7 +51,7 @@ jobs:
         env: 
           NOTARY_CA_CERT_PATH: ../../fixture/certs/ca-cert.cer
         with:
-          package: client
+          package: client_ios
           baseline-ref: origin/main
 
       - name: Compile iOS
