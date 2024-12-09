@@ -39,6 +39,9 @@ jobs:
         
       - name: Check semver
         uses: obi1kenobi/cargo-semver-checks-action@v2
+        env: 
+          NOTARY_CA_CERT_PATH: ../../fixture/certs/ca-cert.cer
+
         with:
           package: client
           baseline-ref: origin/main
