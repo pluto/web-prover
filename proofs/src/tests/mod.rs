@@ -336,53 +336,53 @@ fn test_end_to_end_proofs() {
   proof.0.verify(&program_data.public_params, &vk, &z0_primary, &z0_secondary).unwrap();
 }
 
-// #[test]
-// #[tracing_test::traced_test]
-// #[ignore]
-// fn test_offline_proofs() {
-//   let setup_data = SetupData {
-//     r1cs_types:              vec![
-//       R1CSType::Raw(CHACHA20_R1CS.to_vec()),
-//       R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
-//       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-//       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-//       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
-//     ],
-//     witness_generator_types: vec![
-//       WitnessGeneratorType::Wasm {
-//         path:      String::from("../proofs"),
-//         wtns_path: String::from("witness.wtns"),
-//       },
-//       WitnessGeneratorType::Wasm {
-//         path:      String::from("../proofs"),
-//         wtns_path: String::from("witness.wtns"),
-//       },
-//       WitnessGeneratorType::Wasm {
-//         path:      String::from("../proofs"),
-//         wtns_path: String::from("witness.wtns"),
-//       },
-//       WitnessGeneratorType::Wasm {
-//         path:      String::from("../proofs"),
-//         wtns_path: String::from("witness.wtns"),
-//       },
-//       WitnessGeneratorType::Wasm {
-//         path:      String::from("../proofs"),
-//         wtns_path: String::from("witness.wtns"),
-//       },
-//     ],
-//     max_rom_length:          JSON_MAX_ROM_LENGTH,
-//   };
-//   let public_params = program::setup(&setup_data);
+#[test]
+#[tracing_test::traced_test]
+#[ignore]
+fn test_offline_proofs() {
+  let setup_data = SetupData {
+    r1cs_types:              vec![
+      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
+      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+    ],
+    witness_generator_types: vec![
+      WitnessGeneratorType::Wasm {
+        path:      String::from("../proofs"),
+        wtns_path: String::from("witness.wtns"),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from("../proofs"),
+        wtns_path: String::from("witness.wtns"),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from("../proofs"),
+        wtns_path: String::from("witness.wtns"),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from("../proofs"),
+        wtns_path: String::from("witness.wtns"),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from("../proofs"),
+        wtns_path: String::from("witness.wtns"),
+      },
+    ],
+    max_rom_length:          MAX_ROM_LENGTH,
+  };
+  let public_params = program::setup(&setup_data);
 
-//   let program_data = ProgramData::<Online, NotExpanded> {
-//     public_params,
-//     setup_data,
-//     rom_data: HashMap::new(),
-//     rom: vec![],
-//     initial_nivc_input: vec![],
-//     inputs: HashMap::new(),
-//     witnesses: vec![vec![F::<G1>::from(0)]],
-//   };
-//   let _ = program_data
-//     .into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup_aes.bin").unwrap());
-// }
+  let program_data = ProgramData::<Online, NotExpanded> {
+    public_params,
+    setup_data,
+    rom_data: HashMap::new(),
+    rom: vec![],
+    initial_nivc_input: vec![],
+    inputs: HashMap::new(),
+    witnesses: vec![vec![F::<G1>::from(0)]],
+  };
+  let _ = program_data
+    .into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup_aes.bin").unwrap());
+}

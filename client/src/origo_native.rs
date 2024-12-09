@@ -7,6 +7,7 @@ use proofs::{
   program::{
     self,
     data::{Expanded, NotExpanded, Online, ProgramData},
+    manifest::NivcCircuitInputs,
   },
   F, G1,
 };
@@ -43,24 +44,23 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
   let request_program_output = program::run(&request_program_data)?;
 
   // debug!("starting response recursive proving");
-  // let response_program_output = program::run(&response_program_data)?;
+  let response_program_output = program::run(&response_program_data)?;
 
   debug!("starting request proof compression");
   let request_compressed_verifier =
     program::compress_proof(&request_program_output, &request_program_data.public_params)?;
-  // let response_compressed_verifier =
-  // program::compress_proof(&response_program_output, &response_program_data.public_params)?;
+  let response_compressed_verifier =
+    program::compress_proof(&response_program_output, &response_program_data.public_params)?;
 
   debug!("verification");
   let request_serialized_compressed_verifier = request_compressed_verifier.serialize_and_compress();
-  // let response_serialized_compressed_verifier =
-  // response_compressed_verifier.serialize_and_compress();
+  let response_serialized_compressed_verifier =
+    response_compressed_verifier.serialize_and_compress();
 
   // TODO(Sambhav): handle request and response into one proof
   Ok(crate::Proof::Origo((
     request_serialized_compressed_verifier.0,
-    // response_serialized_compressed_verifier.0,
-    vec![],
+    response_serialized_compressed_verifier.0,
   )))
 }
 
@@ -75,51 +75,58 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
 async fn generate_program_data(
   witness: &WitnessData,
   proving: ProvingData,
-) -> Result<(ProgramData<Online, Expanded>, Option<ProgramData<Online, Expanded>>), ClientErrors> {
+) -> Result<(ProgramData<Online, Expanded>, ProgramData<Online, Expanded>), ClientErrors> {
   let (request_inputs, response_inputs) = decrypt_tls_ciphertext(witness)?;
 
   debug!("Setting up `PublicParams`... (this may take a moment)");
   // TODO (Sambhav): this will result in duplicate program setups. eliminate this.
   // TODO (Sambhav): request and response proving can be easily parallelised. evaluate this using
   // rayon.
-  let request_setup_data = construct_setup_data();
-  let request_public_params = program::setup(&request_setup_data);
-
-  // let response_setup_data = construct_setup_data(response_inputs.plaintext.len());
-  // let response_public_params = program::setup(&response_setup_data);
+  let setup_data = construct_setup_data();
+  let request_public_params = program::setup(&setup_data);
+  let response_public_params = program::setup(&setup_data);
 
   debug!("Created `PublicParams`!");
 
   // - construct private inputs and program layout for circuits for TLS request -
-  let (request_rom_data, request_rom, request_fold_inputs) =
-    proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);
+  let NivcCircuitInputs {
+    rom_data: request_rom_data,
+    rom: request_rom,
+    fold_inputs: request_fold_inputs,
+    initial_nivc_input: request_initial_nivc_input,
+  } = proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);
+
   // - construct private inputs and program layout for circuits for TLS response -
-  // let (response_rom_data, response_rom, response_fold_inputs) =
-  //   proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
+  let NivcCircuitInputs {
+    rom_data: response_rom_data,
+    rom: response_rom,
+    fold_inputs: response_fold_inputs,
+    initial_nivc_input: response_initial_nivc_input,
+  } = proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
 
   let request_program_data = ProgramData::<Online, NotExpanded> {
     public_params:      request_public_params,
-    setup_data:         request_setup_data,
+    setup_data:         setup_data.clone(),
     rom:                request_rom,
     rom_data:           request_rom_data,
-    initial_nivc_input: vec![proofs::F::<G1>::from(0)],
+    initial_nivc_input: request_initial_nivc_input,
     inputs:             request_fold_inputs,
     witnesses:          vec![vec![F::<G1>::from(0)]],
   }
   .into_expanded();
 
-  // let response_program_data = ProgramData::<Online, NotExpanded> {
-  //   public_params:      response_public_params,
-  //   setup_data:         response_setup_data,
-  //   rom:                response_rom,
-  //   rom_data:           response_rom_data,
-  //   initial_nivc_input: vec![proofs::F::<G1>::from(0)],
-  //   inputs:             response_fold_inputs,
-  //   witnesses:          vec![vec![F::<G1>::from(0)]],
-  // }
-  // .into_expanded();
+  let response_program_data = ProgramData::<Online, NotExpanded> {
+    public_params: response_public_params,
+    setup_data,
+    rom: response_rom,
+    rom_data: response_rom_data,
+    initial_nivc_input: response_initial_nivc_input,
+    inputs: response_fold_inputs,
+    witnesses: vec![vec![F::<G1>::from(0)]],
+  }
+  .into_expanded();
 
-  Ok((request_program_data?, None))
+  Ok((request_program_data?, response_program_data?))
 }
 
 /// we want to be able to specify somewhere in here what cipher suite to use.

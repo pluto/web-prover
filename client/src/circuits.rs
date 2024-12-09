@@ -54,12 +54,6 @@ pub fn construct_setup_data() -> SetupData {
     #[cfg(not(target_arch = "wasm32"))]
     witness_generator_types: vec![
       WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
-      // WitnessGeneratorType::Wasm {
-      //   path:      String::from(
-      //     "proofs/web_proof_circuits/target_1024b/plaintext_authentication_js/
-      // plaintext_authentication.wasm" ,   ),
-      //   wtns_path: String::from("witness.wtns"),
-      // },
       WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
