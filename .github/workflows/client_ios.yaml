@@ -10,57 +10,47 @@ on:
   pull_request:
     branches: [ "main" ]
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
   setup:
     uses: ./.github/workflows/download-circuits.yaml
-
-  version-check:
-    needs: setup
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: ./.github/actions/setup-ios
-        with:
-          rust-version: nightly-2024-10-28
-
-      - name: Restore circuit artifacts
-        uses: actions/cache@v3
-        with:
-          path: proofs/web_proof_circuits
-          key: ${{ needs.setup.outputs.cache-key }}
-      
-      - name: Check semver
-        uses: obi1kenobi/cargo-semver-checks-action@v2
-        with:
-          package: client_ios
-          baseline-ref: origin/main
-          manifest-path: ./Cargo.toml
-          check-only-explicit-features: true
-          public-api-crates: client_ios
-  
+    with:
+      version: "v0.5.7"  # Optional, defaults to v0.5.7
   build:
     needs: setup
     name: client_ios
     runs-on: macos-latest
 
+    env:
+      CARGO_TERM_COLOR: always
+
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/actions/setup-ios
-        with:
-          rust-version: nightly-2024-10-28
+      - name: Install Rust toolchain and target
+        run: |
+          rustup toolchain install nightly-2024-10-28 --profile minimal --no-self-update
+          rustup component add rust-src --toolchain nightly-2024-10-28
+          rustup target add aarch64-apple-ios --toolchain nightly-2024-10-28
+          rustup target add aarch64-apple-ios-sim --toolchain nightly-2024-10-28
+
+      # TODO: do we need llvm for this?
+      - name: Install LLVM and Clang to support 'ring' crate and protobuf for witnesscalc
+        run: |
+          brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
+          echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
+          brew install protobuf
 
       - name: Restore circuit artifacts
         uses: actions/cache@v3
         with:
           path: proofs/web_proof_circuits
           key: ${{ needs.setup.outputs.cache-key }}
+
+      - name: Check semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: client
+          baseline-ref: origin/main
 
       - name: Compile iOS
         run: |

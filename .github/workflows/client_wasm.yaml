@@ -64,6 +64,12 @@ jobs:
           path: proofs/web_proof_circuits
           key: ${{ needs.setup.outputs.cache-key }}
 
+      - name: Check semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: client
+          baseline-ref: origin/main
+
       # TODO run automated tests?
       #      wasm-pack test --firefox
       #      docs: https://rustwasm.github.io/docs/wasm-pack/tutorials/npm-browser-packages/testing-your-project.html

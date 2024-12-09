@@ -10,42 +10,9 @@ on:
   pull_request:
     branches: [ "main" ]
 
-env:
-  CARGO_TERM_COLOR: always
-  PROTOC: /opt/homebrew/opt/protobuf/bin/protoc
-
 jobs:
   setup:
     uses: ./.github/workflows/download-circuits.yaml
-
-  version-check:
-    needs: setup
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: ./.github/actions/setup-macos
-        with:
-          rust-version: nightly-2024-10-28
-
-      - name: Restore circuit artifacts
-        uses: actions/cache@v3
-        with:
-          path: proofs/web_proof_circuits
-          key: ${{ needs.setup.outputs.cache-key }}
-      
-      - name: Check semver
-        uses: obi1kenobi/cargo-semver-checks-action@v2
-        with:
-          package: client
-          baseline-ref: origin/main
-          release-type: minor
-          manifest-path: ./Cargo.toml
-          check-only-explicit-features: true
-          public-api-crates: client
-
   test:
     needs: setup
     name: client on macos-latest
@@ -53,21 +20,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/actions/setup-macos
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
         with:
-          rust-version: nightly-2024-10-28
+          toolchain: nightly-2024-10-28
+
+      - name: Install LLVM and Clang to support 'ring' crate and protobuf
+        run: |
+          brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
+          echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
+          brew install protobuf
 
       - name: Restore circuit artifacts
         uses: actions/cache@v3
         with:
           path: proofs/web_proof_circuits
           key: ${{ needs.setup.outputs.cache-key }}
+        
+      - name: Check semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: client
+          baseline-ref: origin/main
 
-      - name: Run tests
-        run: |
+      - run: |
           RUST_LOG=DEBUG cargo +nightly-2024-10-28 run --release -p notary -- --config ./fixture/notary-config.toml &
           sleep 30
           NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer cargo +nightly-2024-10-28 run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
           NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer cargo +nightly-2024-10-28 run --release -p client -- --config ./fixture/client.origo_tcp_local.json
-      
       - uses: Swatinem/rust-cache@v2
