@@ -19,6 +19,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
@@ -41,7 +43,6 @@ jobs:
         uses: obi1kenobi/cargo-semver-checks-action@v2
         env: 
           NOTARY_CA_CERT_PATH: ../../fixture/certs/ca-cert.cer
-
         with:
           package: client
           baseline-ref: origin/main

@@ -28,7 +28,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
+        with:
+          fetch-depth: 0
       # Install the generic nightly toolchain
       - run: rustup toolchain install nightly-2024-10-28 --profile minimal --no-self-update
 
