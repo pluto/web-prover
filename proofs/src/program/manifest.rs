@@ -204,20 +204,20 @@ pub fn make_nonce(iv: [u8; 12], seq: u64) -> [u8; 12] {
 /// **Note**: MAC is ignored from the ciphertext because circuit doesn't verify auth tag.
 fn handle_encryption_circuit_inputs(
   inputs: &EncryptionInput,
-) -> (Vec<u8>, Vec<InstructionConfig>, HashMap<String, CircuitData>, HashMap<String, FoldInput>) {
+) -> (Vec<i16>, Vec<InstructionConfig>, HashMap<String, CircuitData>, HashMap<String, FoldInput>) {
   // handle different cipher suite, currently AES-GCM-128 & ChaCha20-Poly1305
+  let mut plaintext = inputs.plaintext.iter().map(|&x| x as i16).collect::<Vec<i16>>();
+  let mut ciphertext = inputs.ciphertext.iter().map(|&x| x as i16).collect::<Vec<i16>>();
+
   match inputs.key {
     CipherSuiteKey::AES128GCM(key) => {
       debug!("Padding plaintext and ciphertext to nearest 16...");
       let remainder = inputs.plaintext.len() % 16;
-      let mut plaintext = inputs.plaintext.to_vec();
-      let mut ciphertext = inputs.ciphertext.to_vec();
-      // TODO (Sambhav): this padding is incorrect
+
       if remainder != 0 {
         let padding = 16 - remainder;
-        // TODO(Sambhav): remove padding from 0
-        plaintext.resize(plaintext.len() + padding, 0);
-        ciphertext.resize(ciphertext.len() + padding, 0);
+        plaintext.resize(plaintext.len() + padding, -1);
+        ciphertext.resize(ciphertext.len() + padding, -1);
       }
 
       assert_eq!(plaintext.len() % AES_INPUT_LENGTH, 0);
@@ -262,8 +262,6 @@ fn handle_encryption_circuit_inputs(
     },
     CipherSuiteKey::CHACHA20POLY1305(key) => {
       // pad plaintext ciphertext to nearest circuit size
-      let mut plaintext = inputs.plaintext.to_vec();
-      let mut ciphertext = inputs.ciphertext.to_vec();
       plaintext.resize(circuit_size(plaintext.len()), 0);
       ciphertext.resize(circuit_size(ciphertext.len()), 0);
 
@@ -407,10 +405,11 @@ impl Manifest {
               (String::from(JSON_MASK_OBJECT_KEYLEN_NAME), json!([json_key.len()])),
             ]),
           });
-          masked_body = compute_json_witness(
+          let masked_body_res = compute_json_witness(
             &masked_body,
             crate::witness::JsonMaskType::Object(json_key.as_bytes().to_vec()),
           );
+          masked_body = masked_body_res.iter().map(|x| *x as i16).collect();
         },
         JsonKey::Num(index) => {
           rom_data.insert(format!("JSON_MASK_ARRAY_{}", i + 1), CircuitData { opcode: 3 });
@@ -421,8 +420,9 @@ impl Manifest {
               (String::from(JSON_MASK_ARRAY_SIGNAL_NAME), json!([index])),
             ]),
           });
-          masked_body =
-            compute_json_witness(&masked_body, crate::witness::JsonMaskType::ArrayIndex(*index))
+          let masked_body_res =
+            compute_json_witness(&masked_body, crate::witness::JsonMaskType::ArrayIndex(*index));
+          masked_body = masked_body_res.iter().map(|x| *x as i16).collect();
         },
       }
     }

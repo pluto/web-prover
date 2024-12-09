@@ -2,19 +2,30 @@
 //! hashchain-based circuits.
 
 use ff::PrimeField;
+use light_poseidon::{Poseidon, PoseidonBytesHasher};
 use serde_json::Value;
 
 use super::*;
+/// The type of JSON mask to apply depending on key's value type.
 pub enum JsonMaskType {
+  /// Mask a JSON object by key.
   Object(Vec<u8>),
+  /// Mask a JSON array by index.
   ArrayIndex(usize),
 }
 
-pub fn compute_json_witness(masked_plaintext: &[u8], mask_at: JsonMaskType) -> Vec<u8> {
+/// compute private inputs for the JSON circuit.
+/// # Arguments
+/// - `masked_plaintext`: the masked JSON request/response padded with `-1` to nearest power of 2
+/// - `mask_at`: the [`JsonMaskType`] of the JSON request/response to mask
+/// # Returns
+/// - the masked JSON request/response
+pub fn compute_json_witness(masked_plaintext: &[i16], mask_at: JsonMaskType) -> Vec<u8> {
   let json_bytes = masked_plaintext
     .iter()
-    .filter(|&&x| !(x == 0 || x.is_ascii_whitespace()))
+    .filter(|&&x| !(x == -1 || x == 0 || (x as u8).is_ascii_whitespace()))
     .copied()
+    .map(|x| x as u8)
     .collect::<Vec<u8>>();
   let json: Value = serde_json::from_slice(&json_bytes).unwrap();
   let data = match mask_at {
@@ -37,24 +48,30 @@ pub fn compute_json_witness(masked_plaintext: &[u8], mask_at: JsonMaskType) -> V
     // see if this string matches
     let mut filtered_body = masked_plaintext[idx..]
       .iter()
-      .filter(|&&x| !(x == 0 || x.is_ascii_whitespace()))
+      .filter(|&&x| !(x == -1 || x == 0 || (x as u8).is_ascii_whitespace()))
       .copied()
+      .map(|x| x as u8)
       .collect::<Vec<u8>>();
     filtered_body.truncate(filtered_data_bytes.len());
-    if filtered_data_bytes == filtered_body && filtered_data_bytes.first().unwrap() == byte {
+    if filtered_data_bytes == filtered_body
+      && (*filtered_data_bytes.first().unwrap() as i16) == *byte
+    {
       start_idx = Some(idx);
     }
   }
   for (idx, byte) in masked_plaintext.iter().enumerate() {
     let mut filtered_body = masked_plaintext[..idx + 1]
       .iter()
-      .filter(|&&x| !(x == 0 || x.is_ascii_whitespace()))
+      .filter(|&&x| !(x == -1 || x == 0 || (x as u8).is_ascii_whitespace()))
       .copied()
+      .map(|x| x as u8)
       .collect::<Vec<u8>>();
     filtered_body.reverse();
     filtered_body.truncate(filtered_data_bytes.len());
     filtered_body.reverse();
-    if filtered_data_bytes == filtered_body && filtered_data_bytes.last().unwrap() == byte {
+    if filtered_data_bytes == filtered_body
+      && (*filtered_data_bytes.last().unwrap() as i16) == *byte
+    {
       end_idx = Some(idx);
     }
   }
@@ -63,7 +80,7 @@ pub fn compute_json_witness(masked_plaintext: &[u8], mask_at: JsonMaskType) -> V
   masked_plaintext
     .iter()
     .enumerate()
-    .map(|(i, &x)| if i >= start_idx && i <= end_idx { x } else { 0 })
+    .map(|(i, &x)| if i >= start_idx && i <= end_idx { x as u8 } else { 0 })
     .collect::<Vec<u8>>()
 }
 
@@ -72,13 +89,20 @@ pub enum HttpMaskType {
   Header(usize),
   Body,
 }
-pub fn compute_http_witness(plaintext: &[u8], mask_at: HttpMaskType) -> Vec<u8> {
-  let mut result = vec![0u8; plaintext.len()];
+
+/// compute private inputs for the HTTP circuit.
+/// # Arguments
+/// - `plaintext`: the plaintext HTTP request/response padded with `-1` to nearest power of 2
+/// - `mask_at`: the [`HttpMaskType`] of the HTTP request/response to mask
+/// # Returns
+/// - the masked HTTP request/response
+pub fn compute_http_witness(plaintext: &[i16], mask_at: HttpMaskType) -> Vec<i16> {
+  let mut result = vec![0i16; plaintext.len()];
   match mask_at {
     HttpMaskType::StartLine => {
       // Find the first CRLF sequence
       for i in 1..plaintext.len().saturating_sub(1) {
-        if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
+        if plaintext[i] as u8 == b'\r' && plaintext[i + 1] as u8 == b'\n' {
           // Copy bytes from start to the end of CRLF
           result[..=i + 1].copy_from_slice(&plaintext[..=i + 1]);
           break;
@@ -91,7 +115,7 @@ pub fn compute_http_witness(plaintext: &[u8], mask_at: HttpMaskType) -> Vec<u8> 
 
       // Skip the start line
       for i in 1..plaintext.len().saturating_sub(1) {
-        if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
+        if plaintext[i] as u8 == b'\r' && plaintext[i + 1] as u8 == b'\n' {
           start_pos = i + 2;
           break;
         }
@@ -100,7 +124,7 @@ pub fn compute_http_witness(plaintext: &[u8], mask_at: HttpMaskType) -> Vec<u8> 
       // Find the specified header
       let mut header_start_pos = start_pos;
       for i in start_pos..plaintext.len().saturating_sub(1) {
-        if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
+        if plaintext[i] as u8 == b'\r' && plaintext[i + 1] as u8 == b'\n' {
           if current_header == idx {
             // Copy the header line (including CRLF)
             result[header_start_pos..=i + 1].copy_from_slice(&plaintext[header_start_pos..=i + 1]);
@@ -108,7 +132,10 @@ pub fn compute_http_witness(plaintext: &[u8], mask_at: HttpMaskType) -> Vec<u8> 
           }
 
           // Check for end of headers (double CRLF)
-          if i + 3 < plaintext.len() && plaintext[i + 2] == b'\r' && plaintext[i + 3] == b'\n' {
+          if i + 3 < plaintext.len()
+            && plaintext[i + 2] as u8 == b'\r'
+            && plaintext[i + 3] as u8 == b'\n'
+          {
             break;
           }
 
@@ -120,10 +147,11 @@ pub fn compute_http_witness(plaintext: &[u8], mask_at: HttpMaskType) -> Vec<u8> 
     HttpMaskType::Body => {
       // Find double CRLF that marks start of body
       for i in 1..plaintext.len().saturating_sub(3) {
-        if plaintext[i] == b'\r'
-          && plaintext[i + 1] == b'\n'
-          && plaintext[i + 2] == b'\r'
-          && plaintext[i + 3] == b'\n'
+        if plaintext[i] != -1
+          && plaintext[i] as u8 == b'\r'
+          && plaintext[i + 1] as u8 == b'\n'
+          && plaintext[i + 2] as u8 == b'\r'
+          && plaintext[i + 3] as u8 == b'\n'
         {
           // Copy everything after the double CRLF
           let body_start = i + 4;
@@ -138,16 +166,17 @@ pub fn compute_http_witness(plaintext: &[u8], mask_at: HttpMaskType) -> Vec<u8> 
   result
 }
 
-pub fn compute_http_header_witness(plaintext: &[u8], name: &[u8]) -> (usize, Vec<u8>) {
-  let mut result = vec![0u8; plaintext.len()];
+pub fn compute_http_header_witness(plaintext: &[i16], name: &[u8]) -> (usize, Vec<i16>) {
+  let mut result = vec![0i16; plaintext.len()];
 
+  let name = name.iter().map(|&x| x as i16).collect::<Vec<i16>>();
   let mut current_header = 0;
   let mut current_header_name = vec![];
   let mut start_pos = 0;
 
   // Skip the start line
   for i in 1..plaintext.len().saturating_sub(1) {
-    if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
+    if plaintext[i] != -1 && plaintext[i] as u8 == b'\r' && plaintext[i + 1] as u8 == b'\n' {
       start_pos = i + 2;
       break;
     }
@@ -157,11 +186,11 @@ pub fn compute_http_header_witness(plaintext: &[u8], name: &[u8]) -> (usize, Vec
   let mut header_start_pos = start_pos;
   for i in start_pos..plaintext.len().saturating_sub(1) {
     // find header name
-    if plaintext[i] == b':' {
+    if plaintext[i] != -1 && plaintext[i] as u8 == b':' {
       current_header_name = plaintext[header_start_pos..i].to_vec();
     }
     // find next header line
-    if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
+    if plaintext[i] != -1 && plaintext[i] as u8 == b'\r' && plaintext[i + 1] as u8 == b'\n' {
       if current_header_name == name {
         // Copy the header line (including CRLF)
         result[header_start_pos..=i + 1].copy_from_slice(&plaintext[header_start_pos..=i + 1]);
@@ -169,7 +198,10 @@ pub fn compute_http_header_witness(plaintext: &[u8], name: &[u8]) -> (usize, Vec
       }
 
       // Check for end of headers (double CRLF)
-      if i + 3 < plaintext.len() && plaintext[i + 2] == b'\r' && plaintext[i + 3] == b'\n' {
+      if i + 3 < plaintext.len()
+        && plaintext[i + 2] as u8 == b'\r'
+        && plaintext[i + 3] as u8 == b'\n'
+      {
         break;
       }
 
@@ -181,21 +213,34 @@ pub fn compute_http_header_witness(plaintext: &[u8], name: &[u8]) -> (usize, Vec
   (current_header, result)
 }
 
-pub fn bytepack(bytes: &[u8]) -> F<G1> {
+/// Packs a chunk of 16 bytes into a field element
+///
+/// **Note**: if the chunk is fully padded with -1, it will be ignored
+fn bytepack(bytes: &[i16]) -> Option<F<G1>> {
   let mut output = F::<G1>::ZERO;
-  assert!(bytes.len() <= 16);
+  let mut is_padded_chunk = 0;
   for (idx, byte) in bytes.iter().enumerate() {
     let mut pow = F::<G1>::ONE;
-    output += F::<G1>::from(*byte as u64) * {
-      for _ in 0..(8 * idx) {
-        pow *= F::<G1>::from(2);
-      }
-      pow
-    };
+    if *byte != -1 {
+      output += F::<G1>::from(*byte as u64) * {
+        for _ in 0..(8 * idx) {
+          pow *= F::<G1>::from(2);
+        }
+        pow
+      };
+    } else {
+      is_padded_chunk += 1;
+    }
   }
-  output
+
+  if is_padded_chunk == bytes.len() {
+    None
+  } else {
+    Some(output)
+  }
 }
-use light_poseidon::{Poseidon, PoseidonBytesHasher};
+
+/// Hashes preimage with Poseidon
 pub fn poseidon_chainer(preimage: &[F<G1>]) -> F<G1> {
   let mut poseidon = Poseidon::<ark_bn254::Fr>::new_circom(2).unwrap();
 
@@ -210,15 +255,22 @@ pub fn poseidon_chainer(preimage: &[F<G1>]) -> F<G1> {
   F::<G1>::from_repr(hash).unwrap()
 }
 
-pub fn data_hasher(preimage: &[u8]) -> F<G1> {
-  assert_eq!(preimage.len() % 16, 0);
+/// Hashes byte array padded with -1 with Poseidon
+///
+/// **Note**:
+/// - any chunk of 16 bytes that is fully padded with -1 will be ignored
+/// - check [`bytepack`] for more details
+pub fn data_hasher(preimage: &[i16]) -> F<G1> {
+  // Pack the input bytes in chunks of 16 into field elements
+  let packed_inputs = preimage.chunks(16).map(bytepack).collect::<Vec<Option<F<G1>>>>();
 
-  let packed_inputs = preimage.chunks(16).map(bytepack).collect::<Vec<F<G1>>>();
+  // Iterate over the packed inputs and hash them with Poseidon
   let mut hash_val = F::<G1>::ZERO;
   for packed_input in packed_inputs {
-    if packed_input != F::<G1>::ZERO {
-      hash_val = poseidon_chainer(&[hash_val, packed_input]);
+    if packed_input.is_none() {
+      continue;
     }
+    hash_val = poseidon_chainer(&[hash_val, packed_input.unwrap()]);
   }
   hash_val
 }
@@ -228,7 +280,7 @@ mod tests {
 
   use super::*;
 
-  const TEST_HTTP_BYTES: &[u8] = &[
+  const TEST_HTTP_BYTES: &[i16] = &[
     72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101,
     110, 116, 45, 116, 121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110,
     47, 106, 115, 111, 110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13,
@@ -246,7 +298,7 @@ mod tests {
     32, 32, 32, 32, 32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125,
   ];
 
-  const TEST_HTTP_START_LINE: &[u8] = &[
+  const TEST_HTTP_START_LINE: &[i16] = &[
     72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -260,7 +312,7 @@ mod tests {
     0, 0, 0, 0, 0, 0,
   ];
 
-  const TEST_HTTP_HEADER_0: &[u8] = &[
+  const TEST_HTTP_HEADER_0: &[i16] = &[
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99, 111, 110, 116, 101, 110, 116, 45, 116,
     121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106, 115, 111,
     110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13, 10, 0, 0, 0, 0, 0,
@@ -274,7 +326,7 @@ mod tests {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   ];
 
-  const TEST_HTTP_HEADER_1: &[u8] = &[
+  const TEST_HTTP_HEADER_1: &[i16] = &[
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     99, 111, 110, 116, 101, 110, 116, 45, 101, 110, 99, 111, 100, 105, 110, 103, 58, 32, 103, 122,
@@ -331,21 +383,23 @@ mod tests {
   #[test]
   fn test_bytepack() {
     let pack0 = bytepack(&[0, 0, 0]);
-    assert_eq!(pack0, F::<G1>::from(0));
+    assert_eq!(pack0, Some(F::<G1>::from(0)));
 
     let pack1 = bytepack(&[1, 0, 0]);
-    assert_eq!(pack1, F::<G1>::from(1));
+    assert_eq!(pack1, Some(F::<G1>::from(1)));
 
     let pack2 = bytepack(&[0, 1, 0]);
-    assert_eq!(pack2, F::<G1>::from(256));
+    assert_eq!(pack2, Some(F::<G1>::from(256)));
 
     let pack3 = bytepack(&[0, 0, 1]);
-    assert_eq!(pack3, F::<G1>::from(65536));
+    assert_eq!(pack3, Some(F::<G1>::from(65536)));
+
+    let pack4 = bytepack(&[-1, -1, -1]);
+    assert_eq!(pack4, None);
   }
 
   #[test]
   fn test_poseidon() {
-    // let hash = poseidon_chainer(&[bytepack(&[0]), bytepack(&[0])]);
     let hash = poseidon_chainer(&[F::<G1>::from(0), F::<G1>::from(0)]);
     assert_eq!(hash.to_bytes(), [
       100, 72, 182, 70, 132, 238, 57, 168, 35, 213, 254, 95, 213, 36, 49, 220, 129, 228, 129, 123,
@@ -361,11 +415,39 @@ mod tests {
 
   #[test]
   fn test_data_hasher() {
-    let hash = data_hasher(TEST_HTTP_BYTES);
-    dbg!(hash);
+    let hash = data_hasher(&[0i16; 16]);
+    assert_eq!(
+      hash,
+      F::<G1>::from_str_vartime(
+        "14744269619966411208579211824598458697587494354926760081771325075741142829156"
+      )
+      .unwrap()
+    );
+
+    let hash = data_hasher(&[-1i16; 16]);
+    assert_eq!(hash, F::<G1>::ZERO);
+
+    let mut hash_input = [0i16; 16];
+    hash_input[0] = 1;
+    let hash = data_hasher(hash_input.as_ref());
+    assert_eq!(hash, poseidon_chainer([F::<G1>::ZERO, F::<G1>::ONE].as_ref()));
+
+    hash_input = [0i16; 16];
+    hash_input[15] = 1;
+    let hash = data_hasher(hash_input.as_ref());
+    assert_eq!(
+      hash,
+      poseidon_chainer(
+        [
+          F::<G1>::ZERO,
+          F::<G1>::from_str_vartime("1329227995784915872903807060280344576").unwrap()
+        ]
+        .as_ref()
+      )
+    );
   }
 
-  const TEST_HTTP_BODY: &[u8] = &[
+  const TEST_HTTP_BODY: &[i16] = &[
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -484,12 +566,16 @@ mod tests {
   fn test_compute_json_masking_sequence() {
     let masked_array = compute_json_witness(TEST_HTTP_BODY, JsonMaskType::Object(KEY0.to_vec()));
     assert_eq!(masked_array, MASKED_KEY0_ARRAY);
+    let masked_array = masked_array.iter().map(|x| *x as i16).collect::<Vec<i16>>();
     let masked_array = compute_json_witness(&masked_array, JsonMaskType::Object(KEY1.to_vec()));
     assert_eq!(masked_array, MASKED_KEY1_ARRAY);
+    let masked_array = masked_array.iter().map(|x| *x as i16).collect::<Vec<i16>>();
     let masked_array = compute_json_witness(&masked_array, JsonMaskType::ArrayIndex(0));
     assert_eq!(masked_array, MASKED_ARR0_ARRAY);
+    let masked_array = masked_array.iter().map(|x| *x as i16).collect::<Vec<i16>>();
     let masked_array = compute_json_witness(&masked_array, JsonMaskType::Object(KEY2.to_vec()));
     assert_eq!(masked_array, MASKED_KEY2_ARRAY);
+    let masked_array = masked_array.iter().map(|x| *x as i16).collect::<Vec<i16>>();
     let masked_array = compute_json_witness(&masked_array, JsonMaskType::Object(KEY3.to_vec()));
     assert_eq!(masked_array, MASKED_KEY3_ARRAY);
   }

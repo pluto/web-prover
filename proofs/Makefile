@@ -2,19 +2,13 @@
 # Second generate the graph bin files using circom-witnesscalc
 # Finally run test using these files
 
-web-prover-circuits-512:
-	curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/download/v0.5.10/circom-artifacts-512b-v0.5.10.zip
-	mkdir -p web_proof_circuits/target_512b/
-	unzip -o circuits.zip -d web_proof_circuits/target_512b/
-	rm circuits.zip
-
 web-prover-circuits-1024:
-	curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/download/v0.5.10/circom-artifacts-1024b-v0.5.10.zip
+	curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/download/v0.6.0/circom-artifacts-1024b-v0.6.0.zip
 	mkdir -p web_proof_circuits/target_1024b/
 	unzip -o circuits.zip -d web_proof_circuits/target_1024b/
 	rm circuits.zip
 
-web-prover-circuits: web-prover-circuits-512 web-prover-circuits-1024
+web-prover-circuits: web-prover-circuits-1024
 
 
 test-circuits:

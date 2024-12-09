@@ -16,46 +16,37 @@ use crate::{
 
 mod witnesscalc;
 
-const ADD_EXTERNAL_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/add_external.r1cs");
-const SQUARE_ZEROTH_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/square_zeroth.r1cs");
-const SWAP_MEMORY_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/swap_memory.r1cs");
-
-const EXTERNAL_INPUTS: [[u64; 2]; 2] = [[5, 7], [13, 1]];
-const MAX_ROM_LENGTH: usize = 10;
-
-// -----------------------------------------------------------------------------------------------
-// JSON Proof Material
-const JSON_MAX_ROM_LENGTH: usize = 45;
+const MAX_ROM_LENGTH: usize = 80;
 
 // Circuit 0
-const CHACHA20_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/chacha20_nivc_512b.r1cs");
-const CHACHA20_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/chacha20_nivc_512b.bin");
+const PLAINTEXT_AUTHENTICATION_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_1024b/plaintext_authentication_1024b.r1cs");
+const PLAINTEXT_AUTHENTICATION_GRAPH: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_1024b/plaintext_authentication_1024b.bin");
 
 // Circuit 1
-const HTTP_NIVC_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/http_nivc_512b.r1cs");
-const HTTP_NIVC_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/http_nivc_512b.bin");
+const HTTP_VERIFICATION_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_1024b/http_verification_1024b.r1cs");
+const HTTP_VERIFICATION_GRAPH: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_1024b/http_verification_1024b.bin");
 
 // Circuit 2
 const JSON_MASK_OBJECT_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/json_mask_object_512b.r1cs");
+  include_bytes!("../../web_proof_circuits/target_1024b/json_mask_object_1024b.r1cs");
 const JSON_MASK_OBJECT_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/json_mask_object_512b.bin");
+  include_bytes!("../../web_proof_circuits/target_1024b/json_mask_object_1024b.bin");
 
 // Circuit 3
 const JSON_MASK_ARRAY_INDEX_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/json_mask_array_index_512b.r1cs");
+  include_bytes!("../../web_proof_circuits/target_1024b/json_mask_array_index_1024b.r1cs");
 const JSON_MASK_ARRAY_INDEX_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/json_mask_array_index_512b.bin");
+  include_bytes!("../../web_proof_circuits/target_1024b/json_mask_array_index_1024b.bin");
 
 // circuit 4
 const EXTRACT_VALUE_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/json_extract_value_512b.r1cs");
+  include_bytes!("../../web_proof_circuits/target_1024b/json_extract_value_1024b.r1cs");
 const EXTRACT_VALUE_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/json_extract_value_512b.bin");
+  include_bytes!("../../web_proof_circuits/target_1024b/json_extract_value_1024b.bin");
 
 // HTTP/1.1 200 OK
 // content-type: application/json; charset=utf-8
@@ -74,7 +65,7 @@ const EXTRACT_VALUE_GRAPH: &[u8] =
 //        ]
 //    }
 // }
-const HTTP_RESPONSE_PLAINTEXT: (&str, [u8; 320]) = ("plainText", [
+const HTTP_RESPONSE_PLAINTEXT: (&str, [i16; 320]) = ("plainText", [
   72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101, 110,
   116, 45, 116, 121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106,
   115, 111, 110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13, 10, 99,
@@ -92,7 +83,7 @@ const HTTP_RESPONSE_PLAINTEXT: (&str, [u8; 320]) = ("plainText", [
   10, 32, 32, 32, 125, 13, 10, 125,
 ]);
 
-const CHACHA20_CIPHERTEXT: (&str, [u8; 320]) = ("cipherText", [
+const CHACHA20_CIPHERTEXT: (&str, [i16; 320]) = ("cipherText", [
   2, 125, 219, 141, 140, 93, 49, 129, 95, 178, 135, 109, 48, 36, 194, 46, 239, 155, 160, 70, 208,
   147, 37, 212, 17, 195, 149, 190, 38, 215, 23, 241, 84, 204, 167, 184, 179, 172, 187, 145, 38, 75,
   123, 96, 81, 6, 149, 36, 135, 227, 226, 254, 177, 90, 241, 159, 0, 230, 183, 163, 210, 88, 133,
@@ -124,6 +115,7 @@ const JSON_MASK_KEYLEN_DEPTH_4: (&str, [u8; 1]) = ("keyLen", [7]);
 const JSON_MASK_KEY_DEPTH_5: (&str, [u8; 10]) = ("key", [110, 97, 109, 101, 0, 0, 0, 0, 0, 0]); // "name"
 const JSON_MASK_KEYLEN_DEPTH_5: (&str, [u8; 1]) = ("keyLen", [4]);
 const MAX_VALUE_LENGTH: usize = 48;
+const MAX_HTTP_HEADERS: usize = 25;
 
 #[test]
 #[tracing_test::traced_test]
@@ -148,27 +140,27 @@ fn test_end_to_end_proofs() {
 
   let setup_data = SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(CHACHA20_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
+      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      WitnessGeneratorType::Raw(CHACHA20_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
     ],
-    max_rom_length:          JSON_MAX_ROM_LENGTH,
+    max_rom_length:          MAX_ROM_LENGTH,
   };
   debug!("Setting up `Memory`...");
   let public_params = program::setup(&setup_data);
   debug!("Creating ROM");
   let rom_data = HashMap::from([
-    (String::from("CHACHA20"), CircuitData { opcode: 0 }),
-    (String::from("HTTP_NIVC"), CircuitData { opcode: 1 }),
+    (String::from("PLAINTEXT_AUTHENTICATION"), CircuitData { opcode: 0 }),
+    (String::from("HTTP_VERIFICATION"), CircuitData { opcode: 1 }),
     (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 2 }),
     (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 2 }),
     (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 3 }),
@@ -182,79 +174,84 @@ fn test_end_to_end_proofs() {
   let nonce = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4a, 0x00, 0x00, 0x00, 0x00];
 
   let mut padded_plaintext = HTTP_RESPONSE_PLAINTEXT.1.to_vec();
-  padded_plaintext.extend(std::iter::repeat(0).take(512 - HTTP_RESPONSE_PLAINTEXT.1.len()));
+  padded_plaintext.extend(std::iter::repeat(-1).take(1024 - HTTP_RESPONSE_PLAINTEXT.1.len()));
 
   let mut padded_ciphertext = CHACHA20_CIPHERTEXT.1.to_vec();
-  padded_ciphertext.extend(std::iter::repeat(0).take(512 - CHACHA20_CIPHERTEXT.1.len()));
+  padded_ciphertext.extend(std::iter::repeat(-1).take(1024 - CHACHA20_CIPHERTEXT.1.len()));
 
   assert!(padded_plaintext.len() == padded_ciphertext.len());
-  assert_eq!(padded_ciphertext.len(), 512);
+  assert_eq!(padded_ciphertext.len(), 1024);
+  let ciphertext_hash = data_hasher(&padded_ciphertext);
+
+  let positive_plaintext = padded_plaintext
+    .iter()
+    .map(|x| if *x == -1 { -F::<G1>::ONE } else { F::<G1>::from(*x as u64) })
+    .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
+    .collect::<Vec<String>>();
 
   let chacha_rom_opcode_config = InstructionConfig {
-    name:          String::from("CHACHA20"),
+    name:          String::from("PLAINTEXT_AUTHENTICATION"),
     private_input: HashMap::from([
       (String::from(CHACHA20_KEY.0), json!(to_chacha_input(&CHACHA20_KEY.1))),
       (String::from(CHACHA20_NONCE.0), json!(to_chacha_input(&nonce))),
       (String::from("counter"), json!(to_chacha_input(&[1]))),
-      (String::from(CHACHA20_CIPHERTEXT.0), json!(&padded_ciphertext)),
-      (String::from(HTTP_RESPONSE_PLAINTEXT.0), json!(&padded_plaintext)),
+      (String::from(HTTP_RESPONSE_PLAINTEXT.0), json!(&positive_plaintext)),
     ]),
   };
   let mut rom = vec![chacha_rom_opcode_config];
 
-  // After setting the encryption config for the ROM, pad the plaintext to match what http_nivc_512b
-  // requires
+  // After setting the encryption config for the ROM, pad the plaintext to match what
+  // http_nivc_1024b expects
 
   let http_start_line_hash =
     data_hasher(&compute_http_witness(&padded_plaintext, witness::HttpMaskType::StartLine));
   let http_header_1_hash =
     data_hasher(&compute_http_witness(&padded_plaintext, witness::HttpMaskType::Header(1)));
   let http_body = compute_http_witness(&padded_plaintext, witness::HttpMaskType::Body);
+  let http_body_cast = http_body
+    .iter()
+    .map(|x| if *x == -1 { -F::<G1>::ONE } else { F::<G1>::from(*x as u64) })
+    .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
+    .collect::<Vec<String>>();
+
   let http_body_hash = data_hasher(&http_body);
+  let mut http_header_hashes: [String; MAX_HTTP_HEADERS] =
+    core::array::from_fn(|_| String::from("0"));
+  http_header_hashes[1] =
+    BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_header_1_hash.to_bytes()).to_str_radix(10);
 
   let masked_json_key_1 =
     compute_json_witness(&http_body, witness::JsonMaskType::Object("data".as_bytes().to_vec()));
+  let masked_json_key_1_cast = masked_json_key_1.iter().map(|x| *x as i16).collect::<Vec<i16>>();
   let masked_json_key_2 = compute_json_witness(
-    &masked_json_key_1,
+    &masked_json_key_1_cast,
     witness::JsonMaskType::Object("items".as_bytes().to_vec()),
   );
+  let masked_json_key_2_cast = masked_json_key_2.iter().map(|x| *x as i16).collect::<Vec<i16>>();
   let masked_json_key_3 =
-    compute_json_witness(&masked_json_key_2, witness::JsonMaskType::ArrayIndex(0));
+    compute_json_witness(&masked_json_key_2_cast, witness::JsonMaskType::ArrayIndex(0));
+  let masked_json_key_3_cast = masked_json_key_3.iter().map(|x| *x as i16).collect::<Vec<i16>>();
   let masked_json_key_4 = compute_json_witness(
-    &masked_json_key_3,
+    &masked_json_key_3_cast,
     witness::JsonMaskType::Object("profile".as_bytes().to_vec()),
   );
+  let masked_json_key_4_cast = masked_json_key_4.iter().map(|x| *x as i16).collect::<Vec<i16>>();
   let masked_json_key_5 = compute_json_witness(
-    &masked_json_key_4,
+    &masked_json_key_4_cast,
     witness::JsonMaskType::Object("name".as_bytes().to_vec()),
   );
 
   rom.extend([
     InstructionConfig {
-      name:          String::from("HTTP_NIVC"),
+      name:          String::from("HTTP_VERIFICATION"),
       private_input: HashMap::from([
-        (String::from("data"), json!(padded_plaintext)),
+        (String::from("data"), json!(&positive_plaintext)),
         (
           String::from("start_line_hash"),
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
             .to_str_radix(10)]),
         ),
-        (
-          String::from("header_hashes"),
-          json!([
-            "0".to_string(),
-            BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_header_1_hash.to_bytes())
-              .to_str_radix(10),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-          ]),
-        ),
+        (String::from("header_hashes"), json!(http_header_hashes)),
         (
           String::from("body_hash"),
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
@@ -265,7 +262,7 @@ fn test_end_to_end_proofs() {
     InstructionConfig {
       name:          String::from("JSON_MASK_OBJECT_1"),
       private_input: HashMap::from([
-        (String::from("data"), json!(http_body)),
+        (String::from("data"), json!(http_body_cast)),
         (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
         (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
       ]),
@@ -307,15 +304,12 @@ fn test_end_to_end_proofs() {
     },
   ]);
 
-  // should be zero
-  let initial_nivc_input = vec![Fr::ZERO];
-
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
     setup_data,
     rom_data: rom_data.clone(),
     rom: rom.clone(),
-    initial_nivc_input,
+    initial_nivc_input: vec![ciphertext_hash],
     inputs: HashMap::new(),
     witnesses: vec![],
   }
@@ -326,9 +320,9 @@ fn test_end_to_end_proofs() {
 
   let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
 
-  let val = "\"Taylor Swift\"".as_bytes();
+  let val = "\"Taylor Swift\"".as_bytes().iter().map(|x| *x as i16).collect::<Vec<i16>>();
   let mut final_value = [0; MAX_VALUE_LENGTH];
-  final_value[..val.len()].copy_from_slice(val);
+  final_value[..val.len()].copy_from_slice(&val);
 
   assert_eq!(*recursive_snark.zi_primary().first().unwrap(), data_hasher(&final_value));
 
@@ -342,53 +336,53 @@ fn test_end_to_end_proofs() {
   proof.0.verify(&program_data.public_params, &vk, &z0_primary, &z0_secondary).unwrap();
 }
 
-#[test]
-#[tracing_test::traced_test]
-#[ignore]
-fn test_offline_proofs() {
-  let setup_data = SetupData {
-    r1cs_types:              vec![
-      R1CSType::Raw(CHACHA20_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
-    ],
-    witness_generator_types: vec![
-      WitnessGeneratorType::Wasm {
-        path:      String::from("../proofs"),
-        wtns_path: String::from("witness.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from("../proofs"),
-        wtns_path: String::from("witness.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from("../proofs"),
-        wtns_path: String::from("witness.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from("../proofs"),
-        wtns_path: String::from("witness.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from("../proofs"),
-        wtns_path: String::from("witness.wtns"),
-      },
-    ],
-    max_rom_length:          JSON_MAX_ROM_LENGTH,
-  };
-  let public_params = program::setup(&setup_data);
+// #[test]
+// #[tracing_test::traced_test]
+// #[ignore]
+// fn test_offline_proofs() {
+//   let setup_data = SetupData {
+//     r1cs_types:              vec![
+//       R1CSType::Raw(CHACHA20_R1CS.to_vec()),
+//       R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
+//       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
+//       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
+//       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+//     ],
+//     witness_generator_types: vec![
+//       WitnessGeneratorType::Wasm {
+//         path:      String::from("../proofs"),
+//         wtns_path: String::from("witness.wtns"),
+//       },
+//       WitnessGeneratorType::Wasm {
+//         path:      String::from("../proofs"),
+//         wtns_path: String::from("witness.wtns"),
+//       },
+//       WitnessGeneratorType::Wasm {
+//         path:      String::from("../proofs"),
+//         wtns_path: String::from("witness.wtns"),
+//       },
+//       WitnessGeneratorType::Wasm {
+//         path:      String::from("../proofs"),
+//         wtns_path: String::from("witness.wtns"),
+//       },
+//       WitnessGeneratorType::Wasm {
+//         path:      String::from("../proofs"),
+//         wtns_path: String::from("witness.wtns"),
+//       },
+//     ],
+//     max_rom_length:          JSON_MAX_ROM_LENGTH,
+//   };
+//   let public_params = program::setup(&setup_data);
 
-  let program_data = ProgramData::<Online, NotExpanded> {
-    public_params,
-    setup_data,
-    rom_data: HashMap::new(),
-    rom: vec![],
-    initial_nivc_input: vec![],
-    inputs: HashMap::new(),
-    witnesses: vec![vec![F::<G1>::from(0)]],
-  };
-  let _ = program_data
-    .into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup_aes.bin").unwrap());
-}
+//   let program_data = ProgramData::<Online, NotExpanded> {
+//     public_params,
+//     setup_data,
+//     rom_data: HashMap::new(),
+//     rom: vec![],
+//     initial_nivc_input: vec![],
+//     inputs: HashMap::new(),
+//     witnesses: vec![vec![F::<G1>::from(0)]],
+//   };
+//   let _ = program_data
+//     .into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup_aes.bin").unwrap());
+// }
