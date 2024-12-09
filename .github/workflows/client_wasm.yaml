@@ -72,6 +72,10 @@ jobs:
         with:
           package: client_wasm
           baseline-ref: origin/main
+          release-type: minor
+          manifest-path: ./Cargo.toml
+          check-only-explicit-features: true
+          public-api-crates: client_wasm
 
       # TODO run automated tests?
       #      wasm-pack test --firefox
