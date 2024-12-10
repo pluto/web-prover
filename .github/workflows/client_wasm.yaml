@@ -70,11 +70,9 @@ jobs:
         env: 
           NOTARY_CA_CERT_PATH: ../../fixture/certs/ca-cert.cer
         with:
-          package: client_wasm
           baseline-ref: origin/main
-          release-type: minor
-          manifest-path: ./client/Cargo.toml
-          check-only-explicit-features: true
+          manifest-path: client_wasm/Cargo.toml
+          package: client_wasm
 
       # TODO run automated tests?
       #      wasm-pack test --firefox

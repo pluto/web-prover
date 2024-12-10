@@ -44,11 +44,9 @@ jobs:
         env: 
           NOTARY_CA_CERT_PATH: ../../fixture/certs/ca-cert.cer
         with:
-          package: client
           baseline-ref: origin/main
-          release-type: minor
-          manifest-path: ./client/Cargo.toml
-          check-only-explicit-features: true
+          manifest-path: client/Cargo.toml
+          package: client
       - run: |
           RUST_LOG=DEBUG cargo +nightly-2024-10-28 run --release -p notary -- --config ./fixture/notary-config.toml &
           sleep 30

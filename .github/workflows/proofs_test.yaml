@@ -37,6 +37,7 @@ jobs:
         with:
           package: proofs
           baseline-ref: origin/main
+          manifest-path: proofs/Cargo.toml
           
   build:
     needs: setup

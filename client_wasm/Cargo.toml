@@ -3,6 +3,7 @@ name   ="client_wasm"
 version="0.1.0"
 edition="2021"
 build="../build.rs"
+publish = false
 
 [lib]
 crate-type=["cdylib", "rlib"]
