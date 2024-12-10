@@ -31,4 +31,7 @@ proof: web-prover-circuits-1024
 	cargo test --release --features timing -- tests::test_end_to_end_proofs --exact --show-output
 
 params:
-	cargo test -- tests::test_offline_proofs --exact --show-output --ignored
+	cargo test --release -- tests::test_offline_proofs --exact --show-output --ignored
+
+compressed_params:
+	cargo test --release -- tests::test_compressed_proof_params --exact --show-output --ignored

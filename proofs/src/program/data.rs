@@ -1,4 +1,6 @@
 use std::io::Write;
+use std::fs::{self, File};
+
 
 use client_side_prover::{
   fast_serde::FastSerde,
@@ -319,15 +321,12 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
     let aux_param_bytes = aux_params.to_bytes();
 
     if let Some(parent) = path.parent() {
-      std::fs::create_dir_all(parent)?;
+      fs::create_dir_all(parent)?;
     }
-
-    let stem = path.file_stem().unwrap().to_str().unwrap();
-    let root = path.parent().unwrap().to_str().unwrap();
-    let bytes_path = format!("{}/{}.bytes", root, stem);
+    
+    let bytes_path = path.with_extension("bytes");
     debug!("bytes_path={:?}", bytes_path);
-    let mut bytes_file = std::fs::File::create(&bytes_path)?;
-    bytes_file.write_all(&aux_param_bytes)?;
+    File::create(&bytes_path)?.write_all(&aux_param_bytes).unwrap();
 
     let Self { setup_data, rom_data, rom, initial_nivc_input, inputs, witnesses, .. } = self;
     Ok(ProgramData {

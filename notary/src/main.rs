@@ -46,6 +46,14 @@ struct SharedState {
   tlsn_max_sent_data: usize,
   tlsn_max_recv_data: usize,
   origo_sessions:     Arc<Mutex<HashMap<String, OrigoSession>>>,
+
+  // Load the public params (~100MB)
+  // Load the VK file (~300MB)
+  // - We need the VK r1cs files. On the notary, they don't exist elsewhere. 
+  // - We may need to implement fast_serde for it, but it'll require new objects because r1cs shapes are the bulk of the data. 
+  // - Start with bincode::deserialize and test perf
+  // We don't need the pk!
+  //
 }
 
 #[derive(Debug, Clone)]
@@ -113,6 +121,7 @@ async fn main() -> Result<(), NotaryServerError> {
     .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
     .route("/v1/origo", get(origo::proxy))
     .route("/v1/origo/sign", post(origo::sign))
+    .route("/v1/origo/verify", post(origo::verify))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
 

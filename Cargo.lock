@@ -1325,7 +1325,7 @@ dependencies = [
 [[package]]
 name = "client-side-prover"
 version = "0.1.0"
-source = "git+https://github.com/pluto/client-side-prover?rev=9576f74208cd64e10d5159471ba7c71a2292ed2f#9576f74208cd64e10d5159471ba7c71a2292ed2f"
+source = "git+https://github.com/pluto/client-side-prover?branch=tl-compress-serde#302d9c5fa4742e92c19dc18bf7068b3a5c9541e6"
 dependencies = [
  "bellpepper",
  "bellpepper-core",
@@ -4401,6 +4401,7 @@ dependencies = [
  "client-side-prover",
  "ff",
  "halo2curves",
+ "hex",
  "itertools 0.13.0",
  "light-poseidon",
  "num-bigint 0.4.6",

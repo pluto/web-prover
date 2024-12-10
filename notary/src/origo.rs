@@ -640,6 +640,17 @@ pub async fn proxy(
   }
 }
 
+// Verify a proof 
+// - accept as input bytes from a proof object (~200kb)
+// - behind the scenes our underlying config/shared state should:
+// -- have loaded the VK data (including r1cs)
+// -- initialized the VK using that data
+// - in the name of fast notary boot, it would be ideal if either the data existed in the bin or loaded in <5s (via fast_serde)
+// - now, verify the proof, if true return a signed response. 
+pub async fn verify() {
+    todo!("implement me");
+}
+
 pub async fn websocket_notarize(
   socket: WebSocket,
   session_id: String,
