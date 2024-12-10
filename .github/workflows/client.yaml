@@ -47,9 +47,8 @@ jobs:
           package: client
           baseline-ref: origin/main
           release-type: minor
-          manifest-path: ./Cargo.toml
+          manifest-path: ./client/Cargo.toml
           check-only-explicit-features: true
-          public-api-crates: client
       - run: |
           RUST_LOG=DEBUG cargo +nightly-2024-10-28 run --release -p notary -- --config ./fixture/notary-config.toml &
           sleep 30

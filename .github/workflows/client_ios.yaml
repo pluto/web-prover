@@ -52,12 +52,9 @@ jobs:
         env: 
           NOTARY_CA_CERT_PATH: ../../fixture/certs/ca-cert.cer
         with:
-          package: client_ios
-          baseline-ref: origin/main
           release-type: minor
-          manifest-path: ./Cargo.toml
+          manifest-path: ./client/Cargo.toml
           check-only-explicit-features: true
-          public-api-crates: client_ios
 
       - name: Compile iOS
         run: |
