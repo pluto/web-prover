@@ -83,7 +83,8 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, Clie
     .id(config.session_id.clone())
     .root_cert_store(root_store)
     .server_dns(config.target_host()?)
-    .max_transcript_size(max_sent_data + max_recv_data)
+    .max_sent_data(max_sent_data)
+    .max_recv_data(max_recv_data)
     .build()
     .map_err(|e| ClientErrors::Other(e.to_string()))?;
 
