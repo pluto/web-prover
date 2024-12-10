@@ -1,6 +1,7 @@
-use std::io::Write;
-use std::fs::{self, File};
-
+use std::{
+  fs::{self, File},
+  io::Write,
+};
 
 use client_side_prover::{
   fast_serde::FastSerde,
@@ -323,7 +324,7 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
     if let Some(parent) = path.parent() {
       fs::create_dir_all(parent)?;
     }
-    
+
     let bytes_path = path.with_extension("bytes");
     debug!("bytes_path={:?}", bytes_path);
     File::create(&bytes_path)?.write_all(&aux_param_bytes).unwrap();

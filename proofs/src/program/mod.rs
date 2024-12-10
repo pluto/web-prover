@@ -193,22 +193,27 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
   Ok(recursive_snark?)
 }
 
-use client_side_prover::{traits::Dual, provider::Bn256EngineKZG};
+use client_side_prover::{provider::Bn256EngineKZG, traits::Dual};
 use hex;
 
 pub fn compress_proof_no_setup(
   recursive_snark: &RecursiveSNARK<E1>,
   public_params: &PublicParams<E1>,
 ) -> Result<Proof<CompressedSNARK<E1, S1, S2>>, ProofError> {
-
-  // TODO: We need to load these, hardcode to prove it works. 
-  let vk_digest = hex::decode("371cdcd621b427a3beb551f5b1bee5f8c01cb4f33524703d0a34034ec6f18a03").unwrap();
-  let vk_digest_secondary = hex::decode("d83bc114da0fa6d8571d8d8956105d9352820fbdf4f40cc82466292330327101").unwrap();
+  // TODO: We need to load these, hardcode to prove it works.
+  let vk_digest =
+    hex::decode("371cdcd621b427a3beb551f5b1bee5f8c01cb4f33524703d0a34034ec6f18a03").unwrap();
+  let vk_digest_secondary =
+    hex::decode("d83bc114da0fa6d8571d8d8956105d9352820fbdf4f40cc82466292330327101").unwrap();
   let pk = CompressedSNARK::<E1, S1, S2>::initialize_pk(
     &public_params,
-    <Bn256EngineKZG as client_side_prover::traits::Engine>::Scalar::from_bytes(&vk_digest.try_into().unwrap()).unwrap(),
+    <Bn256EngineKZG as client_side_prover::traits::Engine>::Scalar::from_bytes(
+      &vk_digest.try_into().unwrap(),
+    )
+    .unwrap(),
     <Dual<E1> as Engine>::Scalar::from_bytes(&vk_digest_secondary.try_into().unwrap()).unwrap(),
-  ).unwrap();
+  )
+  .unwrap();
 
   let proof = Proof(CompressedSNARK::<E1, S1, S2>::prove(&public_params, &pk, recursive_snark)?);
   debug!("`CompressedSNARK::prove completed!");
@@ -224,7 +229,7 @@ pub fn compress_proof(
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
   let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(public_params)?;
-  debug!("Done setting up `CompressedSNARK`"); 
+  debug!("Done setting up `CompressedSNARK`");
   #[cfg(feature = "timing")]
   trace!("`CompressedSNARK::setup` elapsed: {:?}", time.elapsed());
 
