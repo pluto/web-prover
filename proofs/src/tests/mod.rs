@@ -3,14 +3,15 @@
 // TODO: (Colin): I'm noticing this module could use some TLC. There's a lot of lint here!
 
 use client_side_prover::supernova::RecursiveSNARK;
-use program::data::{CircuitData, InstructionConfig};
 use serde_json::json;
-use witness::{compute_http_witness, compute_json_witness};
 
 use super::*;
 use crate::{
-  program::{data::NotExpanded, manifest::to_chacha_input},
-  witness::data_hasher,
+  program::{
+    data::{CircuitData, InstructionConfig, NotExpanded},
+    manifest::to_chacha_input,
+  },
+  witness::{compute_http_witness, compute_json_witness, data_hasher, ByteOrPad},
 };
 
 mod witnesscalc;
@@ -64,7 +65,7 @@ const EXTRACT_VALUE_GRAPH: &[u8] =
 //        ]
 //    }
 // }
-const HTTP_RESPONSE_PLAINTEXT: (&str, [i16; 320]) = ("plainText", [
+const HTTP_RESPONSE_PLAINTEXT: (&str, [u8; 320]) = ("plainText", [
   72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101, 110,
   116, 45, 116, 121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106,
   115, 111, 110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13, 10, 99,
@@ -82,7 +83,7 @@ const HTTP_RESPONSE_PLAINTEXT: (&str, [i16; 320]) = ("plainText", [
   10, 32, 32, 32, 125, 13, 10, 125,
 ]);
 
-const CHACHA20_CIPHERTEXT: (&str, [i16; 320]) = ("cipherText", [
+const CHACHA20_CIPHERTEXT: (&str, [u8; 320]) = ("cipherText", [
   2, 125, 219, 141, 140, 93, 49, 129, 95, 178, 135, 109, 48, 36, 194, 46, 239, 155, 160, 70, 208,
   147, 37, 212, 17, 195, 149, 190, 38, 215, 23, 241, 84, 204, 167, 184, 179, 172, 187, 145, 38, 75,
   123, 96, 81, 6, 149, 36, 135, 227, 226, 254, 177, 90, 241, 159, 0, 230, 183, 163, 210, 88, 133,
@@ -172,21 +173,17 @@ fn test_end_to_end_proofs() {
 
   let nonce = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4a, 0x00, 0x00, 0x00, 0x00];
 
-  let mut padded_plaintext = HTTP_RESPONSE_PLAINTEXT.1.to_vec();
-  padded_plaintext.extend(std::iter::repeat(-1).take(1024 - HTTP_RESPONSE_PLAINTEXT.1.len()));
+  let padded_plaintext = ByteOrPad::from_bytes_with_padding(
+    &HTTP_RESPONSE_PLAINTEXT.1,
+    1024 - HTTP_RESPONSE_PLAINTEXT.1.len(),
+  );
 
-  let mut padded_ciphertext = CHACHA20_CIPHERTEXT.1.to_vec();
-  padded_ciphertext.extend(std::iter::repeat(-1).take(1024 - CHACHA20_CIPHERTEXT.1.len()));
+  let padded_ciphertext =
+    ByteOrPad::from_bytes_with_padding(&CHACHA20_CIPHERTEXT.1, 1024 - CHACHA20_CIPHERTEXT.1.len());
 
   assert!(padded_plaintext.len() == padded_ciphertext.len());
   assert_eq!(padded_ciphertext.len(), 1024);
   let ciphertext_hash = data_hasher(&padded_ciphertext);
-
-  let positive_plaintext = padded_plaintext
-    .iter()
-    .map(|&x| if x == -1 { -F::<G1>::ONE } else { F::<G1>::from(x as u64) })
-    .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
-    .collect::<Vec<String>>();
 
   let chacha_rom_opcode_config = InstructionConfig {
     name:          String::from("PLAINTEXT_AUTHENTICATION"),
@@ -194,7 +191,7 @@ fn test_end_to_end_proofs() {
       (String::from(CHACHA20_KEY.0), json!(to_chacha_input(&CHACHA20_KEY.1))),
       (String::from(CHACHA20_NONCE.0), json!(to_chacha_input(&nonce))),
       (String::from("counter"), json!(to_chacha_input(&[1]))),
-      (String::from(HTTP_RESPONSE_PLAINTEXT.0), json!(&positive_plaintext)),
+      (String::from(HTTP_RESPONSE_PLAINTEXT.0), json!(&padded_plaintext)),
     ]),
   };
   let mut rom = vec![chacha_rom_opcode_config];
@@ -207,15 +204,9 @@ fn test_end_to_end_proofs() {
   let http_header_1_hash =
     data_hasher(&compute_http_witness(&padded_plaintext, witness::HttpMaskType::Header(1)));
   let http_body = compute_http_witness(&padded_plaintext, witness::HttpMaskType::Body);
-  let http_body_cast = http_body
-    .iter()
-    .map(|&x| if x == -1 { -F::<G1>::ONE } else { F::<G1>::from(x as u64) })
-    .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
-    .collect::<Vec<String>>();
 
   let http_body_hash = data_hasher(&http_body);
-  let mut http_header_hashes: [String; MAX_HTTP_HEADERS] =
-    core::array::from_fn(|_| String::from("0"));
+  let mut http_header_hashes = vec!["0".to_string(); MAX_HTTP_HEADERS];
   http_header_hashes[1] =
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_header_1_hash.to_bytes()).to_str_radix(10);
 
@@ -240,7 +231,7 @@ fn test_end_to_end_proofs() {
     InstructionConfig {
       name:          String::from("HTTP_VERIFICATION"),
       private_input: HashMap::from([
-        (String::from("data"), json!(&positive_plaintext)),
+        (String::from("data"), json!(&padded_plaintext)),
         (
           String::from("start_line_hash"),
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
@@ -257,7 +248,7 @@ fn test_end_to_end_proofs() {
     InstructionConfig {
       name:          String::from("JSON_MASK_OBJECT_1"),
       private_input: HashMap::from([
-        (String::from("data"), json!(http_body_cast)),
+        (String::from("data"), json!(&http_body)),
         (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
         (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
       ]),
@@ -315,9 +306,9 @@ fn test_end_to_end_proofs() {
 
   let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
 
-  let val = "\"Taylor Swift\"".as_bytes().iter().map(|x| *x as i16).collect::<Vec<i16>>();
-  let mut final_value = [0; MAX_VALUE_LENGTH];
-  final_value[..val.len()].copy_from_slice(&val);
+  let val = "\"Taylor Swift\"".as_bytes();
+  let mut final_value = ByteOrPad::from_bytes(val);
+  final_value.resize(MAX_VALUE_LENGTH, ByteOrPad::Byte(0));
 
   assert_eq!(*recursive_snark.zi_primary().first().unwrap(), data_hasher(&final_value));
 

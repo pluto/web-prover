@@ -11,7 +11,7 @@ use proofs::{
   program::{
     self,
     data::{Expanded, NotExpanded, Offline, Online, ProgramData},
-    manifest::NivcCircuitInputs,
+    manifest::{NivcCircuitInputs, TLSEncryption},
   },
   G1,
 };
@@ -71,7 +71,8 @@ async fn generate_program_data(
   proving: ProvingData,
   proving_params: Option<Vec<u8>>,
 ) -> Result<ProgramData<Online, Expanded>, errors::ClientErrors> {
-  let (request_inputs, _response_inputs) = decrypt_tls_ciphertext(witness)?;
+  let TLSEncryption { request: request_inputs, response: response_inputs } =
+    decrypt_tls_ciphertext(witness)?;
 
   let request_setup_data = construct_setup_data();
 
