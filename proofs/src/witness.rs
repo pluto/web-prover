@@ -20,7 +20,8 @@ pub enum JsonMaskType {
 /// - `mask_at`: the [`JsonMaskType`] of the JSON request/response to mask
 /// # Returns
 /// - the masked JSON request/response
-pub fn compute_json_witness(masked_plaintext: &[i16], mask_at: JsonMaskType) -> Vec<u8> {
+pub fn compute_json_witness(masked_plaintext: &[i16], mask_at: JsonMaskType) -> Vec<i16> {
+  // filter out padding and whitespace and convert to serde_json::Value
   let json_bytes = masked_plaintext
     .iter()
     .filter(|&&x| !(x == -1 || x == 0 || (x as u8).is_ascii_whitespace()))
@@ -28,6 +29,8 @@ pub fn compute_json_witness(masked_plaintext: &[i16], mask_at: JsonMaskType) -> 
     .map(|x| x as u8)
     .collect::<Vec<u8>>();
   let json: Value = serde_json::from_slice(&json_bytes).unwrap();
+
+  // get the data to mask and convert to bytes
   let data = match mask_at {
     JsonMaskType::Object(key) => json.get(String::from_utf8(key).unwrap()).unwrap(),
     JsonMaskType::ArrayIndex(idx) => json.as_array().unwrap().get(idx).unwrap(),
@@ -39,7 +42,8 @@ pub fn compute_json_witness(masked_plaintext: &[i16], mask_at: JsonMaskType) -> 
     .iter()
     .filter(|&&x| !(x == 0 || x.is_ascii_whitespace()))
     .copied()
-    .collect::<Vec<u8>>();
+    .map(|x| x as i16)
+    .collect::<Vec<i16>>();
   let mut start_idx: Option<usize> = None;
   let mut end_idx: Option<usize> = None;
   // Iterate through the original bytes and find the subobject
@@ -50,12 +54,9 @@ pub fn compute_json_witness(masked_plaintext: &[i16], mask_at: JsonMaskType) -> 
       .iter()
       .filter(|&&x| !(x == -1 || x == 0 || (x as u8).is_ascii_whitespace()))
       .copied()
-      .map(|x| x as u8)
-      .collect::<Vec<u8>>();
+      .collect::<Vec<i16>>();
     filtered_body.truncate(filtered_data_bytes.len());
-    if filtered_data_bytes == filtered_body
-      && (*filtered_data_bytes.first().unwrap() as i16) == *byte
-    {
+    if filtered_data_bytes == filtered_body && (*filtered_data_bytes.first().unwrap()) == *byte {
       start_idx = Some(idx);
     }
   }
@@ -64,14 +65,11 @@ pub fn compute_json_witness(masked_plaintext: &[i16], mask_at: JsonMaskType) -> 
       .iter()
       .filter(|&&x| !(x == -1 || x == 0 || (x as u8).is_ascii_whitespace()))
       .copied()
-      .map(|x| x as u8)
-      .collect::<Vec<u8>>();
+      .collect::<Vec<i16>>();
     filtered_body.reverse();
     filtered_body.truncate(filtered_data_bytes.len());
     filtered_body.reverse();
-    if filtered_data_bytes == filtered_body
-      && (*filtered_data_bytes.last().unwrap() as i16) == *byte
-    {
+    if filtered_data_bytes == filtered_body && (*filtered_data_bytes.last().unwrap()) == *byte {
       end_idx = Some(idx);
     }
   }
@@ -80,8 +78,8 @@ pub fn compute_json_witness(masked_plaintext: &[i16], mask_at: JsonMaskType) -> 
   masked_plaintext
     .iter()
     .enumerate()
-    .map(|(i, &x)| if i >= start_idx && i <= end_idx { x as u8 } else { 0 })
-    .collect::<Vec<u8>>()
+    .map(|(i, &x)| if i >= start_idx && i <= end_idx { x } else { 0 })
+    .collect::<Vec<i16>>()
 }
 
 pub enum HttpMaskType {
@@ -463,7 +461,7 @@ mod tests {
     32, 32, 32, 32, 32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125,
   ];
 
-  const MASKED_KEY0_ARRAY: &[u8] = &[
+  const MASKED_KEY0_ARRAY: &[i16] = &[
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -478,7 +476,7 @@ mod tests {
     125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32,
     32, 93, 13, 10, 32, 32, 32, 125, 0, 0, 0,
   ];
-  const MASKED_KEY1_ARRAY: &[u8] = &[
+  const MASKED_KEY1_ARRAY: &[i16] = &[
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -493,7 +491,7 @@ mod tests {
     32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 93, 0, 0, 0, 0, 0,
     0, 0, 0, 0,
   ];
-  const MASKED_ARR0_ARRAY: &[u8] = &[
+  const MASKED_ARR0_ARRAY: &[i16] = &[
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -507,7 +505,7 @@ mod tests {
     32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32,
     32, 32, 32, 32, 32, 125, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   ];
-  const MASKED_KEY2_ARRAY: &[u8] = &[
+  const MASKED_KEY2_ARRAY: &[i16] = &[
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -521,7 +519,7 @@ mod tests {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   ];
 
-  const MASKED_KEY3_ARRAY: &[u8] = &[
+  const MASKED_KEY3_ARRAY: &[i16] = &[
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -566,16 +564,12 @@ mod tests {
   fn test_compute_json_masking_sequence() {
     let masked_array = compute_json_witness(TEST_HTTP_BODY, JsonMaskType::Object(KEY0.to_vec()));
     assert_eq!(masked_array, MASKED_KEY0_ARRAY);
-    let masked_array = masked_array.iter().map(|x| *x as i16).collect::<Vec<i16>>();
     let masked_array = compute_json_witness(&masked_array, JsonMaskType::Object(KEY1.to_vec()));
     assert_eq!(masked_array, MASKED_KEY1_ARRAY);
-    let masked_array = masked_array.iter().map(|x| *x as i16).collect::<Vec<i16>>();
     let masked_array = compute_json_witness(&masked_array, JsonMaskType::ArrayIndex(0));
     assert_eq!(masked_array, MASKED_ARR0_ARRAY);
-    let masked_array = masked_array.iter().map(|x| *x as i16).collect::<Vec<i16>>();
     let masked_array = compute_json_witness(&masked_array, JsonMaskType::Object(KEY2.to_vec()));
     assert_eq!(masked_array, MASKED_KEY2_ARRAY);
-    let masked_array = masked_array.iter().map(|x| *x as i16).collect::<Vec<i16>>();
     let masked_array = compute_json_witness(&masked_array, JsonMaskType::Object(KEY3.to_vec()));
     assert_eq!(masked_array, MASKED_KEY3_ARRAY);
   }

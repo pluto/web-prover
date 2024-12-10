@@ -34,59 +34,6 @@ use crate::{
   witness::{compute_http_header_witness, compute_http_witness, compute_json_witness, data_hasher},
 };
 
-/// JSON key required to extract particular value from response
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum JsonKey {
-  /// Object key
-  String(String),
-  /// Array index
-  Num(usize),
-}
-
-/// JSON keys: `["a", "b", 0, "c"]`
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ResponseBody {
-  json: Vec<JsonKey>,
-}
-
-/// HTTP Response items required for circuits
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Response {
-  /// HTTP response status
-  status:  String,
-  /// HTTP version
-  version: String,
-  /// HTTP response message
-  message: String,
-  /// HTTP headers to lock
-  headers: HashMap<String, String>,
-  /// HTTP body keys
-  body:    ResponseBody,
-}
-
-/// HTTP Request items required for circuits
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Request {
-  /// HTTP method (GET or POST)
-  method:      String,
-  /// HTTP request URL
-  url:         String,
-  /// HTTP version
-  version:     String,
-  /// Request headers to lock
-  pub headers: HashMap<String, String>,
-}
-
-/// Manifest containing [`Request`] and [`Response`]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Manifest {
-  /// HTTP request lock items
-  pub request:  Request,
-  /// HTTP response lock items
-  pub response: Response,
-}
-
 /// encryption plaintext signal label
 const PLAINTEXT_SIGNAL_LABEL: &str = "plainText";
 /// encryption circuit ciphertext signal label
@@ -119,6 +66,70 @@ const JSON_MASK_OBJECT_KEYLEN_NAME: &str = "keyLen";
 const JSON_MAX_KEY_LENGTH: usize = 10;
 const JSON_MASK_ARRAY_SIGNAL_NAME: &str = "index";
 
+/// ideal circuit size to used for a plaintext
+const CIRCUIT_SIZE: usize = 1024;
+
+/// JSON key required to extract particular value from response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum JsonKey {
+  /// Object key
+  String(String),
+  /// Array index
+  Num(usize),
+}
+
+/// JSON keys: `["a", "b", 0, "c"]`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ResponseBody {
+  json: Vec<JsonKey>,
+}
+
+/// HTTP Response items required for circuits
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Response {
+  /// HTTP response status
+  status:  String,
+  /// HTTP version
+  #[serde(default = "default_version")]
+  version: String,
+  /// HTTP response message
+  #[serde(default = "default_message")]
+  message: String,
+  /// HTTP headers to lock
+  headers: HashMap<String, String>,
+  /// HTTP body keys
+  body:    ResponseBody,
+}
+
+/// HTTP Request items required for circuits
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Request {
+  /// HTTP method (GET or POST)
+  method:      String,
+  /// HTTP request URL
+  url:         String,
+  /// HTTP version
+  #[serde(default = "default_version")]
+  version:     String,
+  /// Request headers to lock
+  pub headers: HashMap<String, String>,
+}
+
+/// Default HTTP version
+fn default_version() -> String { "HTTP/1.1".to_string() }
+/// Default HTTP message
+fn default_message() -> String { "OK".to_string() }
+
+/// Manifest containing [`Request`] and [`Response`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Manifest {
+  /// HTTP request lock items
+  pub request:  Request,
+  /// HTTP response lock items
+  pub response: Response,
+}
+
 /// generates AES counter for each block
 fn generate_aes_counter(plaintext_blocks: usize) -> Vec<u8> {
   let mut ctr = Vec::new();
@@ -143,8 +154,25 @@ pub struct EncryptionInput {
   pub ciphertext: Vec<u8>,
 }
 
-/// ideal circuit size to used for a plaintext with a minimum size of 512 bytes
-const CIRCUIT_SIZE: usize = 1024;
+/// TLS encryption input for request and response proving
+pub struct TLSEncryption {
+  pub request:  EncryptionInput,
+  pub response: EncryptionInput,
+}
+
+/// encryption circuit input for AES/CHACHA
+struct EncryptionCircuitInput {
+  /// padded plaintext
+  plaintext:   Vec<i16>,
+  /// padded ciphertext
+  ciphertext:  Vec<i16>,
+  /// ROM containing circuit instructions
+  rom_data:    HashMap<String, CircuitData>,
+  /// ROM containing circuit instructions
+  rom:         Vec<InstructionConfig>,
+  /// any input that will be distributed across folds
+  fold_inputs: HashMap<String, FoldInput>,
+}
 
 /// convert bytes to u32
 fn to_u32_array(input: &[u8]) -> Vec<u32> {
@@ -187,14 +215,6 @@ pub fn make_nonce(iv: [u8; 12], seq: u64) -> [u8; 12] {
   });
 
   nonce
-}
-
-struct EncryptionCircuitInput {
-  plaintext:   Vec<i16>,
-  ciphertext:  Vec<i16>,
-  rom_data:    HashMap<String, CircuitData>,
-  rom:         Vec<InstructionConfig>,
-  fold_inputs: HashMap<String, FoldInput>,
 }
 
 /// create ROM circuit data for encryption circuit from TLS inputs
@@ -274,7 +294,7 @@ fn handle_encryption_circuit_inputs(inputs: &EncryptionInput) -> EncryptionCircu
 
       let positive_plaintext = plaintext
         .iter()
-        .map(|x| if *x == -1 { -F::<G1>::ONE } else { F::<G1>::from(*x as u64) })
+        .map(|&x| if x == -1 { -F::<G1>::ONE } else { F::<G1>::from(x as u64) })
         .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
         .collect::<Vec<String>>();
 
@@ -311,8 +331,7 @@ pub struct NivcCircuitInputs {
 }
 
 impl Manifest {
-  /// generates [`crate::program::ProgramData::rom_data`] and [`crate::program::ProgramData::rom`]
-  /// from [`Manifest::request`]
+  /// generates [`NivcCircuitInputs`] from [`Manifest::request`] and [`EncryptionInput`]
   pub fn rom_from_request(&self, inputs: EncryptionInput) -> NivcCircuitInputs {
     assert_eq!(inputs.plaintext.len(), inputs.ciphertext.len());
 
@@ -322,7 +341,7 @@ impl Manifest {
     // TODO (Sambhav): this is redundant work, done already in handle_encryption_circuit_inputs
     let positive_plaintext = plaintext
       .iter()
-      .map(|x| if *x == -1 { -F::<G1>::ONE } else { F::<G1>::from(*x as u64) })
+      .map(|&x| if x == -1 { -F::<G1>::ONE } else { F::<G1>::from(x as u64) })
       .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
       .collect::<Vec<String>>();
     let ciphertext_hash = data_hasher(&ciphertext);
@@ -374,7 +393,7 @@ impl Manifest {
 
     let positive_plaintext = plaintext
       .iter()
-      .map(|x| if *x == -1 { -F::<G1>::ONE } else { F::<G1>::from(*x as u64) })
+      .map(|&x| if x == -1 { -F::<G1>::ONE } else { F::<G1>::from(x as u64) })
       .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
       .collect::<Vec<String>>();
     let ciphertext_hash = data_hasher(&ciphertext);
@@ -417,7 +436,7 @@ impl Manifest {
     for (i, key) in self.response.body.json.iter().enumerate() {
       let masked_body_cast = masked_body
         .iter()
-        .map(|x| if *x == -1 { -F::<G1>::ONE } else { F::<G1>::from(*x as u64) })
+        .map(|&x| if x == -1 { -F::<G1>::ONE } else { F::<G1>::from(x as u64) })
         .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
         .collect::<Vec<String>>();
 
@@ -435,24 +454,22 @@ impl Manifest {
               (String::from(JSON_MASK_OBJECT_KEYLEN_NAME), json!([json_key.len()])),
             ]),
           });
-          let masked_body_res = compute_json_witness(
+          masked_body = compute_json_witness(
             &masked_body,
             crate::witness::JsonMaskType::Object(json_key.as_bytes().to_vec()),
           );
-          masked_body = masked_body_res.iter().map(|x| *x as i16).collect();
         },
         JsonKey::Num(index) => {
           rom_data.insert(format!("JSON_MASK_ARRAY_{}", i + 1), CircuitData { opcode: 3 });
           rom.push(InstructionConfig {
             name:          format!("JSON_MASK_ARRAY_{}", i + 1),
             private_input: HashMap::from([
-              (String::from("data"), json!(masked_body)),
+              (String::from("data"), json!(masked_body_cast)),
               (String::from(JSON_MASK_ARRAY_SIGNAL_NAME), json!([index])),
             ]),
           });
-          let masked_body_res =
+          masked_body =
             compute_json_witness(&masked_body, crate::witness::JsonMaskType::ArrayIndex(*index));
-          masked_body = masked_body_res.iter().map(|x| *x as i16).collect();
         },
       }
     }

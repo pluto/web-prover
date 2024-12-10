@@ -3,7 +3,6 @@
 // TODO: (Colin): I'm noticing this module could use some TLC. There's a lot of lint here!
 
 use client_side_prover::supernova::RecursiveSNARK;
-use halo2curves::bn256::Fr;
 use program::data::{CircuitData, InstructionConfig};
 use serde_json::json;
 use witness::{compute_http_witness, compute_json_witness};
@@ -185,7 +184,7 @@ fn test_end_to_end_proofs() {
 
   let positive_plaintext = padded_plaintext
     .iter()
-    .map(|x| if *x == -1 { -F::<G1>::ONE } else { F::<G1>::from(*x as u64) })
+    .map(|&x| if x == -1 { -F::<G1>::ONE } else { F::<G1>::from(x as u64) })
     .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
     .collect::<Vec<String>>();
 
@@ -210,7 +209,7 @@ fn test_end_to_end_proofs() {
   let http_body = compute_http_witness(&padded_plaintext, witness::HttpMaskType::Body);
   let http_body_cast = http_body
     .iter()
-    .map(|x| if *x == -1 { -F::<G1>::ONE } else { F::<G1>::from(*x as u64) })
+    .map(|&x| if x == -1 { -F::<G1>::ONE } else { F::<G1>::from(x as u64) })
     .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
     .collect::<Vec<String>>();
 
@@ -222,22 +221,18 @@ fn test_end_to_end_proofs() {
 
   let masked_json_key_1 =
     compute_json_witness(&http_body, witness::JsonMaskType::Object("data".as_bytes().to_vec()));
-  let masked_json_key_1_cast = masked_json_key_1.iter().map(|x| *x as i16).collect::<Vec<i16>>();
   let masked_json_key_2 = compute_json_witness(
-    &masked_json_key_1_cast,
+    &masked_json_key_1,
     witness::JsonMaskType::Object("items".as_bytes().to_vec()),
   );
-  let masked_json_key_2_cast = masked_json_key_2.iter().map(|x| *x as i16).collect::<Vec<i16>>();
   let masked_json_key_3 =
-    compute_json_witness(&masked_json_key_2_cast, witness::JsonMaskType::ArrayIndex(0));
-  let masked_json_key_3_cast = masked_json_key_3.iter().map(|x| *x as i16).collect::<Vec<i16>>();
+    compute_json_witness(&masked_json_key_2, witness::JsonMaskType::ArrayIndex(0));
   let masked_json_key_4 = compute_json_witness(
-    &masked_json_key_3_cast,
+    &masked_json_key_3,
     witness::JsonMaskType::Object("profile".as_bytes().to_vec()),
   );
-  let masked_json_key_4_cast = masked_json_key_4.iter().map(|x| *x as i16).collect::<Vec<i16>>();
   let masked_json_key_5 = compute_json_witness(
-    &masked_json_key_4_cast,
+    &masked_json_key_4,
     witness::JsonMaskType::Object("name".as_bytes().to_vec()),
   );
 

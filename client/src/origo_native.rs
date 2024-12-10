@@ -7,7 +7,7 @@ use proofs::{
   program::{
     self,
     data::{Expanded, NotExpanded, Online, ProgramData},
-    manifest::NivcCircuitInputs,
+    manifest::{NivcCircuitInputs, TLSEncryption},
   },
   F, G1,
 };
@@ -19,6 +19,14 @@ use crate::{
   circuits::*, config, config::ProvingData, errors, errors::ClientErrors, origo::SignBody,
   tls::decrypt_tls_ciphertext, Proof,
 };
+
+/// Proving data for the TLS request and response containing request and response [`ProgramData`]
+struct TLSProvingData {
+  /// TLS request proving data
+  request:  ProgramData<Online, Expanded>,
+  /// TLS response proving data
+  response: ProgramData<Online, Expanded>,
+}
 
 pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id();
@@ -37,7 +45,7 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
 
   debug!("generating program data!");
   let witness = origo_conn.to_witness_data();
-  let (request_program_data, response_program_data) =
+  let TLSProvingData { request: request_program_data, response: response_program_data } =
     generate_program_data(&witness, config.proving).await?;
 
   debug!("starting request recursive proving");
@@ -75,8 +83,9 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
 async fn generate_program_data(
   witness: &WitnessData,
   proving: ProvingData,
-) -> Result<(ProgramData<Online, Expanded>, ProgramData<Online, Expanded>), ClientErrors> {
-  let (request_inputs, response_inputs) = decrypt_tls_ciphertext(witness)?;
+) -> Result<TLSProvingData, ClientErrors> {
+  let TLSEncryption { request: request_inputs, response: response_inputs } =
+    decrypt_tls_ciphertext(witness)?;
 
   debug!("Setting up `PublicParams`... (this may take a moment)");
   // TODO (Sambhav): this will result in duplicate program setups. eliminate this.
@@ -126,7 +135,7 @@ async fn generate_program_data(
   }
   .into_expanded();
 
-  Ok((request_program_data?, response_program_data?))
+  Ok(TLSProvingData { request: request_program_data?, response: response_program_data? })
 }
 
 /// we want to be able to specify somewhere in here what cipher suite to use.
