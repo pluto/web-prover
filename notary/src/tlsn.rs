@@ -74,7 +74,8 @@ pub async fn notary_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 
   config_builder = config_builder
     .id(session_id)
-    .max_transcript_size(max_sent_data.unwrap() + max_recv_data.unwrap()); // TODO unwrap, probably shouldn't be Option in the first place
+    .max_sent_data(max_sent_data.unwrap())
+    .max_recv_data(max_recv_data.unwrap());
 
   let config = config_builder.build()?;
 
