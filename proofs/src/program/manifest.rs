@@ -70,37 +70,37 @@ pub enum JsonKey {
 
 /// JSON keys: `["a", "b", 0, "c"]`
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct ResponseBody {
-  json: Vec<JsonKey>,
+pub struct ResponseBody {
+  pub json: Vec<Key>,
 }
 
 /// HTTP Response items required for circuits
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Response {
   /// HTTP response status
-  status:  String,
+  pub status:  String,
   /// HTTP version
   #[serde(default = "default_version")]
-  version: String,
+  pub version: String,
   /// HTTP response message
   #[serde(default = "default_message")]
-  message: String,
+  pub message: String,
   /// HTTP headers to lock
-  headers: HashMap<String, String>,
+  pub headers: HashMap<String, String>,
   /// HTTP body keys
-  body:    ResponseBody,
+  pub body:    ResponseBody,
 }
 
 /// HTTP Request items required for circuits
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Request {
   /// HTTP method (GET or POST)
-  method:      String,
+  pub method:  String,
   /// HTTP request URL
-  url:         String,
+  pub url:     String,
   /// HTTP version
   #[serde(default = "default_version")]
-  version:     String,
+  pub version: String,
   /// Request headers to lock
   pub headers: HashMap<String, String>,
 }
