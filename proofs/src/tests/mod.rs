@@ -307,7 +307,7 @@ fn test_end_to_end_proofs() {
   let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
 
   let val = "\"Taylor Swift\"".as_bytes();
-  let mut final_value = ByteOrPad::from_bytes(val);
+  let mut final_value = val.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>();
   final_value.resize(MAX_VALUE_LENGTH, ByteOrPad::Byte(0));
 
   assert_eq!(*recursive_snark.zi_primary().first().unwrap(), data_hasher(&final_value));

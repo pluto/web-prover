@@ -6,7 +6,7 @@ use client_side_prover::{
 };
 use data::Expanded;
 use proof::Proof;
-use tracing::trace;
+#[cfg(feature = "timing")] use tracing::trace;
 use utils::into_input_json;
 
 use super::*;

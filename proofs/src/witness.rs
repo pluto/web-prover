@@ -4,7 +4,6 @@
 use ff::PrimeField;
 use light_poseidon::{Poseidon, PoseidonBytesHasher};
 use serde_json::Value;
-use tracing_subscriber::field::debug;
 
 use super::*;
 /// The type of JSON mask to apply depending on key's value type.
@@ -15,6 +14,7 @@ pub enum JsonMaskType {
   ArrayIndex(usize),
 }
 
+/// Struct representing a byte or padding.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ByteOrPad {
   Byte(u8),
@@ -22,16 +22,14 @@ pub enum ByteOrPad {
 }
 
 impl ByteOrPad {
-  pub fn from_bytes(bytes: &[u8]) -> Vec<ByteOrPad> {
-    bytes.iter().map(|&b| ByteOrPad::Byte(b)).collect()
-  }
-
+  /// Converts a slice of bytes to a vector of `ByteOrPad` with padding.
   pub fn from_bytes_with_padding(bytes: &[u8], padding: usize) -> Vec<ByteOrPad> {
     let mut result = bytes.iter().map(|&b| ByteOrPad::Byte(b)).collect::<Vec<_>>();
     result.extend(std::iter::repeat(ByteOrPad::Pad).take(padding));
     result
   }
 
+  /// Converts to field element, padding is represented as `-1`
   fn as_field_element(&self) -> F<G1> {
     match self {
       ByteOrPad::Byte(b) => F::<G1>::from(*b as u64),
@@ -40,6 +38,11 @@ impl ByteOrPad {
   }
 }
 
+impl From<u8> for ByteOrPad {
+  fn from(b: u8) -> Self { ByteOrPad::Byte(b) }
+}
+
+/// Converts a field element to a base10 string.
 fn field_element_to_base10_string(fe: F<G1>) -> String {
   BigInt::from_bytes_le(num_bigint::Sign::Plus, &fe.to_bytes()).to_str_radix(10)
 }
@@ -400,39 +403,50 @@ mod tests {
 
   #[test]
   fn test_compute_http_witness_start_line() {
-    let bytes =
-      compute_http_witness(&ByteOrPad::from_bytes(TEST_HTTP_BYTES), HttpMaskType::StartLine);
+    let bytes = compute_http_witness(
+      &TEST_HTTP_BYTES.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
+      HttpMaskType::StartLine,
+    );
     assert_eq!(bytes, TEST_HTTP_START_LINE);
   }
 
   #[test]
   fn test_compute_http_witness_header_0() {
-    let bytes =
-      compute_http_witness(&ByteOrPad::from_bytes(TEST_HTTP_BYTES), HttpMaskType::Header(0));
+    let bytes = compute_http_witness(
+      &TEST_HTTP_BYTES.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
+      HttpMaskType::Header(0),
+    );
     assert_eq!(bytes, TEST_HTTP_HEADER_0);
   }
 
   #[test]
   fn test_compute_http_witness_header_1() {
-    let bytes =
-      compute_http_witness(&ByteOrPad::from_bytes(TEST_HTTP_BYTES), HttpMaskType::Header(1));
+    let bytes = compute_http_witness(
+      &TEST_HTTP_BYTES.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
+      HttpMaskType::Header(1),
+    );
     assert_eq!(bytes, TEST_HTTP_HEADER_1);
   }
 
   #[test]
   fn test_compute_http_witness_body() {
-    let bytes = compute_http_witness(&ByteOrPad::from_bytes(TEST_HTTP_BYTES), HttpMaskType::Body);
+    let bytes = compute_http_witness(
+      &TEST_HTTP_BYTES.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
+      HttpMaskType::Body,
+    );
     assert_eq!(bytes, TEST_HTTP_BODY);
   }
 
   #[test]
   fn test_compute_http_witness_name() {
     let (index, bytes_from_name) = compute_http_header_witness(
-      &ByteOrPad::from_bytes(TEST_HTTP_BYTES),
+      &TEST_HTTP_BYTES.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
       "Transfer-Encoding".as_bytes(),
     );
-    let bytes_from_index =
-      compute_http_witness(&ByteOrPad::from_bytes(TEST_HTTP_BYTES), HttpMaskType::Header(2));
+    let bytes_from_index = compute_http_witness(
+      &TEST_HTTP_BYTES.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
+      HttpMaskType::Header(2),
+    );
     assert_eq!(bytes_from_index, bytes_from_name);
     assert_eq!(index, 2);
   }
@@ -440,7 +454,7 @@ mod tests {
   #[test]
   fn test_compute_http_witness_name_not_present() {
     let (_, bytes_from_name) = compute_http_header_witness(
-      &ByteOrPad::from_bytes(TEST_HTTP_BYTES),
+      &TEST_HTTP_BYTES.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
       "pluto-rocks".as_bytes(),
     );
     assert_eq!(bytes_from_name, vec![0; TEST_HTTP_BYTES.len()]);
@@ -448,16 +462,16 @@ mod tests {
 
   #[test]
   fn test_bytepack() {
-    let pack0 = bytepack(&ByteOrPad::from_bytes(&[0, 0, 0]));
+    let pack0 = bytepack(&[0, 0, 0].into_iter().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>());
     assert_eq!(pack0, Some(F::<G1>::from(0)));
 
-    let pack1 = bytepack(&ByteOrPad::from_bytes(&[1, 0, 0]));
+    let pack1 = bytepack(&[1, 0, 0].into_iter().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>());
     assert_eq!(pack1, Some(F::<G1>::from(1)));
 
-    let pack2 = bytepack(&ByteOrPad::from_bytes(&[0, 1, 0]));
+    let pack2 = bytepack(&[0, 1, 0].into_iter().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>());
     assert_eq!(pack2, Some(F::<G1>::from(256)));
 
-    let pack3 = bytepack(&ByteOrPad::from_bytes(&[0, 0, 1]));
+    let pack3 = bytepack(&[0, 0, 1].into_iter().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>());
     assert_eq!(pack3, Some(F::<G1>::from(65536)));
 
     let pack4 = bytepack(&[ByteOrPad::Pad; 3]);
@@ -625,7 +639,7 @@ mod tests {
   #[test]
   fn test_compute_json_witness() {
     let masked_array = compute_json_witness(
-      &ByteOrPad::from_bytes(TEST_HTTP_BODY),
+      &TEST_HTTP_BODY.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
       JsonMaskType::Object(KEY0.to_vec()),
     );
     assert_eq!(masked_array, MASKED_KEY0_ARRAY);
@@ -634,7 +648,7 @@ mod tests {
   #[test]
   fn test_compute_json_masking_sequence() {
     let masked_array = compute_json_witness(
-      &ByteOrPad::from_bytes(TEST_HTTP_BODY),
+      &TEST_HTTP_BODY.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
       JsonMaskType::Object(KEY0.to_vec()),
     );
     assert_eq!(masked_array, MASKED_KEY0_ARRAY);
