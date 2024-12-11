@@ -25,4 +25,4 @@ proof: web-prover-circuits-512
 	cargo test --release --features timing -- tests::test_end_to_end_proofs --exact --show-output
 
 params:
-	cargo test --release -- tests::test_offline_proofs --exact --show-output --ignored
+	cargo test -- tests::test_offline_proofs --exact --show-output --ignored

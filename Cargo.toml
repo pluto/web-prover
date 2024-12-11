@@ -44,6 +44,11 @@ tokio-rustls  ={ version="0.26.0", default-features=false, features=["logging", 
 serde         ={ version="1.0.204", features=["derive"] }
 serde_json    ="1.0.120"
 
+[profile.dev]
+opt-level      =1
+overflow-checks=false
+split-debuginfo="unpacked"
+
 [profile.release]
 opt-level    =3
 lto          ="fat"

@@ -1368,7 +1368,6 @@ name = "client_ios"
 version = "0.2.0"
 dependencies = [
  "client",
- "proofs",
  "serde",
  "serde_json",
  "tokio",
