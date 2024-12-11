@@ -18,6 +18,10 @@ use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use k256::ecdsa::SigningKey as Secp256k1SigningKey;
 use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
+use proofs::{
+  program::data::{CircuitData, InstructionConfig, NotExpanded, Offline, Online, ProgramData},
+  F, G1,
+};
 use rustls::{
   pki_types::{CertificateDer, PrivateKeyDer},
   ServerConfig,
@@ -30,19 +34,15 @@ use tower_http::cors::CorsLayer;
 use tower_service::Service;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use proofs::{
-  program::data::{NotExpanded, Online, Offline, ProgramData, CircuitData, InstructionConfig},
-  F, G1,
-};
 
 mod axum_websocket;
+mod circuits;
 mod config;
 mod errors;
 mod origo;
 mod tcp;
 mod tlsn;
 mod websocket_proxy;
-mod circuits;
 
 struct SharedState {
   notary_signing_key: SigningKey,
@@ -50,7 +50,7 @@ struct SharedState {
   tlsn_max_sent_data: usize,
   tlsn_max_recv_data: usize,
   origo_sessions:     Arc<Mutex<HashMap<String, OrigoSession>>>,
-  verifier_params: ProgramData<Online, NotExpanded>,
+  verifier_params:    ProgramData<Online, NotExpanded>,
 }
 
 #[derive(Debug, Clone)]
@@ -104,19 +104,19 @@ async fn main() -> Result<(), NotaryServerError> {
   let listener = TcpListener::bind(&c.listen).await?;
   info!("Listening on https://{}", &c.listen);
 
-
-  // TODO: Move this into a method on the proofs crate, probably also move the circuits.rs file. 
+  // TODO: Move this into a method on the proofs crate, probably also move the circuits.rs file.
   let setup_data_small = circuits::construct_setup_data(512);
-  let proving_param_bytes = std::fs::read("proofs/web_proof_circuits/serialized_setup_aes.bytes").unwrap();
-  
+  let proving_param_bytes =
+    std::fs::read("proofs/web_proof_circuits/serialized_setup_aes.bytes").unwrap();
+
   let chacha_label = String::from("CHACHA20");
   let http_label = String::from("HTTP_NIVC");
   let rom_data = HashMap::from([
     (chacha_label.clone(), CircuitData { opcode: 0 }),
-    (http_label.clone(), CircuitData { opcode: 1 })
+    (http_label.clone(), CircuitData { opcode: 1 }),
   ]);
-  
-  // NOTE: Hacky way to inform the verifier of the instruction layout. 
+
+  // NOTE: Hacky way to inform the verifier of the instruction layout.
   let rom: Vec<InstructionConfig> = vec![
     InstructionConfig { name: chacha_label, private_input: HashMap::new() },
     InstructionConfig { name: http_label, private_input: HashMap::new() },
@@ -139,7 +139,7 @@ async fn main() -> Result<(), NotaryServerError> {
     tlsn_max_sent_data: c.tlsn_max_sent_data,
     tlsn_max_recv_data: c.tlsn_max_recv_data,
     origo_sessions:     Default::default(),
-    verifier_params: program_data_small.unwrap(),
+    verifier_params:    program_data_small.unwrap(),
   });
 
   let router = Router::new()

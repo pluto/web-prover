@@ -85,9 +85,8 @@ pub async fn prover_inner_origo(
   };
 
   // TODO: Actually propagate errors up to the client
-  let verify_response = origo::verify(config, origo::VerifyBody{
-    proof: real_proof,
-  }).await.unwrap();
+  let verify_response =
+    origo::verify(config, origo::VerifyBody { proof: real_proof }).await.unwrap();
 
   // TODO: Don't assert?
   assert!(verify_response.valid);

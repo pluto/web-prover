@@ -74,10 +74,9 @@ pub struct SignBody {
   handshake_server_key: String,
 }
 
-
 #[derive(Deserialize, Debug, Clone)]
 pub struct VerifyBody {
-  proof: Vec<u8>
+  proof: Vec<u8>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -652,37 +651,32 @@ pub async fn proxy(
   }
 }
 
-use proofs::proof::Proof;
 use client_side_prover::supernova::snark::CompressedSNARK;
-use proofs::{
-  F, G2, E1, S1, S2,
-};
 use k256::elliptic_curve::Field;
+use proofs::{proof::Proof, E1, F, G2, S1, S2};
 pub async fn verify(
   State(state): State<Arc<SharedState>>,
-  extract::Json(payload): extract::Json<VerifyBody>
+  extract::Json(payload): extract::Json<VerifyBody>,
 ) -> Result<Json<VerifyReply>, ProxyError> {
-    let proving_params = &state.verifier_params;
-    let proof = Proof(payload.proof).decompress_and_serialize();
-    
-    // TODO: Replace with a process that loads from cache, i.e. `initialize_vk`
-    let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&proving_params.public_params).unwrap();
-    let (z0_primary, _) = proving_params.extend_public_inputs().unwrap();
-    let z0_secondary = vec![F::<G2>::ZERO];
+  let proving_params = &state.verifier_params;
+  let proof = Proof(payload.proof).decompress_and_serialize();
 
-    let valid = match proof.0.verify(&proving_params.public_params, &vk, &z0_primary, &z0_secondary) {
-      Ok(_) => true,
-      Err(e) => {
-        info!("Error verifying proof: {:?}", e);
-        false
-      }
-    };
+  // TODO: Replace with a process that loads from cache, i.e. `initialize_vk`
+  let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&proving_params.public_params).unwrap();
+  let (z0_primary, _) = proving_params.extend_public_inputs().unwrap();
+  let z0_secondary = vec![F::<G2>::ZERO];
 
-    let response = VerifyReply {
-      valid,
-    };
-  
-    Ok(Json(response))
+  let valid = match proof.0.verify(&proving_params.public_params, &vk, &z0_primary, &z0_secondary) {
+    Ok(_) => true,
+    Err(e) => {
+      info!("Error verifying proof: {:?}", e);
+      false
+    },
+  };
+
+  let response = VerifyReply { valid };
+
+  Ok(Json(response))
 }
 
 pub async fn websocket_notarize(

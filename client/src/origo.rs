@@ -47,7 +47,7 @@ pub async fn sign(
 
 #[derive(Serialize, Debug, Clone)]
 pub struct VerifyBody {
-  pub proof: Vec<u8>
+  pub proof: Vec<u8>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -79,7 +79,7 @@ pub async fn verify(
   let response = client.post(url).json(&verify_body).send().await?;
   assert!(response.status() == hyper::StatusCode::OK);
   let verify_response = response.json::<VerifyReply>().await?;
-  
+
   debug!("\n{:?}\n\n", verify_response.clone());
 
   Ok(verify_response)
