@@ -3,6 +3,7 @@
 
 use ff::PrimeField;
 use light_poseidon::{Poseidon, PoseidonBytesHasher};
+use program::manifest::Manifest;
 use serde_json::Value;
 
 use super::*;
@@ -302,15 +303,14 @@ fn bytepack(bytes: &[ByteOrPad]) -> Option<F<G1>> {
   }
 }
 
-/// Hashes preimage with Poseidon
-pub fn poseidon_chainer(preimage: &[F<G1>]) -> F<G1> {
-  let mut poseidon = Poseidon::<ark_bn254::Fr>::new_circom(2).unwrap();
+pub fn poseidon<const N: usize>(preimage: &[F<G1>]) -> F<G1> {
+  let mut poseidon = Poseidon::<ark_bn254::Fr>::new_circom(N).unwrap();
 
   // Convert each field element to bytes and collect into a Vec
-  let byte_arrays: Vec<[u8; 32]> = preimage.iter().map(|x| x.to_bytes()).collect();
+  let byte_arrays: Vec<[u8; 32]> = preimage.iter().map(F::<G1>::to_bytes).collect();
 
   // Create slice of references to the bytes
-  let byte_slices: Vec<&[u8]> = byte_arrays.iter().map(|arr| arr.as_slice()).collect();
+  let byte_slices: Vec<&[u8]> = byte_arrays.iter().map(<[u8; 32]>::as_slice).collect();
 
   let hash: [u8; 32] = poseidon.hash_bytes_le(&byte_slices).unwrap();
 
@@ -332,28 +332,41 @@ pub fn data_hasher(preimage: &[ByteOrPad]) -> F<G1> {
     if packed_input.is_none() {
       continue;
     }
-    hash_val = poseidon_chainer(&[hash_val, packed_input.unwrap()]);
+    hash_val = poseidon::<2>(&[hash_val, packed_input.unwrap()]);
   }
   hash_val
+}
+
+pub fn polynomial_digest(bytes: &[u8], polynomial_input: F<G1>) -> F<G1> {
+  let mut monomial = F::<G1>::ONE;
+  let mut accumulated = F::<G1>::ZERO;
+  for byte in bytes {
+    accumulated += F::<G1>::from(u64::from(*byte)) * monomial;
+    monomial *= polynomial_input;
+  }
+  accumulated
 }
 
 // TODO: Need to take into account if we enter into a value that is an object inside of object. So
 // need a bit more than just `JsonMaskType` maybe.
 pub fn json_tree_hasher(
-  key_sequence: Vec<JsonMaskType>,
-  target_value: Vec<u8>,
+  polynomial_input: F<G1>,
+  key_sequence: &[JsonMaskType],
+  target_value: &[u8],
   max_stack_height: usize,
 ) -> (Vec<[F<G1>; 2]>, Vec<[F<G1>; 2]>) {
-  assert!(key_sequence.len() < max_stack_height);
+  assert!(key_sequence.len() < max_stack_height); // TODO: This should be an error
   let mut stack = Vec::new();
   let mut tree_hashes = Vec::new();
-  for (idx, val_type) in key_sequence.iter().enumerate() {
+  for val_type in key_sequence {
     match val_type {
       JsonMaskType::Object(str_bytes) => {
         stack.push([F::<G1>::ONE, F::<G1>::ONE]);
         let mut string_hash = F::<G1>::ZERO;
+        let mut monomial = F::<G1>::ONE;
         for byte in str_bytes {
-          string_hash = poseidon_chainer(&[string_hash, F::<G1>::from(u64::from(*byte))]);
+          string_hash += monomial * F::<G1>::from(u64::from(*byte));
+          monomial *= polynomial_input;
         }
         tree_hashes.push([string_hash, F::<G1>::ZERO]);
       },
@@ -364,11 +377,69 @@ pub fn json_tree_hasher(
     }
   }
   let mut target_value_hash = F::<G1>::ZERO;
+  let mut monomial = F::<G1>::ONE;
   for byte in target_value {
-    target_value_hash = poseidon_chainer(&[target_value_hash, F::<G1>::from(u64::from(byte))]);
+    target_value_hash += monomial * F::<G1>::from(u64::from(*byte));
+    monomial *= polynomial_input;
   }
   tree_hashes[key_sequence.len() - 1] = [tree_hashes[key_sequence.len() - 1][0], target_value_hash];
   (stack, tree_hashes)
+}
+
+pub fn compress_tree_hash(
+  polynomial_input: F<G1>,
+  stack_and_tree_hashes: (Vec<[F<G1>; 2]>, Vec<[F<G1>; 2]>),
+) -> F<G1> {
+  assert!(stack_and_tree_hashes.0.len() == stack_and_tree_hashes.1.len()); // TODO: This should be an error
+  let mut accumulated = F::<G1>::ZERO;
+  let mut monomial = F::<G1>::ONE;
+  for idx in 0..stack_and_tree_hashes.0.len() {
+    accumulated += stack_and_tree_hashes.0[idx][0] * monomial;
+    monomial *= polynomial_input;
+    accumulated += stack_and_tree_hashes.0[idx][1] * monomial;
+    monomial *= polynomial_input;
+    accumulated += stack_and_tree_hashes.1[idx][0] * monomial;
+    monomial *= polynomial_input;
+    accumulated += stack_and_tree_hashes.1[idx][1] * monomial;
+    monomial *= polynomial_input;
+  }
+  accumulated
+}
+
+// TODO: for now this is just doing the response
+pub fn initial_digest(manifest: &Manifest, ciphertext: &[u8]) -> (F<G1>, F<G1>) {
+  // First create a digest of the ciphertext itself
+  let ciphertext_digest = data_hasher(ciphertext);
+
+  // TODO: This assumes the start line format here as well.
+  // Then digest the start line using the ciphertext_digest as a random input
+  let start_line_bytes = format!(
+    "{} {} {}",
+    &manifest.response.version, &manifest.response.status, &manifest.response.message
+  )
+  .as_bytes()
+  .to_vec();
+  let start_line_digest = polynomial_digest(&start_line_bytes, ciphertext_digest);
+
+  // Digest all the headers
+  let header_bytes = headers_to_bytes(&manifest.response.headers);
+  let headers_digest = header_bytes.iter().map(|bytes| polynomial_digest(bytes, ciphertext_digest));
+
+  // Put all the digests into a vec
+  let mut all_digests = vec![];
+  all_digests.push(ciphertext_digest);
+  all_digests.push(start_line_digest);
+  headers_digest.into_iter().for_each(|d| all_digests.push(d));
+
+  // Iterate through the material and sum up poseidon hashes of each as to not mix polynomials
+  let manifest_digest = all_digests.into_iter().map(|d| poseidon::<1>(&[d])).sum();
+  (ciphertext_digest, manifest_digest)
+}
+
+// TODO: Note, HTTP does not require a `:` and space between the name and value of a header, so we
+// will have to deal with this somehow, but for now I'm assuming there's a space
+fn headers_to_bytes(headers: &HashMap<String, String>) -> Vec<Vec<u8>> {
+  headers.iter().map(|(k, v)| format!("{}: {}", k.clone(), v.clone()).as_bytes().to_vec()).collect()
 }
 
 #[cfg(test)]
@@ -515,13 +586,14 @@ mod tests {
 
   #[test]
   fn test_poseidon() {
-    let hash = poseidon_chainer(&[F::<G1>::from(0), F::<G1>::from(0)]);
+    // let hash = poseidon_chainer(&[bytepack(&[0]), bytepack(&[0])]);
+    let hash = poseidon::<2>(&[F::<G1>::from(0), F::<G1>::from(0)]);
     assert_eq!(hash.to_bytes(), [
       100, 72, 182, 70, 132, 238, 57, 168, 35, 213, 254, 95, 213, 36, 49, 220, 129, 228, 129, 123,
       242, 195, 234, 60, 171, 158, 35, 158, 251, 245, 152, 32
     ]);
 
-    let hash = poseidon_chainer(&[F::<G1>::from(69), F::<G1>::from(420)]);
+    let hash = poseidon::<2>(&[F::<G1>::from(69), F::<G1>::from(420)]);
     assert_eq!(hash.to_bytes(), [
       10, 230, 247, 95, 9, 23, 36, 117, 25, 37, 98, 141, 178, 220, 241, 100, 187, 169, 126, 226,
       80, 175, 17, 100, 232, 1, 29, 0, 165, 144, 139, 2,
@@ -697,6 +769,8 @@ mod tests {
     assert_eq!(masked_array, MASKED_KEY3_ARRAY);
   }
 
+  use num_bigint::BigUint;
+
   #[test]
   fn test_json_tree_hasher() {
     let key_sequence = vec![
@@ -706,9 +780,27 @@ mod tests {
       JsonMaskType::Object(KEY2.to_vec()),
       JsonMaskType::Object(KEY3.to_vec()),
     ];
-    let target_value = "Taylor Swift".as_bytes();
-    let (stack, tree_hashes) = json_tree_hasher(key_sequence, target_value.to_vec(), 10);
-    dbg!(stack);
-    dbg!(tree_hashes);
+    let target_value = b"Taylor Swift";
+    let polynomial_input = poseidon::<2>(&[F::<G1>::from(69), F::<G1>::from(420)]);
+    println!("polynomial_input: {:?}", BigUint::from_bytes_le(&polynomial_input.to_bytes()));
+    let stack_and_tree_hashes = json_tree_hasher(polynomial_input, &key_sequence, target_value, 10);
+
+    println!("Stack (decimal):");
+    for (i, pair) in stack_and_tree_hashes.0.iter().enumerate() {
+      let num1 = BigUint::from_bytes_le(&pair[0].to_bytes());
+      let num2 = BigUint::from_bytes_le(&pair[1].to_bytes());
+      println!("  {i}: [{num1}, {num2}]");
+    }
+
+    println!("\nTree hashes (decimal):");
+    for (i, pair) in stack_and_tree_hashes.1.iter().enumerate() {
+      let num1 = BigUint::from_bytes_le(&pair[0].to_bytes());
+      let num2 = BigUint::from_bytes_le(&pair[1].to_bytes());
+      println!("  {i}: [{num1}, {num2}]");
+    }
+
+    let digest = compress_tree_hash(polynomial_input, stack_and_tree_hashes);
+    println!("\nDigest (decimal):");
+    println!("  {}", BigUint::from_bytes_le(&digest.to_bytes()));
   }
 }
