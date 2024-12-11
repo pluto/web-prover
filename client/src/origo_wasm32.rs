@@ -25,7 +25,7 @@ use crate::{
   tls_client_async2::bind_client, Proof,
 };
 
-pub async fn proxy_and_sign(
+pub async fn proxy_and_sign_and_generate_proof(
   mut config: config::Config,
   proving_params: Option<Vec<u8>>,
 ) -> Result<Proof, errors::ClientErrors> {
@@ -51,12 +51,13 @@ pub async fn proxy_and_sign(
   let program_output = program::run(&program_data)?;
 
   debug!("compressing proof!");
-  let compressed_verifier = program::compress_proof(&program_output, &program_data.public_params)?;
+  let compressed_snark_proof =
+    program::compress_proof(&program_output, &program_data.public_params)?;
 
   debug!("running compressed verifier!");
-  let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
+  let proof = compressed_snark_proof.serialize();
 
-  Ok(crate::Proof::Origo((serialized_compressed_verifier.0, vec![])))
+  Ok(crate::Proof::Origo((proof.0, vec![])))
 }
 /// takes TLS transcripts and [`ProvingData`] and generates NIVC [`ProgramData`] for request and
 /// response separately
