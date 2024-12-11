@@ -28,18 +28,19 @@ impl ByteOrPad {
     result.extend(std::iter::repeat(ByteOrPad::Pad).take(padding));
     result
   }
-
-  /// Converts to field element, padding is represented as `-1`
-  fn as_field_element(&self) -> F<G1> {
-    match self {
-      ByteOrPad::Byte(b) => F::<G1>::from(*b as u64),
-      ByteOrPad::Pad => -F::<G1>::ONE,
-    }
-  }
 }
 
 impl From<u8> for ByteOrPad {
   fn from(b: u8) -> Self { ByteOrPad::Byte(b) }
+}
+
+impl From<&ByteOrPad> for halo2curves::bn256::Fr {
+  fn from(b: &ByteOrPad) -> Self {
+    match b {
+      ByteOrPad::Byte(b) => halo2curves::bn256::Fr::from(*b as u64),
+      ByteOrPad::Pad => -halo2curves::bn256::Fr::one(),
+    }
+  }
 }
 
 /// Converts a field element to a base10 string.
@@ -51,7 +52,7 @@ impl Serialize for ByteOrPad {
   /// converts to field element using `to_field_element` and then to base10 string
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
   where S: serde::Serializer {
-    serializer.serialize_str(field_element_to_base10_string(self.as_field_element()).as_str())
+    serializer.serialize_str(field_element_to_base10_string(self.into()).as_str())
   }
 }
 
