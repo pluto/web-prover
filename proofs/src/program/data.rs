@@ -68,6 +68,7 @@ pub enum WitnessGeneratorType {
 pub trait SetupStatus {
   type PublicParams;
 }
+
 pub struct Online;
 impl SetupStatus for Online {
   type PublicParams = PublicParams<E1>;
@@ -83,6 +84,7 @@ pub trait WitnessStatus {
   /// - For [`NotExpanded`] status, it is a tuple of private input and fold input of a circuit
   type PrivateInputs;
 }
+
 pub struct Expanded;
 impl WitnessStatus for Expanded {
   /// expanded input for each fold of each circuit in the ROM
@@ -340,9 +342,7 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
       inputs,
     })
   }
-}
 
-impl ProgramData<Online, Expanded> {
   /// Extends and prepares the public inputs for the zero-knowledge proof circuits.
   ///
   /// This function performs two main operations:
@@ -363,6 +363,7 @@ impl ProgramData<Online, Expanded> {
   /// Returns a `ProofError` if:
   /// - Any opcode configuration specified in the ROM is not found in `rom_data`
   pub fn extend_public_inputs(&self) -> Result<(Vec<F<G1>>, Vec<u64>), ProofError> {
+    // TODO: This is currently enabled for _either_ Expanded or NotExpanded
     let mut rom = self
       .rom
       .iter()

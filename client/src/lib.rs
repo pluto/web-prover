@@ -73,8 +73,24 @@ pub async fn prover_inner_origo(
   proving_params: Option<Vec<u8>>,
 ) -> Result<Proof, errors::ClientErrors> {
   #[cfg(target_arch = "wasm32")]
-  return origo_wasm32::proxy_and_sign_and_generate_proof(config, proving_params).await;
+  let proof = origo_wasm32::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await;
 
   #[cfg(not(target_arch = "wasm32"))]
-  return origo_native::proxy_and_sign_and_generate_proof(config).await;
+  let proof = origo_native::proxy_and_sign_and_generate_proof(config.clone()).await;
+
+  let r = proof.unwrap();
+  let real_proof = match &r {
+    Proof::Origo(proof) => proof.0.clone(),
+    _ => Vec::new(),
+  };
+
+  // TODO: Actually propagate errors up to the client
+  let verify_response = origo::verify(config, origo::VerifyBody{
+    proof: real_proof,
+  }).await.unwrap();
+
+  // TODO: Don't assert?
+  assert!(verify_response.valid);
+
+  Ok(r)
 }

@@ -30,6 +30,10 @@ use tower_http::cors::CorsLayer;
 use tower_service::Service;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use proofs::{
+  program::data::{NotExpanded, Online, Offline, ProgramData, CircuitData, InstructionConfig},
+  F, G1,
+};
 
 mod axum_websocket;
 mod config;
@@ -38,21 +42,15 @@ mod origo;
 mod tcp;
 mod tlsn;
 mod websocket_proxy;
+mod circuits;
 
-#[derive(Debug, Clone)]
 struct SharedState {
   notary_signing_key: SigningKey,
   origo_signing_key:  Secp256k1SigningKey,
   tlsn_max_sent_data: usize,
   tlsn_max_recv_data: usize,
   origo_sessions:     Arc<Mutex<HashMap<String, OrigoSession>>>,
-  // Load the public params (~100MB)
-  // Load the VK file (~300MB)
-  // - We need the VK r1cs files. On the notary, they don't exist elsewhere.
-  // - We may need to implement fast_serde for it, but it'll require new objects because r1cs
-  //   shapes are the bulk of the data.
-  // - Start with bincode::deserialize and test perf
-  // We don't need the pk!
+  verifier_params: ProgramData<Online, NotExpanded>,
 }
 
 #[derive(Debug, Clone)]
@@ -106,12 +104,42 @@ async fn main() -> Result<(), NotaryServerError> {
   let listener = TcpListener::bind(&c.listen).await?;
   info!("Listening on https://{}", &c.listen);
 
+
+  // TODO: Move this into a method on the proofs crate, probably also move the circuits.rs file. 
+  let setup_data_small = circuits::construct_setup_data(512);
+  let proving_param_bytes = std::fs::read("proofs/web_proof_circuits/serialized_setup_aes.bytes").unwrap();
+  
+  let chacha_label = String::from("CHACHA20");
+  let http_label = String::from("HTTP_NIVC");
+  let rom_data = HashMap::from([
+    (chacha_label.clone(), CircuitData { opcode: 0 }),
+    (http_label.clone(), CircuitData { opcode: 1 })
+  ]);
+  
+  // NOTE: Hacky way to inform the verifier of the instruction layout. 
+  let rom: Vec<InstructionConfig> = vec![
+    InstructionConfig { name: chacha_label, private_input: HashMap::new() },
+    InstructionConfig { name: http_label, private_input: HashMap::new() },
+  ];
+
+  let program_data_small = ProgramData::<Offline, NotExpanded> {
+    public_params: proving_param_bytes,
+    setup_data: setup_data_small,
+    rom,
+    rom_data,
+    initial_nivc_input: vec![F::<G1>::from(0)],
+    inputs: HashMap::new(),
+    witnesses: vec![],
+  }
+  .into_online();
+
   let shared_state = Arc::new(SharedState {
     notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
     origo_signing_key:  load_origo_signing_key(&c.origo_signing_key),
     tlsn_max_sent_data: c.tlsn_max_sent_data,
     tlsn_max_recv_data: c.tlsn_max_recv_data,
     origo_sessions:     Default::default(),
+    verifier_params: program_data_small.unwrap(),
   });
 
   let router = Router::new()

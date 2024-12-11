@@ -5,6 +5,8 @@ edition="2021"
 build  ="../build.rs"
 
 [dependencies]
+client-side-prover={ git="https://github.com/pluto/client-side-prover", branch="tl-compress-serde" }
+proofs={ path="../proofs", package="proofs" }
 hyper={ workspace=true, features=["client", "http1", "server"] }
 hyper-util={ workspace=true }
 serde={ workspace=true }
@@ -49,3 +51,6 @@ tls-client2={ workspace=true }
 
 [dev-dependencies]
 tower="0.4.13"
+
+[profile.dev]
+split-debuginfo = "unpacked"

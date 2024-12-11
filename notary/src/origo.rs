@@ -74,6 +74,18 @@ pub struct SignBody {
   handshake_server_key: String,
 }
 
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct VerifyBody {
+  proof: Vec<u8>
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct VerifyReply {
+  valid: bool,
+  // TODO: need a signature
+}
+
 pub async fn sign(
   query: Query<SignQuery>,
   State(state): State<Arc<SharedState>>,
@@ -640,16 +652,37 @@ pub async fn proxy(
   }
 }
 
-// Verify a proof
-// - accept as input bytes from a proof object (~200kb)
-// - behind the scenes our underlying config/shared state should:
-// -- have loaded the VK data (including r1cs)
-// -- initialized the VK using that data
-// - in the name of fast notary boot, it would be ideal if either the data existed in the bin or
-//   loaded in <5s (via fast_serde)
-// - now, verify the proof, if true return a signed response.
-pub async fn verify() {
-  todo!("implement me");
+use proofs::proof::Proof;
+use client_side_prover::supernova::snark::CompressedSNARK;
+use proofs::{
+  F, G2, E1, S1, S2,
+};
+use k256::elliptic_curve::Field;
+pub async fn verify(
+  State(state): State<Arc<SharedState>>,
+  extract::Json(payload): extract::Json<VerifyBody>
+) -> Result<Json<VerifyReply>, ProxyError> {
+    let proving_params = &state.verifier_params;
+    let proof = Proof(payload.proof).decompress_and_serialize();
+    
+    // TODO: Replace with a process that loads from cache, i.e. `initialize_vk`
+    let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&proving_params.public_params).unwrap();
+    let (z0_primary, _) = proving_params.extend_public_inputs().unwrap();
+    let z0_secondary = vec![F::<G2>::ZERO];
+
+    let valid = match proof.0.verify(&proving_params.public_params, &vk, &z0_primary, &z0_secondary) {
+      Ok(_) => true,
+      Err(e) => {
+        info!("Error verifying proof: {:?}", e);
+        false
+      }
+    };
+
+    let response = VerifyReply {
+      valid,
+    };
+  
+    Ok(Json(response))
 }
 
 pub async fn websocket_notarize(
