@@ -87,6 +87,10 @@ ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wa
 serde-wasm-bindgen="0.6.5"
 reqwest           ={ version="0.12", features=["json"] }
 
+tokio={ version="1", default-features = false, features=["io-util"] }
+# mio = {version = "1", default-features = false }
+rustls={ version="0.21", default-features=false, features=["dangerous_configuration"] }
+
 # Other
 ring          ={ version="0.17", default-features=false, features=["wasm32_unknown_unknown_js"] }
 elliptic-curve={ version="0.13.5", features=["pkcs8"] }

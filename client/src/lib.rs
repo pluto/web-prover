@@ -6,10 +6,13 @@ pub mod origo;
 #[cfg(not(target_arch = "wasm32"))] mod origo_native;
 #[cfg(target_arch = "wasm32")] mod origo_wasm32;
 
+// TODO
+#[cfg(not(target_arch = "wasm32"))] mod tee; // TODO only non-wasm for now
+#[cfg(target_arch = "wasm32")] mod tee_wasm32;
+
 mod circuits;
 pub mod config;
 pub mod errors;
-#[cfg(not(target_arch = "wasm32"))] mod tee; // TODO only non-wasm for now
 mod tls;
 pub mod tls_client_async2;
 use serde::{Deserialize, Serialize};

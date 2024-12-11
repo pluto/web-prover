@@ -24,8 +24,14 @@ use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
 use crate::{
-  circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
-  tls_client_async2::bind_client, Proof,
+  circuits::*,
+  config::{self, ProvingData},
+  errors,
+  origo::SignBody,
+  tee_wasm32::foo,
+  tls::decrypt_tls_ciphertext,
+  tls_client_async2::bind_client,
+  Proof,
 };
 
 pub async fn proxy_and_sign(
@@ -139,6 +145,13 @@ pub async fn proxy(
   )?;
 
   let (_, ws_stream) = WsMeta::connect(wss_url.to_string(), None).await?;
+
+  // ----------------------------------------
+  // ----------------------------------------
+  let ws_stream = foo(ws_stream);
+
+  // ----------------------------------------
+  // ----------------------------------------
 
   let (mut client_tls_conn, tls_fut) = bind_client(ws_stream.into_io(), client);
 
