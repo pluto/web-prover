@@ -1,5 +1,5 @@
 // TODO many root_stores ... this could use some cleanup where possible
-use proofs::program::manifest::EncryptionInput;
+use proofs::program::manifest::{EncryptionInput, TLSEncryption};
 use tls_client2::{origo::WitnessData, CipherSuite, CipherSuiteKey, Decrypter, ProtocolVersion};
 use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
 use tracing::{debug, trace};
@@ -74,9 +74,7 @@ pub fn tls_client_default_root_store() -> tls_client::RootCertStore {
 }
 
 /// Decrypt plaintext from TLS transcript ciphertext using [`WitnessData`]
-pub(crate) fn decrypt_tls_ciphertext(
-  witness: &WitnessData,
-) -> Result<(EncryptionInput, EncryptionInput), ClientErrors> {
+pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncryption, ClientErrors> {
   // - get AES key, IV, request ciphertext, request plaintext, and AAD -
   let key = parse_cipher_key(&witness.request.aead_key)?;
   let iv: [u8; 12] = witness.request.aead_iv[..12].try_into()?;
@@ -112,7 +110,7 @@ pub(crate) fn decrypt_tls_ciphertext(
     },
   };
 
-  let aad = hex::decode(meta.additional_data.to_owned())?;
+  let aad = hex::decode(&meta.additional_data)?;
   let mut padded_aad = vec![0; 16 - aad.len()];
   padded_aad.extend(aad);
 
@@ -170,29 +168,29 @@ pub(crate) fn decrypt_tls_ciphertext(
     response_ciphertext.extend_from_slice(&ct_chunk[..pt.len()]);
 
     response_plaintext.extend(pt);
-    let aad = hex::decode(meta.additional_data.to_owned())?;
+    let aad = hex::decode(&meta.additional_data)?;
     let mut padded_aad = vec![0; 16 - aad.len()];
     padded_aad.extend(&aad);
   }
   trace!("response plaintext: {:?}", response_plaintext);
   assert_eq!(response_plaintext.len(), response_ciphertext.len());
 
-  Ok((
-    EncryptionInput {
+  Ok(TLSEncryption {
+    request:  EncryptionInput {
       key,
       iv,
       aad: padded_aad.clone(),
       plaintext: request_plaintext,
       ciphertext: request_ciphertext,
     },
-    EncryptionInput {
+    response: EncryptionInput {
       key:        response_key,
       iv:         response_iv,
       aad:        padded_aad, // TODO: use response's AAD
       plaintext:  response_plaintext,
       ciphertext: response_ciphertext,
     },
-  ))
+  })
 }
 
 fn parse_cipher_key(key: &[u8]) -> Result<CipherSuiteKey, ClientErrors> {

@@ -63,7 +63,7 @@ pub fn compute_web_proof(
   let recursive_snark = program::run(program_data)?;
   // TODO: Unecessary 2x generation of pk,vk, but it is cheap. Refactor later if need be!
   let proof = program::compress_proof(&recursive_snark, &program_data.public_params)?;
-  let serialized_proof = proof.serialize_and_compress();
+  let serialized_proof = proof.serialize();
   Ok(serialized_proof.0)
 }
 

@@ -7,7 +7,7 @@ on:
       version:
         required: false
         type: string
-        default: "v0.5.10"
+        default: "v0.6.0"
     outputs:
       cache-key:
         description: "Cache key for the downloaded circuits"
@@ -19,7 +19,7 @@ jobs:
     outputs:
       cache-key: ${{ steps.set-cache-key.outputs.key }}
     steps:
-      - uses: actions/checkout@v4 
+      - uses: actions/checkout@v4
 
       - name: Generate cache key
         id: set-cache-key
