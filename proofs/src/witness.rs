@@ -444,6 +444,31 @@ fn headers_to_bytes(headers: &HashMap<String, String>) -> Vec<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
+  fn mock_manifest() -> Manifest {
+    let request = Request {
+      method:  "GET".to_string(),
+      url:     "spotify.com".to_string(),
+      version: "HTTP/1.1".to_string(),
+      headers: HashMap::new(),
+    };
+    let mut headers = HashMap::new();
+    headers.insert("Content-Type".to_string(), "application/json".to_string());
+    let body = ResponseBody {
+      json: vec![
+        JsonKey::String("data".to_string()),
+        JsonKey::String("items".to_string()),
+        JsonKey::Num(0),
+      ],
+    };
+    let response = Response {
+      status: "200".to_string(),
+      version: "HTTP/1.1".to_string(),
+      message: "OK".to_string(),
+      headers,
+      body,
+    };
+    Manifest { request, response }
+  }
 
   use super::*;
 
@@ -617,14 +642,14 @@ mod tests {
     let mut hash_input = [ByteOrPad::Byte(0); 16];
     hash_input[0] = ByteOrPad::Byte(1);
     let hash = data_hasher(hash_input.as_ref());
-    assert_eq!(hash, poseidon_chainer([F::<G1>::ZERO, F::<G1>::ONE].as_ref()));
+    assert_eq!(hash, poseidon::<2>([F::<G1>::ZERO, F::<G1>::ONE].as_ref()));
 
     hash_input = [ByteOrPad::Byte(0); 16];
     hash_input[15] = ByteOrPad::Byte(1);
     let hash = data_hasher(hash_input.as_ref());
     assert_eq!(
       hash,
-      poseidon_chainer(
+      poseidon::<2>(
         [
           F::<G1>::ZERO,
           F::<G1>::from_str_vartime("1329227995784915872903807060280344576").unwrap()
@@ -770,6 +795,7 @@ mod tests {
   }
 
   use num_bigint::BigUint;
+  use program::manifest::{JsonKey, Request, Response, ResponseBody};
 
   #[test]
   fn test_json_tree_hasher() {
@@ -802,5 +828,9 @@ mod tests {
     let digest = compress_tree_hash(polynomial_input, stack_and_tree_hashes);
     println!("\nDigest (decimal):");
     println!("  {}", BigUint::from_bytes_le(&digest.to_bytes()));
+  }
+
+  fn test_initial_digest() {
+    let (ct_digest, manifest_digest) = initial_digest(&mock_manifest(), ciphertext);
   }
 }
