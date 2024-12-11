@@ -1,11 +1,6 @@
 // logic common to wasm32 and native
 use serde::Serialize;
-use serde_json::json;
-use tls_client2::{origo::WitnessData, CipherSuite, ProtocolVersion};
-use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
 use tracing::debug;
-
-use crate::errors;
 
 #[derive(Serialize)]
 pub struct SignBody {
@@ -25,7 +20,8 @@ pub async fn sign(
     session_id.clone(),
   );
 
-  let client = reqwest::ClientBuilder::new().build()?;
+  #[allow(unused_variables)]
+  let client: reqwest::Client = reqwest::ClientBuilder::new().build()?;
 
   #[cfg(feature = "notary_ca_cert")]
   // TODO: recheck use of rustls backend

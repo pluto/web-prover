@@ -16,10 +16,6 @@ web-prover-circuits-1024:
 
 web-prover-circuits: web-prover-circuits-512 web-prover-circuits-1024
 
-aes:
-	# AES-GCM, ~500K constraints (for now we need wasm witgen)
-	circom web_proof_circuits/aes_gcm/aes_gcm.circom --r1cs --wasm -o web_proof_circuits/aes_gcm -l node_modules
-	build-circuit web_proof_circuits/aes_gcm/aes_gcm.circom web_proof_circuits/aes_gcm/aes_gcm.bin -l node_modules
 
 test-circuits:
 	# Test circuits

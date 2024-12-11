@@ -25,7 +25,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
+        with:
+          fetch-depth: 0
       - name: Install Rust toolchain and target
         run: |
           rustup toolchain install nightly-2024-10-28 --profile minimal --no-self-update

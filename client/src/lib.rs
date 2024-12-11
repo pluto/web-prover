@@ -67,6 +67,7 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, erro
   Ok(Proof::TLSN(p))
 }
 
+#[allow(unused_variables)]
 pub async fn prover_inner_origo(
   config: config::Config,
   proving_params: Option<Vec<u8>>,

@@ -6,7 +6,6 @@ use rustls::ClientConfig;
 use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
 use tokio_rustls::TlsConnector;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
-use tracing::debug;
 
 use crate::{config::Config, tlsn::send_request};
 

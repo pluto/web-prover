@@ -1,4 +1,4 @@
-name: tests/proofs
+name: proofs
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -9,37 +9,52 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+
 jobs:
   setup:
     uses: ./.github/workflows/download-circuits.yaml
-    with:
-      version: "v0.5.7"  # Optional, defaults to v0.5.7
+
+  version-check:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/protoc
+        with:
+          rust-version: nightly-2024-06-10
+
+      - name: Restore circuit artifacts
+        uses: actions/cache@v3
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ needs.setup.outputs.cache-key }}
+      
+      - name: Check semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: proofs
+          baseline-ref: origin/main
+          manifest-path: proofs/Cargo.toml
+          
   build:
     needs: setup
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install Protocol Buffers
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y protobuf-compiler libprotobuf-dev
-
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
+    - uses: ./.github/actions/protoc
       with:
-        toolchain: nightly-2024-06-10
-
-    - name: Install unzip
-      run: sudo apt install unzip -y
+        rust-version: nightly-2024-06-10
 
     - name: Restore circuit artifacts
       uses: actions/cache@v3
       with:
-        path: proofs/web_proof_circuits
-        key: ${{ needs.setup.outputs.cache-key }}
+          path: proofs/web_proof_circuits
+          key: ${{ needs.setup.outputs.cache-key }}
 
     - name: Run tests
       run: |
