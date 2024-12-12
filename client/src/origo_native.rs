@@ -7,7 +7,10 @@ use proofs::{
   program::{
     self,
     data::{Expanded, NotExpanded, Online, ProgramData},
-    manifest::{EncryptionInput, Manifest, NivcCircuitInputs, TLSEncryption},
+    manifest::{
+      EncryptionInput, NIVCRom, NivcCircuitInputs, Request as ManifestRequest,
+      Response as ManifestResponse, TLSEncryption,
+    },
   },
   proof::Proof as CompressedSNARKProof,
   F, G1,
@@ -51,8 +54,8 @@ pub async fn proxy_and_sign_and_generate_proof(
   // generate NIVC proofs for request and response
   let manifest = config.proving.manifest.unwrap();
   let (request_proof, response_proof) = rayon::join(
-    || construct_request_program_data_and_proof(&manifest, request_inputs),
-    || construct_response_program_data_and_proof(&manifest, response_inputs),
+    || construct_request_program_data_and_proof(&manifest.request, request_inputs),
+    || construct_response_program_data_and_proof(&manifest.response, response_inputs),
   );
 
   // TODO(Sambhav): handle request and response into one proof
@@ -91,22 +94,23 @@ fn generate_proof(
 /// - create consolidate [`ProgramData`]
 /// - expand private inputs into fold inputs as per circuits
 fn construct_request_program_data_and_proof(
-  manifest: &Manifest,
+  manifest_request: &ManifestRequest,
   inputs: EncryptionInput,
 ) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
   debug!("Setting up request's `PublicParams`... (this may take a moment)");
   let setup_data = construct_setup_data();
   let public_params = program::setup(&setup_data);
 
-  let NivcCircuitInputs { rom_data, rom, fold_inputs, private_inputs, initial_nivc_input } =
-    manifest.rom_from_request(inputs);
+  let NivcCircuitInputs { fold_inputs, private_inputs, initial_nivc_input } =
+    manifest_request.build_inputs(inputs);
+  let NIVCRom { circuit_data, rom } = manifest_request.build_rom();
 
   debug!("Generating request's `ProgramData`...");
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
     setup_data,
     rom,
-    rom_data,
+    rom_data: circuit_data,
     initial_nivc_input,
     inputs: (private_inputs, fold_inputs),
     witnesses: vec![vec![F::<G1>::from(0)]],
@@ -127,22 +131,23 @@ fn construct_request_program_data_and_proof(
 /// - create consolidate [`ProgramData`]
 /// - expand private inputs into fold inputs as per circuits
 fn construct_response_program_data_and_proof(
-  manifest: &Manifest,
+  manifest_response: &ManifestResponse,
   inputs: EncryptionInput,
 ) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
   debug!("Setting up response's `PublicParams`... (this may take a moment)");
   let setup_data = construct_setup_data();
   let public_params = program::setup(&setup_data);
 
-  let NivcCircuitInputs { rom_data, rom, private_inputs, fold_inputs, initial_nivc_input } =
-    manifest.rom_from_response(inputs);
+  let NivcCircuitInputs { private_inputs, fold_inputs, initial_nivc_input } =
+    manifest_response.build_inputs(inputs);
+  let NIVCRom { circuit_data, rom } = manifest_response.build_rom();
 
   debug!("Generating response's `ProgramData`...");
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
     setup_data,
     rom,
-    rom_data,
+    rom_data: circuit_data,
     initial_nivc_input,
     inputs: (private_inputs, fold_inputs),
     witnesses: vec![vec![F::<G1>::from(0)]],

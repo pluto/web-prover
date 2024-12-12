@@ -11,7 +11,7 @@ use proofs::{
   program::{
     self,
     data::{Expanded, NotExpanded, Offline, Online, ProgramData},
-    manifest::{NivcCircuitInputs, TLSEncryption},
+    manifest::{NIVCRom, NivcCircuitInputs, TLSEncryption},
   },
   G1,
 };
@@ -79,11 +79,12 @@ async fn generate_program_data(
 
   // - construct private inputs and program layout for circuits for TLS request -
   let NivcCircuitInputs {
-    rom_data: request_rom_data,
-    rom: request_rom,
     fold_inputs: request_fold_inputs,
+    private_inputs: request_private_inputs,
     initial_nivc_input: request_initial_nivc_input,
-  } = proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);
+  } = proving.manifest.as_ref().unwrap().request.build_inputs(request_inputs);
+  let NIVCRom { circuit_data: request_rom_data, rom: request_rom } =
+    proving.manifest.as_ref().unwrap().request.build_rom();
 
   // // pad AES response ciphertext
   // let (response_rom_data, response_rom, response_fold_inputs) =
@@ -105,7 +106,7 @@ async fn generate_program_data(
     rom: request_rom,
     rom_data: request_rom_data,
     initial_nivc_input: request_initial_nivc_input,
-    inputs: request_fold_inputs,
+    inputs: (request_private_inputs, request_fold_inputs),
     witnesses,
   }
   .into_online();
