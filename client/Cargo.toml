@@ -3,7 +3,7 @@ name   ="client"
 version="0.2.0"
 edition="2021"
 build  ="../build.rs"
-publish = false
+publish=false
 
 [features]
 websocket=[]
@@ -25,11 +25,9 @@ proofs={ path="../proofs", package="proofs" }
 
 webpki-roots="0.26.1"
 pki-types   ={ package="rustls-pki-types", version="1.7" }
-cfg-if      ="1.0.0"
 # Serde
 serde.workspace     =true
 serde_json.workspace=true
-serde_bytes         ="0.11"
 # Web
 hex           ="0.4"
 url           ="2.5"
@@ -40,8 +38,7 @@ tracing.workspace           =true
 tracing-subscriber.workspace=true
 thiserror                   ="1.0.61"
 # Async
-futures     ="0.3"
-futures-util="0.3.28"
+futures="0.3"
 # Other
 base64="0.22.0"
 tokio-util={ version="0.7", features=[
@@ -49,7 +46,6 @@ tokio-util={ version="0.7", features=[
 ] } # compat is used to work with AsyncRead and AsyncWrite from other crates
 chrono="0.4"
 p256={ version="0.13", features=["pem", "ecdsa"] }
-num-bigint="0.4"
 
 [dependencies.uuid]
 version         ="1.10.0"
@@ -75,6 +71,7 @@ async-tungstenite    ={ version="0.25.1", features=["async-std-runtime", "async-
 ws_stream_tungstenite={ version="0.13.0", features=["tokio_io"] }
 clap                 ={ version="4.5.13", features=["derive"] }
 reqwest              ={ version="0.12", features=["json", "rustls-tls"] }
+rayon                ={ workspace=true }
 
 #- Wasm target configuration ----------------------------------------------------------------------#
 [target.'cfg(target_arch = "wasm32")'.dependencies]

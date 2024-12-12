@@ -11,6 +11,7 @@ use proofs::{
   program::{
     self,
     data::{Expanded, NotExpanded, Offline, Online, ProgramData},
+    manifest::{NivcCircuitInputs, TLSEncryption},
   },
   G1,
 };
@@ -24,7 +25,7 @@ use crate::{
   tls_client_async2::bind_client, Proof,
 };
 
-pub async fn proxy_and_sign(
+pub async fn proxy_and_sign_and_generate_proof(
   mut config: config::Config,
   proving_params: Option<Vec<u8>>,
 ) -> Result<Proof, errors::ClientErrors> {
@@ -50,12 +51,13 @@ pub async fn proxy_and_sign(
   let program_output = program::run(&program_data)?;
 
   debug!("compressing proof!");
-  let compressed_verifier = program::compress_proof(&program_output, &program_data.public_params)?;
+  let compressed_snark_proof =
+    program::compress_proof(&program_output, &program_data.public_params)?;
 
   debug!("running compressed verifier!");
-  let serialized_compressed_verifier = compressed_verifier.serialize_and_compress();
+  let proof = compressed_snark_proof.serialize();
 
-  Ok(crate::Proof::Origo((serialized_compressed_verifier.0, vec![])))
+  Ok(crate::Proof::Origo((proof.0, vec![])))
 }
 /// takes TLS transcripts and [`ProvingData`] and generates NIVC [`ProgramData`] for request and
 /// response separately
@@ -70,13 +72,18 @@ async fn generate_program_data(
   proving: ProvingData,
   proving_params: Option<Vec<u8>>,
 ) -> Result<ProgramData<Online, Expanded>, errors::ClientErrors> {
-  let (request_inputs, _response_inputs) = decrypt_tls_ciphertext(witness)?;
+  let TLSEncryption { request: request_inputs, response: response_inputs } =
+    decrypt_tls_ciphertext(witness)?;
 
-  let request_setup_data = construct_setup_data(request_inputs.plaintext.len());
+  let request_setup_data = construct_setup_data();
 
   // - construct private inputs and program layout for circuits for TLS request -
-  let (request_rom_data, request_rom, request_fold_inputs) =
-    proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);
+  let NivcCircuitInputs {
+    rom_data: request_rom_data,
+    rom: request_rom,
+    fold_inputs: request_fold_inputs,
+    initial_nivc_input: request_initial_nivc_input,
+  } = proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);
 
   // // pad AES response ciphertext
   // let (response_rom_data, response_rom, response_fold_inputs) =
@@ -97,7 +104,7 @@ async fn generate_program_data(
     setup_data: request_setup_data,
     rom: request_rom,
     rom_data: request_rom_data,
-    initial_nivc_input: vec![proofs::F::<G1>::from(0)],
+    initial_nivc_input: request_initial_nivc_input,
     inputs: request_fold_inputs,
     witnesses,
   }

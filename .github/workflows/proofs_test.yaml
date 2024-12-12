@@ -31,14 +31,14 @@ jobs:
         with:
           path: proofs/web_proof_circuits
           key: ${{ needs.setup.outputs.cache-key }}
-      
+
       - name: Check semver
         uses: obi1kenobi/cargo-semver-checks-action@v2
         with:
           package: proofs
           baseline-ref: origin/main
           manifest-path: proofs/Cargo.toml
-          
+
   build:
     needs: setup
     runs-on: ubuntu-latest
