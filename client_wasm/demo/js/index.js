@@ -43,7 +43,7 @@ const _snarkjs = import("snarkjs");
 const snarkjs = await _snarkjs;
 
 const getWitnessGenerator = async function (circuit) {
-  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/target_1024b/${circuit}_js/`).toString();
+  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/target_512b/${circuit}_js/`).toString();
   const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
   return wasm;
 }
@@ -248,7 +248,7 @@ const generateWitnessBytesForRequest = async function (circuits, inputs) {
   inputs[1]["start_line_hash"] = DataHasher(http_start_line);
   let http_header_0_hash = DataHasher(http_header_0[1]);
   let http_header_1_hash = DataHasher(http_header_1[1]);
-  inputs[1]["header_hashes"] = Array(25).fill(0);
+  inputs[1]["header_hashes"] = Array(10).fill(0);
   inputs[1]["header_hashes"][0] = http_header_0_hash;
   inputs[1]["header_hashes"][1] = http_header_1_hash;
   inputs[1]["body_hash"] = DataHasher(http_body);
@@ -315,7 +315,7 @@ const generateWitnessBytesForRequest = async function (circuits, inputs) {
   return witnesses;
 };
 
-const TOTAL_BYTES_ACROSS_NIVC = 1024;
+const TOTAL_BYTES_ACROSS_NIVC = 512;
 
 // 256 bytes
 const PLAINTEXT = [
@@ -380,7 +380,7 @@ var inputs = [
 startPreWitgen();
 
 // TODO: Configurable identifiers
-var circuits = ["plaintext_authentication_1024b", "http_verification_1024b", "json_mask_object_1024b", "json_mask_array_index_1024b", "json_extract_value_1024b"];
+var circuits = ["plaintext_authentication_512b", "http_verification_512b", "json_mask_object_512b", "json_mask_array_index_512b", "json_extract_value_512b"];
 var witnesses = await generateWitnessBytesForRequest(circuits, inputs);
 console.log("witness", witnesses);
 

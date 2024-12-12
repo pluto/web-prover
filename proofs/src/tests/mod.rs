@@ -48,6 +48,28 @@ const EXTRACT_VALUE_R1CS: &[u8] =
 const EXTRACT_VALUE_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/target_1024b/json_extract_value_1024b.bin");
 
+const MAX_ROM_LENGTH_512: usize = 10;
+
+// Circuit 0
+const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/plaintext_authentication_512b.r1cs");
+
+// Circuit 1
+const HTTP_VERIFICATION_512B_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/http_verification_512b.r1cs");
+
+// Circuit 2
+const JSON_MASK_OBJECT_512B_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/json_mask_object_512b.r1cs");
+
+// Circuit 3
+const JSON_MASK_ARRAY_INDEX_512B_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/json_mask_array_index_512b.r1cs");
+
+// circuit 4
+const EXTRACT_VALUE_512B_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/json_extract_value_512b.r1cs");
+
 // HTTP/1.1 200 OK
 // content-type: application/json; charset=utf-8
 // content-encoding: gzip
@@ -328,11 +350,11 @@ fn test_end_to_end_proofs() {
 fn test_offline_proofs() {
   let setup_data = SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_OBJECT_512B_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_512B_R1CS.to_vec()),
+      R1CSType::Raw(EXTRACT_VALUE_512B_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
       WitnessGeneratorType::Wasm {
@@ -356,7 +378,7 @@ fn test_offline_proofs() {
         wtns_path: String::from("witness.wtns"),
       },
     ],
-    max_rom_length:          MAX_ROM_LENGTH,
+    max_rom_length:          MAX_ROM_LENGTH_512,
   };
   let public_params = program::setup(&setup_data);
 

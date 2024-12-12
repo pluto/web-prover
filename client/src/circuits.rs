@@ -41,26 +41,64 @@ const EXTRACT_VALUE_R1CS: &[u8] =
 const EXTRACT_VALUE_GRAPH: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_1024b/json_extract_value_1024b.bin");
 
+// -------------------------------------- 512B circuits -------------------------------------- //
+const MAX_ROM_LENGTH_512: usize = 10;
+
+// Circuit 0
+const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/target_512b/plaintext_authentication_512b.r1cs");
+
+// Circuit 1
+const HTTP_VERIFICATION_512B_R1CS: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/target_512b/http_verification_512b.r1cs");
+
+// Circuit 2
+const JSON_MASK_OBJECT_512B_R1CS: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/target_512b/json_mask_object_512b.r1cs");
+
+// Circuit 3
+const JSON_MASK_ARRAY_INDEX_512B_R1CS: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/target_512b/json_mask_array_index_512b.r1cs");
+
+// circuit 4
+const EXTRACT_VALUE_512B_R1CS: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/target_512b/json_extract_value_512b.r1cs");
+
 /// construct [`SetupData`] with all the required inputs for 1024B inputs
 pub fn construct_setup_data() -> SetupData {
-  SetupData {
-    r1cs_types: vec![
-      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
-    ],
-    #[cfg(not(target_arch = "wasm32"))]
-    witness_generator_types: vec![
-      WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
-    ],
-    #[cfg(target_arch = "wasm32")]
-    witness_generator_types: vec![WitnessGeneratorType::Browser; 5],
-    max_rom_length: MAX_ROM_LENGTH,
+  #[cfg(not(target_arch = "wasm32"))]
+  {
+    SetupData {
+      r1cs_types:              vec![
+        R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
+        R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
+        R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
+        R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
+        R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+      ],
+      witness_generator_types: vec![
+        WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
+        WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
+        WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
+        WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
+        WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
+      ],
+      max_rom_length:          MAX_ROM_LENGTH,
+    }
+  }
+
+  #[cfg(target_arch = "wasm32")]
+  {
+    SetupData {
+      r1cs_types:              vec![
+        R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
+        R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
+        R1CSType::Raw(JSON_MASK_OBJECT_512B_R1CS.to_vec()),
+        R1CSType::Raw(JSON_MASK_ARRAY_INDEX_512B_R1CS.to_vec()),
+        R1CSType::Raw(EXTRACT_VALUE_512B_R1CS.to_vec()),
+      ],
+      witness_generator_types: vec![WitnessGeneratorType::Browser; 5],
+      max_rom_length:          MAX_ROM_LENGTH_512,
+    }
   }
 }
