@@ -46,26 +46,26 @@ fn run_entry(
     (String::from("SQUARE_ZEROTH"), CircuitData { opcode: 1 }),
     (String::from("SWAP_MEMORY"), CircuitData { opcode: 2 }),
   ]);
-  let rom = vec![
-    InstructionConfig {
-      name:          String::from("ADD_EXTERNAL"),
-      private_input: external_input0,
-    },
-    InstructionConfig {
-      name:          String::from("SQUARE_ZEROTH"),
-      private_input: HashMap::new(),
-    },
-    InstructionConfig { name: String::from("SWAP_MEMORY"), private_input: HashMap::new() },
-    InstructionConfig {
-      name:          String::from("ADD_EXTERNAL"),
-      private_input: external_input1,
-    },
-    InstructionConfig {
-      name:          String::from("SQUARE_ZEROTH"),
-      private_input: HashMap::new(),
-    },
-    InstructionConfig { name: String::from("SWAP_MEMORY"), private_input: HashMap::new() },
-  ];
+
+  let mut private_inputs = vec![];
+
+  let mut rom = vec![String::from("ADD_EXTERNAL")];
+  private_inputs.push(external_input0);
+
+  rom.push(String::from("SQUARE_ZEROTH"));
+  private_inputs.push(HashMap::new());
+
+  rom.push(String::from("SWAP_MEMORY"));
+  private_inputs.push(HashMap::new());
+
+  rom.push(String::from("ADD_EXTERNAL"));
+  private_inputs.push(external_input1);
+
+  rom.push(String::from("SQUARE_ZEROTH"));
+  private_inputs.push(HashMap::new());
+
+  rom.push(String::from("SWAP_MEMORY"));
+  private_inputs.push(HashMap::new());
   let public_params = program::setup(&setup_data);
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
@@ -73,7 +73,7 @@ fn run_entry(
     rom_data,
     rom,
     initial_nivc_input: vec![F::<G1>::from(1), F::<G1>::from(2)],
-    inputs: HashMap::new(),
+    inputs: (private_inputs, HashMap::new()),
     witnesses: vec![],
   }
   .into_expanded()?;

@@ -98,7 +98,7 @@ fn construct_request_program_data_and_proof(
   let setup_data = construct_setup_data();
   let public_params = program::setup(&setup_data);
 
-  let NivcCircuitInputs { rom_data, rom, fold_inputs, initial_nivc_input } =
+  let NivcCircuitInputs { rom_data, rom, fold_inputs, private_inputs, initial_nivc_input } =
     manifest.rom_from_request(inputs);
 
   debug!("Generating request's `ProgramData`...");
@@ -108,7 +108,7 @@ fn construct_request_program_data_and_proof(
     rom,
     rom_data,
     initial_nivc_input,
-    inputs: fold_inputs,
+    inputs: (private_inputs, fold_inputs),
     witnesses: vec![vec![F::<G1>::from(0)]],
   }
   .into_expanded()?;
@@ -134,7 +134,7 @@ fn construct_response_program_data_and_proof(
   let setup_data = construct_setup_data();
   let public_params = program::setup(&setup_data);
 
-  let NivcCircuitInputs { rom_data, rom, fold_inputs, initial_nivc_input } =
+  let NivcCircuitInputs { rom_data, rom, private_inputs, fold_inputs, initial_nivc_input } =
     manifest.rom_from_response(inputs);
 
   debug!("Generating response's `ProgramData`...");
@@ -144,7 +144,7 @@ fn construct_response_program_data_and_proof(
     rom,
     rom_data,
     initial_nivc_input,
-    inputs: fold_inputs,
+    inputs: (private_inputs, fold_inputs),
     witnesses: vec![vec![F::<G1>::from(0)]],
   }
   .into_expanded()?;

@@ -75,15 +75,20 @@ impl SetupStatus for Offline {
 }
 
 pub trait WitnessStatus {
+  /// Private input for a circuit containing signals name and vector of values
+  /// - For [`Expanded`] status, it is a vector of private inputs for each fold of a circuit
+  /// - For [`NotExpanded`] status, it is a tuple of private input and fold input of a circuit
   type PrivateInputs;
 }
 pub struct Expanded;
 impl WitnessStatus for Expanded {
+  /// expanded input for each fold of each circuit in the ROM
   type PrivateInputs = Vec<HashMap<String, Value>>;
 }
 pub struct NotExpanded;
 impl WitnessStatus for NotExpanded {
-  type PrivateInputs = HashMap<String, FoldInput>;
+  /// Private input and fold input for each circuit in the ROM
+  type PrivateInputs = (Vec<HashMap<String, Value>>, HashMap<String, FoldInput>);
 }
 
 /// Circuit setup data containing r1cs and witness generators along with max NIVC ROM length
@@ -104,21 +109,12 @@ pub struct CircuitData {
   pub opcode: u64,
 }
 
-/// Circuit instruction config
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct InstructionConfig {
-  /// opcode label
-  pub name:          String,
-  /// circuit private input
-  pub private_input: HashMap<String, Value>,
-}
-
 #[derive(Debug)]
 pub struct ProgramData<S: SetupStatus, W: WitnessStatus> {
   pub public_params:      S::PublicParams,
   pub setup_data:         SetupData,
   pub rom_data:           HashMap<String, CircuitData>,
-  pub rom:                Vec<InstructionConfig>,
+  pub rom:                Vec<String>,
   pub initial_nivc_input: Vec<F<G1>>,
   pub inputs:             W::PrivateInputs,
   pub witnesses:          Vec<Vec<F<G1>>>, // TODO: Ideally remove this
@@ -165,19 +161,20 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
   /// The resulting expanded form contains individual private inputs for each ROM position, with
   /// fold inputs properly distributed according to circuit usage.
   pub fn into_expanded(self) -> Result<ProgramData<S, Expanded>, ProofError> {
+    assert!(self.inputs.0.len() == self.rom.len());
+
     let mut instruction_usage: HashMap<String, Vec<usize>> = HashMap::new();
     for (index, circuit) in self.rom.iter().enumerate() {
-      if let Some(usage) = instruction_usage.get_mut(&circuit.name) {
+      if let Some(usage) = instruction_usage.get_mut(circuit.as_str()) {
         usage.push(index);
       } else {
-        instruction_usage.insert(circuit.name.clone(), vec![index]);
+        instruction_usage.insert(circuit.clone(), vec![index]);
       }
     }
-    let mut private_inputs: Vec<HashMap<String, Value>> =
-      self.rom.iter().map(|opcode_config| opcode_config.private_input.to_owned()).collect();
+    let mut private_inputs: Vec<HashMap<String, Value>> = self.inputs.0;
 
     // add fold input sliced to chunks and add to private input
-    for (circuit_label, fold_inputs) in self.inputs.iter() {
+    for (circuit_label, fold_inputs) in self.inputs.1.iter() {
       let inputs = match instruction_usage.get(circuit_label) {
         Some(inputs) => inputs,
         None =>
@@ -188,6 +185,8 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
         private_inputs[*idx].extend(input);
       }
     }
+
+    assert!(private_inputs.len() == self.rom.len());
 
     let Self { public_params, setup_data, rom_data, initial_nivc_input, witnesses, .. } = self;
     Ok(ProgramData {
@@ -370,12 +369,9 @@ impl ProgramData<Online, Expanded> {
       .map(|opcode_config| {
         self
           .rom_data
-          .get(&opcode_config.name)
+          .get(opcode_config)
           .ok_or_else(|| {
-            ProofError::Other(format!(
-              "Opcode config '{}' not found in rom_data",
-              opcode_config.name
-            ))
+            ProofError::Other(format!("Opcode config '{}' not found in rom_data", opcode_config))
           })
           .map(|config| config.opcode)
       })
@@ -395,25 +391,30 @@ mod tests {
 
   const JSON: &str = r#"
 {
-    "input": {
-      "CIRCUIT_1": {
-        "external": [5,7],
-        "plaintext": [1,2,3,4]
-      },
-      "CIRCUIT_2": {
-        "ciphertext": [1, 2, 3, 4],
-        "external": [2, 4]
-      },
-      "CIRCUIT_3": {
-        "key": [2, 3],
-        "value": [4, 5]
+    "input": [
+      [
+      {},{},{}
+      ],
+      {
+        "CIRCUIT_1": {
+          "external": [5,7],
+          "plaintext": [1,2,3,4]
+        },
+        "CIRCUIT_2": {
+          "ciphertext": [1, 2, 3, 4],
+          "external": [2, 4]
+        },
+        "CIRCUIT_3": {
+          "key": [2, 3],
+          "value": [4, 5]
+        }
       }
-    }
+    ]
 }"#;
 
   #[derive(Debug, Deserialize)]
   struct MockInputs {
-    input: HashMap<String, FoldInput>,
+    input: (Vec<HashMap<String, Value>>, HashMap<String, FoldInput>),
   }
 
   // Helper function to create test program data
@@ -427,10 +428,7 @@ mod tests {
     rom_data.insert("mul".to_string(), CircuitData { opcode: 2u64 });
 
     // Rest of the function remains same
-    let rom: Vec<InstructionConfig> = vec![
-      InstructionConfig { name: "add".to_string(), private_input: HashMap::new() },
-      InstructionConfig { name: "mul".to_string(), private_input: HashMap::new() },
-    ];
+    let rom: Vec<String> = vec!["add".to_string(), "mul".to_string()];
 
     let setup_data = SetupData {
       max_rom_length:          4,
@@ -446,7 +444,7 @@ mod tests {
       rom_data,
       rom,
       initial_nivc_input: vec![F::<G1>::ONE],
-      inputs: vec![HashMap::new()],
+      inputs: vec![HashMap::new(), HashMap::new()],
       witnesses: vec![vec![F::<G1>::ONE]],
     }
   }
@@ -481,10 +479,7 @@ mod tests {
     let mut program_data = create_test_program_data();
 
     // Add an opcode config that doesn't exist in rom_data
-    program_data.rom.push(InstructionConfig {
-      name:          "nonexistent".to_string(),
-      private_input: HashMap::new(),
-    });
+    program_data.rom.push("nonexistent".to_string());
 
     let result = program_data.extend_public_inputs();
     assert!(result.is_err());
@@ -499,9 +494,9 @@ mod tests {
   fn test_deserialize_inputs() {
     let mock_inputs: MockInputs = serde_json::from_str(JSON).unwrap();
     dbg!(&mock_inputs.input);
-    assert!(mock_inputs.input.contains_key("CIRCUIT_1"));
-    assert!(mock_inputs.input.contains_key("CIRCUIT_2"));
-    assert!(mock_inputs.input.contains_key("CIRCUIT_3"));
+    assert!(mock_inputs.input.1.contains_key("CIRCUIT_1"));
+    assert!(mock_inputs.input.1.contains_key("CIRCUIT_2"));
+    assert!(mock_inputs.input.1.contains_key("CIRCUIT_3"));
   }
 
   #[ignore]
@@ -513,8 +508,6 @@ mod tests {
       witness_generator_types: vec![WitnessGeneratorType::Raw(vec![])],
       max_rom_length:          3,
     };
-    let public_params = program::setup(&setup_data);
-    let _ap = public_params.aux_params();
 
     let mock_inputs: MockInputs = serde_json::from_str(JSON).unwrap();
     let program_data = ProgramData::<Offline, NotExpanded> {
@@ -525,20 +518,7 @@ mod tests {
         (String::from("CIRCUIT_2"), CircuitData { opcode: 1 }),
         (String::from("CIRCUIT_3"), CircuitData { opcode: 2 }),
       ]),
-      rom: vec![
-        InstructionConfig {
-          name:          String::from("CIRCUIT_1"),
-          private_input: HashMap::new(),
-        },
-        InstructionConfig {
-          name:          String::from("CIRCUIT_2"),
-          private_input: HashMap::new(),
-        },
-        InstructionConfig {
-          name:          String::from("CIRCUIT_3"),
-          private_input: HashMap::new(),
-        },
-      ],
+      rom: vec![String::from("CIRCUIT_1"), String::from("CIRCUIT_2"), String::from("CIRCUIT_3")],
       initial_nivc_input: vec![],
       inputs: mock_inputs.input,
       witnesses: vec![],

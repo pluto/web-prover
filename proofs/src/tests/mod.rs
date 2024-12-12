@@ -8,7 +8,7 @@ use serde_json::json;
 use super::*;
 use crate::{
   program::{
-    data::{CircuitData, InstructionConfig, NotExpanded},
+    data::{CircuitData, NotExpanded},
     manifest::to_chacha_input,
   },
   witness::{compute_http_witness, compute_json_witness, data_hasher, ByteOrPad},
@@ -206,17 +206,15 @@ fn test_end_to_end_proofs() {
   assert!(padded_plaintext.len() == padded_ciphertext.len());
   assert_eq!(padded_ciphertext.len(), 1024);
   let ciphertext_hash = data_hasher(&padded_ciphertext);
+  let mut private_inputs = vec![];
 
-  let chacha_rom_opcode_config = InstructionConfig {
-    name:          String::from("PLAINTEXT_AUTHENTICATION"),
-    private_input: HashMap::from([
-      (String::from(CHACHA20_KEY.0), json!(to_chacha_input(&CHACHA20_KEY.1))),
-      (String::from(CHACHA20_NONCE.0), json!(to_chacha_input(&nonce))),
-      (String::from("counter"), json!(to_chacha_input(&[1]))),
-      (String::from(HTTP_RESPONSE_PLAINTEXT.0), json!(&padded_plaintext)),
-    ]),
-  };
-  let mut rom = vec![chacha_rom_opcode_config];
+  let mut rom = vec![String::from("PLAINTEXT_AUTHENTICATION")];
+  private_inputs.push(HashMap::from([
+    (String::from(CHACHA20_KEY.0), json!(to_chacha_input(&CHACHA20_KEY.1))),
+    (String::from(CHACHA20_NONCE.0), json!(to_chacha_input(&nonce))),
+    (String::from("counter"), json!(to_chacha_input(&[1]))),
+    (String::from(HTTP_RESPONSE_PLAINTEXT.0), json!(&padded_plaintext)),
+  ]));
 
   // After setting the encryption config for the ROM, pad the plaintext to match what
   // http_nivc_1024b expects
@@ -249,68 +247,55 @@ fn test_end_to_end_proofs() {
     witness::JsonMaskType::Object("name".as_bytes().to_vec()),
   );
 
-  rom.extend([
-    InstructionConfig {
-      name:          String::from("HTTP_VERIFICATION"),
-      private_input: HashMap::from([
-        (String::from("data"), json!(&padded_plaintext)),
-        (
-          String::from("start_line_hash"),
-          json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
-            .to_str_radix(10)]),
-        ),
-        (String::from("header_hashes"), json!(http_header_hashes)),
-        (
-          String::from("body_hash"),
-          json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
-            .to_str_radix(10),]),
-        ),
+  rom.push(String::from("HTTP_VERIFICATION"));
+  private_inputs.push(HashMap::from([
+    (String::from("data"), json!(&padded_plaintext)),
+    (
+      String::from("start_line_hash"),
+      json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
+        .to_str_radix(10)]),
+    ),
+    (String::from("header_hashes"), json!(http_header_hashes)),
+    (
+      String::from("body_hash"),
+      json!([
+        BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes()).to_str_radix(10),
       ]),
-    },
-    InstructionConfig {
-      name:          String::from("JSON_MASK_OBJECT_1"),
-      private_input: HashMap::from([
-        (String::from("data"), json!(&http_body)),
-        (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
-        (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
-      ]),
-    },
-    InstructionConfig {
-      name:          String::from("JSON_MASK_OBJECT_2"),
-      private_input: HashMap::from([
-        (String::from("data"), json!(masked_json_key_1)),
-        (String::from(JSON_MASK_KEY_DEPTH_2.0), json!(JSON_MASK_KEY_DEPTH_2.1)),
-        (String::from(JSON_MASK_KEYLEN_DEPTH_2.0), json!(JSON_MASK_KEYLEN_DEPTH_2.1)),
-      ]),
-    },
-    InstructionConfig {
-      name:          String::from("JSON_MASK_ARRAY_3"),
-      private_input: HashMap::from([
-        (String::from("data"), json!(masked_json_key_2)),
-        (String::from(JSON_MASK_ARR_DEPTH_3.0), json!(JSON_MASK_ARR_DEPTH_3.1)),
-      ]),
-    },
-    InstructionConfig {
-      name:          String::from("JSON_MASK_OBJECT_4"),
-      private_input: HashMap::from([
-        (String::from("data"), json!(masked_json_key_3)),
-        (String::from(JSON_MASK_KEY_DEPTH_4.0), json!(JSON_MASK_KEY_DEPTH_4.1)),
-        (String::from(JSON_MASK_KEYLEN_DEPTH_4.0), json!(JSON_MASK_KEYLEN_DEPTH_4.1)),
-      ]),
-    },
-    InstructionConfig {
-      name:          String::from("JSON_MASK_OBJECT_5"),
-      private_input: HashMap::from([
-        (String::from("data"), json!(masked_json_key_4)),
-        (String::from(JSON_MASK_KEY_DEPTH_5.0), json!(JSON_MASK_KEY_DEPTH_5.1)),
-        (String::from(JSON_MASK_KEYLEN_DEPTH_5.0), json!(JSON_MASK_KEYLEN_DEPTH_5.1)),
-      ]),
-    },
-    InstructionConfig {
-      name:          String::from("EXTRACT_VALUE"),
-      private_input: HashMap::from([(String::from("data"), json!(masked_json_key_5))]),
-    },
-  ]);
+    ),
+  ]));
+
+  rom.push(String::from("JSON_MASK_OBJECT_1"));
+  private_inputs.push(HashMap::from([
+    (String::from("data"), json!(&http_body)),
+    (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
+    (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
+  ]));
+  rom.push(String::from("JSON_MASK_OBJECT_2"));
+  private_inputs.push(HashMap::from([
+    (String::from("data"), json!(masked_json_key_1)),
+    (String::from(JSON_MASK_KEY_DEPTH_2.0), json!(JSON_MASK_KEY_DEPTH_2.1)),
+    (String::from(JSON_MASK_KEYLEN_DEPTH_2.0), json!(JSON_MASK_KEYLEN_DEPTH_2.1)),
+  ]));
+  rom.push(String::from("JSON_MASK_ARRAY_3"));
+  private_inputs.push(HashMap::from([
+    (String::from("data"), json!(masked_json_key_2)),
+    (String::from(JSON_MASK_ARR_DEPTH_3.0), json!(JSON_MASK_ARR_DEPTH_3.1)),
+  ]));
+  rom.push(String::from("JSON_MASK_OBJECT_4"));
+  private_inputs.push(HashMap::from([
+    (String::from("data"), json!(masked_json_key_3)),
+    (String::from(JSON_MASK_KEY_DEPTH_4.0), json!(JSON_MASK_KEY_DEPTH_4.1)),
+    (String::from(JSON_MASK_KEYLEN_DEPTH_4.0), json!(JSON_MASK_KEYLEN_DEPTH_4.1)),
+  ]));
+  rom.push(String::from("JSON_MASK_OBJECT_5"));
+  private_inputs.push(HashMap::from([
+    (String::from("data"), json!(masked_json_key_4)),
+    (String::from(JSON_MASK_KEY_DEPTH_5.0), json!(JSON_MASK_KEY_DEPTH_5.1)),
+    (String::from(JSON_MASK_KEYLEN_DEPTH_5.0), json!(JSON_MASK_KEYLEN_DEPTH_5.1)),
+  ]));
+
+  rom.push(String::from("EXTRACT_VALUE"));
+  private_inputs.push(HashMap::from([(String::from("data"), json!(masked_json_key_5))]));
 
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
@@ -318,7 +303,7 @@ fn test_end_to_end_proofs() {
     rom_data: rom_data.clone(),
     rom: rom.clone(),
     initial_nivc_input: vec![ciphertext_hash],
-    inputs: HashMap::new(),
+    inputs: (private_inputs, HashMap::new()),
     witnesses: vec![],
   }
   .into_expanded()
@@ -388,7 +373,7 @@ fn test_offline_proofs() {
     rom_data: HashMap::new(),
     rom: vec![],
     initial_nivc_input: vec![],
-    inputs: HashMap::new(),
+    inputs: (vec![], HashMap::new()),
     witnesses: vec![vec![F::<G1>::from(0)]],
   };
   let _ = program_data

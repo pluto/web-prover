@@ -26,7 +26,7 @@ use tls_client2::CipherSuiteKey;
 
 use crate::{
   program::{
-    data::{CircuitData, FoldInput, InstructionConfig},
+    data::{CircuitData, FoldInput},
     F, G1,
   },
   witness::{
@@ -143,15 +143,17 @@ pub struct TLSEncryption {
 /// encryption circuit input for AES/CHACHA
 struct EncryptionCircuitInput {
   /// padded plaintext
-  plaintext:   Vec<ByteOrPad>,
+  plaintext:     Vec<ByteOrPad>,
   /// padded ciphertext
-  ciphertext:  Vec<ByteOrPad>,
+  ciphertext:    Vec<ByteOrPad>,
   /// ROM containing circuit instructions
-  rom_data:    HashMap<String, CircuitData>,
+  rom_data:      HashMap<String, CircuitData>,
   /// ROM containing circuit instructions
-  rom:         Vec<InstructionConfig>,
+  rom:           Vec<String>,
+  /// private input
+  private_input: HashMap<String, serde_json::Value>,
   /// any input that will be distributed across folds
-  fold_inputs: HashMap<String, FoldInput>,
+  fold_inputs:   HashMap<String, FoldInput>,
 }
 
 /// convert bytes to u32
@@ -230,22 +232,26 @@ fn handle_encryption_circuit_inputs(inputs: &EncryptionInput) -> EncryptionCircu
       let nonce = make_nonce(inputs.iv, 0);
 
       // create CHACHA instruction config
-      let chacha_instr_label = String::from("CHACHA20");
+      let chacha_instr_label = String::from("PLAINTEXT_AUTHENTICATION");
       let rom_data = HashMap::from([(chacha_instr_label.clone(), CircuitData { opcode: 0 })]);
 
       // CHACHA rom opcode with private inputs
-      let chacha_rom_opcode_config = InstructionConfig {
-        name:          chacha_instr_label,
-        private_input: HashMap::from([
-          (String::from(KEY_SIGNAL_LABEL), json!(to_chacha_input(&key))),
-          (String::from(CHACHA_NONCE_SIGNAL_LABEL), json!(to_chacha_input(&nonce))),
-          (String::from(CHACHA_COUNTER_SIGNAL_LABEL), json!(to_chacha_input(&[1]))),
-          (String::from(PLAINTEXT_SIGNAL_LABEL), json!(&plaintext)),
-        ]),
-      };
-      let rom = vec![chacha_rom_opcode_config];
+      let private_input = HashMap::from([
+        (String::from(KEY_SIGNAL_LABEL), json!(to_chacha_input(&key))),
+        (String::from(CHACHA_NONCE_SIGNAL_LABEL), json!(to_chacha_input(&nonce))),
+        (String::from(CHACHA_COUNTER_SIGNAL_LABEL), json!(to_chacha_input(&[1]))),
+        (String::from(PLAINTEXT_SIGNAL_LABEL), json!(&plaintext)),
+      ]);
+      let rom = vec![chacha_instr_label];
 
-      EncryptionCircuitInput { plaintext, ciphertext, rom, rom_data, fold_inputs: HashMap::new() }
+      EncryptionCircuitInput {
+        plaintext,
+        ciphertext,
+        rom,
+        rom_data,
+        private_input,
+        fold_inputs: HashMap::new(),
+      }
     },
     _ => {
       unimplemented!("Only CHACHA20POLY1305 is supported for now");
@@ -255,7 +261,8 @@ fn handle_encryption_circuit_inputs(inputs: &EncryptionInput) -> EncryptionCircu
 
 pub struct NivcCircuitInputs {
   pub rom_data:           HashMap<String, CircuitData>,
-  pub rom:                Vec<InstructionConfig>,
+  pub rom:                Vec<String>,
+  pub private_inputs:     Vec<HashMap<String, serde_json::Value>>,
   pub fold_inputs:        HashMap<String, FoldInput>,
   pub initial_nivc_input: Vec<F<G1>>,
 }
@@ -265,8 +272,16 @@ impl Manifest {
   pub fn rom_from_request(&self, inputs: EncryptionInput) -> NivcCircuitInputs {
     assert_eq!(inputs.plaintext.len(), inputs.ciphertext.len());
 
-    let EncryptionCircuitInput { plaintext, ciphertext, mut rom, mut rom_data, fold_inputs } =
-      handle_encryption_circuit_inputs(&inputs);
+    let mut private_inputs = vec![];
+    let EncryptionCircuitInput {
+      plaintext,
+      ciphertext,
+      mut rom,
+      mut rom_data,
+      private_input,
+      fold_inputs,
+    } = handle_encryption_circuit_inputs(&inputs);
+    private_inputs.push(private_input);
 
     let ciphertext_hash = data_hasher(&ciphertext);
 
@@ -286,34 +301,46 @@ impl Manifest {
     let http_body_hash = data_hasher(&http_body);
 
     // initialise rom data and rom
-    rom_data.insert(String::from("HTTP_NIVC"), CircuitData { opcode: 1 });
-    rom.push(InstructionConfig {
-      name:          String::from("HTTP_NIVC"),
-      private_input: HashMap::from([
-        (String::from(DATA_SIGNAL_NAME), json!(&plaintext)),
-        (
-          String::from(HTTP_START_LINE_HASH_SIGNAL_NAME),
-          json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
-            .to_str_radix(10)]),
-        ),
-        (String::from(HTTP_HEADER_HASHES_SIGNAL_NAME), json!(http_header_hashes)),
-        (
-          String::from(HTTP_BODY_HASH_SIGNAL_NAME),
-          json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
-            .to_str_radix(10),]),
-        ),
-      ]),
-    });
+    rom_data.insert(String::from("HTTP_VERIFICATION"), CircuitData { opcode: 1 });
+    rom.push(String::from("HTTP_VERIFICATION"));
+    private_inputs.push(HashMap::from([
+      (String::from(DATA_SIGNAL_NAME), json!(&plaintext)),
+      (
+        String::from(HTTP_START_LINE_HASH_SIGNAL_NAME),
+        json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
+          .to_str_radix(10)]),
+      ),
+      (String::from(HTTP_HEADER_HASHES_SIGNAL_NAME), json!(http_header_hashes)),
+      (
+        String::from(HTTP_BODY_HASH_SIGNAL_NAME),
+        json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
+          .to_str_radix(10),]),
+      ),
+    ]));
 
-    NivcCircuitInputs { rom_data, rom, fold_inputs, initial_nivc_input: vec![ciphertext_hash] }
+    NivcCircuitInputs {
+      rom_data,
+      rom,
+      private_inputs,
+      fold_inputs,
+      initial_nivc_input: vec![ciphertext_hash],
+    }
   }
 
   /// generates ROM from [`Manifest::response`]
   pub fn rom_from_response(&self, inputs: EncryptionInput) -> NivcCircuitInputs {
     assert_eq!(inputs.plaintext.len(), inputs.ciphertext.len());
 
-    let EncryptionCircuitInput { plaintext, ciphertext, mut rom, mut rom_data, fold_inputs } =
-      handle_encryption_circuit_inputs(&inputs);
+    let mut private_inputs = vec![];
+    let EncryptionCircuitInput {
+      plaintext,
+      ciphertext,
+      mut rom,
+      mut rom_data,
+      private_input,
+      fold_inputs,
+    } = handle_encryption_circuit_inputs(&inputs);
+    private_inputs.push(private_input);
 
     let ciphertext_hash = data_hasher(&ciphertext);
 
@@ -331,24 +358,22 @@ impl Manifest {
     let http_body_hash = data_hasher(&http_body);
 
     // http parse
-    rom_data.insert(String::from("HTTP_NIVC"), CircuitData { opcode: 1 });
-    rom.push(InstructionConfig {
-      name:          String::from("HTTP_NIVC"),
-      private_input: HashMap::from([
-        (String::from(DATA_SIGNAL_NAME), json!(&plaintext)),
-        (
-          String::from(HTTP_START_LINE_HASH_SIGNAL_NAME),
-          json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
-            .to_str_radix(10)]),
-        ),
-        (String::from(HTTP_HEADER_HASHES_SIGNAL_NAME), json!(http_header_hashes)),
-        (
-          String::from(HTTP_BODY_HASH_SIGNAL_NAME),
-          json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
-            .to_str_radix(10),]),
-        ),
-      ]),
-    });
+    rom_data.insert(String::from("HTTP_VERIFICATION"), CircuitData { opcode: 1 });
+    rom.push(String::from("HTTP_VERIFICATION"));
+    private_inputs.push(HashMap::from([
+      (String::from(DATA_SIGNAL_NAME), json!(&plaintext)),
+      (
+        String::from(HTTP_START_LINE_HASH_SIGNAL_NAME),
+        json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
+          .to_str_radix(10)]),
+      ),
+      (String::from(HTTP_HEADER_HASHES_SIGNAL_NAME), json!(http_header_hashes)),
+      (
+        String::from(HTTP_BODY_HASH_SIGNAL_NAME),
+        json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
+          .to_str_radix(10),]),
+      ),
+    ]));
 
     // json keys
     let mut masked_body = http_body;
@@ -359,14 +384,12 @@ impl Manifest {
           let mut json_key_padded = [0u8; JSON_MAX_KEY_LENGTH];
           json_key_padded[..json_key.len()].copy_from_slice(json_key.as_bytes());
           rom_data.insert(format!("JSON_MASK_OBJECT_{}", i + 1), CircuitData { opcode: 2 });
-          rom.push(InstructionConfig {
-            name:          format!("JSON_MASK_OBJECT_{}", i + 1),
-            private_input: HashMap::from([
-              (String::from("data"), json!(masked_body)),
-              (String::from(JSON_MASK_OBJECT_KEY_NAME), json!(json_key_padded)),
-              (String::from(JSON_MASK_OBJECT_KEYLEN_NAME), json!([json_key.len()])),
-            ]),
-          });
+          rom.push(format!("JSON_MASK_OBJECT_{}", i + 1));
+          private_inputs.push(HashMap::from([
+            (String::from("data"), json!(masked_body)),
+            (String::from(JSON_MASK_OBJECT_KEY_NAME), json!(json_key_padded)),
+            (String::from(JSON_MASK_OBJECT_KEYLEN_NAME), json!([json_key.len()])),
+          ]));
           masked_body = compute_json_witness(
             &masked_body,
             crate::witness::JsonMaskType::Object(json_key.as_bytes().to_vec()),
@@ -374,13 +397,11 @@ impl Manifest {
         },
         JsonKey::Num(index) => {
           rom_data.insert(format!("JSON_MASK_ARRAY_{}", i + 1), CircuitData { opcode: 3 });
-          rom.push(InstructionConfig {
-            name:          format!("JSON_MASK_ARRAY_{}", i + 1),
-            private_input: HashMap::from([
-              (String::from("data"), json!(masked_body)),
-              (String::from(JSON_MASK_ARRAY_SIGNAL_NAME), json!([index])),
-            ]),
-          });
+          rom.push(format!("JSON_MASK_ARRAY_{}", i + 1));
+          private_inputs.push(HashMap::from([
+            (String::from("data"), json!(masked_body)),
+            (String::from(JSON_MASK_ARRAY_SIGNAL_NAME), json!([index])),
+          ]));
           masked_body =
             compute_json_witness(&masked_body, crate::witness::JsonMaskType::ArrayIndex(*index));
         },
@@ -389,12 +410,16 @@ impl Manifest {
 
     // final extraction
     rom_data.insert(String::from("EXTRACT_VALUE"), CircuitData { opcode: 4 });
-    rom.push(InstructionConfig {
-      name:          String::from("EXTRACT_VALUE"),
-      private_input: HashMap::from([(String::from(DATA_SIGNAL_NAME), json!(masked_body))]),
-    });
+    rom.push(String::from("EXTRACT_VALUE"));
+    private_inputs.push(HashMap::from([(String::from(DATA_SIGNAL_NAME), json!(masked_body))]));
 
-    NivcCircuitInputs { rom_data, rom, fold_inputs, initial_nivc_input: vec![ciphertext_hash] }
+    NivcCircuitInputs {
+      rom_data,
+      rom,
+      fold_inputs,
+      private_inputs,
+      initial_nivc_input: vec![ciphertext_hash],
+    }
   }
 }
 
@@ -493,8 +518,8 @@ mod tests {
   fn generate_chacha_rom_from_request() {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
-    let NivcCircuitInputs { rom_data, rom, fold_inputs, .. } =
-      manifest.rom_from_request(EncryptionInput {
+    let NivcCircuitInputs { rom_data, rom, fold_inputs, private_inputs, .. } = manifest
+      .rom_from_request(EncryptionInput {
         key:        tls_client2::CipherSuiteKey::CHACHA20POLY1305(CHACHA_KEY.1),
         iv:         AEAD_IV.1,
         aad:        AEAD_AAD.1.to_vec(),
@@ -502,29 +527,29 @@ mod tests {
         ciphertext: TEST_MANIFEST_REQUEST.to_vec(),
       });
 
-    // CHACHA + HTTP parse
+    // CHACHA + HTTP verification
     assert_eq!(rom_data.len(), 2);
-    assert_eq!(rom_data.get(&String::from("HTTP_NIVC")).unwrap().opcode, 1);
+    assert_eq!(rom_data.get(&String::from("HTTP_VERIFICATION")).unwrap().opcode, 1);
 
     // should contain http parse and http headers
     assert_eq!(rom.len(), 1 + 1);
 
     // assert http parse inputs
     let http_instruction_len = 1;
-    assert_eq!(rom[http_instruction_len].name, String::from("HTTP_NIVC"));
-    assert!(rom[http_instruction_len].private_input.contains_key("start_line_hash"));
-    assert!(rom[http_instruction_len].private_input.contains_key("header_hashes"));
-    assert!(rom[http_instruction_len].private_input.contains_key("body_hash"));
+    assert_eq!(rom[http_instruction_len], "HTTP_VERIFICATION");
+    assert!(private_inputs[http_instruction_len].contains_key("start_line_hash"));
+    assert!(private_inputs[http_instruction_len].contains_key("header_hashes"));
+    assert!(private_inputs[http_instruction_len].contains_key("body_hash"));
 
-    assert!(!fold_inputs.contains_key(&String::from("CHACHA20")));
+    assert!(!fold_inputs.contains_key(&String::from("PLAINTEXT_AUTHENTICATION")));
   }
 
   #[test]
   fn generate_chacha_rom_from_response() {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
-    let NivcCircuitInputs { rom_data, rom, fold_inputs, .. } =
-      manifest.rom_from_response(EncryptionInput {
+    let NivcCircuitInputs { rom_data, rom, fold_inputs, private_inputs, .. } = manifest
+      .rom_from_response(EncryptionInput {
         key:        tls_client2::CipherSuiteKey::CHACHA20POLY1305(CHACHA_KEY.1),
         iv:         AEAD_IV.1,
         aad:        AEAD_AAD.1.to_vec(),
@@ -545,16 +570,16 @@ mod tests {
     // assert http parse inputs
     let http_instruction_len = 1;
 
-    assert_eq!(rom[http_instruction_len].name, String::from("HTTP_NIVC"));
-    assert!(rom[http_instruction_len].private_input.contains_key("start_line_hash"));
-    assert!(rom[http_instruction_len].private_input.contains_key("header_hashes"));
-    assert!(rom[http_instruction_len].private_input.contains_key("body_hash"));
+    assert_eq!(rom[http_instruction_len], String::from("HTTP_VERIFICATION"));
+    assert!(private_inputs[http_instruction_len].contains_key("start_line_hash"));
+    assert!(private_inputs[http_instruction_len].contains_key("header_hashes"));
+    assert!(private_inputs[http_instruction_len].contains_key("body_hash"));
 
     // check final circuit is extract
-    assert_eq!(rom[rom.len() - 1].name, String::from("EXTRACT_VALUE"));
-    assert!(rom[rom.len() - 1].private_input.contains_key("data"));
+    assert_eq!(rom[rom.len() - 1], String::from("EXTRACT_VALUE"));
+    assert!(private_inputs[rom.len() - 1].contains_key("data"));
 
-    assert!(!fold_inputs.contains_key(&String::from("CHACHA20")));
+    assert!(!fold_inputs.contains_key(&String::from("PLAINTEXT_AUTHENTICATION")));
   }
 
   #[test]
