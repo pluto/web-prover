@@ -16,6 +16,7 @@ use proofs::{
   proof::FoldingProof,
   F, G1, G2,
 };
+use serde_wasm_bindgen::from_value;
 use tls_client2::origo::OrigoConnection;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
@@ -60,21 +61,15 @@ pub async fn proxy_and_sign_and_generate_proof(
   // generate NIVC proofs for request and response
   // TODO (tracy): cloning proving params here is likely quite expensive.
   let manifest = config.proving.manifest.unwrap();
-  let (request_proof, response_proof) = rayon::join(
-    || {
-      construct_request_program_data_and_proof(
-        &manifest.request,
-        request_inputs,
-        proving_params.clone().unwrap(),
-      )
-    },
-    || {
-      construct_response_program_data_and_proof(
-        &manifest.response,
-        response_inputs,
-        proving_params.clone().unwrap(),
-      )
-    },
+  let request_proof = construct_request_program_data_and_proof(
+    &manifest.request,
+    request_inputs,
+    proving_params.clone().unwrap(),
+  );
+  let response_proof = construct_response_program_data_and_proof(
+    &manifest.response,
+    response_inputs,
+    proving_params.clone().unwrap(),
   );
 
   // TODO(Sambhav): handle request and response into one proof
@@ -136,7 +131,7 @@ fn construct_request_program_data_and_proof(
     setup_data,
     rom,
     rom_data: circuit_data,
-    initial_nivc_input: initial_nivc_input.clone(),
+    initial_nivc_input: vec![initial_nivc_input[0]],
     inputs: (private_inputs, fold_inputs),
     witnesses: vec![vec![F::<G1>::from(0)]],
   }
@@ -166,8 +161,8 @@ fn construct_response_program_data_and_proof(
   let setup_data = construct_setup_data();
 
   let NivcCircuitInputs { private_inputs, fold_inputs, initial_nivc_input } =
-    manifest_response.build_inputs(inputs)?;
-  let NIVCRom { circuit_data, rom } = manifest_response.build_rom();
+    manifest_response.build_inputs(&inputs)?;
+  let NIVCRom { circuit_data, rom } = manifest_response.build_rom(inputs.plaintext.len());
 
   debug!("Generating response's `ProgramData`...");
   let program_data = ProgramData::<Offline, NotExpanded> {
@@ -177,7 +172,7 @@ fn construct_response_program_data_and_proof(
     setup_data,
     rom,
     rom_data: circuit_data,
-    initial_nivc_input,
+    initial_nivc_input: vec![initial_nivc_input[0]],
     inputs: (private_inputs, fold_inputs),
     witnesses: vec![vec![F::<G1>::from(0)]],
   }

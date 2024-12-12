@@ -62,7 +62,7 @@ impl TryFrom<&[u8]> for R1CS {
 
   fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
     let cursor = BufReader::new(Cursor::new(value));
-    from_reader(cursor).map_err(ProofError::from)
+    from_reader(cursor)
   }
 }
 
@@ -71,7 +71,7 @@ impl TryFrom<&PathBuf> for R1CS {
 
   fn try_from(filename: &PathBuf) -> Result<Self, Self::Error> {
     let reader = BufReader::new(OpenOptions::new().read(true).open(filename)?);
-    from_reader(reader).map_err(ProofError::from)
+    from_reader(reader)
   }
 }
 

@@ -93,6 +93,7 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
   let iv: [u8; 12] = witness.request.aead_iv[..12].try_into()?;
   let trim_bytes = (TLS_13_TYPE_BYTES + TLS_13_AEAD_BYTES) as usize;
 
+  // TODO (Sambhav): might have to apply similar multi-packet logic for request as well
   // Get the request ciphertext, request plaintext, and AAD
   let request_ciphertext = hex::decode(witness.request.ciphertext[0].as_bytes())?;
 
@@ -148,15 +149,15 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
   let mut padded_aad = vec![0; 16 - aad.len()];
   padded_aad.extend(aad);
 
-  let request_plaintext = plaintext.payload.0.to_vec();
-  debug!("TLS_DECRYPT (request): plaintext={:?}", bytes_to_ascii(request_plaintext.clone()));
+  let request_plaintext = vec![plaintext.payload.0.to_vec()];
+  debug!("TLS_DECRYPT (request): plaintext={:?}", bytes_to_ascii(request_plaintext[0].clone()));
   debug!("TLS_DECRYPT (request): ciphertext={:?}", hex::encode(request_ciphertext.clone()));
   debug!(
     "TLS_DECRYPT (request): trimmed_bytes={:?}",
     hex::encode(&request_ciphertext.clone()[request_ciphertext.len() - trim_bytes..])
   );
 
-  let request_ciphertext = request_ciphertext[..request_ciphertext.len() - trim_bytes].to_vec();
+  let request_ciphertext = vec![request_ciphertext[..request_ciphertext.len() - trim_bytes].to_vec()];
   assert_eq!(request_plaintext.len(), request_ciphertext.len());
 
   // ----------------------------------------------------------------------------------------------------------------------- //
@@ -212,15 +213,13 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
       i,
       hex::encode(&ct_chunk.clone()[ct_chunk.len() - trim_bytes..])
     );
-    response_ciphertext.extend_from_slice(&ct_chunk[..ct_chunk.len() - trim_bytes]);
+    response_ciphertext.push(ct_chunk[..ct_chunk.len() - trim_bytes].to_vec());
 
-    response_plaintext.extend(pt);
+    response_plaintext.push(pt);
     let aad = hex::decode(&meta.additional_data)?;
     let mut padded_aad = vec![0; 16 - aad.len()];
     padded_aad.extend(&aad);
   }
-
-  assert_eq!(response_plaintext.len(), response_ciphertext.len());
 
   Ok(TLSEncryption {
     request:  EncryptionInput {

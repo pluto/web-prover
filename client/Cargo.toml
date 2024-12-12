@@ -54,11 +54,11 @@ tokio-util={ version="0.7", features=[
 ] } # compat is used to work with AsyncRead and AsyncWrite from other crates
 chrono="0.4"
 p256={ version="0.13", features=["pem", "ecdsa"] }
+rayon={ workspace=true }
 
 uuid={ version="1.10.0", default-features=false, features=["v4"] }
 
-rayon={ workspace=true }
-clap ={ workspace=true }
+clap={ workspace=true }
 
 ####################################################################################################
 # Target-specific configuration

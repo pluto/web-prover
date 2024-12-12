@@ -83,9 +83,30 @@ pub fn construct_setup_data() -> SetupData {
         R1CSType::Raw(JSON_EXTRACTION_R1CS.to_vec()),
       ],
       witness_generator_types: vec![
-        WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
-        WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
-        WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
+        // WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
+        // WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
+        // WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
+        WitnessGeneratorType::Wasm {
+          path:      String::from(
+            "proofs/web_proof_circuits/target_1024b/plaintext_authentication_1024b_js/\
+             plaintext_authentication_1024b.wasm",
+          ),
+          wtns_path: String::from("witness.wtns"),
+        },
+        WitnessGeneratorType::Wasm {
+          path:      String::from(
+            "proofs/web_proof_circuits/target_1024b/http_verification_1024b_js/\
+             http_verification_1024b.wasm",
+          ),
+          wtns_path: String::from("witness.wtns"),
+        },
+        WitnessGeneratorType::Wasm {
+          path:      String::from(
+            "proofs/web_proof_circuits/target_1024b/json_extraction_1024b_js/\
+             json_extraction_1024b.wasm",
+          ),
+          wtns_path: String::from("witness.wtns"),
+        },
       ],
       max_rom_length:          MAX_ROM_LENGTH,
     }
@@ -95,9 +116,9 @@ pub fn construct_setup_data() -> SetupData {
   {
     SetupData {
       r1cs_types:              vec![
-        R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
-        R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
-        R1CSType::Raw(JSON_EXTRACTION_512B_R1CS.to_vec()),
+        R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
+        R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
+        R1CSType::Raw(JSON_EXTRACTION_R1CS.to_vec()),
       ],
       witness_generator_types: vec![WitnessGeneratorType::Browser; 3],
       max_rom_length:          MAX_ROM_LENGTH,

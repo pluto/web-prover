@@ -179,9 +179,28 @@ fn test_end_to_end_proofs() {
       R1CSType::Raw(JSON_EXTRACTION_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
+      // WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
+      WitnessGeneratorType::Wasm {
+        path:      String::from(
+          "web_proof_circuits/target_1024b/plaintext_authentication_1024b_js/\
+           plaintext_authentication_1024b.wasm",
+        ),
+        wtns_path: "wtns.wtns".to_string(),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from(
+          "web_proof_circuits/target_1024b/http_verification_1024b_js/http_verification_1024b.wasm",
+        ),
+        wtns_path: "wtns.wtns".to_string(),
+      },
+      WitnessGeneratorType::Wasm {
+        path:      String::from(
+          "web_proof_circuits/target_1024b/json_extraction_1024b_js/json_extraction_1024b.wasm",
+        ),
+        wtns_path: "wtns.wtns".to_string(),
+      },
     ],
     max_rom_length:          MAX_ROM_LENGTH,
   };
@@ -212,28 +231,37 @@ fn test_end_to_end_proofs() {
 
   let (ciphertext_digest, init_nivc_input) = crate::witness::response_initial_digest(
     &mock_manifest().response,
-    ciphertext_digest,
+    &[padded_ciphertext],
     MAX_STACK_HEIGHT,
   );
   let mut private_inputs = vec![];
 
+  debug!("Creating ROM...");
   let mut rom = vec![String::from("PLAINTEXT_AUTHENTICATION")];
   private_inputs.push(HashMap::from([
     (String::from(CHACHA20_KEY.0), json!(to_chacha_input(&CHACHA20_KEY.1))),
     (String::from(CHACHA20_NONCE.0), json!(to_chacha_input(&nonce))),
     (String::from("counter"), json!(to_chacha_input(&[1]))),
     (String::from(HTTP_RESPONSE_PLAINTEXT.0), json!(&padded_plaintext)),
+    (String::from("plaintext_index_counter"), json!(0)),
+    (
+      String::from("ciphertext_digest"),
+      json!(BigInt::from_bytes_le(num_bigint::Sign::Plus, &ciphertext_digest.to_bytes())
+        .to_str_radix(10)),
+    ),
   ]));
 
+  debug!("Creating HTTP verification private inputs...");
   let http_start_line = compute_http_witness(&padded_plaintext, witness::HttpMaskType::StartLine);
   let http_start_line_digest =
-    polynomial_digest(&ByteOrPad::as_bytes(&http_start_line), ciphertext_digest);
+    polynomial_digest(&ByteOrPad::as_bytes(&http_start_line), ciphertext_digest, 0);
   let http_header_0_digest = polynomial_digest(
     &ByteOrPad::as_bytes(&compute_http_witness(
       &padded_plaintext,
       witness::HttpMaskType::Header(0),
     )),
     ciphertext_digest,
+    0,
   );
   let http_header_1_digest = polynomial_digest(
     &ByteOrPad::as_bytes(&compute_http_witness(
@@ -241,6 +269,7 @@ fn test_end_to_end_proofs() {
       witness::HttpMaskType::Header(1),
     )),
     ciphertext_digest,
+    0,
   );
 
   let mut http_body = compute_http_witness(&padded_plaintext, witness::HttpMaskType::Body);
@@ -281,7 +310,7 @@ fn test_end_to_end_proofs() {
     json_tree_hasher(ciphertext_digest, &key_sequence, MAX_STACK_HEIGHT),
   );
   let val = "Taylor Swift".as_bytes();
-  let value_digest = &polynomial_digest(val, ciphertext_digest);
+  let value_digest = &polynomial_digest(val, ciphertext_digest, 0);
 
   rom.push(String::from("JSON_EXTRACTION"));
   private_inputs.push(HashMap::from([
