@@ -73,8 +73,8 @@ pub async fn prover_inner_origo(
   proving_params: Option<Vec<u8>>,
 ) -> Result<Proof, errors::ClientErrors> {
   #[cfg(target_arch = "wasm32")]
-  return origo_wasm32::proxy_and_sign_and_generate_proof(config, proving_params).await;
+  return origo_wasm32::proxy_and_sign(config, proving_params).await;
 
   #[cfg(not(target_arch = "wasm32"))]
-  return origo_native::proxy_and_sign_and_generate_proof(config).await;
+  return origo_native::proxy_and_sign(config).await;
 }

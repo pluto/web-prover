@@ -21,6 +21,7 @@ halo2curves       ="0.6.1"
 
 byteorder ="1.5"
 num-bigint="0.4"
+num-traits="0.2"
 itertools ="0.13"
 
 clap                        ={ version="4.5", features=["derive"] }

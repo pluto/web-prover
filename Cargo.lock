@@ -1271,17 +1271,20 @@ dependencies = [
  "async-tungstenite 0.25.1",
  "base64 0.22.1",
  "bytes",
+ "cfg-if",
  "chrono",
  "clap",
  "console_error_panic_hook",
  "elliptic-curve",
  "futures",
+ "futures-util",
  "getrandom 0.2.15",
  "hex",
  "http-body-util",
  "hyper 1.5.1",
  "hyper-util",
  "js-sys",
+ "num-bigint 0.4.6",
  "p256",
  "parking_lot",
  "pin-project-lite",
@@ -1293,6 +1296,7 @@ dependencies = [
  "rustls-pki-types",
  "serde",
  "serde-wasm-bindgen",
+ "serde_bytes",
  "serde_json",
  "strum",
  "strum_macros",
@@ -1368,6 +1372,7 @@ name = "client_ios"
 version = "0.2.0"
 dependencies = [
  "client",
+ "proofs",
  "serde",
  "serde_json",
  "tokio",
@@ -3705,6 +3710,7 @@ dependencies = [
  "axum-core",
  "base64 0.21.7",
  "clap",
+ "clap_derive",
  "config",
  "eyre",
  "futures",
@@ -3715,12 +3721,14 @@ dependencies = [
  "hyper-util",
  "k256",
  "nom",
+ "nom-derive",
  "p256",
  "rs_merkle",
  "rustls 0.23.19",
  "rustls-acme",
  "rustls-pemfile 2.2.0",
  "serde",
+ "serde_json",
  "sha1",
  "thiserror 1.0.69",
  "tls-client",
@@ -4437,6 +4445,7 @@ dependencies = [
  "itertools 0.13.0",
  "light-poseidon",
  "num-bigint 0.4.6",
+ "num-traits",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -5300,6 +5309,15 @@ name = "serde_arrays"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38636132857f68ec3d5f3eb121166d2af33cb55174c4d5ff645db6165cbef0fd"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "serde_bytes"
+version = "0.11.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "387cc504cb06bb40a96c8e04e951fe01854cf6bc921053c954e4a606d9675c6a"
 dependencies = [
  "serde",
 ]
@@ -7042,6 +7060,7 @@ dependencies = [
 name = "webprover"
 version = "0.0.0"
 dependencies = [
+ "futures-util",
  "http-body-util",
  "hyper 1.5.1",
  "hyper-util",

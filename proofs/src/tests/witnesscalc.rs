@@ -6,15 +6,9 @@ use serde_json::json;
 use super::*;
 use crate::program::data::{R1CSType, SetupData, WitnessGeneratorType};
 
-const ADD_EXTERNAL_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/add_external.r1cs");
-const SQUARE_ZEROTH_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/square_zeroth.r1cs");
-const SWAP_MEMORY_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/swap_memory.r1cs");
-
-const EXTERNAL_INPUTS: [[u64; 2]; 2] = [[5, 7], [13, 1]];
 const ADD_EXTERNAL_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/add_external.bin");
 const SQUARE_ZEROTH_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/square_zeroth.bin");
 const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/swap_memory.bin");
-const MAX_ROM_LENGTH: usize = 10;
 
 const TEST_OFFLINE_PATH: &str = "src/tests/test_run_serialized_verify.bytes";
 
@@ -126,10 +120,10 @@ fn test_run_serialized_verify() {
   let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
 
   // Serialize the proof and zlib compress further
-  let serialized_compressed_proof = proof.serialize();
+  let serialized_compressed_proof = proof.serialize_and_compress();
 
   // Decompress and deserialize
-  let proof = serialized_compressed_proof.deserialize();
+  let proof = serialized_compressed_proof.decompress_and_serialize();
 
   // Extend the initial state input with the ROM (happens internally inside of `program::run`, so
   // we do it out here just for the test)
