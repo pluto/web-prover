@@ -7,19 +7,27 @@ use proofs::{
   program::{
     self,
     data::{Expanded, NotExpanded, Online, ProgramData},
+    manifest::{EncryptionInput, Manifest, NivcCircuitInputs, TLSEncryption},
   },
+  proof::Proof as CompressedSNARKProof,
   F, G1,
 };
-use tls_client2::origo::{OrigoConnection, WitnessData};
+use tls_client2::origo::OrigoConnection;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
 use crate::{
-  circuits::*, config, config::ProvingData, errors, errors::ClientErrors, origo::SignBody,
-  tls::decrypt_tls_ciphertext, Proof,
+  circuits::*, config, errors::ClientErrors, origo::SignBody, tls::decrypt_tls_ciphertext, Proof,
 };
 
-pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
+/// Runs TLS proxy and generates NIVC proof
+/// - runs TLS proxy to get TLS transcripts
+/// - calls proxy to sign witness data
+/// - decrypts TLS ciphertext in [`tls_client2::backend::origo::WitnessData`]
+/// - takes TLS transcripts along with client [`Manifest`] and generates NIVC [`Proof`]
+pub async fn proxy_and_sign_and_generate_proof(
+  mut config: config::Config,
+) -> Result<Proof, ClientErrors> {
   let session_id = config.session_id();
   let mut origo_conn = proxy(config.clone(), session_id.clone()).await?;
 
@@ -34,34 +42,80 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
 
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb).await;
 
-  debug!("generating program data!");
   let witness = origo_conn.to_witness_data();
-  let (request_program_data, response_program_data) =
-    generate_program_data(&witness, config.proving).await?;
 
-  debug!("starting request recursive proving");
-  let request_program_output = program::run(&request_program_data)?;
+  // decrypt TLS ciphertext for request and response and create NIVC inputs
+  let TLSEncryption { request: request_inputs, response: response_inputs } =
+    decrypt_tls_ciphertext(&witness)?;
 
-  // debug!("starting response recursive proving");
-  // let response_program_output = program::run(&response_program_data)?;
-
-  debug!("starting request proof compression");
-  let request_compressed_verifier =
-    program::compress_proof(&request_program_output, &request_program_data.public_params)?;
-  // let response_compressed_verifier =
-  // program::compress_proof(&response_program_output, &response_program_data.public_params)?;
-
-  debug!("verification");
-  let request_serialized_compressed_verifier = request_compressed_verifier.serialize_and_compress();
-  // let response_serialized_compressed_verifier =
-  // response_compressed_verifier.serialize_and_compress();
+  // generate NIVC proofs for request and response
+  let manifest = config.proving.manifest.unwrap();
+  let (request_proof, response_proof) = rayon::join(
+    || construct_request_program_data_and_proof(&manifest, request_inputs),
+    || construct_response_program_data_and_proof(&manifest, response_inputs),
+  );
 
   // TODO(Sambhav): handle request and response into one proof
-  Ok(crate::Proof::Origo((
-    request_serialized_compressed_verifier.0,
-    // response_serialized_compressed_verifier.0,
-    vec![],
-  )))
+  Ok(crate::Proof::Origo((request_proof?.0, response_proof?.0)))
+}
+
+/// generates NIVC proof from [`ProgramData`]
+/// - run NIVC recursive proving
+/// - run CompressedSNARK to compress proof
+/// - serialize proof
+fn generate_proof(
+  program_data: ProgramData<Online, Expanded>,
+) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
+  debug!("starting request recursive proving");
+  let program_output = program::run(&program_data)?;
+  debug!("starting request proof compression");
+  let compressed_snark_proof =
+    program::compress_proof(&program_output, &program_data.public_params)?;
+  debug!("serialize");
+  Ok(compressed_snark_proof.serialize())
+}
+
+/// creates NIVC proof from TLS transcript and [`Manifest`] config
+///
+/// # Arguments
+/// - `manifest` - [`Manifest`] config containing proof and circuit information
+/// - `inputs` - TLS transcript inputs
+///
+/// # Returns
+/// - `CompressedSNARKProof` - NIVC proof
+///
+/// # Details
+/// - generates NIVC ROM from [`Manifest`] config for request and response
+/// - get circuit [`SetupData`] containing circuit R1CS and witness generator files according to
+///   input sizes
+/// - create consolidate [`ProgramData`]
+/// - expand private inputs into fold inputs as per circuits
+fn construct_request_program_data_and_proof(
+  manifest: &Manifest,
+  inputs: EncryptionInput,
+) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
+  debug!("Setting up request's `PublicParams`... (this may take a moment)");
+  let setup_data = construct_setup_data();
+  let public_params = program::setup(&setup_data);
+
+  let NivcCircuitInputs { rom_data, rom, fold_inputs, initial_nivc_input } =
+    manifest.rom_from_request(inputs);
+
+  debug!("Generating request's `ProgramData`...");
+  let program_data = ProgramData::<Online, NotExpanded> {
+    public_params,
+    setup_data,
+    rom,
+    rom_data,
+    initial_nivc_input,
+    inputs: fold_inputs,
+    witnesses: vec![vec![F::<G1>::from(0)]],
+  }
+  .into_expanded()?;
+
+  let proof = generate_proof(program_data)?;
+
+  Ok(proof)
 }
 
 /// takes TLS transcripts and [`ProvingData`] and generates NIVC [`ProgramData`] for request and
@@ -72,54 +126,32 @@ pub async fn proxy_and_sign(mut config: config::Config) -> Result<Proof, errors:
 ///   input sizes
 /// - create consolidate [`ProgramData`]
 /// - expand private inputs into fold inputs as per circuits
-async fn generate_program_data(
-  witness: &WitnessData,
-  proving: ProvingData,
-) -> Result<(ProgramData<Online, Expanded>, Option<ProgramData<Online, Expanded>>), ClientErrors> {
-  let (request_inputs, response_inputs) = decrypt_tls_ciphertext(witness)?;
+fn construct_response_program_data_and_proof(
+  manifest: &Manifest,
+  inputs: EncryptionInput,
+) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
+  debug!("Setting up response's `PublicParams`... (this may take a moment)");
+  let setup_data = construct_setup_data();
+  let public_params = program::setup(&setup_data);
 
-  debug!("Setting up `PublicParams`... (this may take a moment)");
-  // TODO (Sambhav): this will result in duplicate program setups. eliminate this.
-  // TODO (Sambhav): request and response proving can be easily parallelised. evaluate this using
-  // rayon.
-  let request_setup_data = construct_setup_data(request_inputs.plaintext.len());
-  let request_public_params = program::setup(&request_setup_data);
+  let NivcCircuitInputs { rom_data, rom, fold_inputs, initial_nivc_input } =
+    manifest.rom_from_response(inputs);
 
-  // let response_setup_data = construct_setup_data(response_inputs.plaintext.len());
-  // let response_public_params = program::setup(&response_setup_data);
-
-  debug!("Created `PublicParams`!");
-
-  // - construct private inputs and program layout for circuits for TLS request -
-  let (request_rom_data, request_rom, request_fold_inputs) =
-    proving.manifest.as_ref().unwrap().rom_from_request(request_inputs);
-  // - construct private inputs and program layout for circuits for TLS response -
-  // let (response_rom_data, response_rom, response_fold_inputs) =
-  //   proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
-
-  let request_program_data = ProgramData::<Online, NotExpanded> {
-    public_params:      request_public_params,
-    setup_data:         request_setup_data,
-    rom:                request_rom,
-    rom_data:           request_rom_data,
-    initial_nivc_input: vec![proofs::F::<G1>::from(0)],
-    inputs:             request_fold_inputs,
-    witnesses:          vec![vec![F::<G1>::from(0)]],
+  debug!("Generating response's `ProgramData`...");
+  let program_data = ProgramData::<Online, NotExpanded> {
+    public_params,
+    setup_data,
+    rom,
+    rom_data,
+    initial_nivc_input,
+    inputs: fold_inputs,
+    witnesses: vec![vec![F::<G1>::from(0)]],
   }
-  .into_expanded();
+  .into_expanded()?;
 
-  // let response_program_data = ProgramData::<Online, NotExpanded> {
-  //   public_params:      response_public_params,
-  //   setup_data:         response_setup_data,
-  //   rom:                response_rom,
-  //   rom_data:           response_rom_data,
-  //   initial_nivc_input: vec![proofs::F::<G1>::from(0)],
-  //   inputs:             response_fold_inputs,
-  //   witnesses:          vec![vec![F::<G1>::from(0)]],
-  // }
-  // .into_expanded();
+  let proof = generate_proof(program_data)?;
 
-  Ok((request_program_data?, None))
+  Ok(proof)
 }
 
 /// we want to be able to specify somewhere in here what cipher suite to use.

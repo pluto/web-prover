@@ -66,22 +66,29 @@ async function generateWitness(circuit, input, wasm) {
 }
 
 function DataHasher(input) {
-  if (input.length % 16 !== 0) {
-    throw new Error("DATA_BYTES must be divisible by 16");
-  }
-
   let hashes = [BigInt(0)];  // Initialize first hash as 0
 
-  for (let i = 0; i < Math.floor(input.length / 16); i++) {
+  for (let i = 0; i < Math.ceil(input.length / 16); i++) {
     let packedInput = BigInt(0);
+    let isPaddedChunk = 0;
 
+    // Allow for using unpadded input:
+    let innerLoopLength = 16;
+    let lengthRemaining = input.length - 16 * i;
+    if (lengthRemaining < 16) {
+      innerLoopLength = lengthRemaining;
+    }
     // Pack 16 bytes into a single number
-    for (let j = 0; j < 16; j++) {
-      packedInput += BigInt(input[16 * i + j]) * BigInt(2 ** (8 * j));
+    for (let j = 0; j < innerLoopLength; j++) {
+      if (input[16 * i + j] != -1) {
+        packedInput += BigInt(input[16 * i + j]) * BigInt(2 ** (8 * j));
+      } else {
+        isPaddedChunk += 1;
+      }
     }
 
-    // Compute next hash using previous hash and packed input, but if packed input is zero, don't hash it.
-    if (packedInput == BigInt(0)) {
+    // Compute next hash using previous hash and packed input, but if the whole block was padding, don't do it
+    if (isPaddedChunk == innerLoopLength) {
       hashes.push(hashes[i]);
     } else {
       hashes.push(poseidon2([hashes[i], packedInput]));
@@ -89,7 +96,7 @@ function DataHasher(input) {
   }
 
   // Return the last hash
-  return hashes[Math.floor(input.length / 16)];
+  return hashes[Math.ceil(input.length / 16)];
 }
 
 const generateWitnessBytesForResponse = async function (circuits, inputs) {
@@ -219,16 +226,15 @@ const generateWitnessBytesForRequest = async function (circuits, inputs) {
   let witnesses = [];
 
   let plaintext = inputs[0]["plainText"];
-  let extendedHTTPInput = plaintext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
-  let paddedCiphertext = CHACHA20_CIPHERTEXT.concat(Array(TOTAL_BYTES_ACROSS_NIVC - CHACHA20_CIPHERTEXT.length).fill(0));
+  let extendedHTTPInput = plaintext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(-1));
+  let paddedCiphertext = CHACHA20_CIPHERTEXT.concat(Array(TOTAL_BYTES_ACROSS_NIVC - CHACHA20_CIPHERTEXT.length).fill(-1));
 
   console.log("CHACHA");
   inputs[0]["key"] = toInput(Buffer.from(inputs[0]["key"]));
   inputs[0]["nonce"] = toInput(Buffer.from(inputs[0]["nonce"]));
-  inputs[0]["cipherText"] = paddedCiphertext;
   inputs[0]["plainText"] = extendedHTTPInput;
   inputs[0]["counter"] = uintArray32ToBits([1])[0];
-  inputs[0]["step_in"] = 0;
+  inputs[0]["step_in"] = DataHasher(paddedCiphertext);
 
   let chachaWtns = await generateWitness(circuits[0], inputs[0], await getWitnessGenerator(circuits[0]));
   witnesses.push(chachaWtns.data);
@@ -242,10 +248,11 @@ const generateWitnessBytesForRequest = async function (circuits, inputs) {
   inputs[1]["start_line_hash"] = DataHasher(http_start_line);
   let http_header_0_hash = DataHasher(http_header_0[1]);
   let http_header_1_hash = DataHasher(http_header_1[1]);
-  inputs[1]["header_hashes"] = [http_header_0_hash, http_header_1_hash, 0, 0, 0, 0, 0, 0, 0, 0];
+  inputs[1]["header_hashes"] = Array(10).fill(0);
+  inputs[1]["header_hashes"][0] = http_header_0_hash;
+  inputs[1]["header_hashes"][1] = http_header_1_hash;
   inputs[1]["body_hash"] = DataHasher(http_body);
   inputs[1]["step_in"] = DataHasher(extendedHTTPInput);
-  console.log("extended http input", extendedHTTPInput);
   inputs[1]["data"] = extendedHTTPInput;
 
   let wtns = await generateWitness(circuits[1], inputs[1], await getWitnessGenerator(circuits[1]));
@@ -356,7 +363,6 @@ var inputs = [
     "key": CHACHA20_KEY,
     "nonce": CHACHA20_NONCE,
     "plainText": PLAINTEXT,
-    "cipherText": CHACHA20_CIPHERTEXT,
     "counter": [1],
   },
   {
@@ -374,7 +380,7 @@ var inputs = [
 startPreWitgen();
 
 // TODO: Configurable identifiers
-var circuits = ["chacha20_nivc_512b", "http_nivc_512b", "json_mask_object_512b", "json_mask_array_index_512b", "json_extract_value_512b"];
+var circuits = ["plaintext_authentication_512b", "http_verification_512b", "json_mask_object_512b", "json_mask_array_index_512b", "json_extract_value_512b"];
 var witnesses = await generateWitnessBytesForRequest(circuits, inputs);
 console.log("witness", witnesses);
 

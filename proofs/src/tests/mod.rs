@@ -3,59 +3,72 @@
 // TODO: (Colin): I'm noticing this module could use some TLC. There's a lot of lint here!
 
 use client_side_prover::supernova::RecursiveSNARK;
-use halo2curves::bn256::Fr;
-use program::data::{CircuitData, InstructionConfig};
 use serde_json::json;
-use witness::{compute_http_witness, compute_json_witness};
 
 use super::*;
 use crate::{
-  program::{data::NotExpanded, manifest::to_chacha_input},
-  witness::data_hasher,
+  program::{
+    data::{CircuitData, InstructionConfig, NotExpanded},
+    manifest::to_chacha_input,
+  },
+  witness::{compute_http_witness, compute_json_witness, data_hasher, ByteOrPad},
 };
 
 mod witnesscalc;
 
-const ADD_EXTERNAL_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/add_external.r1cs");
-const SQUARE_ZEROTH_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/square_zeroth.r1cs");
-const SWAP_MEMORY_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/swap_memory.r1cs");
-
-const EXTERNAL_INPUTS: [[u64; 2]; 2] = [[5, 7], [13, 1]];
-const MAX_ROM_LENGTH: usize = 10;
-
-// -----------------------------------------------------------------------------------------------
-// JSON Proof Material
-const JSON_MAX_ROM_LENGTH: usize = 45;
+const MAX_ROM_LENGTH: usize = 80;
 
 // Circuit 0
-const CHACHA20_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/chacha20_nivc_512b.r1cs");
-const CHACHA20_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/chacha20_nivc_512b.bin");
+const PLAINTEXT_AUTHENTICATION_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_1024b/plaintext_authentication_1024b.r1cs");
+const PLAINTEXT_AUTHENTICATION_GRAPH: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_1024b/plaintext_authentication_1024b.bin");
 
 // Circuit 1
-const HTTP_NIVC_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/http_nivc_512b.r1cs");
-const HTTP_NIVC_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/http_nivc_512b.bin");
+const HTTP_VERIFICATION_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_1024b/http_verification_1024b.r1cs");
+const HTTP_VERIFICATION_GRAPH: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_1024b/http_verification_1024b.bin");
 
 // Circuit 2
 const JSON_MASK_OBJECT_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/json_mask_object_512b.r1cs");
+  include_bytes!("../../web_proof_circuits/target_1024b/json_mask_object_1024b.r1cs");
 const JSON_MASK_OBJECT_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/json_mask_object_512b.bin");
+  include_bytes!("../../web_proof_circuits/target_1024b/json_mask_object_1024b.bin");
 
 // Circuit 3
 const JSON_MASK_ARRAY_INDEX_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/json_mask_array_index_512b.r1cs");
+  include_bytes!("../../web_proof_circuits/target_1024b/json_mask_array_index_1024b.r1cs");
 const JSON_MASK_ARRAY_INDEX_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/json_mask_array_index_512b.bin");
+  include_bytes!("../../web_proof_circuits/target_1024b/json_mask_array_index_1024b.bin");
 
 // circuit 4
 const EXTRACT_VALUE_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/json_extract_value_512b.r1cs");
+  include_bytes!("../../web_proof_circuits/target_1024b/json_extract_value_1024b.r1cs");
 const EXTRACT_VALUE_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/json_extract_value_512b.bin");
+  include_bytes!("../../web_proof_circuits/target_1024b/json_extract_value_1024b.bin");
+
+const MAX_ROM_LENGTH_512: usize = 10;
+
+// Circuit 0
+const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/plaintext_authentication_512b.r1cs");
+
+// Circuit 1
+const HTTP_VERIFICATION_512B_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/http_verification_512b.r1cs");
+
+// Circuit 2
+const JSON_MASK_OBJECT_512B_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/json_mask_object_512b.r1cs");
+
+// Circuit 3
+const JSON_MASK_ARRAY_INDEX_512B_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/json_mask_array_index_512b.r1cs");
+
+// circuit 4
+const EXTRACT_VALUE_512B_R1CS: &[u8] =
+  include_bytes!("../../web_proof_circuits/target_512b/json_extract_value_512b.r1cs");
 
 // HTTP/1.1 200 OK
 // content-type: application/json; charset=utf-8
@@ -124,6 +137,7 @@ const JSON_MASK_KEYLEN_DEPTH_4: (&str, [u8; 1]) = ("keyLen", [7]);
 const JSON_MASK_KEY_DEPTH_5: (&str, [u8; 10]) = ("key", [110, 97, 109, 101, 0, 0, 0, 0, 0, 0]); // "name"
 const JSON_MASK_KEYLEN_DEPTH_5: (&str, [u8; 1]) = ("keyLen", [4]);
 const MAX_VALUE_LENGTH: usize = 48;
+const MAX_HTTP_HEADERS: usize = 25;
 
 #[test]
 #[tracing_test::traced_test]
@@ -148,27 +162,27 @@ fn test_end_to_end_proofs() {
 
   let setup_data = SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(CHACHA20_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
+      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
       R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
       R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      WitnessGeneratorType::Raw(CHACHA20_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_NIVC_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
       WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
     ],
-    max_rom_length:          JSON_MAX_ROM_LENGTH,
+    max_rom_length:          MAX_ROM_LENGTH,
   };
   debug!("Setting up `Memory`...");
   let public_params = program::setup(&setup_data);
   debug!("Creating ROM");
   let rom_data = HashMap::from([
-    (String::from("CHACHA20"), CircuitData { opcode: 0 }),
-    (String::from("HTTP_NIVC"), CircuitData { opcode: 1 }),
+    (String::from("PLAINTEXT_AUTHENTICATION"), CircuitData { opcode: 0 }),
+    (String::from("HTTP_VERIFICATION"), CircuitData { opcode: 1 }),
     (String::from("JSON_MASK_OBJECT_1"), CircuitData { opcode: 2 }),
     (String::from("JSON_MASK_OBJECT_2"), CircuitData { opcode: 2 }),
     (String::from("JSON_MASK_ARRAY_3"), CircuitData { opcode: 3 }),
@@ -181,36 +195,42 @@ fn test_end_to_end_proofs() {
 
   let nonce = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4a, 0x00, 0x00, 0x00, 0x00];
 
-  let mut padded_plaintext = HTTP_RESPONSE_PLAINTEXT.1.to_vec();
-  padded_plaintext.extend(std::iter::repeat(0).take(512 - HTTP_RESPONSE_PLAINTEXT.1.len()));
+  let padded_plaintext = ByteOrPad::from_bytes_with_padding(
+    &HTTP_RESPONSE_PLAINTEXT.1,
+    1024 - HTTP_RESPONSE_PLAINTEXT.1.len(),
+  );
 
-  let mut padded_ciphertext = CHACHA20_CIPHERTEXT.1.to_vec();
-  padded_ciphertext.extend(std::iter::repeat(0).take(512 - CHACHA20_CIPHERTEXT.1.len()));
+  let padded_ciphertext =
+    ByteOrPad::from_bytes_with_padding(&CHACHA20_CIPHERTEXT.1, 1024 - CHACHA20_CIPHERTEXT.1.len());
 
   assert!(padded_plaintext.len() == padded_ciphertext.len());
-  assert_eq!(padded_ciphertext.len(), 512);
+  assert_eq!(padded_ciphertext.len(), 1024);
+  let ciphertext_hash = data_hasher(&padded_ciphertext);
 
   let chacha_rom_opcode_config = InstructionConfig {
-    name:          String::from("CHACHA20"),
+    name:          String::from("PLAINTEXT_AUTHENTICATION"),
     private_input: HashMap::from([
       (String::from(CHACHA20_KEY.0), json!(to_chacha_input(&CHACHA20_KEY.1))),
       (String::from(CHACHA20_NONCE.0), json!(to_chacha_input(&nonce))),
       (String::from("counter"), json!(to_chacha_input(&[1]))),
-      (String::from(CHACHA20_CIPHERTEXT.0), json!(&padded_ciphertext)),
       (String::from(HTTP_RESPONSE_PLAINTEXT.0), json!(&padded_plaintext)),
     ]),
   };
   let mut rom = vec![chacha_rom_opcode_config];
 
-  // After setting the encryption config for the ROM, pad the plaintext to match what http_nivc_512b
-  // requires
+  // After setting the encryption config for the ROM, pad the plaintext to match what
+  // http_nivc_1024b expects
 
   let http_start_line_hash =
     data_hasher(&compute_http_witness(&padded_plaintext, witness::HttpMaskType::StartLine));
   let http_header_1_hash =
     data_hasher(&compute_http_witness(&padded_plaintext, witness::HttpMaskType::Header(1)));
   let http_body = compute_http_witness(&padded_plaintext, witness::HttpMaskType::Body);
+
   let http_body_hash = data_hasher(&http_body);
+  let mut http_header_hashes = vec!["0".to_string(); MAX_HTTP_HEADERS];
+  http_header_hashes[1] =
+    BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_header_1_hash.to_bytes()).to_str_radix(10);
 
   let masked_json_key_1 =
     compute_json_witness(&http_body, witness::JsonMaskType::Object("data".as_bytes().to_vec()));
@@ -231,30 +251,15 @@ fn test_end_to_end_proofs() {
 
   rom.extend([
     InstructionConfig {
-      name:          String::from("HTTP_NIVC"),
+      name:          String::from("HTTP_VERIFICATION"),
       private_input: HashMap::from([
-        (String::from("data"), json!(padded_plaintext)),
+        (String::from("data"), json!(&padded_plaintext)),
         (
           String::from("start_line_hash"),
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_hash.to_bytes())
             .to_str_radix(10)]),
         ),
-        (
-          String::from("header_hashes"),
-          json!([
-            "0".to_string(),
-            BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_header_1_hash.to_bytes())
-              .to_str_radix(10),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-            "0".to_string(),
-          ]),
-        ),
+        (String::from("header_hashes"), json!(http_header_hashes)),
         (
           String::from("body_hash"),
           json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_body_hash.to_bytes())
@@ -265,7 +270,7 @@ fn test_end_to_end_proofs() {
     InstructionConfig {
       name:          String::from("JSON_MASK_OBJECT_1"),
       private_input: HashMap::from([
-        (String::from("data"), json!(http_body)),
+        (String::from("data"), json!(&http_body)),
         (String::from(JSON_MASK_KEY_DEPTH_1.0), json!(JSON_MASK_KEY_DEPTH_1.1)),
         (String::from(JSON_MASK_KEYLEN_DEPTH_1.0), json!(JSON_MASK_KEYLEN_DEPTH_1.1)),
       ]),
@@ -307,15 +312,12 @@ fn test_end_to_end_proofs() {
     },
   ]);
 
-  // should be zero
-  let initial_nivc_input = vec![Fr::ZERO];
-
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
     setup_data,
     rom_data: rom_data.clone(),
     rom: rom.clone(),
-    initial_nivc_input,
+    initial_nivc_input: vec![ciphertext_hash],
     inputs: HashMap::new(),
     witnesses: vec![],
   }
@@ -327,8 +329,8 @@ fn test_end_to_end_proofs() {
   let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
 
   let val = "\"Taylor Swift\"".as_bytes();
-  let mut final_value = [0; MAX_VALUE_LENGTH];
-  final_value[..val.len()].copy_from_slice(val);
+  let mut final_value = val.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>();
+  final_value.resize(MAX_VALUE_LENGTH, ByteOrPad::Byte(0));
 
   assert_eq!(*recursive_snark.zi_primary().first().unwrap(), data_hasher(&final_value));
 
@@ -348,11 +350,11 @@ fn test_end_to_end_proofs() {
 fn test_offline_proofs() {
   let setup_data = SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(CHACHA20_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_OBJECT_512B_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_512B_R1CS.to_vec()),
+      R1CSType::Raw(EXTRACT_VALUE_512B_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
       WitnessGeneratorType::Wasm {
@@ -376,7 +378,7 @@ fn test_offline_proofs() {
         wtns_path: String::from("witness.wtns"),
       },
     ],
-    max_rom_length:          JSON_MAX_ROM_LENGTH,
+    max_rom_length:          MAX_ROM_LENGTH_512,
   };
   let public_params = program::setup(&setup_data);
 

@@ -125,11 +125,6 @@ struct ContentView: View {
                             "target_method": "\(localMethod)",
                             "target_url": "\(localUrl)",
                             "proving": {
-                                "witnesses": [
-                                    {
-                                        "val": []
-                                    }
-                                ],
                                 "manifest": {
                                     "manifestVersion": "1",
                                     "id": "reddit-user-karma",
@@ -161,13 +156,11 @@ struct ContentView: View {
                                         "version": "HTTP/1.1",
                                         "message": "OK",
                                         "headers": {
-                                            "Content-Type": "application/json"
+                                            "Content-Type": "text/plain"
                                         },
                                         "body": {
                                             "json": [
-                                                "data",
-                                                "items",
-                                                0
+                                                "hello"
                                             ],
                                             "contains": "this_string_exists_in_body"
                                         }
