@@ -335,11 +335,11 @@ fn test_end_to_end_proofs() {
 fn test_offline_proofs() {
   let setup_data = SetupData {
     r1cs_types:              vec![
-      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_OBJECT_512B_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_512B_R1CS.to_vec()),
-      R1CSType::Raw(EXTRACT_VALUE_512B_R1CS.to_vec()),
+      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
+      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
       WitnessGeneratorType::Wasm {
@@ -363,7 +363,7 @@ fn test_offline_proofs() {
         wtns_path: String::from("witness.wtns"),
       },
     ],
-    max_rom_length:          MAX_ROM_LENGTH_512,
+    max_rom_length:          MAX_ROM_LENGTH,
   };
   let public_params = program::setup(&setup_data);
 

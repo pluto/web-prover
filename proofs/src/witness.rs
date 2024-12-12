@@ -90,7 +90,13 @@ pub fn compute_json_witness(
 
   // get the data to mask and convert to bytes
   let data = match mask_at {
-    JsonMaskType::Object(key) => json.get(String::from_utf8(key).unwrap()).unwrap(),
+    // we are panic here
+    JsonMaskType::Object(key) => {
+      debug!("key bytes: {:?}", key);
+      let string_key = String::from_utf8(key).unwrap();
+      debug!("Key: {:?}", string_key);
+      json.get(string_key).unwrap()
+    },
     JsonMaskType::ArrayIndex(idx) => json.as_array().unwrap().get(idx).unwrap(),
   };
   let data_bytes = serde_json::to_string(&data).unwrap();

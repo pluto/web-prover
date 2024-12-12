@@ -86,7 +86,7 @@ pub struct Response {
   #[serde(default = "default_message")]
   message: String,
   /// HTTP headers to lock
-  headers: HashMap<String, String>,
+  pub headers: HashMap<String, String>,
   /// HTTP body keys
   body:    ResponseBody,
 }
@@ -321,18 +321,22 @@ fn build_json_mask_circuit_inputs(
           (String::from(JSON_MASK_OBJECT_KEY_NAME), json!(json_key_padded)),
           (String::from(JSON_MASK_OBJECT_KEYLEN_NAME), json!([json_key.len()])),
         ]));
-        masked_body = compute_json_witness(
-          &masked_body,
-          crate::witness::JsonMaskType::Object(json_key.as_bytes().to_vec()),
-        );
+
+        // bug trace here
+
+        // masked_body = compute_json_witness(
+        //   &masked_body,
+        //   crate::witness::JsonMaskType::Object(json_key.as_bytes().to_vec()),
+        // );
       },
       JsonKey::Num(index) => {
         private_inputs.push(HashMap::from([
           (String::from("data"), json!(masked_body)),
           (String::from(JSON_MASK_ARRAY_SIGNAL_NAME), json!([index])),
         ]));
-        masked_body =
-          compute_json_witness(&masked_body, crate::witness::JsonMaskType::ArrayIndex(*index));
+        // bug trace here
+        // masked_body =
+        //   compute_json_witness(&masked_body, crate::witness::JsonMaskType::ArrayIndex(*index));
       },
     }
   }
@@ -362,7 +366,7 @@ impl Request {
   /// # circuits
   /// - plaintext authentication
   /// - http verification
-  pub fn build_inputs(&self, inputs: EncryptionInput) -> NivcCircuitInputs {
+  pub fn build_inputs(&self, inputs: &EncryptionInput) -> NivcCircuitInputs {
     assert_eq!(inputs.plaintext.len(), inputs.ciphertext.len());
 
     let mut private_inputs = vec![];
@@ -409,7 +413,7 @@ impl Response {
   /// - http verification
   /// - json mask (depending on the keys)
   /// - final extraction
-  pub fn build_inputs(&self, inputs: EncryptionInput) -> NivcCircuitInputs {
+  pub fn build_inputs(&self, inputs: &EncryptionInput) -> NivcCircuitInputs {
     assert_eq!(inputs.plaintext.len(), inputs.ciphertext.len());
 
     let mut private_inputs = vec![];
@@ -585,7 +589,7 @@ mod tests {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
     let NivcCircuitInputs { fold_inputs, private_inputs, .. } =
-      manifest.request.build_inputs(EncryptionInput {
+      manifest.request.build_inputs(&EncryptionInput {
         key:        tls_client2::CipherSuiteKey::CHACHA20POLY1305(CHACHA_KEY.1),
         iv:         AEAD_IV.1,
         aad:        AEAD_AAD.1.to_vec(),
@@ -616,7 +620,7 @@ mod tests {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
     let NivcCircuitInputs { fold_inputs, private_inputs, .. } =
-      manifest.response.build_inputs(EncryptionInput {
+      manifest.response.build_inputs(&EncryptionInput {
         key:        tls_client2::CipherSuiteKey::CHACHA20POLY1305(CHACHA_KEY.1),
         iv:         AEAD_IV.1,
         aad:        AEAD_AAD.1.to_vec(),

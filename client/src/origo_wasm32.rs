@@ -1,22 +1,33 @@
 use std::{
+  clone,
   io::{BufReader, Cursor},
   ops::Deref,
   sync::Arc,
 };
+use crate::ClientErrors;
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::StatusCode;
+use js_sys::Promise;
 use proofs::{
   circom::witness::load_witness_from_bin_reader,
   program::{
     self,
     data::{Expanded, NotExpanded, Offline, Online, ProgramData},
-    manifest::{NIVCRom, NivcCircuitInputs, TLSEncryption},
+    manifest::{
+      EncryptionInput, NIVCRom, NivcCircuitInputs, Request as ManifestRequest,
+      Response as ManifestResponse, TLSEncryption,
+    },
   },
-  G1,
+  proof::Proof as CompressedSNARKProof,
+  F, G1,
 };
-use tls_client2::origo::WitnessData;
-use tracing::debug;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use tls_client2::{origo::WitnessData, CipherSuiteKey};
+use tracing::{debug, info};
+use tracing_subscriber::field::debug;
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
@@ -24,6 +35,63 @@ use crate::{
   circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
   tls_client_async2::bind_client, Proof,
 };
+
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Serialize, Clone, Deserialize)]
+pub struct WitnessInput {
+  pub key:        Vec<u8>,
+  pub iv:         Vec<u8>,
+  pub aad:        Vec<u8>,
+  pub plaintext:  Vec<u8>,
+  pub ciphertext: Vec<u8>,
+  pub headers:    Vec<String>,
+}
+
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Debug)]
+pub struct WitnessOutput {
+  pub data: Vec<js_sys::Uint8Array>,
+}
+
+#[wasm_bindgen]
+impl WitnessOutput {
+  #[wasm_bindgen(constructor)]
+  pub fn new(wit: Vec<js_sys::Uint8Array>) -> WitnessOutput { Self { data: wit } }
+}
+
+
+#[wasm_bindgen]
+extern "C" {
+  #[wasm_bindgen(js_namespace = witness, js_name = createWitness)]
+  async fn create_witness_js(input: &JsValue) -> JsValue;
+}
+
+// #[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub async fn create_witness(input: WitnessInput) -> Result<WitnessOutput, JsValue> {
+  // Convert the Rust WitnessInput to a JsValue
+  let js_input = serde_wasm_bindgen::to_value(&input).unwrap();
+
+  let js_witnesses_output = create_witness_js(&js_input).await;
+  // Call JavaScript function and await the Promise
+  info!("result: {:?}", js_witnesses_output);
+  let js_obj = js_sys::Object::from(js_witnesses_output);
+  info!("js_obj: {:?}", js_obj);
+  let data_value = js_sys::Reflect::get(&js_obj, &JsValue::from_str("data"))?;
+  info!("data_value: {:?}", data_value);
+  let array = js_sys::Array::from(&data_value);
+  info!("array: {:?}", array);
+  let mut data = Vec::with_capacity(array.length() as usize);
+
+  for i in 0..array.length() {
+    let item = array.get(i);
+    if let Ok(uint8_array) = item.dyn_into::<js_sys::Uint8Array>() {
+      data.push(uint8_array);
+    }
+  }
+  info!("data: {:?}", data);
+  Ok(WitnessOutput { data })
+}
 
 pub async fn proxy_and_sign_and_generate_proof(
   mut config: config::Config,
@@ -43,21 +111,74 @@ pub async fn proxy_and_sign_and_generate_proof(
 
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb).await;
 
-  debug!("generating NIVC program data!");
+  debug!("generating program data!");
   let witness = origo_conn.to_witness_data();
-  let program_data = generate_program_data(&witness, config.proving, proving_params).await?;
 
-  debug!("starting proof generation!");
-  let program_output = program::run(&program_data)?;
+  // decrypt TLS ciphertext for request and response and create NIVC inputs
+  let TLSEncryption { request: request_inputs, response: response_inputs } =
+    decrypt_tls_ciphertext(&witness)?;
 
-  debug!("compressing proof!");
-  let compressed_snark_proof =
-    program::compress_proof(&program_output, &program_data.public_params)?;
+  // generate NIVC proofs for request and response
+  let manifest = config.proving.manifest.unwrap();
+  // TODO(WJ 2024-12-16): Can we do parrallel processing with wasm somehow here?
+  // okay wtf, let me bisec this.
+  // okay so the request proof on it's own works fines
+  // let request_proof = construct_request_program_data_and_proof(&manifest.request, request_inputs).await?;
+  // okay so error is here:
+  let response_proof =  construct_response_program_data_and_proof(&manifest.response, response_inputs).await?;
 
-  debug!("running compressed verifier!");
-  let proof = compressed_snark_proof.serialize();
 
-  Ok(crate::Proof::Origo((proof.0, vec![])))
+  // TODO(Sambhav): handle request and response into one proof
+  Ok(crate::Proof::Origo((response_proof.0, vec![])))
+}
+
+/// creates NIVC proof from TLS transcript and [`Manifest`] config
+///
+/// # Arguments
+/// - `manifest` - [`Manifest`] config containing proof and circuit information
+/// - `inputs` - TLS transcript inputs
+///
+/// # Returns
+/// - `CompressedSNARKProof` - NIVC proof
+///
+/// # Details
+/// - generates NIVC ROM from [`Manifest`] config for request and response
+/// - get circuit [`SetupData`] containing circuit R1CS and witness generator files according to
+///   input sizes
+/// - create consolidate [`ProgramData`]
+/// - expand private inputs into fold inputs as per circuits
+async fn construct_request_program_data_and_proof(
+  manifest_request: &ManifestRequest,
+  inputs: EncryptionInput,
+) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
+  debug!("Setting up request's `PublicParams`... (this may take a moment)");
+  let setup_data = construct_setup_data();
+  let public_params = program::setup(&setup_data);
+
+  let NivcCircuitInputs { fold_inputs, private_inputs, initial_nivc_input } =
+    manifest_request.build_inputs(&inputs);
+  let NIVCRom { circuit_data, rom } = manifest_request.build_rom();
+
+  debug!("generating witness in wasm");
+  /// now we call the js FFI to generate the witness in wasm with snarkjs
+  let witnesses = build_witness_data_from_wasm(
+    &inputs,
+    manifest_request.headers.keys().map(clone::Clone::clone).collect(),
+  )
+  .await?;
+  debug!("Generating request's `ProgramData`...");
+  let program_data = ProgramData::<Online, NotExpanded> {
+    public_params,
+    setup_data,
+    rom,
+    rom_data: circuit_data,
+    initial_nivc_input,
+    inputs: (private_inputs, fold_inputs),
+    witnesses,
+  }
+  .into_expanded()?;
+  let proof = generate_proof(program_data)?;
+  Ok(proof)
 }
 /// takes TLS transcripts and [`ProvingData`] and generates NIVC [`ProgramData`] for request and
 /// response separately
@@ -67,52 +188,56 @@ pub async fn proxy_and_sign_and_generate_proof(
 ///   input sizes
 /// - create consolidate [`ProgramData`]
 /// - expand private inputs into fold inputs as per circuits
-async fn generate_program_data(
-  witness: &WitnessData,
-  proving: ProvingData,
-  proving_params: Option<Vec<u8>>,
-) -> Result<ProgramData<Online, Expanded>, errors::ClientErrors> {
-  let TLSEncryption { request: request_inputs, response: response_inputs } =
-    decrypt_tls_ciphertext(witness)?;
+async fn construct_response_program_data_and_proof(
+  manifest_response: &ManifestResponse,
+  inputs: EncryptionInput,
+) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
+  debug!("Setting up response's `PublicParams`... (this may take a moment)");
+  let setup_data = construct_setup_data();
+  let public_params = program::setup(&setup_data);
 
-  let request_setup_data = construct_setup_data();
+  let NivcCircuitInputs { private_inputs, fold_inputs, initial_nivc_input } =
+    manifest_response.build_inputs(&inputs);
+  let NIVCRom { circuit_data, rom } = manifest_response.build_rom();
 
-  // - construct private inputs and program layout for circuits for TLS request -
-  let NivcCircuitInputs {
-    fold_inputs: request_fold_inputs,
-    private_inputs: request_private_inputs,
-    initial_nivc_input: request_initial_nivc_input,
-  } = proving.manifest.as_ref().unwrap().request.build_inputs(request_inputs);
-  let NIVCRom { circuit_data: request_rom_data, rom: request_rom } =
-    proving.manifest.as_ref().unwrap().request.build_rom();
-
-  // // pad AES response ciphertext
-  // let (response_rom_data, response_rom, response_fold_inputs) =
-  // proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
-
-  // TODO (tracy): Today we are carrying witness data on the proving object,
-  // it's not obviously the right place for it. This code path needs a larger
-  // refactor.
-  debug!("serializing witness objects");
-  let mut witnesses = Vec::new();
-  for w in proving.witnesses.unwrap() {
-    witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w)))?);
-  }
-
-  debug!("initializing public params");
-  let program_data = ProgramData::<Offline, NotExpanded> {
-    public_params: proving_params.unwrap(),
-    setup_data: request_setup_data,
-    rom: request_rom,
-    rom_data: request_rom_data,
-    initial_nivc_input: request_initial_nivc_input,
-    inputs: (request_private_inputs, request_fold_inputs),
+  debug!("generating witness in wasm");
+  /// now we call the js FFI to generate the witness in wasm with snarkjs
+  let witnesses = build_witness_data_from_wasm(
+    &inputs,
+    manifest_response.headers.keys().map(clone::Clone::clone).collect(),
+  )
+  .await?;
+  debug!("Generating response's `ProgramData`...");
+  let program_data = ProgramData::<Online, NotExpanded> {
+    public_params,
+    setup_data,
+    rom,
+    rom_data: circuit_data,
+    initial_nivc_input,
+    inputs: (private_inputs, fold_inputs),
     witnesses,
   }
-  .into_online();
+  .into_expanded()?;
 
-  debug!("online -> expanded");
-  Ok(program_data?.into_expanded()?)
+  let proof = generate_proof(program_data)?;
+
+  Ok(proof)
+}
+
+/// generates NIVC proof from [`ProgramData`]
+/// - run NIVC recursive proving
+/// - run CompressedSNARK to compress proof
+/// - serialize proof
+fn generate_proof(
+  program_data: ProgramData<Online, Expanded>,
+) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
+  debug!("starting request recursive proving");
+  let program_output = program::run(&program_data)?;
+  debug!("starting request proof compression");
+  let compressed_snark_proof =
+    program::compress_proof(&program_output, &program_data.public_params)?;
+  debug!("serialize");
+  Ok(compressed_snark_proof.serialize())
 }
 
 async fn proxy(
@@ -177,6 +302,42 @@ async fn proxy(
 
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
   Ok(origo_conn)
+}
+
+async fn build_witness_data_from_wasm(
+  witness_data: &EncryptionInput,
+  headers: Vec<String>,
+) -> Result<Vec<Vec<F<G1>>>, errors::ClientErrors> {
+  let js_witness_input = to_js_witness_input(witness_data, headers);
+  let js_witnesses_output = create_witness(js_witness_input).await.unwrap();
+  debug!("js_witnesses_output: {:?}", js_witnesses_output);
+  let js_computed_witnesses: Vec<Vec<u8>> =
+    js_witnesses_output.data.iter().map(|w| w.to_vec()).collect();
+  let mut witnesses = Vec::new();
+  info!("js_computed_witnesses: {:?}", js_computed_witnesses);
+  for w in js_computed_witnesses {
+    witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w)))?);
+  }
+  // for wit in js_computed_witnesses {
+  //   info!("loading witness from bytes {:?}",wit);
+  //   witnesses.push(load_witness_from_bytes(wit)?);
+  // }
+  Ok(witnesses)
+}
+
+fn to_js_witness_input(witness: &EncryptionInput, headers: Vec<String>) -> WitnessInput {
+  let key_vec = match witness.key {
+    CipherSuiteKey::CHACHA20POLY1305(key) => key.to_vec(),
+    CipherSuiteKey::AES128GCM(key) => key.to_vec(),
+  };
+  WitnessInput {
+    key: key_vec,
+    iv: witness.iv.to_vec(),
+    aad: witness.aad.to_vec(),
+    plaintext: witness.plaintext.clone(),
+    ciphertext: witness.ciphertext.clone(),
+    headers,
+  }
 }
 
 use core::slice;
