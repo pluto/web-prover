@@ -3,17 +3,10 @@
 
 use ff::PrimeField;
 use light_poseidon::{Poseidon, PoseidonBytesHasher};
-use program::manifest::Manifest;
+use program::manifest::{JsonKey, Manifest};
 use serde_json::Value;
 
 use super::*;
-/// The type of JSON mask to apply depending on key's value type.
-pub enum JsonMaskType {
-  /// Mask a JSON object by key.
-  Object(Vec<u8>),
-  /// Mask a JSON array by index.
-  ArrayIndex(usize),
-}
 
 /// Struct representing a byte or padding.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -33,6 +26,10 @@ impl ByteOrPad {
 
 impl From<u8> for ByteOrPad {
   fn from(b: u8) -> Self { ByteOrPad::Byte(b) }
+}
+
+impl From<&u8> for ByteOrPad {
+  fn from(b: &u8) -> Self { ByteOrPad::Byte(*b) }
 }
 
 impl From<&ByteOrPad> for halo2curves::bn256::Fr {
@@ -72,10 +69,7 @@ impl PartialEq<u8> for ByteOrPad {
 /// - `mask_at`: the [`JsonMaskType`] of the JSON request/response to mask
 /// # Returns
 /// - the masked JSON request/response
-pub fn compute_json_witness(
-  masked_plaintext: &[ByteOrPad],
-  mask_at: JsonMaskType,
-) -> Vec<ByteOrPad> {
+pub fn compute_json_witness(masked_plaintext: &[ByteOrPad], mask_at: JsonKey) -> Vec<ByteOrPad> {
   // filter out padding and whitespace and convert to serde_json::Value
   let json_bytes = masked_plaintext
     .iter()
@@ -91,8 +85,8 @@ pub fn compute_json_witness(
 
   // get the data to mask and convert to bytes
   let data = match mask_at {
-    JsonMaskType::Object(key) => json.get(String::from_utf8(key).unwrap()).unwrap(),
-    JsonMaskType::ArrayIndex(idx) => json.as_array().unwrap().get(idx).unwrap(),
+    JsonKey::String(key) => json.get(key).unwrap(),
+    JsonKey::Num(idx) => json.as_array().unwrap().get(idx).unwrap(),
   };
   let data_bytes = serde_json::to_string(&data).unwrap();
   let data_bytes = data_bytes.as_bytes();
@@ -351,26 +345,26 @@ pub fn polynomial_digest(bytes: &[u8], polynomial_input: F<G1>) -> F<G1> {
 // need a bit more than just `JsonMaskType` maybe.
 pub fn json_tree_hasher(
   polynomial_input: F<G1>,
-  key_sequence: &[JsonMaskType],
+  key_sequence: &[JsonKey],
   target_value: &[u8],
   max_stack_height: usize,
 ) -> (Vec<[F<G1>; 2]>, Vec<[F<G1>; 2]>) {
-  assert!(key_sequence.len() < max_stack_height); // TODO: This should be an error
+  assert!(key_sequence.len() <= max_stack_height); // TODO: This should be an error
   let mut stack = Vec::new();
   let mut tree_hashes = Vec::new();
   for val_type in key_sequence {
     match val_type {
-      JsonMaskType::Object(str_bytes) => {
+      JsonKey::String(string) => {
         stack.push([F::<G1>::ONE, F::<G1>::ONE]);
         let mut string_hash = F::<G1>::ZERO;
         let mut monomial = F::<G1>::ONE;
-        for byte in str_bytes {
+        for byte in string.as_bytes() {
           string_hash += monomial * F::<G1>::from(u64::from(*byte));
           monomial *= polynomial_input;
         }
         tree_hashes.push([string_hash, F::<G1>::ZERO]);
       },
-      JsonMaskType::ArrayIndex(idx) => {
+      JsonKey::Num(idx) => {
         tree_hashes.push([F::<G1>::ZERO, F::<G1>::ZERO]);
         stack.push([F::<G1>::from(2), F::<G1>::from(*idx as u64)]);
       },
@@ -407,9 +401,14 @@ pub fn compress_tree_hash(
 }
 
 // TODO: for now this is just doing the response
-pub fn initial_digest(manifest: &Manifest, ciphertext: &[u8]) -> (F<G1>, F<G1>) {
+pub fn initial_digest(
+  manifest: &Manifest,
+  ciphertext: &[u8],
+  target_value: &[u8],
+  max_stack_height: usize,
+) -> (F<G1>, F<G1>) {
   // First create a digest of the ciphertext itself
-  let ciphertext_digest = data_hasher(ciphertext);
+  let ciphertext_digest = data_hasher(&ciphertext.iter().map(ByteOrPad::from).collect::<Vec<_>>());
 
   // TODO: This assumes the start line format here as well.
   // Then digest the start line using the ciphertext_digest as a random input
@@ -423,16 +422,27 @@ pub fn initial_digest(manifest: &Manifest, ciphertext: &[u8]) -> (F<G1>, F<G1>) 
 
   // Digest all the headers
   let header_bytes = headers_to_bytes(&manifest.response.headers);
+  dbg!(&header_bytes);
   let headers_digest = header_bytes.iter().map(|bytes| polynomial_digest(bytes, ciphertext_digest));
+
+  // Digest the JSON sequence
+  let json_tree_hash = json_tree_hasher(
+    ciphertext_digest,
+    &manifest.response.body.json,
+    target_value,
+    max_stack_height,
+  );
+  let json_sequence_digest = compress_tree_hash(ciphertext_digest, json_tree_hash);
 
   // Put all the digests into a vec
   let mut all_digests = vec![];
-  all_digests.push(ciphertext_digest);
+  all_digests.push(json_sequence_digest);
   all_digests.push(start_line_digest);
   headers_digest.into_iter().for_each(|d| all_digests.push(d));
 
   // Iterate through the material and sum up poseidon hashes of each as to not mix polynomials
-  let manifest_digest = all_digests.into_iter().map(|d| poseidon::<1>(&[d])).sum();
+  let manifest_digest =
+    ciphertext_digest + all_digests.into_iter().map(|d| poseidon::<1>(&[d])).sum::<F<G1>>();
   (ciphertext_digest, manifest_digest)
 }
 
@@ -452,12 +462,15 @@ mod tests {
       headers: HashMap::new(),
     };
     let mut headers = HashMap::new();
-    headers.insert("Content-Type".to_string(), "application/json".to_string());
+    headers.insert("content-type".to_string(), "application/json; charset=utf-8".to_string());
+    headers.insert("content-encoding".to_string(), "gzip".to_string());
     let body = ResponseBody {
       json: vec![
         JsonKey::String("data".to_string()),
         JsonKey::String("items".to_string()),
         JsonKey::Num(0),
+        JsonKey::String("profile".to_string()),
+        JsonKey::String("name".to_string()),
       ],
     };
     let response = Response {
@@ -488,6 +501,25 @@ mod tests {
     108, 111, 114, 32, 83, 119, 105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
     32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32,
     32, 32, 32, 32, 32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125,
+  ];
+
+  const TEST_CIPHERTEXT: [u8; 320] = [
+    2, 125, 219, 141, 140, 93, 49, 129, 95, 178, 135, 109, 48, 36, 194, 46, 239, 155, 160, 70, 208,
+    147, 37, 212, 17, 195, 149, 190, 38, 215, 23, 241, 84, 204, 167, 184, 179, 172, 187, 145, 38,
+    75, 123, 96, 81, 6, 149, 36, 135, 227, 226, 254, 177, 90, 241, 159, 0, 230, 183, 163, 210, 88,
+    133, 176, 9, 122, 225, 83, 171, 157, 185, 85, 122, 4, 110, 52, 2, 90, 36, 189, 145, 63, 122,
+    75, 94, 21, 163, 24, 77, 85, 110, 90, 228, 157, 103, 41, 59, 128, 233, 149, 57, 175, 121, 163,
+    185, 144, 162, 100, 17, 34, 9, 252, 162, 223, 59, 221, 106, 127, 104, 11, 121, 129, 154, 49,
+    66, 220, 65, 130, 171, 165, 43, 8, 21, 248, 12, 214, 33, 6, 109, 3, 144, 52, 124, 225, 206,
+    223, 213, 86, 186, 93, 170, 146, 141, 145, 140, 57, 152, 226, 218, 57, 30, 4, 131, 161, 0, 248,
+    172, 49, 206, 181, 47, 231, 87, 72, 96, 139, 145, 117, 45, 77, 134, 249, 71, 87, 178, 239, 30,
+    244, 156, 70, 118, 180, 176, 90, 92, 80, 221, 177, 86, 120, 222, 223, 244, 109, 150, 226, 142,
+    97, 171, 210, 38, 117, 143, 163, 204, 25, 223, 238, 209, 58, 59, 100, 1, 86, 241, 103, 152,
+    228, 37, 187, 79, 36, 136, 133, 171, 41, 184, 145, 146, 45, 192, 173, 219, 146, 133, 12, 246,
+    190, 5, 54, 99, 155, 8, 198, 156, 174, 99, 12, 210, 95, 5, 128, 166, 118, 50, 66, 26, 20, 3,
+    129, 232, 1, 192, 104, 23, 152, 212, 94, 97, 138, 162, 90, 185, 108, 221, 211, 247, 184, 253,
+    15, 16, 24, 32, 240, 240, 3, 148, 89, 30, 54, 161, 131, 230, 161, 217, 29, 229, 251, 33, 220,
+    230, 102, 131, 245, 27, 141, 220, 67, 16, 26,
   ];
 
   const TEST_HTTP_START_LINE: &[u8] = &[
@@ -747,10 +779,10 @@ mod tests {
     0, 0, 0, 0, 0, 0, 0, 0, 0,
   ];
 
-  const KEY0: &[u8] = "data".as_bytes();
-  const KEY1: &[u8] = "items".as_bytes();
-  const KEY2: &[u8] = "profile".as_bytes();
-  const KEY3: &[u8] = "name".as_bytes();
+  const KEY0: &str = "data";
+  const KEY1: &str = "items";
+  const KEY2: &str = "profile";
+  const KEY3: &str = "name";
   // HTTP/1.1 200 OK
   // content-type: application/json; charset=utf-8
   // content-encoding: gzip
@@ -772,7 +804,7 @@ mod tests {
   fn test_compute_json_witness() {
     let masked_array = compute_json_witness(
       &TEST_HTTP_BODY.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
-      JsonMaskType::Object(KEY0.to_vec()),
+      JsonKey::String(KEY0.to_string()),
     );
     assert_eq!(masked_array, MASKED_KEY0_ARRAY);
   }
@@ -781,30 +813,31 @@ mod tests {
   fn test_compute_json_masking_sequence() {
     let masked_array = compute_json_witness(
       &TEST_HTTP_BODY.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
-      JsonMaskType::Object(KEY0.to_vec()),
+      JsonKey::String(KEY0.to_string()),
     );
     assert_eq!(masked_array, MASKED_KEY0_ARRAY);
-    let masked_array = compute_json_witness(&masked_array, JsonMaskType::Object(KEY1.to_vec()));
+    let masked_array = compute_json_witness(&masked_array, JsonKey::String(KEY1.to_string()));
     assert_eq!(masked_array, MASKED_KEY1_ARRAY);
-    let masked_array = compute_json_witness(&masked_array, JsonMaskType::ArrayIndex(0));
+    let masked_array = compute_json_witness(&masked_array, JsonKey::Num(0));
     assert_eq!(masked_array, MASKED_ARR0_ARRAY);
-    let masked_array = compute_json_witness(&masked_array, JsonMaskType::Object(KEY2.to_vec()));
+    let masked_array = compute_json_witness(&masked_array, JsonKey::String(KEY2.to_string()));
     assert_eq!(masked_array, MASKED_KEY2_ARRAY);
-    let masked_array = compute_json_witness(&masked_array, JsonMaskType::Object(KEY3.to_vec()));
+    let masked_array = compute_json_witness(&masked_array, JsonKey::String(KEY3.to_string()));
     assert_eq!(masked_array, MASKED_KEY3_ARRAY);
   }
 
   use num_bigint::BigUint;
   use program::manifest::{JsonKey, Request, Response, ResponseBody};
 
+  // TODO: This test doesn't actually test anything at all. Fix that.
   #[test]
   fn test_json_tree_hasher() {
     let key_sequence = vec![
-      JsonMaskType::Object(KEY0.to_vec()),
-      JsonMaskType::Object(KEY1.to_vec()),
-      JsonMaskType::ArrayIndex(0),
-      JsonMaskType::Object(KEY2.to_vec()),
-      JsonMaskType::Object(KEY3.to_vec()),
+      JsonKey::String(KEY0.to_string()),
+      JsonKey::String(KEY1.to_string()),
+      JsonKey::Num(0),
+      JsonKey::String(KEY2.to_string()),
+      JsonKey::String(KEY3.to_string()),
     ];
     let target_value = b"Taylor Swift";
     let polynomial_input = poseidon::<2>(&[F::<G1>::from(69), F::<G1>::from(420)]);
@@ -830,7 +863,14 @@ mod tests {
     println!("  {}", BigUint::from_bytes_le(&digest.to_bytes()));
   }
 
+  // TODO: This test doesn't actually test anything at all. Fix that.
+  #[test]
   fn test_initial_digest() {
-    let (ct_digest, manifest_digest) = initial_digest(&mock_manifest(), ciphertext);
+    let (ct_digest, manifest_digest) =
+      initial_digest(&mock_manifest(), &TEST_CIPHERTEXT, b"Taylor Swift", 5);
+    println!("\nCiphertext Digest (decimal):");
+    println!("  {}", BigUint::from_bytes_le(&ct_digest.to_bytes()));
+    println!("\nManifest Digest (decimal):");
+    println!("  {}", BigUint::from_bytes_le(&manifest_digest.to_bytes()));
   }
 }

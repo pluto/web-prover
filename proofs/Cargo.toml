@@ -2,7 +2,7 @@
 name   ="proofs"
 version="0.2.0"
 edition="2021"
-publish = false
+publish=false
 
 [[bin]]
 name="test-prove"
@@ -32,7 +32,9 @@ bincode="1.3"
 thiserror="1.0"
 
 # Poseidon hashing
-light-poseidon={ git="https://github.com/pluto/light-poseidon" }
+# TODO: This needs to be fixed and add in the case for poseidon_1 (t==2, i believe)
+# light-poseidon={ git="https://github.com/pluto/light-poseidon" }
+light-poseidon="0.2"
 ark-bn254     ="=0.4.0"
 
 tls-client2.workspace=true

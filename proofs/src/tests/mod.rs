@@ -3,6 +3,7 @@
 // TODO: (Colin): I'm noticing this module could use some TLC. There's a lot of lint here!
 
 use client_side_prover::supernova::RecursiveSNARK;
+use program::manifest::JsonKey;
 use serde_json::json;
 
 use super::*;
@@ -230,22 +231,14 @@ fn test_end_to_end_proofs() {
   http_header_hashes[1] =
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_header_1_hash.to_bytes()).to_str_radix(10);
 
-  let masked_json_key_1 =
-    compute_json_witness(&http_body, witness::JsonMaskType::Object("data".as_bytes().to_vec()));
-  let masked_json_key_2 = compute_json_witness(
-    &masked_json_key_1,
-    witness::JsonMaskType::Object("items".as_bytes().to_vec()),
-  );
-  let masked_json_key_3 =
-    compute_json_witness(&masked_json_key_2, witness::JsonMaskType::ArrayIndex(0));
-  let masked_json_key_4 = compute_json_witness(
-    &masked_json_key_3,
-    witness::JsonMaskType::Object("profile".as_bytes().to_vec()),
-  );
-  let masked_json_key_5 = compute_json_witness(
-    &masked_json_key_4,
-    witness::JsonMaskType::Object("name".as_bytes().to_vec()),
-  );
+  let masked_json_key_1 = compute_json_witness(&http_body, JsonKey::String("data".to_string()));
+  let masked_json_key_2 =
+    compute_json_witness(&masked_json_key_1, JsonKey::String("items".to_string()));
+  let masked_json_key_3 = compute_json_witness(&masked_json_key_2, JsonKey::Num(0));
+  let masked_json_key_4 =
+    compute_json_witness(&masked_json_key_3, JsonKey::String("profile".to_string()));
+  let masked_json_key_5 =
+    compute_json_witness(&masked_json_key_4, JsonKey::String("name".to_string()));
 
   rom.push(String::from("HTTP_VERIFICATION"));
   private_inputs.push(HashMap::from([

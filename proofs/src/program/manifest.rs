@@ -58,8 +58,6 @@ const JSON_MASK_ARRAY_SIGNAL_NAME: &str = "index";
 /// ideal circuit size to used for a plaintext
 const CIRCUIT_SIZE: usize = 1024;
 
-// TODO: This is a duplicate of the `JsonMaskType` enum almost exactly. We should remove the
-// `JsonMaskType`
 /// JSON key required to extract particular value from response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
