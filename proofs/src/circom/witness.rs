@@ -137,6 +137,8 @@ pub fn generate_witness_from_wasm_file(
   witness
 }
 
+
+/// Waylon self note: maybe we can use something like this to convert the witness bytes to Vec<F<G1>>
 pub fn load_witness_from_bin_reader<R: Read>(mut reader: R) -> Result<Vec<F<G1>>, ProofError> {
   let mut wtns_header = [0u8; 4];
   reader.read_exact(&mut wtns_header)?;
@@ -173,6 +175,26 @@ pub fn load_witness_from_bin_reader<R: Read>(mut reader: R) -> Result<Vec<F<G1>>
   for _ in 0..witness_len {
     result.push(read_field(&mut reader)?);
   }
+  Ok(result)
+}
+
+pub fn load_witness_from_bytes(bytes: Vec<u8>) -> Result<Vec<F<G1>>, ProofError> {
+  let field_size = 32;
+  
+  if bytes.len() % field_size != 0 {
+      return Err(ProofError::Other("Witness is wrong size".to_owned()));
+  }
+  
+  let num_witnesses = bytes.len() / field_size;
+  let mut result = Vec::with_capacity(num_witnesses);
+  
+  for chunk in bytes.chunks(field_size) {
+      let mut field_bytes = [0u8; 32];
+      field_bytes.copy_from_slice(chunk);
+      let field = F::<G1>::from_bytes(&field_bytes).unwrap_or(Err(ProofError::Other("Failed to convert bytes to field element".to_owned()))?);
+      result.push(field);
+  }
+  
   Ok(result)
 }
 

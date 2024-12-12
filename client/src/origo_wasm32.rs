@@ -6,17 +6,21 @@ use std::{
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::StatusCode;
+use js_sys::Promise;
 use proofs::{
-  circom::witness::load_witness_from_bin_reader,
+  circom::witness::load_witness_from_bytes,
   program::{
     self,
     data::{Expanded, NotExpanded, Offline, Online, ProgramData},
-    manifest::{NIVCRom, NivcCircuitInputs, TLSEncryption},
+    manifest::{EncryptionInput, NIVCRom, NivcCircuitInputs, TLSEncryption},
   },
-  G1,
+  F, G1,
 };
-use tls_client2::origo::WitnessData;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use tls_client2::{origo::WitnessData, CipherSuiteKey};
 use tracing::debug;
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
@@ -24,6 +28,48 @@ use crate::{
   circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
   tls_client_async2::bind_client, Proof,
 };
+
+/// Waylon's thoughts. Right now we are just hardcoding the wtns in JS. What we need to do is pass
+/// a This object `WitnessInput` to the the JS function and then `create_witness_js` should be
+/// called in the index.js file so that it can take these inputs and use snark js to generate the
+/// `WitnessOutput` The the witness output should be passed back to the Rust code and then we can
+/// use it to generate the Proof
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Serialize, Clone, Deserialize)]
+pub struct WitnessInput {
+  pub key:        Vec<u8>,
+  pub iv:         Vec<u8>,
+  // #[serde(with = "serde_bytes")]
+  pub aad:        Vec<u8>,
+  // #[serde(with = "serde_bytes")]
+  pub plaintext:  Vec<u8>,
+  // #[serde(with = "serde_bytes")]
+  pub ciphertext: Vec<u8>,
+}
+
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Debug)]
+pub struct WitnessOutput {
+  // #[serde(with = "serde_bytes")]
+  pub data: Vec<js_sys::Uint8Array>,
+}
+// TODO(WJ 2024-12-12): move to wasm client lib?
+// #[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+extern "C" {
+  #[wasm_bindgen(js_namespace = witness, js_name = createWitness)]
+  fn create_witness_js(input: &JsValue) -> WitnessOutput;
+}
+
+// #[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub async fn create_witness(input: WitnessInput) -> Result<WitnessOutput, JsValue> {
+  // Convert the Rust WitnessInput to a JsValue
+  let js_input = serde_wasm_bindgen::to_value(&input).unwrap();
+
+  // Call JavaScript function and await the Promise
+  Ok(create_witness_js(&js_input))
+}
 
 pub async fn proxy_and_sign_and_generate_proof(
   mut config: config::Config,
@@ -43,7 +89,7 @@ pub async fn proxy_and_sign_and_generate_proof(
 
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb).await;
 
-  debug!("generating NIVC program data!");
+  debug!("generating program data!");
   let witness = origo_conn.to_witness_data();
   let program_data = generate_program_data(&witness, config.proving, proving_params).await?;
 
@@ -93,11 +139,11 @@ async fn generate_program_data(
   // TODO (tracy): Today we are carrying witness data on the proving object,
   // it's not obviously the right place for it. This code path needs a larger
   // refactor.
-  debug!("serializing witness objects");
-  let mut witnesses = Vec::new();
-  for w in proving.witnesses.unwrap() {
-    witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w)))?);
-  }
+
+  // now we call the js FFI to generate the witness in wasm with snarkjs
+  debug!("generating witness in wasm");
+  /// now we pass witness input type to generate program data
+  let witnesses = build_witness_data_from_wasm(&request_inputs).await?;
 
   debug!("initializing public params");
   let program_data = ProgramData::<Offline, NotExpanded> {
@@ -177,6 +223,34 @@ async fn proxy(
 
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
   Ok(origo_conn)
+}
+
+async fn build_witness_data_from_wasm(
+  witness_data: &EncryptionInput,
+) -> Result<Vec<Vec<F<G1>>>, errors::ClientErrors> {
+  let js_witness_input = to_js_witness_input(witness_data);
+  let js_witnesses_output = create_witness(js_witness_input).await.unwrap();
+  let js_computed_witnesses: Vec<Vec<u8>> =
+    js_witnesses_output.data.iter().map(|w| w.to_vec()).collect();
+  let mut witnesses = Vec::new();
+  for wit in js_computed_witnesses {
+    witnesses.push(load_witness_from_bytes(wit)?);
+  }
+  Ok(witnesses)
+}
+
+fn to_js_witness_input(witness: &EncryptionInput) -> WitnessInput {
+  let key_vec = match witness.key {
+    CipherSuiteKey::CHACHA20POLY1305(key) => key.to_vec(),
+    CipherSuiteKey::AES128GCM(key) => key.to_vec(),
+  };
+  WitnessInput {
+    key:        key_vec,
+    iv:         witness.iv.to_vec(),
+    aad:        witness.aad.clone(),
+    plaintext:  witness.plaintext.clone(),
+    ciphertext: witness.ciphertext.clone(),
+  }
 }
 
 use core::slice;

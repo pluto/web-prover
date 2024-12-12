@@ -31,14 +31,13 @@ use ws_stream_wasm::WsMeta;
 #[wasm_bindgen(getter_with_clone)]
 pub struct ProvingParamsWasm {
   pub aux_params: js_sys::Uint8Array, // Custom byte parser for aux_params
-  pub witnesses:  Vec<js_sys::Uint8Array>, // Custom byte parser
 }
 
 #[wasm_bindgen]
 impl ProvingParamsWasm {
   #[wasm_bindgen(constructor)]
-  pub fn new(ap: js_sys::Uint8Array, w: Vec<js_sys::Uint8Array>) -> ProvingParamsWasm {
-    Self { aux_params: ap, witnesses: w }
+  pub fn new(ap: js_sys::Uint8Array) -> ProvingParamsWasm {
+    Self { aux_params: ap }
   }
 }
 
@@ -49,9 +48,6 @@ pub async fn prover(config: JsValue, proving_params: ProvingParamsWasm) -> Resul
   debug!("start config serde");
   let mut config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
   debug!("end config serde");
-
-  // TODO: Refactor this object to remove witnesses from here.
-  config.proving.witnesses = Some(proving_params.witnesses.iter().map(|w| w.to_vec()).collect());
 
   let proof = client::prover_inner(config, Some(proving_params.aux_params.to_vec()))
     .await

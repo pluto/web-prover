@@ -1,7 +1,7 @@
 params:
 	cd proofs && make params
 
-wasm: params
+wasm: 
 	@# NOTE: This build depends on RUSTFLAGS in the client_wasm/.cargo/config.toml
 	-cargo install wasm-pack
 	-cd client_wasm/demo/static && rm -f build && ln -s ../../../proofs/web_proof_circuits build && cd ../../..
@@ -10,7 +10,7 @@ wasm: params
 	  rustup run nightly-2024-10-28 ~/.cargo/bin/wasm-pack build --release --target web ./ -- \
 	    -Z build-std=panic_abort,std
 
-wasm-debug: params
+wasm-debug:
 	-cargo install wasm-pack
 	-cd client_wasm/demo/static && rm -f build && ln -s ../../../proofs/web_proof_circuits build && cd ../../..
 	cd client_wasm && \

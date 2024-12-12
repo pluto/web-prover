@@ -1,3 +1,6 @@
+/// this is exposed via and FFI to the rust code
+/// it will be called there
+
 export function toByte(data) {
   const byteArray = [];
   for (let i = 0; i < data.length; i++) {
@@ -155,4 +158,23 @@ export function computeHttpWitnessBody(paddedPlaintext) {
   }
 
   return result;
+}
+
+import { generateWitnessBytesForRequest } from "./index";
+
+export const witness = {
+  createWitness: async (input) => {
+    // console.log("createWitness", input);
+    // circuits need to be 512b
+    var circuits = ["plaintext_authentication_1024b", "http_verification_1024b", "json_mask_object_1024b", "json_mask_array_index_1024b", "json_extract_value_1024b"];
+    var witnesses = await generateWitnessBytesForRequest(circuits, input);
+    return witnesses;
+  }
+};
+
+
+if (typeof window !== 'undefined') {
+  window.witness = witness;  // For main thread
+} else if (typeof self !== 'undefined') {
+  self.witness = witness;    // For worker thread
 }
