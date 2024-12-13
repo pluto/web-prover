@@ -20,7 +20,7 @@ use proofs::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tls_client2::{origo::WitnessData, CipherSuiteKey};
-use tracing::debug;
+use tracing::{debug, info};
 use tracing_subscriber::field::debug;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -31,11 +31,6 @@ use crate::{
   tls_client_async2::bind_client, Proof,
 };
 
-/// Waylon's thoughts. Right now we are just hardcoding the wtns in JS. What we need to do is pass
-/// a This object `WitnessInput` to the the JS function and then `create_witness_js` should be
-/// called in the index.js file so that it can take these inputs and use snark js to generate the
-/// `WitnessOutput` The the witness output should be passed back to the Rust code and then we can
-/// use it to generate the Proof
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Serialize, Clone, Deserialize)]
 pub struct WitnessInput {
@@ -50,15 +45,20 @@ pub struct WitnessInput {
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Debug)]
 pub struct WitnessOutput {
-  // #[serde(with = "serde_bytes")]
   pub data: Vec<js_sys::Uint8Array>,
+}
+
+#[wasm_bindgen]
+impl WitnessOutput {
+  #[wasm_bindgen(constructor)]
+  pub fn new(wit: Vec<js_sys::Uint8Array>) -> WitnessOutput { Self { data: wit } }
 }
 // TODO(WJ 2024-12-12): move to wasm client lib?
 // #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 extern "C" {
-  #[wasm_bindgen(js_namespace = witness, js_name = createWitness, catch)]
-  fn create_witness_js(input: &JsValue) -> Result<WitnessOutput, JsValue>;
+  #[wasm_bindgen(js_namespace = witness, js_name = createWitness)]
+  async fn create_witness_js(input: &JsValue) -> JsValue;
 }
 
 // #[cfg(target_arch = "wasm32")]
@@ -67,9 +67,24 @@ pub async fn create_witness(input: WitnessInput) -> Result<WitnessOutput, JsValu
   // Convert the Rust WitnessInput to a JsValue
   let js_input = serde_wasm_bindgen::to_value(&input).unwrap();
 
-  let js_witnesses_output = create_witness_js(&js_input).unwrap();
+  let js_witnesses_output = create_witness_js(&js_input).await;
   // Call JavaScript function and await the Promise
-  Ok(js_witnesses_output)
+  info!("result: {:?}", js_witnesses_output);
+  let js_obj = js_sys::Object::from(js_witnesses_output);
+  let data_value = js_sys::Reflect::get(&js_obj, &JsValue::from_str("data"))?;
+  let array = js_sys::Array::from(&data_value);
+  let mut data = Vec::with_capacity(array.length() as usize);
+
+  for i in 0..array.length() {
+    let item = array.get(i);
+    if let Ok(uint8_array) = item.dyn_into::<js_sys::Uint8Array>() {
+      data.push(uint8_array);
+    }
+  }
+
+  info!("output: {:?}", data);
+
+  Ok(WitnessOutput { data: Vec::new() })
 }
 
 pub async fn proxy_and_sign_and_generate_proof(

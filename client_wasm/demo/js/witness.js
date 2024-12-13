@@ -1,62 +1,9 @@
-/// this is exposed via and FFI to the rust code
-/// it will be called there
 import { Buffer } from "buffer";
 import { poseidon2 } from "poseidon-lite";
+import { WitnessOutput } from "../pkg/client_wasm";
 const _snarkjs = import("snarkjs");
 const snarkjs = await _snarkjs;
 
-export function toByte(data) {
-  const byteArray = [];
-  for (let i = 0; i < data.length; i++) {
-    byteArray.push(data.charCodeAt(i));
-  }
-  return byteArray
-}
-
-export function isNullOrSpace(val) {
-  return !(val == 0 || val == '\t'.charCodeAt(0) || val == '\n'.charCodeAt(0) || val == '\r'.charCodeAt(0) || val == '\x0C'.charCodeAt(0) || val == ' '.charCodeAt(0));
-}
-
-// Function to convert byte array to string
-export function byteArrayToString(byteArray) {
-  return Array.from(byteArray)
-    .map(byte => String.fromCharCode(byte))
-    .join('');
-}
-
-export function arraysEqual(a, b) {
-  if (a === b) return true;
-  if (a == null || b == null) return false;
-  if (a.length !== b.length) return false;
-
-  // If you don't care about the order of the elements inside
-  // the array, you should sort both arrays here.
-  // Please note that calling sort on an array will modify that array.
-  // you might want to clone your array first.
-
-  for (var i = 0; i < a.length; ++i) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
-}
-
-// Function to convert byte array to object with multiple parsing methods
-export function byteArrayToObject(byteArray) {
-  try {
-    // Method 1: Using TextDecoder
-    if (typeof TextDecoder !== 'undefined') {
-      const decoder = new TextDecoder('utf-8');
-      const jsonString = decoder.decode(new Uint8Array(byteArray));
-      return JSON.parse(jsonString);
-    }
-
-    // Method 2: Manual conversion (fallback)
-    const jsonString = byteArrayToString(byteArray);
-    return JSON.parse(jsonString);
-  } catch (error) {
-    throw new Error(`Failed to convert byte array to object: ${error.message}`);
-  }
-}
 
 export function compute_json_witness(padded_plaintext, key) {
   let plaintext = padded_plaintext.filter(isNullOrSpace);
@@ -237,10 +184,13 @@ const getWitnessGenerator = async function (circuit) {
   const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
   return wasm;
 }
-async function generateWitness(circuit, input, wasm) {
+async function generateWitness(input, wasm) {
   const witStart = +Date.now();
   let wtns = { type: "mem" };
+  console.log("Calculating witness with wasm", wasm);
+  console.log("input", input);
   await snarkjs.wtns.calculate(input, new Uint8Array(wasm), wtns);
+  console.log("Witness calculated");
   const witEnd = +Date.now();
   console.log("witgen time:", witEnd - witStart);
   console.log("witness", wtns);
@@ -275,8 +225,10 @@ export const generateWitnessBytesForRequest = async function (circuits, inputs) 
   chachaInputs["plainText"] = extendedHTTPInput;
   chachaInputs["counter"] = uintArray32ToBits([1])[0];
   chachaInputs["step_in"] = DataHasher(paddedCiphertext);
+  console.log("input generated 4", chachaInputs);
 
-  let chachaWtns = await generateWitness(circuits[0], chachaInputs, await getWitnessGenerator(circuits[0]));
+  // we get here in the dbg logs in the console. 
+  let chachaWtns = await generateWitness(chachaInputs, await getWitnessGenerator(circuits[0]));
   witnesses.push(chachaWtns.data);
 
   // HTTP
@@ -299,16 +251,68 @@ export const generateWitnessBytesForRequest = async function (circuits, inputs) 
 
   return witnesses;
 };
+export function toByte(data) {
+  const byteArray = [];
+  for (let i = 0; i < data.length; i++) {
+    byteArray.push(data.charCodeAt(i));
+  }
+  return byteArray
+}
 
+export function isNullOrSpace(val) {
+  return !(val == 0 || val == '\t'.charCodeAt(0) || val == '\n'.charCodeAt(0) || val == '\r'.charCodeAt(0) || val == '\x0C'.charCodeAt(0) || val == ' '.charCodeAt(0));
+}
+
+// Function to convert byte array to string
+export function byteArrayToString(byteArray) {
+  return Array.from(byteArray)
+    .map(byte => String.fromCharCode(byte))
+    .join('');
+}
+
+export function arraysEqual(a, b) {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (a.length !== b.length) return false;
+
+  // If you don't care about the order of the elements inside
+  // the array, you should sort both arrays here.
+  // Please note that calling sort on an array will modify that array.
+  // you might want to clone your array first.
+
+  for (var i = 0; i < a.length; ++i) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+// Function to convert byte array to object with multiple parsing methods
+export function byteArrayToObject(byteArray) {
+  try {
+    // Method 1: Using TextDecoder
+    if (typeof TextDecoder !== 'undefined') {
+      const decoder = new TextDecoder('utf-8');
+      const jsonString = decoder.decode(new Uint8Array(byteArray));
+      return JSON.parse(jsonString);
+    }
+
+    // Method 2: Manual conversion (fallback)
+    const jsonString = byteArrayToString(byteArray);
+    return JSON.parse(jsonString);
+  } catch (error) {
+    throw new Error(`Failed to convert byte array to object: ${error.message}`);
+  }
+}
+
+// this is exposed via FFI to the rust code
+/// it will be called there after as part of the executions trace of the prove function
 export const witness = {
   createWitness: async (input) => {
     console.log("createWitness", input);
     // circuits need to be 512b
     var circuits = ["plaintext_authentication_512b", "http_verification_512b", "json_mask_object_512b", "json_mask_array_index_512b", "json_extract_value_512b"];
     // var witnesses = await generateWitnessBytesForRequest(circuits, input);
-    let witnesses = {
-      "data": [new Uint8Array(0), new Uint8Array(0)]
-    }
+    let witnesses = new WitnessOutput([new Uint8Array(0), new Uint8Array(0)]);
     console.log("witness", witnesses);
     return witnesses;
   }

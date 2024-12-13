@@ -47,80 +47,11 @@ function end() {
 }
 
 
-const getWitnessGenerator = async function (circuit) {
-  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/target_512b/${circuit}_js/`).toString();
-  const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
-  return wasm;
-}
-
 const getByteParams = async function (setupFile, additionalPath) {
   const ppUrl = new URL(`${setupFile}.${additionalPath}`, "https://localhost:8090/build/").toString();
   const pp = await fetch(ppUrl).then((r) => r.arrayBuffer());
   console.log("byte_params", pp);
   return pp;
-}
-
-async function generateWitness(circuit, input, wasm) {
-  const witStart = +Date.now();
-  let wtns = { type: "mem" };
-  await snarkjs.wtns.calculate(input, new Uint8Array(wasm), wtns);
-  const witEnd = +Date.now();
-  console.log("witgen time:", witEnd - witStart);
-  console.log("witness", wtns);
-  return wtns;
-}
-
-function DataHasher(input) {
-  let hashes = [BigInt(0)];  // Initialize first hash as 0
-
-  for (let i = 0; i < Math.ceil(input.length / 16); i++) {
-    let packedInput = BigInt(0);
-    let isPaddedChunk = 0;
-
-    // Allow for using unpadded input:
-    let innerLoopLength = 16;
-    let lengthRemaining = input.length - 16 * i;
-    if (lengthRemaining < 16) {
-      innerLoopLength = lengthRemaining;
-    }
-    // Pack 16 bytes into a single number
-    for (let j = 0; j < innerLoopLength; j++) {
-      if (input[16 * i + j] != -1) {
-        packedInput += BigInt(input[16 * i + j]) * BigInt(2 ** (8 * j));
-      } else {
-        isPaddedChunk += 1;
-      }
-    }
-
-    // Compute next hash using previous hash and packed input, but if the whole block was padding, don't do it
-    if (isPaddedChunk == innerLoopLength) {
-      hashes.push(hashes[i]);
-    } else {
-      hashes.push(poseidon2([hashes[i], packedInput]));
-    }
-  }
-
-  // Return the last hash
-  return hashes[Math.ceil(input.length / 16)];
-}
-
-function toUint32Array(buf) {
-  const arr = new Uint32Array(buf.length / 4)
-  const arrView = new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
-  for (let i = 0; i < arr.length; i++) {
-    arr[i] = arrView.getUint32(i * 4, true)
-  }
-  return arr
-}
-
-function uintArray32ToBits(uintArray) {
-  const bits = []
-  for (let i = 0; i < uintArray.length; i++) {
-    const uint = uintArray[i]
-    bits.push(numToBitsNumerical(uint))
-  }
-
-  return bits
 }
 
 export function numToBitsNumerical(num, bitCount = 32) {
@@ -133,49 +64,6 @@ export function numToBitsNumerical(num, bitCount = 32) {
 
   return bits
 }
-
-function toInput(bytes) {
-  return uintArray32ToBits(toUint32Array(bytes))
-}
-
-const generateWitnessBytesForRequest = async function (circuits, inputs) {
-  let witnesses = [];
-
-  let plaintext = inputs[0]["plainText"];
-  let extendedHTTPInput = plaintext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(-1));
-  let paddedCiphertext = CHACHA20_CIPHERTEXT.concat(Array(TOTAL_BYTES_ACROSS_NIVC - CHACHA20_CIPHERTEXT.length).fill(-1));
-
-  console.log("CHACHA");
-  inputs[0]["key"] = toInput(Buffer.from(inputs[0]["key"]));
-  inputs[0]["nonce"] = toInput(Buffer.from(inputs[0]["nonce"]));
-  inputs[0]["plainText"] = extendedHTTPInput;
-  inputs[0]["counter"] = uintArray32ToBits([1])[0];
-  inputs[0]["step_in"] = DataHasher(paddedCiphertext);
-
-  let chachaWtns = await generateWitness(circuits[0], inputs[0], await getWitnessGenerator(circuits[0]));
-  witnesses.push(chachaWtns.data);
-
-  // HTTP
-  let http_start_line = computeHttpWitnessStartline(extendedHTTPInput);
-  let http_header_0 = computeHttpWitnessHeader(extendedHTTPInput, toByte("content-type"));
-  let http_header_1 = computeHttpWitnessHeader(extendedHTTPInput, toByte("content-encoding"));
-  let http_body = computeHttpWitnessBody(extendedHTTPInput);
-
-  inputs[1]["start_line_hash"] = DataHasher(http_start_line);
-  let http_header_0_hash = DataHasher(http_header_0[1]);
-  let http_header_1_hash = DataHasher(http_header_1[1]);
-  inputs[1]["header_hashes"] = Array(10).fill(0);
-  inputs[1]["header_hashes"][0] = http_header_0_hash;
-  inputs[1]["header_hashes"][1] = http_header_1_hash;
-  inputs[1]["body_hash"] = DataHasher(http_body);
-  inputs[1]["step_in"] = DataHasher(extendedHTTPInput);
-  inputs[1]["data"] = extendedHTTPInput;
-
-  let wtns = await generateWitness(circuits[1], inputs[1], await getWitnessGenerator(circuits[1]));
-  witnesses.push(wtns.data);
-
-  return witnesses;
-};
 
 
 start();

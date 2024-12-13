@@ -36,9 +36,7 @@ pub struct ProvingParamsWasm {
 #[wasm_bindgen]
 impl ProvingParamsWasm {
   #[wasm_bindgen(constructor)]
-  pub fn new(ap: js_sys::Uint8Array) -> ProvingParamsWasm {
-    Self { aux_params: ap }
-  }
+  pub fn new(ap: js_sys::Uint8Array) -> ProvingParamsWasm { Self { aux_params: ap } }
 }
 
 #[wasm_bindgen]
