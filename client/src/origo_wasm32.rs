@@ -9,7 +9,7 @@ use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::StatusCode;
 use js_sys::Promise;
 use proofs::{
-  circom::witness::{load_witness_from_bin_reader, load_witness_from_bytes},
+  circom::witness::load_witness_from_bin_reader,
   program::{
     self,
     data::{Expanded, NotExpanded, Offline, Online, ProgramData},
