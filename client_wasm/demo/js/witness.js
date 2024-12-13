@@ -189,7 +189,7 @@ async function generateWitness(input, wasm) {
   let wtns = { type: "mem" };
   console.log("Calculating witness with wasm", wasm);
   console.log("input", input);
-  await snarkjs.wtns.calculate(input, new Uint8Array(wasm), wtns);
+  await snarkjs.wtns.calculate(input, new Uint8Array(wasm), wtns); // where we are stuck
   console.log("Witness calculated");
   const witEnd = +Date.now();
   console.log("witgen time:", witEnd - witStart);
@@ -230,24 +230,29 @@ export const generateWitnessBytesForRequest = async function (circuits, inputs) 
   // we get here in the dbg logs in the console. 
   let chachaWtns = await generateWitness(chachaInputs, await getWitnessGenerator(circuits[0]));
   witnesses.push(chachaWtns.data);
+  console.log("witnesses after CHACHA", witnesses);
 
   // HTTP
 
   let httpInputs = {};
   httpInputs["start_line_hash"] = DataHasher(computeHttpWitnessStartline(extendedHTTPInput));
   httpInputs["header_hashes"] = Array(10).fill(0);
+  console.log("before 4 loop in http");
   for (var i = 0; i < inputs.headers.length; i++) {
     let computedHttpHeaderWitness = computeHttpWitnessHeader(extendedHTTPInput, toByte(inputs.headers[i]));
     let httpHeaderHash = DataHasher(computedHttpHeaderWitness[1]);
     httpInputs["header_hashes"][computedHttpHeaderWitness[0]] = httpHeaderHash;
   }
+  console.log("after 4 loop in http");
   let httpBody = computeHttpWitnessBody(extendedHTTPInput);
+  console.log("after computehttpwitnesbody in http");
   httpInputs["body_hash"] = DataHasher(httpBody);
   httpInputs["step_in"] = DataHasher(extendedHTTPInput);
   httpInputs["data"] = extendedHTTPInput;
-
-  let wtns = await generateWitness(circuits[1], httpInputs, await getWitnessGenerator(circuits[1]));
+  console.log("before generatewitness in http");
+  let wtns = await generateWitness(httpInputs, await getWitnessGenerator(circuits[1]));
   witnesses.push(wtns.data);
+  console.log("witnesses after HTTP", witnesses);
 
   return witnesses;
 };
@@ -311,10 +316,10 @@ export const witness = {
     console.log("createWitness", input);
     // circuits need to be 512b
     var circuits = ["plaintext_authentication_512b", "http_verification_512b", "json_mask_object_512b", "json_mask_array_index_512b", "json_extract_value_512b"];
-    // var witnesses = await generateWitnessBytesForRequest(circuits, input);
-    let witnesses = new WitnessOutput([new Uint8Array(0), new Uint8Array(0)]);
-    console.log("witness", witnesses);
-    return witnesses;
+    var witnesses = await generateWitnessBytesForRequest(circuits, input);
+    let witnesses_typed = new WitnessOutput(witnesses);
+    console.log("witness", witnesses_typed);
+    return witnesses_typed;
   }
 };
 

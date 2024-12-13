@@ -25,6 +25,7 @@ use tracing_subscriber::field::debug;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
+use proofs::circom::witness::load_witness_from_bin_reader;
 
 use crate::{
   circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
@@ -71,8 +72,11 @@ pub async fn create_witness(input: WitnessInput) -> Result<WitnessOutput, JsValu
   // Call JavaScript function and await the Promise
   info!("result: {:?}", js_witnesses_output);
   let js_obj = js_sys::Object::from(js_witnesses_output);
+  info!("js_obj: {:?}", js_obj);
   let data_value = js_sys::Reflect::get(&js_obj, &JsValue::from_str("data"))?;
+  info!("data_value: {:?}", data_value);
   let array = js_sys::Array::from(&data_value);
+  info!("array: {:?}", array);
   let mut data = Vec::with_capacity(array.length() as usize);
 
   for i in 0..array.length() {
@@ -81,10 +85,8 @@ pub async fn create_witness(input: WitnessInput) -> Result<WitnessOutput, JsValu
       data.push(uint8_array);
     }
   }
-
-  info!("output: {:?}", data);
-
-  Ok(WitnessOutput { data: Vec::new() })
+  info!("data: {:?}", data);
+  Ok(WitnessOutput { data})
 }
 
 pub async fn proxy_and_sign_and_generate_proof(
@@ -255,9 +257,14 @@ async fn build_witness_data_from_wasm(
   let js_computed_witnesses: Vec<Vec<u8>> =
     js_witnesses_output.data.iter().map(|w| w.to_vec()).collect();
   let mut witnesses = Vec::new();
-  for wit in js_computed_witnesses {
-    witnesses.push(load_witness_from_bytes(wit)?);
+  info!("js_computed_witnesses: {:?}", js_computed_witnesses);
+  for w in js_computed_witnesses {
+    witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w)))?);
   }
+  // for wit in js_computed_witnesses {
+  //   info!("loading witness from bytes {:?}",wit);
+  //   witnesses.push(load_witness_from_bytes(wit)?);
+  // }
   Ok(witnesses)
 }
 

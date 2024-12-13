@@ -178,27 +178,6 @@ pub fn load_witness_from_bin_reader<R: Read>(mut reader: R) -> Result<Vec<F<G1>>
   Ok(result)
 }
 
-pub fn load_witness_from_bytes(bytes: Vec<u8>) -> Result<Vec<F<G1>>, ProofError> {
-  let field_size = 32;
-
-  if bytes.len() % field_size != 0 {
-    return Err(ProofError::Other("Witness is wrong size".to_owned()));
-  }
-
-  let num_witnesses = bytes.len() / field_size;
-  let mut result = Vec::with_capacity(num_witnesses);
-
-  for chunk in bytes.chunks(field_size) {
-    let mut field_bytes = [0u8; 32];
-    field_bytes.copy_from_slice(chunk);
-    let field = F::<G1>::from_bytes(&field_bytes)
-      .unwrap_or(Err(ProofError::Other("Failed to convert bytes to field element".to_owned()))?);
-    result.push(field);
-  }
-
-  Ok(result)
-}
-
 pub(crate) fn read_field<R: Read>(mut reader: R) -> Result<F<G1>, ProofError> {
   let mut repr = F::<G1>::ZERO.to_repr();
   for digit in repr.as_mut().iter_mut() {
