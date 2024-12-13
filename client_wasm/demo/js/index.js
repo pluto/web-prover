@@ -138,7 +138,7 @@ function toInput(bytes) {
   return uintArray32ToBits(toUint32Array(bytes))
 }
 
-export const generateWitnessBytesForRequest = async function (circuits, inputs) {
+const generateWitnessBytesForRequest = async function (circuits, inputs) {
   let witnesses = [];
 
   let plaintext = inputs[0]["plainText"];
