@@ -9,7 +9,7 @@ use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::StatusCode;
 use js_sys::Promise;
 use proofs::{
-  circom::witness::load_witness_from_bytes,
+  circom::witness::{load_witness_from_bin_reader, load_witness_from_bytes},
   program::{
     self,
     data::{Expanded, NotExpanded, Offline, Online, ProgramData},
@@ -25,7 +25,6 @@ use tracing_subscriber::field::debug;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
-use proofs::circom::witness::load_witness_from_bin_reader;
 
 use crate::{
   circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
@@ -86,7 +85,7 @@ pub async fn create_witness(input: WitnessInput) -> Result<WitnessOutput, JsValu
     }
   }
   info!("data: {:?}", data);
-  Ok(WitnessOutput { data})
+  Ok(WitnessOutput { data })
 }
 
 pub async fn proxy_and_sign_and_generate_proof(
