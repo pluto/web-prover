@@ -370,13 +370,6 @@ pub fn json_tree_hasher(
       },
     }
   }
-  let mut target_value_hash = F::<G1>::ZERO;
-  let mut monomial = F::<G1>::ONE;
-  for byte in target_value {
-    target_value_hash += monomial * F::<G1>::from(u64::from(*byte));
-    monomial *= polynomial_input;
-  }
-  tree_hashes[key_sequence.len() - 1] = [tree_hashes[key_sequence.len() - 1][0], target_value_hash];
   (stack, tree_hashes)
 }
 
@@ -393,8 +386,6 @@ pub fn compress_tree_hash(
     accumulated += stack_and_tree_hashes.0[idx][1] * monomial;
     monomial *= polynomial_input;
     accumulated += stack_and_tree_hashes.1[idx][0] * monomial;
-    monomial *= polynomial_input;
-    accumulated += stack_and_tree_hashes.1[idx][1] * monomial;
     monomial *= polynomial_input;
   }
   accumulated
