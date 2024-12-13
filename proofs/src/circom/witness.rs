@@ -137,8 +137,7 @@ pub fn generate_witness_from_wasm_file(
   witness
 }
 
-/// Waylon self note: maybe we can use something like this to convert the witness bytes to
-/// Vec<F<G1>>
+
 pub fn load_witness_from_bin_reader<R: Read>(mut reader: R) -> Result<Vec<F<G1>>, ProofError> {
   let mut wtns_header = [0u8; 4];
   reader.read_exact(&mut wtns_header)?;
