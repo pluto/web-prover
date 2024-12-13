@@ -1,4 +1,5 @@
 use std::{
+  clone,
   io::{BufReader, Cursor},
   ops::Deref,
   sync::Arc,
@@ -20,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tls_client2::{origo::WitnessData, CipherSuiteKey};
 use tracing::debug;
+use tracing_subscriber::field::debug;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
@@ -39,12 +41,10 @@ use crate::{
 pub struct WitnessInput {
   pub key:        Vec<u8>,
   pub iv:         Vec<u8>,
-  // #[serde(with = "serde_bytes")]
   pub aad:        Vec<u8>,
-  // #[serde(with = "serde_bytes")]
   pub plaintext:  Vec<u8>,
-  // #[serde(with = "serde_bytes")]
   pub ciphertext: Vec<u8>,
+  pub headers:    Vec<String>,
 }
 
 #[wasm_bindgen(getter_with_clone)]
@@ -57,8 +57,8 @@ pub struct WitnessOutput {
 // #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 extern "C" {
-  #[wasm_bindgen(js_namespace = witness, js_name = createWitness)]
-  fn create_witness_js(input: &JsValue) -> WitnessOutput;
+  #[wasm_bindgen(js_namespace = witness, js_name = createWitness, catch)]
+  fn create_witness_js(input: &JsValue) -> Result<WitnessOutput, JsValue>;
 }
 
 // #[cfg(target_arch = "wasm32")]
@@ -67,8 +67,9 @@ pub async fn create_witness(input: WitnessInput) -> Result<WitnessOutput, JsValu
   // Convert the Rust WitnessInput to a JsValue
   let js_input = serde_wasm_bindgen::to_value(&input).unwrap();
 
+  let js_witnesses_output = create_witness_js(&js_input).unwrap();
   // Call JavaScript function and await the Promise
-  Ok(create_witness_js(&js_input))
+  Ok(js_witnesses_output)
 }
 
 pub async fn proxy_and_sign_and_generate_proof(
@@ -143,7 +144,11 @@ async fn generate_program_data(
   // now we call the js FFI to generate the witness in wasm with snarkjs
   debug!("generating witness in wasm");
   /// now we pass witness input type to generate program data
-  let witnesses = build_witness_data_from_wasm(&request_inputs).await?;
+  let witnesses = build_witness_data_from_wasm(
+    &request_inputs,
+    proving.manifest.unwrap().request.headers.keys().map(clone::Clone::clone).collect(),
+  )
+  .await?;
 
   debug!("initializing public params");
   let program_data = ProgramData::<Offline, NotExpanded> {
@@ -227,9 +232,11 @@ async fn proxy(
 
 async fn build_witness_data_from_wasm(
   witness_data: &EncryptionInput,
+  headers: Vec<String>,
 ) -> Result<Vec<Vec<F<G1>>>, errors::ClientErrors> {
-  let js_witness_input = to_js_witness_input(witness_data);
+  let js_witness_input = to_js_witness_input(witness_data, headers);
   let js_witnesses_output = create_witness(js_witness_input).await.unwrap();
+  debug!("js_witnesses_output: {:?}", js_witnesses_output);
   let js_computed_witnesses: Vec<Vec<u8>> =
     js_witnesses_output.data.iter().map(|w| w.to_vec()).collect();
   let mut witnesses = Vec::new();
@@ -239,17 +246,18 @@ async fn build_witness_data_from_wasm(
   Ok(witnesses)
 }
 
-fn to_js_witness_input(witness: &EncryptionInput) -> WitnessInput {
+fn to_js_witness_input(witness: &EncryptionInput, headers: Vec<String>) -> WitnessInput {
   let key_vec = match witness.key {
     CipherSuiteKey::CHACHA20POLY1305(key) => key.to_vec(),
     CipherSuiteKey::AES128GCM(key) => key.to_vec(),
   };
   WitnessInput {
-    key:        key_vec,
-    iv:         witness.iv.to_vec(),
-    aad:        witness.aad.clone(),
-    plaintext:  witness.plaintext.clone(),
+    key: key_vec,
+    iv: witness.iv.to_vec(),
+    aad: witness.aad.to_vec(),
+    plaintext: witness.plaintext.clone(),
     ciphertext: witness.ciphertext.clone(),
+    headers,
   }
 }
 

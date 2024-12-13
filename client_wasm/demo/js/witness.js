@@ -250,7 +250,7 @@ const TOTAL_BYTES_ACROSS_NIVC = 512;
 
 const make_nonce = function (iv, seq) {
   let nonce = new Uint8Array(12);
-  nonce.set(iv.slice(0, 12));
+  nonce.fill(0);
   for (let i = 0; i < 8; i++) {
     nonce[4 + i] = seq >> (56 - 8 * i) & 0xff;
   }
@@ -268,40 +268,34 @@ export const generateWitnessBytesForRequest = async function (circuits, inputs) 
   let extendedHTTPInput = plaintext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(-1));
   let paddedCiphertext = ciphertext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - ciphertext.length).fill(-1));
 
-  console.log("CHACHA 1");
+  console.log("CHACHA");
   let chachaInputs = {};
   chachaInputs["key"] = toInput(Buffer.from(inputs.key));
-  console.log("input generated 1", chachaInputs);
   chachaInputs["nonce"] = toInput(Buffer.from(make_nonce(inputs.iv, 0)));
-  console.log("input generated 2", chachaInputs);
   chachaInputs["plainText"] = extendedHTTPInput;
   chachaInputs["counter"] = uintArray32ToBits([1])[0];
-  console.log("input generated 3", chachaInputs);
   chachaInputs["step_in"] = DataHasher(paddedCiphertext);
-  console.log("input generated", chachaInputs);
 
   let chachaWtns = await generateWitness(circuits[0], chachaInputs, await getWitnessGenerator(circuits[0]));
   witnesses.push(chachaWtns.data);
 
   // HTTP
-  let http_start_line = computeHttpWitnessStartline(extendedHTTPInput);
-  let http_header_0 = computeHttpWitnessHeader(extendedHTTPInput, toByte("content-type"));
-  let http_header_1 = computeHttpWitnessHeader(extendedHTTPInput, toByte("content-encoding"));
-  let http_body = computeHttpWitnessBody(extendedHTTPInput);
 
   let httpInputs = {};
-  httpInputs["start_line_hash"] = DataHasher(http_start_line);
-  let http_header_0_hash = DataHasher(http_header_0[1]);
-  let http_header_1_hash = DataHasher(http_header_1[1]);
-  httpInputs["header_hashes"] = Array(25).fill(0);
-  httpInputs["header_hashes"][0] = http_header_0_hash;
-  httpInputs["header_hashes"][1] = http_header_1_hash;
-  httpInputs["body_hash"] = DataHasher(http_body);
+  httpInputs["start_line_hash"] = DataHasher(computeHttpWitnessStartline(extendedHTTPInput));
+  httpInputs["header_hashes"] = Array(10).fill(0);
+  for (var i = 0; i < inputs.headers.length; i++) {
+    let computedHttpHeaderWitness = computeHttpWitnessHeader(extendedHTTPInput, toByte(inputs.headers[i]));
+    let httpHeaderHash = DataHasher(computedHttpHeaderWitness[1]);
+    httpInputs["header_hashes"][computedHttpHeaderWitness[0]] = httpHeaderHash;
+  }
+  let httpBody = computeHttpWitnessBody(extendedHTTPInput);
+  httpInputs["body_hash"] = DataHasher(httpBody);
   httpInputs["step_in"] = DataHasher(extendedHTTPInput);
   httpInputs["data"] = extendedHTTPInput;
 
   let wtns = await generateWitness(circuits[1], httpInputs, await getWitnessGenerator(circuits[1]));
-  // witnesses.push(wtns.data);
+  witnesses.push(wtns.data);
 
   return witnesses;
 };
@@ -311,7 +305,11 @@ export const witness = {
     console.log("createWitness", input);
     // circuits need to be 512b
     var circuits = ["plaintext_authentication_512b", "http_verification_512b", "json_mask_object_512b", "json_mask_array_index_512b", "json_extract_value_512b"];
-    var witnesses = await generateWitnessBytesForRequest(circuits, input);
+    // var witnesses = await generateWitnessBytesForRequest(circuits, input);
+    let witnesses = {
+      "data": [new Uint8Array(0), new Uint8Array(0)]
+    }
+    console.log("witness", witnesses);
     return witnesses;
   }
 };
