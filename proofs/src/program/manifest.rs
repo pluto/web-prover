@@ -362,7 +362,7 @@ impl Request {
   /// # circuits
   /// - plaintext authentication
   /// - http verification
-  pub fn build_inputs(&self, inputs: EncryptionInput) -> NivcCircuitInputs {
+  pub fn build_inputs(&self, inputs: &EncryptionInput) -> NivcCircuitInputs {
     assert_eq!(inputs.plaintext.len(), inputs.ciphertext.len());
 
     let mut private_inputs = vec![];
@@ -585,7 +585,7 @@ mod tests {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
     let NivcCircuitInputs { fold_inputs, private_inputs, .. } =
-      manifest.request.build_inputs(EncryptionInput {
+      manifest.request.build_inputs(&EncryptionInput {
         key:        tls_client2::CipherSuiteKey::CHACHA20POLY1305(CHACHA_KEY.1),
         iv:         AEAD_IV.1,
         aad:        AEAD_AAD.1.to_vec(),

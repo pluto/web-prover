@@ -15,6 +15,7 @@ use proofs::{
   proof::Proof as CompressedSNARKProof,
   F, G1,
 };
+use serde_wasm_bindgen::from_value;
 use tls_client2::origo::OrigoConnection;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
@@ -102,7 +103,7 @@ fn construct_request_program_data_and_proof(
   let public_params = program::setup(&setup_data);
 
   let NivcCircuitInputs { fold_inputs, private_inputs, initial_nivc_input } =
-    manifest_request.build_inputs(inputs);
+    manifest_request.build_inputs(&inputs);
   let NIVCRom { circuit_data, rom } = manifest_request.build_rom();
 
   debug!("Generating request's `ProgramData`...");

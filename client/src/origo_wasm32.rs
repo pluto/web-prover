@@ -1,4 +1,5 @@
 use std::{
+  clone,
   io::{BufReader, Cursor},
   ops::Deref,
   sync::Arc,
@@ -6,17 +7,22 @@ use std::{
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::StatusCode;
+use js_sys::Promise;
 use proofs::{
   circom::witness::load_witness_from_bin_reader,
   program::{
     self,
     data::{Expanded, NotExpanded, Offline, Online, ProgramData},
-    manifest::{NIVCRom, NivcCircuitInputs, TLSEncryption},
+    manifest::{EncryptionInput, NIVCRom, NivcCircuitInputs, TLSEncryption},
   },
-  G1,
+  F, G1,
 };
-use tls_client2::origo::WitnessData;
-use tracing::debug;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use tls_client2::{origo::WitnessData, CipherSuiteKey};
+use tracing::{debug, info};
+use tracing_subscriber::field::debug;
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
@@ -24,6 +30,63 @@ use crate::{
   circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
   tls_client_async2::bind_client, Proof,
 };
+
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Serialize, Clone, Deserialize)]
+pub struct WitnessInput {
+  pub key:        Vec<u8>,
+  pub iv:         Vec<u8>,
+  pub aad:        Vec<u8>,
+  pub plaintext:  Vec<u8>,
+  pub ciphertext: Vec<u8>,
+  pub headers:    Vec<String>,
+}
+
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Debug)]
+pub struct WitnessOutput {
+  pub data: Vec<js_sys::Uint8Array>,
+}
+
+#[wasm_bindgen]
+impl WitnessOutput {
+  #[wasm_bindgen(constructor)]
+  pub fn new(wit: Vec<js_sys::Uint8Array>) -> WitnessOutput { Self { data: wit } }
+}
+// TODO(WJ 2024-12-12): move to wasm client lib?
+// #[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+extern "C" {
+  #[wasm_bindgen(js_namespace = witness, js_name = createWitness)]
+  async fn create_witness_js(input: &JsValue) -> JsValue;
+}
+
+// #[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub async fn create_witness(input: WitnessInput) -> Result<WitnessOutput, JsValue> {
+  // Convert the Rust WitnessInput to a JsValue
+  let js_input = serde_wasm_bindgen::to_value(&input).unwrap();
+
+  let js_witnesses_output = create_witness_js(&js_input).await;
+  // Call JavaScript function and await the Promise
+  info!("result: {:?}", js_witnesses_output);
+  let js_obj = js_sys::Object::from(js_witnesses_output);
+  info!("js_obj: {:?}", js_obj);
+  let data_value = js_sys::Reflect::get(&js_obj, &JsValue::from_str("data"))?;
+  info!("data_value: {:?}", data_value);
+  let array = js_sys::Array::from(&data_value);
+  info!("array: {:?}", array);
+  let mut data = Vec::with_capacity(array.length() as usize);
+
+  for i in 0..array.length() {
+    let item = array.get(i);
+    if let Ok(uint8_array) = item.dyn_into::<js_sys::Uint8Array>() {
+      data.push(uint8_array);
+    }
+  }
+  info!("data: {:?}", data);
+  Ok(WitnessOutput { data })
+}
 
 pub async fn proxy_and_sign_and_generate_proof(
   mut config: config::Config,
@@ -43,7 +106,7 @@ pub async fn proxy_and_sign_and_generate_proof(
 
   let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb).await;
 
-  debug!("generating NIVC program data!");
+  debug!("generating program data!");
   let witness = origo_conn.to_witness_data();
   let program_data = generate_program_data(&witness, config.proving, proving_params).await?;
 
@@ -82,7 +145,7 @@ async fn generate_program_data(
     fold_inputs: request_fold_inputs,
     private_inputs: request_private_inputs,
     initial_nivc_input: request_initial_nivc_input,
-  } = proving.manifest.as_ref().unwrap().request.build_inputs(request_inputs);
+  } = proving.manifest.as_ref().unwrap().request.build_inputs(&request_inputs);
   let NIVCRom { circuit_data: request_rom_data, rom: request_rom } =
     proving.manifest.as_ref().unwrap().request.build_rom();
 
@@ -93,11 +156,15 @@ async fn generate_program_data(
   // TODO (tracy): Today we are carrying witness data on the proving object,
   // it's not obviously the right place for it. This code path needs a larger
   // refactor.
-  debug!("serializing witness objects");
-  let mut witnesses = Vec::new();
-  for w in proving.witnesses.unwrap() {
-    witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w)))?);
-  }
+
+  // now we call the js FFI to generate the witness in wasm with snarkjs
+  debug!("generating witness in wasm");
+  /// now we pass witness input type to generate program data
+  let witnesses = build_witness_data_from_wasm(
+    &request_inputs,
+    proving.manifest.unwrap().request.headers.keys().map(clone::Clone::clone).collect(),
+  )
+  .await?;
 
   debug!("initializing public params");
   let program_data = ProgramData::<Offline, NotExpanded> {
@@ -177,6 +244,42 @@ async fn proxy(
 
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
   Ok(origo_conn)
+}
+
+async fn build_witness_data_from_wasm(
+  witness_data: &EncryptionInput,
+  headers: Vec<String>,
+) -> Result<Vec<Vec<F<G1>>>, errors::ClientErrors> {
+  let js_witness_input = to_js_witness_input(witness_data, headers);
+  let js_witnesses_output = create_witness(js_witness_input).await.unwrap();
+  debug!("js_witnesses_output: {:?}", js_witnesses_output);
+  let js_computed_witnesses: Vec<Vec<u8>> =
+    js_witnesses_output.data.iter().map(|w| w.to_vec()).collect();
+  let mut witnesses = Vec::new();
+  info!("js_computed_witnesses: {:?}", js_computed_witnesses);
+  for w in js_computed_witnesses {
+    witnesses.push(load_witness_from_bin_reader(BufReader::new(Cursor::new(w)))?);
+  }
+  // for wit in js_computed_witnesses {
+  //   info!("loading witness from bytes {:?}",wit);
+  //   witnesses.push(load_witness_from_bytes(wit)?);
+  // }
+  Ok(witnesses)
+}
+
+fn to_js_witness_input(witness: &EncryptionInput, headers: Vec<String>) -> WitnessInput {
+  let key_vec = match witness.key {
+    CipherSuiteKey::CHACHA20POLY1305(key) => key.to_vec(),
+    CipherSuiteKey::AES128GCM(key) => key.to_vec(),
+  };
+  WitnessInput {
+    key: key_vec,
+    iv: witness.iv.to_vec(),
+    aad: witness.aad.to_vec(),
+    plaintext: witness.plaintext.clone(),
+    ciphertext: witness.ciphertext.clone(),
+    headers,
+  }
 }
 
 use core::slice;

@@ -1,4 +1,5 @@
 import init, { prover, setup_tracing, initThreadPool, ProvingParamsWasm } from "../pkg/client_wasm";
+import { witness } from "./witness";
 
 let wasmInitialized = false;
 let sharedMemory = null;
@@ -60,7 +61,6 @@ self.onmessage = async function (e) {
         start();
         var pp = new ProvingParamsWasm(
             new Uint8Array(proving_params.aux_params),
-            proving_params.witnesses,
         );
         console.log("proving params", proving_params);
         const proof = await prover(proverConfig, pp);
