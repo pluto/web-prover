@@ -36,7 +36,6 @@ jobs:
         uses: obi1kenobi/cargo-semver-checks-action@v2
         with:
           package: proofs
-          baseline-ref: origin/main
           manifest-path: proofs/Cargo.toml
 
   build:
