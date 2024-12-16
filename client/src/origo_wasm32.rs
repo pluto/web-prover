@@ -145,7 +145,7 @@ async fn generate_program_data(
     fold_inputs: request_fold_inputs,
     private_inputs: request_private_inputs,
     initial_nivc_input: request_initial_nivc_input,
-  } = proving.manifest.as_ref().unwrap().request.build_inputs(request_inputs);
+  } = proving.manifest.as_ref().unwrap().request.build_inputs(&request_inputs);
   let NIVCRom { circuit_data: request_rom_data, rom: request_rom } =
     proving.manifest.as_ref().unwrap().request.build_rom();
 

@@ -103,7 +103,7 @@ fn construct_request_program_data_and_proof(
   let public_params = program::setup(&setup_data);
 
   let NivcCircuitInputs { fold_inputs, private_inputs, initial_nivc_input } =
-    manifest_request.build_inputs(inputs);
+    manifest_request.build_inputs(&inputs);
   let NIVCRom { circuit_data, rom } = manifest_request.build_rom();
 
   debug!("Generating request's `ProgramData`...");
