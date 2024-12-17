@@ -3,7 +3,7 @@
 
 use ff::PrimeField;
 use light_poseidon::{Poseidon, PoseidonBytesHasher};
-use program::manifest::{JsonKey, Manifest};
+use program::manifest::{JsonKey, Request, Response};
 use serde_json::Value;
 
 use super::*;
@@ -22,6 +22,8 @@ impl ByteOrPad {
     result.extend(std::iter::repeat(ByteOrPad::Pad).take(padding));
     result
   }
+
+  pub fn as_bytes(bytes: &[ByteOrPad]) -> Vec<u8> { bytes.iter().map(|b| u8::from(b)).collect() }
 }
 
 impl From<u8> for ByteOrPad {
@@ -37,6 +39,15 @@ impl From<&ByteOrPad> for halo2curves::bn256::Fr {
     match b {
       ByteOrPad::Byte(b) => halo2curves::bn256::Fr::from(*b as u64),
       ByteOrPad::Pad => -halo2curves::bn256::Fr::one(),
+    }
+  }
+}
+
+impl From<&ByteOrPad> for u8 {
+  fn from(b: &ByteOrPad) -> Self {
+    match b {
+      ByteOrPad::Byte(b) => *b,
+      ByteOrPad::Pad => 0,
     }
   }
 }
@@ -156,14 +167,13 @@ pub enum HttpMaskType {
 /// # Returns
 /// - the masked HTTP request/response
 pub fn compute_http_witness(plaintext: &[ByteOrPad], mask_at: HttpMaskType) -> Vec<ByteOrPad> {
-  let mut result = vec![ByteOrPad::Byte(0); plaintext.len()];
+  let mut result = Vec::new();
   match mask_at {
     HttpMaskType::StartLine => {
       // Find the first CRLF sequence
-      for i in 1..plaintext.len().saturating_sub(1) {
+      for i in 0..plaintext.len().saturating_sub(1) {
         if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
-          // Copy bytes from start to the end of CRLF
-          result[..=i + 1].copy_from_slice(&plaintext[..=i + 1]);
+          result = plaintext[..i].to_vec();
           break;
         }
       }
@@ -173,7 +183,7 @@ pub fn compute_http_witness(plaintext: &[ByteOrPad], mask_at: HttpMaskType) -> V
       let mut start_pos = 0;
 
       // Skip the start line
-      for i in 1..plaintext.len().saturating_sub(1) {
+      for i in 0..plaintext.len().saturating_sub(1) {
         if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
           start_pos = i + 2;
           break;
@@ -186,7 +196,7 @@ pub fn compute_http_witness(plaintext: &[ByteOrPad], mask_at: HttpMaskType) -> V
         if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
           if current_header == idx {
             // Copy the header line (including CRLF)
-            result[header_start_pos..=i + 1].copy_from_slice(&plaintext[header_start_pos..=i + 1]);
+            result = plaintext[header_start_pos..i].to_vec();
             break;
           }
 
@@ -202,7 +212,7 @@ pub fn compute_http_witness(plaintext: &[ByteOrPad], mask_at: HttpMaskType) -> V
     },
     HttpMaskType::Body => {
       // Find double CRLF that marks start of body
-      for i in 1..plaintext.len().saturating_sub(3) {
+      for i in 0..plaintext.len().saturating_sub(3) {
         if plaintext[i] == b'\r'
           && plaintext[i + 1] == b'\n'
           && plaintext[i + 2] == b'\r'
@@ -211,7 +221,7 @@ pub fn compute_http_witness(plaintext: &[ByteOrPad], mask_at: HttpMaskType) -> V
           // Copy everything after the double CRLF
           let body_start = i + 4;
           if body_start < plaintext.len() {
-            result[body_start..].copy_from_slice(&plaintext[body_start..]);
+            result = plaintext[body_start..].to_vec();
           }
           break;
         }
@@ -346,7 +356,6 @@ pub fn polynomial_digest(bytes: &[u8], polynomial_input: F<G1>) -> F<G1> {
 pub fn json_tree_hasher(
   polynomial_input: F<G1>,
   key_sequence: &[JsonKey],
-  target_value: &[u8],
   max_stack_height: usize,
 ) -> (Vec<[F<G1>; 2]>, Vec<[F<G1>; 2]>) {
   assert!(key_sequence.len() <= max_stack_height); // TODO: This should be an error
@@ -391,38 +400,63 @@ pub fn compress_tree_hash(
   accumulated
 }
 
+pub fn request_initial_digest(
+  manifest_request: &Request,
+  ciphertext: &[ByteOrPad],
+) -> (F<G1>, F<G1>) {
+  // First create a digest of the ciphertext itself
+  let ciphertext_digest = data_hasher(&ciphertext);
+
+  // TODO: This assumes the start line format here as well.
+  // Then digest the start line using the ciphertext_digest as a random input
+  let start_line_bytes =
+    format!("{} {} {}", &manifest_request.method, &manifest_request.url, &manifest_request.version)
+      .as_bytes()
+      .to_vec();
+  let start_line_digest = polynomial_digest(&start_line_bytes, ciphertext_digest);
+
+  // Digest all the headers
+  let header_bytes = headers_to_bytes(&manifest_request.headers);
+  dbg!(&header_bytes);
+  let headers_digest = header_bytes.iter().map(|bytes| polynomial_digest(bytes, ciphertext_digest));
+
+  // Put all the digests into a vec
+  let mut all_digests = vec![];
+  all_digests.push(start_line_digest);
+  headers_digest.into_iter().for_each(|d| all_digests.push(d));
+
+  // Iterate through the material and sum up poseidon hashes of each as to not mix polynomials
+  let manifest_digest =
+    ciphertext_digest + all_digests.into_iter().map(|d| poseidon::<1>(&[d])).sum::<F<G1>>();
+  (ciphertext_digest, manifest_digest)
+}
+
 // TODO: for now this is just doing the response
-pub fn initial_digest(
-  manifest: &Manifest,
-  ciphertext: &[u8],
-  target_value: &[u8],
+pub fn response_initial_digest(
+  manifest_response: &Response,
+  ciphertext: &[ByteOrPad],
   max_stack_height: usize,
 ) -> (F<G1>, F<G1>) {
   // First create a digest of the ciphertext itself
-  let ciphertext_digest = data_hasher(&ciphertext.iter().map(ByteOrPad::from).collect::<Vec<_>>());
+  let ciphertext_digest = data_hasher(&ciphertext);
 
   // TODO: This assumes the start line format here as well.
   // Then digest the start line using the ciphertext_digest as a random input
   let start_line_bytes = format!(
     "{} {} {}",
-    &manifest.response.version, &manifest.response.status, &manifest.response.message
+    &manifest_response.version, &manifest_response.status, &manifest_response.message
   )
   .as_bytes()
   .to_vec();
   let start_line_digest = polynomial_digest(&start_line_bytes, ciphertext_digest);
 
   // Digest all the headers
-  let header_bytes = headers_to_bytes(&manifest.response.headers);
-  dbg!(&header_bytes);
+  let header_bytes = headers_to_bytes(&manifest_response.headers);
   let headers_digest = header_bytes.iter().map(|bytes| polynomial_digest(bytes, ciphertext_digest));
 
   // Digest the JSON sequence
-  let json_tree_hash = json_tree_hasher(
-    ciphertext_digest,
-    &manifest.response.body.json,
-    target_value,
-    max_stack_height,
-  );
+  let json_tree_hash =
+    json_tree_hasher(ciphertext_digest, &manifest_response.body.json, max_stack_height);
   let json_sequence_digest = compress_tree_hash(ciphertext_digest, json_tree_hash);
 
   // Put all the digests into a vec
@@ -445,36 +479,10 @@ fn headers_to_bytes(headers: &HashMap<String, String>) -> Vec<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
-  fn mock_manifest() -> Manifest {
-    let request = Request {
-      method:  "GET".to_string(),
-      url:     "spotify.com".to_string(),
-      version: "HTTP/1.1".to_string(),
-      headers: HashMap::new(),
-    };
-    let mut headers = HashMap::new();
-    headers.insert("content-type".to_string(), "application/json; charset=utf-8".to_string());
-    headers.insert("content-encoding".to_string(), "gzip".to_string());
-    let body = ResponseBody {
-      json: vec![
-        JsonKey::String("data".to_string()),
-        JsonKey::String("items".to_string()),
-        JsonKey::Num(0),
-        JsonKey::String("profile".to_string()),
-        JsonKey::String("name".to_string()),
-      ],
-    };
-    let response = Response {
-      status: "200".to_string(),
-      version: "HTTP/1.1".to_string(),
-      message: "OK".to_string(),
-      headers,
-      body,
-    };
-    Manifest { request, response }
-  }
+  use num_bigint::BigUint;
 
   use super::*;
+  use crate::{program::manifest::JsonKey, tests::mock_manifest};
 
   const TEST_HTTP_BYTES: &[u8] = &[
     72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101,
@@ -513,46 +521,17 @@ mod tests {
     230, 102, 131, 245, 27, 141, 220, 67, 16, 26,
   ];
 
-  const TEST_HTTP_START_LINE: &[u8] = &[
-    72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0,
-  ];
+  const TEST_HTTP_START_LINE: &[u8] = &[72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75];
 
   const TEST_HTTP_HEADER_0: &[u8] = &[
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99, 111, 110, 116, 101, 110, 116, 45, 116,
-    121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106, 115, 111,
-    110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13, 10, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    99, 111, 110, 116, 101, 110, 116, 45, 116, 121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99,
+    97, 116, 105, 111, 110, 47, 106, 115, 111, 110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61,
+    117, 116, 102, 45, 56,
   ];
 
   const TEST_HTTP_HEADER_1: &[u8] = &[
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     99, 111, 110, 116, 101, 110, 116, 45, 101, 110, 99, 111, 100, 105, 110, 103, 58, 32, 103, 122,
-    105, 112, 13, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    105, 112,
   ];
 
   #[test]
@@ -561,7 +540,7 @@ mod tests {
       &TEST_HTTP_BYTES.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
       HttpMaskType::StartLine,
     );
-    assert_eq!(bytes, TEST_HTTP_START_LINE);
+    assert_eq!(ByteOrPad::as_bytes(&bytes), TEST_HTTP_START_LINE);
   }
 
   #[test]
@@ -570,7 +549,7 @@ mod tests {
       &TEST_HTTP_BYTES.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
       HttpMaskType::Header(0),
     );
-    assert_eq!(bytes, TEST_HTTP_HEADER_0);
+    assert_eq!(ByteOrPad::as_bytes(&bytes), TEST_HTTP_HEADER_0);
   }
 
   #[test]
@@ -579,7 +558,7 @@ mod tests {
       &TEST_HTTP_BYTES.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
       HttpMaskType::Header(1),
     );
-    assert_eq!(bytes, TEST_HTTP_HEADER_1);
+    assert_eq!(ByteOrPad::as_bytes(&bytes), TEST_HTTP_HEADER_1);
   }
 
   #[test]
@@ -588,7 +567,7 @@ mod tests {
       &TEST_HTTP_BYTES.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
       HttpMaskType::Body,
     );
-    assert_eq!(bytes, TEST_HTTP_BODY);
+    assert_eq!(ByteOrPad::as_bytes(&bytes), TEST_HTTP_BODY);
   }
 
   #[test]
@@ -683,19 +662,15 @@ mod tests {
   }
 
   const TEST_HTTP_BODY: &[u8] = &[
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 123, 13, 10, 32, 32, 32, 34,
-    100, 97, 116, 97, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 34, 105, 116, 101, 109,
-    115, 34, 58, 32, 91, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 123, 13, 10, 32, 32,
-    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34, 65,
-    114, 116, 105, 115, 116, 34, 44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-    32, 32, 34, 112, 114, 111, 102, 105, 108, 101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32,
-    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121,
-    108, 111, 114, 32, 83, 119, 105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-    32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32,
-    32, 32, 32, 32, 32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125,
+    123, 13, 10, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32,
+    32, 34, 105, 116, 101, 109, 115, 34, 58, 32, 91, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+    32, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97,
+    116, 97, 34, 58, 32, 34, 65, 114, 116, 105, 115, 116, 34, 44, 13, 10, 32, 32, 32, 32, 32, 32,
+    32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 112, 114, 111, 102, 105, 108, 101, 34, 58, 32, 123, 13,
+    10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 110, 97, 109, 101, 34,
+    58, 32, 34, 84, 97, 121, 108, 111, 114, 32, 83, 119, 105, 102, 116, 34, 13, 10, 32, 32, 32, 32,
+    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+    32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125,
   ];
 
   const MASKED_KEY0_ARRAY: &[u8] = &[
@@ -817,9 +792,6 @@ mod tests {
     assert_eq!(masked_array, MASKED_KEY3_ARRAY);
   }
 
-  use num_bigint::BigUint;
-  use program::manifest::{JsonKey, Request, Response, ResponseBody};
-
   // TODO: This test doesn't actually test anything at all. Fix that.
   #[test]
   fn test_json_tree_hasher() {
@@ -833,7 +805,7 @@ mod tests {
     let target_value = b"Taylor Swift";
     let polynomial_input = poseidon::<2>(&[F::<G1>::from(69), F::<G1>::from(420)]);
     println!("polynomial_input: {:?}", BigUint::from_bytes_le(&polynomial_input.to_bytes()));
-    let stack_and_tree_hashes = json_tree_hasher(polynomial_input, &key_sequence, target_value, 10);
+    let stack_and_tree_hashes = json_tree_hasher(polynomial_input, &key_sequence, 10);
 
     println!("Stack (decimal):");
     for (i, pair) in stack_and_tree_hashes.0.iter().enumerate() {
@@ -857,11 +829,30 @@ mod tests {
   // TODO: This test doesn't actually test anything at all. Fix that.
   #[test]
   fn test_initial_digest() {
+    let test_ciphertext_padded =
+      TEST_CIPHERTEXT.iter().map(|x| ByteOrPad::Byte(*x)).collect::<Vec<ByteOrPad>>();
+
     let (ct_digest, manifest_digest) =
-      initial_digest(&mock_manifest(), &TEST_CIPHERTEXT, b"Taylor Swift", 5);
-    println!("\nCiphertext Digest (decimal):");
-    println!("  {}", BigUint::from_bytes_le(&ct_digest.to_bytes()));
+      response_initial_digest(&mock_manifest().response, &test_ciphertext_padded, 5);
     println!("\nManifest Digest (decimal):");
     println!("  {}", BigUint::from_bytes_le(&manifest_digest.to_bytes()));
+
+    assert_eq!(
+      BigUint::from_bytes_le(&ct_digest.to_bytes()),
+      BigUint::from_str(
+        "5947802862726868637928743536818722886587721698845887498686185738472802646104"
+      )
+      .unwrap()
+    );
+
+    let (ct_digest, _manifest_digest) =
+      request_initial_digest(&mock_manifest().request, &test_ciphertext_padded);
+    assert_eq!(
+      BigUint::from_bytes_le(&ct_digest.to_bytes()),
+      BigUint::from_str(
+        "5947802862726868637928743536818722886587721698845887498686185738472802646104"
+      )
+      .unwrap()
+    );
   }
 }
