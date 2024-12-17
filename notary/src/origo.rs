@@ -77,6 +77,7 @@ pub struct SignBody {
 #[derive(Deserialize, Debug, Clone)]
 pub struct VerifyBody {
   proof: Vec<u8>,
+  ciphertext_hash: Vec<u8>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -91,7 +92,7 @@ pub async fn sign(
   extract::Json(payload): extract::Json<SignBody>,
 ) -> Result<Json<SignReply>, ProxyError> {
   let session = state.origo_sessions.lock().unwrap().get(&query.session_id).unwrap().clone();
-  let messages = extract_tls_handshake(&session.request, payload)?;
+  let (messages, encrypted_messages) = extract_tls_handshake(&session.request, payload)?;
   let handshake_hash_buffer = HandshakeHashBuffer::new();
   // TODO: get hash algorithm from cipher suite in a better way
   let mut transcript =
@@ -171,6 +172,15 @@ pub async fn sign(
     }
   }
 
+  let mut ciphertext = Vec::new();
+  for msg in encrypted_messages {
+    match msg.payload {
+      Payload(bytes) => ciphertext.push(bytes.clone()),
+      _ => panic!("invalid payload")
+    }
+  }
+  debug!("Prepared ciphertext={:?}", ciphertext);
+
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
 
@@ -247,7 +257,7 @@ fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
 ///
 /// # Returns
 /// * `Result<Vec<Message>, ProxyError>` - Vector of parsed TLS messages or error
-fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>, ProxyError> {
+fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<(Vec<Message>, Vec<OpaqueMessage>), ProxyError> {
   let server_hs_key = hex::decode(payload.handshake_server_key).unwrap();
   let server_hs_iv = hex::decode(payload.handshake_server_iv).unwrap();
   info!("key_as_string: {:?}, length: {}", server_hs_key, server_hs_key.len());
@@ -255,8 +265,10 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
 
   let mut cursor = Cursor::new(bytes);
   let mut messages: Vec<Message> = vec![];
+  let mut encrypted_messages: Vec<OpaqueMessage> = vec![];
   let mut seq = 0u64;
 
+  let mut cipher_suite_key: Option<CipherSuiteKey> = None;
   while cursor.position() < bytes.len() as u64 {
     let current_bytes = &cursor.get_ref()[cursor.position() as usize..];
     match local_parse_record(current_bytes) {
@@ -268,7 +280,6 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
         //
         // These are plaintext. The first encrypted message is an extension from the server
         // which is labeled application data, like all subsequent encrypted messages in TLS1.3
-        let mut cipher_suite_key: Option<CipherSuiteKey> = None;
         if record.hdr.record_type == tls_parser::TlsRecordType::Handshake {
           let rec = parse_tls_message_handshake(record.data);
           match rec {
@@ -297,6 +308,7 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
           handle_application_data(
             record.data.to_vec(),
             &mut messages,
+            &mut encrypted_messages,
             server_hs_iv.clone(),
             cipher_suite_key.clone(),
             seq,
@@ -318,8 +330,11 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
     }
   }
 
+  // TODO: This thing needs to actually output the application ciphertext. 
+  debug!("found encrypted messages={:?}", encrypted_messages);
+
   if !messages.is_empty() {
-    Ok(messages)
+    Ok((messages, encrypted_messages))
   } else {
     Err(ProxyError::TlsHandshakeExtract(String::from("empty handshake messages")))
   }
@@ -351,7 +366,8 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<Vec<Message>
 /// * `TLS13_CHACHA20_POLY1305_SHA256` - Uses ChaCha20-Poly1305 decryption
 fn handle_application_data(
   record: Vec<u8>,
-  messages: &mut Vec<Message>,
+  decrypted_messages: &mut Vec<Message>,
+  encrypted_messages: &mut Vec<OpaqueMessage>,
   server_hs_iv: Vec<u8>,
   cipher_suite_key: Option<CipherSuiteKey>,
   seq: u64,
@@ -377,10 +393,11 @@ fn handle_application_data(
               let mut handshake_joiner = HandshakeJoiner::new();
               handshake_joiner.take_message(plain_message);
               while let Some(msg) = handshake_joiner.frames.pop_front() {
-                messages.push(msg);
+                decrypted_messages.push(msg);
               }
             },
             Err(_) => {
+              encrypted_messages.push(msg);
               trace!("Unable to decrypt record. Skipping.");
             },
           };
@@ -397,13 +414,14 @@ fn handle_application_data(
               let mut handshake_joiner = HandshakeJoiner::new();
               handshake_joiner.take_message(plain_message);
               while let Some(msg) = handshake_joiner.frames.pop_front() {
-                messages.push(msg);
+                decrypted_messages.push(msg);
               }
             },
             Err(_) => {
               // This occurs once we pass the handshake records, we will no longer
               // have the correct keys to decrypt. We want to continue logging the
               // ciphertext.
+              encrypted_messages.push(msg);
               trace!("Unable to decrypt record. Skipping.");
             },
           };
@@ -650,23 +668,64 @@ pub async fn proxy(
     }),
   }
 }
+use proofs::{
+  proof::Proof, E1, F, G1, G2, S1, S2,
+  witness::{data_hasher, ByteOrPad},
+  program::data::{CircuitData, NotExpanded, Offline, Online, ProgramData},
+};
+use std::collections::HashMap;
+use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
+use crate::circuits;
 
-use client_side_prover::supernova::snark::CompressedSNARK;
-use k256::elliptic_curve::Field;
-use proofs::{proof::Proof, E1, F, G2, S1, S2};
 pub async fn verify(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<VerifyBody>,
 ) -> Result<Json<VerifyReply>, ProxyError> {
-  let proving_params = &state.verifier_params;
   let proof = Proof(payload.proof).decompress_and_serialize();
 
-  // TODO: Replace with a process that loads from cache, i.e. `initialize_vk`
-  let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&proving_params.public_params).unwrap();
-  let (z0_primary, _) = proving_params.extend_public_inputs().unwrap();
-  let z0_secondary = vec![F::<G2>::ZERO];
+  let max_ciphertext = 1024;
+  // TODO (tracy): Move this into a method on the proofs crate, probably also move the circuits.rs file.
+  let setup_data_large = circuits::construct_setup_data(max_ciphertext);
+  let decryption_label = String::from("PLAINTEXT_AUTHENTICATION");
+  let http_label = String::from("HTTP_VERIFICATION");
+  let rom_data = HashMap::from([
+    (decryption_label.clone(), CircuitData { opcode: 0 }),
+    (http_label.clone(), CircuitData { opcode: 1 }),
+  ]);
+    
+  // TODO (tracy): Need to form the real ciphertext, for now just accept a hash. 
+  let ciphertext = vec![];
+  let padded_ciphertext = ByteOrPad::from_bytes_with_padding(
+    &ciphertext,
+    max_ciphertext - ciphertext.len(), // TODO: support different sizes.
+  );
+  use client_side_prover::traits::Engine;
+  // let initial_nivc_input = vec![data_hasher(&padded_ciphertext)];
+  let initial_nivc_input =  vec![<E1 as Engine>::Scalar::from_bytes(&payload.ciphertext_hash.try_into().unwrap()).unwrap()];
 
-  let valid = match proof.0.verify(&proving_params.public_params, &vk, &z0_primary, &z0_secondary) {
+  // TODO (tracy): We are re-initializing this everytime we verify a proof, which slows down this API.
+  // We did it this way due to initial_nivc_input being static on the object. Add getter/setter. 
+  let rom = vec![decryption_label, http_label];
+  let local_params = ProgramData::<Offline, NotExpanded> {
+    public_params: state.verifier_param_bytes.clone(),
+    vk_digest_primary: F::<G1>::from(0), // TODO: This is gross. 
+    vk_digest_secondary: F::<G2>::from(0),
+    setup_data: setup_data_large,
+    rom,
+    rom_data,
+    initial_nivc_input,
+    inputs: (vec![HashMap::new()], HashMap::new()),
+    witnesses: vec![],
+  }
+  .into_online()
+  .unwrap();
+
+  let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&local_params.public_params).unwrap();
+  debug!("initialized vk_primary.digest={:?}, vk_secondary.digest={:?}, ck_s={:?}", vk.vk_primary.digest, vk.vk_secondary.digest, vk.vk_secondary.vk_ee.ck_s);
+  let (z0_primary, _) = local_params.extend_public_inputs().unwrap();
+  let z0_secondary = vec![F::<G2>::from(0)];
+
+  let valid = match proof.0.verify(&local_params.public_params, &vk, &z0_primary, &z0_secondary) {
     Ok(_) => true,
     Err(e) => {
       info!("Error verifying proof: {:?}", e);

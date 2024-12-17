@@ -15,7 +15,7 @@ use proofs::{
     data::{Expanded, NotExpanded, Offline, Online, ProgramData},
     manifest::{EncryptionInput, NIVCRom, NivcCircuitInputs, TLSEncryption},
   },
-  F, G1,
+  F, G1, G2
 };
 use serde::{Deserialize, Serialize};
 use tls_client2::{origo::WitnessData, CipherSuiteKey};
@@ -112,12 +112,14 @@ pub async fn proxy_and_sign_and_generate_proof(
   let program_output = program::run(&program_data)?;
 
   debug!("compressing proof!");
+
   let compressed_snark_proof =
-    program::compress_proof_no_setup(&program_output, &program_data.public_params)?;
+    program::compress_proof_no_setup(&program_output, &program_data.public_params, program_data.vk_digest_primary, program_data.vk_digest_secondary)?;
 
   debug!("running compressed verifier!");
-  let proof = compressed_snark_proof.serialize();
+  let proof = compressed_snark_proof.serialize_and_compress();
 
+  // TODO(sambhav): Add real response proving
   Ok(crate::Proof::Origo((proof.0, vec![])))
 }
 
@@ -168,6 +170,8 @@ async fn generate_program_data(
   debug!("initializing public params");
   let program_data = ProgramData::<Offline, NotExpanded> {
     public_params: proving_params.unwrap(),
+    vk_digest_primary: proofs::F::<G1>::from(0),
+    vk_digest_secondary: proofs::F::<G2>::from(0),
     setup_data: request_setup_data,
     rom: request_rom,
     rom_data: request_rom_data,

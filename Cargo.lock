@@ -1325,7 +1325,7 @@ dependencies = [
 [[package]]
 name = "client-side-prover"
 version = "0.1.0"
-source = "git+https://github.com/pluto/client-side-prover?branch=tl-compress-serde#302d9c5fa4742e92c19dc18bf7068b3a5c9541e6"
+source = "git+https://github.com/pluto/client-side-prover?branch=tl-compress-serde#913186701c8095515b9e02b18c49d7b28853db19"
 dependencies = [
  "bellpepper",
  "bellpepper-core",

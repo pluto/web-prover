@@ -48,6 +48,7 @@ pub async fn sign(
 #[derive(Serialize, Debug, Clone)]
 pub struct VerifyBody {
   pub proof: Vec<u8>,
+  pub ciphertext_hash: Vec<u8>,
 }
 
 #[derive(Deserialize, Debug, Clone)]

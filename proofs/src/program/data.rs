@@ -117,6 +117,9 @@ pub struct CircuitData {
 #[derive(Debug)]
 pub struct ProgramData<S: SetupStatus, W: WitnessStatus> {
   pub public_params:      S::PublicParams,
+  // TODO: Refactor this onto the PublicParams object and share the ProvingParams abstraction
+  pub vk_digest_primary:   <E1 as Engine>::Scalar, 
+  pub vk_digest_secondary: <Dual<E1> as Engine>::Scalar,
   pub setup_data:         SetupData,
   pub rom_data:           HashMap<String, CircuitData>,
   pub rom:                Vec<String>,
@@ -193,9 +196,11 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
 
     assert!(private_inputs.len() == self.rom.len());
 
-    let Self { public_params, setup_data, rom_data, initial_nivc_input, witnesses, .. } = self;
+    let Self { public_params, vk_digest_primary, vk_digest_secondary, setup_data, rom_data, initial_nivc_input, witnesses, .. } = self;
     Ok(ProgramData {
       public_params,
+      vk_digest_primary,
+      vk_digest_secondary,
       setup_data,
       rom_data,
       rom: self.rom,
@@ -230,8 +235,6 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
   /// # Errors
   ///
   /// This function will return an error if:
-  /// * Zlib decompression fails
-  /// * Bincode deserialization fails
   /// * Circuit initialization fails
   /// * Circuit shape generation fails
   ///
@@ -248,17 +251,9 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
   ///
   /// # Example
   pub fn into_online(self) -> Result<ProgramData<Online, W>, ProofError> {
-    #[cfg(feature = "timing")]
-    let time = std::time::Instant::now();
     debug!("loading proving params, proving_param_bytes={:?}", self.public_params.len());
-    let aux_params = AuxParams::<E1>::from_bytes(&self.public_params).unwrap();
+    let proving_params = ProvingParams::from_bytes(&self.public_params).unwrap();
     debug!("done loading proving params");
-    #[cfg(feature = "timing")]
-    let aux_params_duration = {
-      let aux_params_duration = time.elapsed();
-      trace!("Reading in `AuxParams` elapsed: {:?}", aux_params_duration);
-      aux_params_duration
-    };
 
     // TODO: get the circuit shapes needed
     info!("circuit list");
@@ -266,18 +261,15 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
     let memory = Memory { circuits, rom: vec![0; self.setup_data.max_rom_length] }; // Note, `rom` here is not used in setup, only `circuits`
     info!("circuit shapes");
     let circuit_shapes = get_circuit_shapes(&memory);
-    #[cfg(feature = "timing")]
-    {
-      let circuit_shapes_duration = time.elapsed() - aux_params_duration;
-      trace!("`get_circuit_shapes()` elapsed: {:?}", circuit_shapes_duration);
-    }
 
     info!("public params from parts");
-    let public_params = PublicParams::<E1>::from_parts(circuit_shapes, aux_params);
+    let public_params = PublicParams::<E1>::from_parts_unchecked(circuit_shapes, proving_params.aux_params);
     let Self { setup_data, rom, initial_nivc_input, inputs, witnesses, rom_data, .. } = self;
 
     Ok(ProgramData {
       public_params,
+      vk_digest_primary: proving_params.vk_digest_primary,
+      vk_digest_secondary: proving_params.vk_digest_secondary,
       setup_data,
       rom,
       initial_nivc_input,
@@ -321,7 +313,13 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   ///   program data
   pub fn into_offline(self, path: PathBuf) -> Result<ProgramData<Offline, W>, ProofError> {
     let (_, aux_params) = self.public_params.into_parts();
-    let aux_param_bytes = aux_params.to_bytes();
+    let vk_digest_primary = self.vk_digest_primary;
+    let vk_digest_secondary = self.vk_digest_secondary;
+    let proving_param_bytes = ProvingParams {
+      aux_params,
+      vk_digest_primary,
+      vk_digest_secondary,
+    }.to_bytes();
 
     if let Some(parent) = path.parent() {
       fs::create_dir_all(parent)?;
@@ -329,11 +327,13 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
 
     let bytes_path = path.with_extension("bytes");
     debug!("bytes_path={:?}", bytes_path);
-    File::create(&bytes_path)?.write_all(&aux_param_bytes).unwrap();
+    File::create(&bytes_path)?.write_all(&proving_param_bytes).unwrap();
 
     let Self { setup_data, rom_data, rom, initial_nivc_input, inputs, witnesses, .. } = self;
     Ok(ProgramData {
-      public_params: aux_param_bytes,
+      public_params: proving_param_bytes,
+      vk_digest_primary,
+      vk_digest_secondary,
       setup_data,
       rom_data,
       rom,
@@ -438,10 +438,13 @@ mod tests {
     };
 
     let public_params = program::setup(&setup_data);
+    let (prover_key, _vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
 
     ProgramData {
       public_params,
       setup_data,
+      vk_digest_primary: prover_key.pk_primary.vk_digest,
+      vk_digest_secondary: prover_key.pk_secondary.vk_digest,
       rom_data,
       rom,
       initial_nivc_input: vec![F::<G1>::ONE],
@@ -520,6 +523,8 @@ mod tests {
         (String::from("CIRCUIT_3"), CircuitData { opcode: 2 }),
       ]),
       rom: vec![String::from("CIRCUIT_1"), String::from("CIRCUIT_2"), String::from("CIRCUIT_3")],
+      vk_digest_primary: F::<G1>::ZERO,
+      vk_digest_secondary: F::<G2>::ZERO,
       initial_nivc_input: vec![],
       inputs: mock_inputs.input,
       witnesses: vec![],

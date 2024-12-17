@@ -76,19 +76,23 @@ pub async fn prover_inner_origo(
   let proof = origo_wasm32::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await;
 
   #[cfg(not(target_arch = "wasm32"))]
-  let proof = origo_native::proxy_and_sign_and_generate_proof(config.clone()).await;
+  let proof = origo_native::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await;
 
+  // TODO (tracy): Handle verify of response proofs. 
   let r = proof.unwrap();
-  let real_proof = match &r {
-    Proof::Origo(proof) => proof.0.clone(),
-    _ => Vec::new(),
+  let (real_proof, ciphertext_hash) = match &r {
+    Proof::Origo(proof) => (proof.0.clone(), proof.1.clone()),
+    _ => (Vec::new(), Vec::new())
   };
 
   // TODO: Actually propagate errors up to the client
+  // TODO: Do not pass the ciphertext hash like this (it's unauthenticated)
   let verify_response =
-    origo::verify(config, origo::VerifyBody { proof: real_proof }).await.unwrap();
+    origo::verify(config, origo::VerifyBody { proof: real_proof, ciphertext_hash }).await.unwrap();
 
   // TODO: Don't assert?
+  use tracing::debug;
+  debug!("response={:?}", verify_response);
   assert!(verify_response.valid);
 
   Ok(r)

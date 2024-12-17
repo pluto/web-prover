@@ -72,6 +72,8 @@ fn run_entry(
     setup_data,
     rom_data,
     rom,
+    vk_digest_primary: F::<G1>::ZERO,
+    vk_digest_secondary: F::<G2>::ZERO,
     initial_nivc_input: vec![F::<G1>::from(1), F::<G1>::from(2)],
     inputs: (private_inputs, HashMap::new()),
     witnesses: vec![],
@@ -126,10 +128,10 @@ fn test_run_serialized_verify() {
   let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
 
   // Serialize the proof and zlib compress further
-  let serialized_compressed_proof = proof.serialize();
+  let serialized_compressed_proof = proof.serialize_and_compress();
 
   // Decompress and deserialize
-  let proof = serialized_compressed_proof.deserialize();
+  let proof = serialized_compressed_proof.decompress_and_serialize();
 
   // Extend the initial state input with the ROM (happens internally inside of `program::run`, so
   // we do it out here just for the test)

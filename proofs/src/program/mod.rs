@@ -2,7 +2,7 @@ use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
 use client_side_prover::{
   supernova::{NonUniformCircuit, RecursiveSNARK, StepCircuit},
-  traits::snark::default_ck_hint,
+  traits::{snark::default_ck_hint, TranscriptReprTrait},
 };
 use data::Expanded;
 use proof::Proof;
@@ -199,22 +199,18 @@ use hex;
 pub fn compress_proof_no_setup(
   recursive_snark: &RecursiveSNARK<E1>,
   public_params: &PublicParams<E1>,
+  vk_digest_primary: <E1 as Engine>::Scalar,
+  vk_digest_secondary: <Dual<E1> as Engine>::Scalar,
 ) -> Result<Proof<CompressedSNARK<E1, S1, S2>>, ProofError> {
-  // TODO: We need to load these, hardcode to prove it works.
-  let vk_digest =
-    hex::decode("371cdcd621b427a3beb551f5b1bee5f8c01cb4f33524703d0a34034ec6f18a03").unwrap();
-  let vk_digest_secondary =
-    hex::decode("d83bc114da0fa6d8571d8d8956105d9352820fbdf4f40cc82466292330327101").unwrap();
   let pk = CompressedSNARK::<E1, S1, S2>::initialize_pk(
     &public_params,
-    <Bn256EngineKZG as client_side_prover::traits::Engine>::Scalar::from_bytes(
-      &vk_digest.try_into().unwrap(),
-    )
-    .unwrap(),
-    <Dual<E1> as Engine>::Scalar::from_bytes(&vk_digest_secondary.try_into().unwrap()).unwrap(),
+    vk_digest_primary,
+    vk_digest_secondary,
   )
   .unwrap();
+  debug!("initialized pk pk_primary.digest={:?}, pk_secondary.digest={:?}", pk.pk_primary.vk_digest, pk.pk_secondary.vk_digest);
 
+  debug!("`CompressedSNARK::prove STARTING PROVING!");
   let proof = Proof(CompressedSNARK::<E1, S1, S2>::prove(&public_params, &pk, recursive_snark)?);
   debug!("`CompressedSNARK::prove completed!");
 

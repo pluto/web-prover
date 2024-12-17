@@ -295,8 +295,13 @@ fn test_end_to_end_proofs() {
     ),
   ]));
 
+  let (pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
+  let vk_digest_primary = pk.pk_primary.vk_digest;
+  let vk_digest_secondary = pk.pk_secondary.vk_digest;
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
+    vk_digest_primary,
+    vk_digest_secondary,
     setup_data,
     rom_data: rom_data.clone(),
     rom: rom.clone(),
@@ -309,7 +314,7 @@ fn test_end_to_end_proofs() {
 
   let recursive_snark = program::run(&program_data).unwrap();
 
-  let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
+  let proof = program::compress_proof_no_setup(&recursive_snark, &program_data.public_params, vk_digest_primary, vk_digest_secondary).unwrap();
   assert_eq!(*recursive_snark.zi_primary().first().unwrap(), *value_digest);
 
   // TODO (autoparallel): This is redundant, we call the setup inside compress_proof. We should
@@ -353,6 +358,8 @@ fn test_offline_proofs() {
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
     setup_data,
+    vk_digest_primary: pk.pk_primary.vk_digest,
+    vk_digest_secondary: pk.pk_secondary.vk_digest,
     rom_data: HashMap::new(),
     rom: vec![],
     initial_nivc_input: vec![],
@@ -368,12 +375,10 @@ fn test_offline_proofs() {
 #[ignore]
 fn test_compressed_proof_params() {
   let setup_data = SetupData {
-    r1cs_types:              vec![
-      R1CSType::Raw(CHACHA20_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_NIVC_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+    r1cs_types:             vec![
+      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
+      R1CSType::Raw(JSON_EXTRACTION_512B_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
       WitnessGeneratorType::Wasm {
@@ -387,83 +392,24 @@ fn test_compressed_proof_params() {
       WitnessGeneratorType::Wasm {
         path:      String::from("../proofs"),
         wtns_path: String::from("witness.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from("../proofs"),
-        wtns_path: String::from("witness.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from("../proofs"),
-        wtns_path: String::from("witness.wtns"),
-      },
+      }
     ],
-    max_rom_length:          JSON_MAX_ROM_LENGTH,
+    max_rom_length:          MAX_ROM_LENGTH,
   };
-  // let public_params = program::setup(&setup_data);
-  use std::{
-    fs::{self, File},
-    io::Write,
+  
+  let public_params = program::setup(&setup_data);
+  let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
+  let program_data = ProgramData::<Online, NotExpanded> {
+    public_params,
+    vk_digest_primary: pk.pk_primary.vk_digest,
+    vk_digest_secondary: pk.pk_secondary.vk_digest,
+    setup_data,
+    rom_data: HashMap::new(),
+    rom: vec![],
+    initial_nivc_input: vec![],
+    inputs: (vec![], HashMap::new()),
+    witnesses: vec![vec![F::<G1>::from(0)]],
   };
-
-  let pk_path_json =
-    PathBuf::from_str("web_proof_circuits/serialized_compressed_setup_pk.json").unwrap();
-  // let aux_path_json =
-  // PathBuf::from_str("web_proof_circuits/serialized_compressed_setup.json").unwrap();
-
-  let pk_path =
-    PathBuf::from_str("web_proof_circuits/serialized_compressed_setup_pk.bytes").unwrap();
-  let vk_path =
-    PathBuf::from_str("web_proof_circuits/serialized_compressed_setup_vk.bytes").unwrap();
-  let aux_path = PathBuf::from_str("web_proof_circuits/serialized_compressed_setup.bytes").unwrap();
-
-  let crate::BackendData { aux_params, prover_key, verifier_key } =
-    crate::setup_backend(setup_data).unwrap();
-
-  let serialized_pk = bincode::serialize(&prover_key).unwrap();
-  let serialized_vk = bincode::serialize(&verifier_key).unwrap();
-  let serialized_aux_params = bincode::serialize(&aux_params).unwrap();
-
-  // let serialized_pk_json = serde_json::to_vec(&prover_key).unwrap();
-  let serialized_pk_json = serde_json::to_vec(&prover_key).unwrap();
-  // let serialized_pk_json = serde_json::to_vec(&prover_key.pk_primary).unwrap();
-
-  // just r1cs shapes
-  // let serialized_vk_json = serde_json::to_vec(&verifier_key.vk_primary.vk_ee).unwrap();
-  // let serialized_vk_json = serde_json::to_vec(&verifier_key.vk_primary.S).unwrap();
-  // let serialized_vk_json = serde_json::to_vec(&verifier_key.vk_primary.digest).unwrap();
-
-  // let vk_shapes_path =
-  // PathBuf::from_str("web_proof_circuits/serialized_compressed_setup_vk_shapes.bytes").unwrap();
-  // let serialized_vk_bin_shapes = bincode::serialize(&verifier_key.vk_primary.S).unwrap();
-  // File::create(&vk_shapes_path).unwrap().write_all(&serialized_vk_bin_shapes).unwrap();
-
-  // let vk_primary_path_json =
-  // PathBuf::from_str("web_proof_circuits/serialized_compressed_setup_vk_primary.json").unwrap();
-  // let vk_secondary_path_json =
-  // PathBuf::from_str("web_proof_circuits/serialized_compressed_setup_vk_secondary.json").unwrap();
-  // let serialized_vk_primary_json = serde_json::to_vec(&verifier_key.vk_primary.vk_ee).unwrap();
-  // let serialized_vk_secondary_json = serde_json::to_vec(&verifier_key.vk_secondary).unwrap();
-
-  let ck_primary_json =
-    PathBuf::from_str("web_proof_circuits/serialized_compressed_setup_ap_ck_primary.json").unwrap();
-  let ck_secondary_json =
-    PathBuf::from_str("web_proof_circuits/serialized_compressed_setup_ap_ck_secondary.json")
-      .unwrap();
-  let a = serde_json::to_vec(&aux_params.ck_primary).unwrap();
-  let b = serde_json::to_vec(&aux_params.ck_secondary).unwrap();
-  File::create(&ck_primary_json).unwrap().write_all(&a).unwrap();
-  File::create(&ck_secondary_json).unwrap().write_all(&b).unwrap();
-
-  if let Some(parent) = vk_path.parent() {
-    fs::create_dir_all(parent).unwrap();
-  }
-
-  File::create(&pk_path_json).unwrap().write_all(&serialized_pk_json).unwrap();
-  // File::create(&vk_primary_path_json).unwrap().write_all(&serialized_vk_primary_json).unwrap();
-  // File::create(&vk_secondary_path_json).unwrap().write_all(&serialized_vk_secondary_json).
-  // unwrap();
-
-  File::create(&vk_path).unwrap().write_all(&serialized_vk).unwrap();
-  File::create(&pk_path).unwrap().write_all(&serialized_pk).unwrap();
-  File::create(&aux_path).unwrap().write_all(&serialized_aux_params).unwrap();
+  let _ = program_data
+    .into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup_aes.bin").unwrap());
 }
