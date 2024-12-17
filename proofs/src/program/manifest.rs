@@ -321,18 +321,14 @@ fn build_json_mask_circuit_inputs(
           (String::from(JSON_MASK_OBJECT_KEY_NAME), json!(json_key_padded)),
           (String::from(JSON_MASK_OBJECT_KEYLEN_NAME), json!([json_key.len()])),
         ]));
-        masked_body = compute_json_witness(
-          &masked_body,
-          crate::witness::JsonMaskType::Object(json_key.as_bytes().to_vec()),
-        );
+        masked_body = compute_json_witness(&masked_body, key.clone());
       },
       JsonKey::Num(index) => {
         private_inputs.push(HashMap::from([
           (String::from("data"), json!(masked_body)),
           (String::from(JSON_MASK_ARRAY_SIGNAL_NAME), json!([index])),
         ]));
-        masked_body =
-          compute_json_witness(&masked_body, crate::witness::JsonMaskType::ArrayIndex(*index));
+        masked_body = compute_json_witness(&masked_body, key.clone());
       },
     }
   }
