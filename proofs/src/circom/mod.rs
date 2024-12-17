@@ -57,6 +57,9 @@ impl CircomCircuit {
     cs: &mut CS,
     z: &[AllocatedNum<F<G1>>],
   ) -> Result<Vec<AllocatedNum<F<G1>>>, SynthesisError> {
+    // NOTE: Here `z` will basically just consist of `step_in` concatenated with the `pc`, then the
+    // ROM data
+    dbg!(&z);
     let witness = &self.witness;
 
     let mut vars: Vec<AllocatedNum<F<G1>>> = vec![];
@@ -92,6 +95,7 @@ impl CircomCircuit {
       vars.push(v);
     }
 
+    // Lambda (closure) for making rank1 constraints (linear combinations)
     let make_lc = |lc_data: Vec<(usize, F<G1>)>| {
       let res = lc_data.iter().fold(
         LinearCombination::<F<G1>>::zero(),
@@ -105,6 +109,7 @@ impl CircomCircuit {
       );
       res
     };
+    // Now use that the embed the r1cs into the constraint system here.
     for (i, constraint) in self.r1cs.constraints.iter().enumerate() {
       cs.enforce(
         || format!("constraint {}", i),
@@ -114,6 +119,8 @@ impl CircomCircuit {
       );
     }
 
+    // NOTE (autoparallel): This just seems to actually go over the number of public inputs and then
+    // increments the PC? The names used here are bad.
     for i in (pub_output_count + 1)..self.r1cs.num_inputs {
       cs.enforce(
         || format!("pub input enforce {}", i),

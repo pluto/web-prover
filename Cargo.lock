@@ -4666,6 +4666,7 @@ name = "proofs"
 version = "0.2.0"
 dependencies = [
  "acvm",
+ "ark-bn254",
  "bellpepper-core",
  "bincode",
  "byteorder",

@@ -305,7 +305,7 @@ fn bytepack(bytes: &[ByteOrPad]) -> Option<F<G1>> {
 
 /// Hashes preimage with Poseidon
 pub fn poseidon_chainer(preimage: &[F<G1>]) -> F<G1> {
-  let mut poseidon = Poseidon::<F<G1>>::new_circom(2).unwrap();
+  let mut poseidon = Poseidon::<ark_bn254::Fr>::new_circom(2).unwrap();
 
   // Convert each field element to bytes and collect into a Vec
   let byte_arrays: Vec<[u8; 32]> = preimage.iter().map(|x| x.to_bytes()).collect();

@@ -32,7 +32,9 @@ bincode="1.3"
 thiserror="1.0"
 
 # Poseidon hashing
-light-poseidon       ={ git="https://github.com/pluto/light-poseidon" }
+light-poseidon={ git="https://github.com/pluto/light-poseidon" }
+ark-bn254     ="=0.4.0"
+
 tls-client2.workspace=true
 
 # Noir support
