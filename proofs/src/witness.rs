@@ -74,86 +74,6 @@ impl PartialEq<u8> for ByteOrPad {
   }
 }
 
-/// compute private inputs for the JSON circuit.
-/// # Arguments
-/// - `masked_plaintext`: the masked JSON request/response padded with `-1` to nearest power of 2
-/// - `mask_at`: the [`JsonMaskType`] of the JSON request/response to mask
-/// # Returns
-/// - the masked JSON request/response
-pub fn compute_json_witness(masked_plaintext: &[ByteOrPad], mask_at: JsonKey) -> Vec<ByteOrPad> {
-  // filter out padding and whitespace and convert to serde_json::Value
-  let json_bytes = masked_plaintext
-    .iter()
-    .filter(|&&x| {
-      !(matches!(x, ByteOrPad::Pad)
-        || x == 0
-        || matches!(x, ByteOrPad::Byte(b) if b.is_ascii_whitespace()))
-    })
-    .copied()
-    .filter_map(|x| if let ByteOrPad::Byte(b) = x { Some(b) } else { None })
-    .collect::<Vec<u8>>();
-  let json: Value = serde_json::from_slice(&json_bytes).unwrap();
-
-  // get the data to mask and convert to bytes
-  let data = match mask_at {
-    JsonKey::String(key) => json.get(key).unwrap(),
-    JsonKey::Num(idx) => json.as_array().unwrap().get(idx).unwrap(),
-  };
-  let data_bytes = serde_json::to_string(&data).unwrap();
-  let data_bytes = data_bytes.as_bytes();
-
-  let filtered_data_bytes = data_bytes
-    .iter()
-    .filter(|&&x| !(x == 0 || x.is_ascii_whitespace()))
-    .copied()
-    .collect::<Vec<u8>>();
-  let mut start_idx: Option<usize> = None;
-  let mut end_idx: Option<usize> = None;
-  // Iterate through the original bytes and find the subobject
-  for (idx, byte) in masked_plaintext.iter().enumerate() {
-    // If we find that the byte we are at matches the first byte of our subobject, then we should
-    // see if this string matches
-    let mut filtered_body = masked_plaintext[idx..]
-      .iter()
-      .filter(|&&x| {
-        !(matches!(x, ByteOrPad::Pad)
-          || x == 0
-          || matches!(x, ByteOrPad::Byte(b) if b.is_ascii_whitespace()))
-      })
-      .copied()
-      .collect::<Vec<ByteOrPad>>();
-    filtered_body.truncate(filtered_data_bytes.len());
-    if filtered_body == filtered_data_bytes && *byte == (*filtered_data_bytes.first().unwrap()) {
-      start_idx = Some(idx);
-    }
-  }
-
-  for (idx, byte) in masked_plaintext.iter().enumerate() {
-    let mut filtered_body = masked_plaintext[..idx + 1]
-      .iter()
-      .filter(|&&x| {
-        !(matches!(x, ByteOrPad::Pad)
-          || x == 0
-          || matches!(x, ByteOrPad::Byte(b) if b.is_ascii_whitespace()))
-      })
-      .copied()
-      .collect::<Vec<ByteOrPad>>();
-    filtered_body.reverse();
-    filtered_body.truncate(filtered_data_bytes.len());
-    filtered_body.reverse();
-    if filtered_body == filtered_data_bytes && *byte == (*filtered_data_bytes.last().unwrap()) {
-      end_idx = Some(idx);
-    }
-  }
-  let start_idx = start_idx.unwrap();
-  let end_idx = end_idx.unwrap();
-  masked_plaintext
-    .iter()
-    .enumerate()
-    .map(|(i, &x)| if i >= start_idx && i <= end_idx { x } else { ByteOrPad::Byte(0) })
-    .collect::<Vec<ByteOrPad>>()
-}
-
 pub enum HttpMaskType {
   StartLine,
   Header(usize),
@@ -235,7 +155,7 @@ pub fn compute_http_header_witness(
   plaintext: &[ByteOrPad],
   name: &[u8],
 ) -> (usize, Vec<ByteOrPad>) {
-  let mut result = vec![ByteOrPad::Byte(0); plaintext.len()];
+  let mut result = Vec::new();
 
   let mut current_header = 0;
   let mut current_header_name = vec![];
@@ -260,7 +180,7 @@ pub fn compute_http_header_witness(
     if plaintext[i] == b'\r' && plaintext[i + 1] == b'\n' {
       if current_header_name == name {
         // Copy the header line (including CRLF)
-        result[header_start_pos..=i + 1].copy_from_slice(&plaintext[header_start_pos..=i + 1]);
+        result = plaintext[header_start_pos..i].to_vec();
         break;
       }
 
@@ -400,6 +320,36 @@ pub fn compress_tree_hash(
   accumulated
 }
 
+pub fn json_value_digest(plaintext: &[ByteOrPad], keys: &[JsonKey]) -> Result<Vec<u8>, ProofError> {
+  let pad_index = plaintext.iter().position(|&b| b == ByteOrPad::Pad).unwrap_or(plaintext.len());
+  let mut json: Value = serde_json::from_slice(&ByteOrPad::as_bytes(&plaintext[..pad_index]))?;
+
+  for key in keys {
+    match key {
+      JsonKey::String(string) =>
+        if let Some(value) = json.get_mut(string) {
+          json = value.take();
+        } else {
+          return Err(ProofError::JsonKeyError(string.clone()));
+        },
+      JsonKey::Num(idx) =>
+        if let Some(value) = json.get_mut(*idx) {
+          json = value.take();
+        } else {
+          return Err(ProofError::JsonKeyError(idx.to_string()));
+        },
+    }
+  }
+
+  let value = match json {
+    Value::Number(num) => num.to_string(),
+    Value::String(val) => val,
+    _ => return Err(ProofError::JsonKeyError("Value is not a string or number".to_string())),
+  };
+
+  Ok(value.as_bytes().to_vec())
+}
+
 pub fn request_initial_digest(
   manifest_request: &Request,
   ciphertext: &[ByteOrPad],
@@ -417,7 +367,6 @@ pub fn request_initial_digest(
 
   // Digest all the headers
   let header_bytes = headers_to_bytes(&manifest_request.headers);
-  dbg!(&header_bytes);
   let headers_digest = header_bytes.iter().map(|bytes| polynomial_digest(bytes, ciphertext_digest));
 
   // Put all the digests into a vec
@@ -673,124 +622,10 @@ mod tests {
     32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125,
   ];
 
-  const MASKED_KEY0_ARRAY: &[u8] = &[
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 34, 105, 116, 101, 109, 115, 34, 58, 32,
-    91, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32,
-    32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34, 65, 114, 116, 105,
-    115, 116, 34, 44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 112,
-    114, 111, 102, 105, 108, 101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-    32, 32, 32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121, 108, 111, 114, 32,
-    83, 119, 105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-    125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32,
-    32, 93, 13, 10, 32, 32, 32, 125, 0, 0, 0,
-  ];
-  const MASKED_KEY1_ARRAY: &[u8] = &[
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 91, 13, 10, 32, 32, 32,
-    32, 32, 32, 32, 32, 32, 32, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-    32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34, 65, 114, 116, 105, 115, 116, 34, 44, 13, 10,
-    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 112, 114, 111, 102, 105, 108,
-    101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-    34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121, 108, 111, 114, 32, 83, 119, 105, 102, 116,
-    34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32,
-    32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 93, 0, 0, 0, 0, 0,
-    0, 0, 0, 0,
-  ];
-  const MASKED_ARR0_ARRAY: &[u8] = &[
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34,
-    100, 97, 116, 97, 34, 58, 32, 34, 65, 114, 116, 105, 115, 116, 34, 44, 13, 10, 32, 32, 32, 32,
-    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 112, 114, 111, 102, 105, 108, 101, 34, 58, 32,
-    123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 110, 97, 109,
-    101, 34, 58, 32, 34, 84, 97, 121, 108, 111, 114, 32, 83, 119, 105, 102, 116, 34, 13, 10, 32,
-    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32,
-    32, 32, 32, 32, 32, 125, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  ];
-  const MASKED_KEY2_ARRAY: &[u8] = &[
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34,
-    110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121, 108, 111, 114, 32, 83, 119, 105, 102, 116, 34,
-    13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  ];
-
-  const MASKED_KEY3_ARRAY: &[u8] = &[
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    34, 84, 97, 121, 108, 111, 114, 32, 83, 119, 105, 102, 116, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0,
-  ];
-
   const KEY0: &str = "data";
   const KEY1: &str = "items";
   const KEY2: &str = "profile";
   const KEY3: &str = "name";
-  // HTTP/1.1 200 OK
-  // content-type: application/json; charset=utf-8
-  // content-encoding: gzip
-  // Transfer-Encoding: chunked
-  //
-  // {
-  //    "data": {
-  //        "items": [
-  //            {
-  //                "data": "Artist",
-  //                "profile": {
-  //                    "name": "Taylor Swift"
-  //                }
-  //            }
-  //        ]
-  //    }
-  // }
-  #[test]
-  fn test_compute_json_witness() {
-    let masked_array = compute_json_witness(
-      &TEST_HTTP_BODY.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
-      JsonKey::String(KEY0.to_string()),
-    );
-    assert_eq!(masked_array, MASKED_KEY0_ARRAY);
-  }
-
-  #[test]
-  fn test_compute_json_masking_sequence() {
-    let masked_array = compute_json_witness(
-      &TEST_HTTP_BODY.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
-      JsonKey::String(KEY0.to_string()),
-    );
-    assert_eq!(masked_array, MASKED_KEY0_ARRAY);
-    let masked_array = compute_json_witness(&masked_array, JsonKey::String(KEY1.to_string()));
-    assert_eq!(masked_array, MASKED_KEY1_ARRAY);
-    let masked_array = compute_json_witness(&masked_array, JsonKey::Num(0));
-    assert_eq!(masked_array, MASKED_ARR0_ARRAY);
-    let masked_array = compute_json_witness(&masked_array, JsonKey::String(KEY2.to_string()));
-    assert_eq!(masked_array, MASKED_KEY2_ARRAY);
-    let masked_array = compute_json_witness(&masked_array, JsonKey::String(KEY3.to_string()));
-    assert_eq!(masked_array, MASKED_KEY3_ARRAY);
-  }
 
   // TODO: This test doesn't actually test anything at all. Fix that.
   #[test]
@@ -854,5 +689,22 @@ mod tests {
       )
       .unwrap()
     );
+  }
+
+  #[test]
+  fn test_json_value_digest() {
+    let json = r#"{"data": {"items": [{"profile": {"name": "Taylor Swift"}}]}}"#;
+    let json_bytes_padded = ByteOrPad::from_bytes_with_padding(json.as_bytes(), 1024);
+
+    let keys = vec![
+      JsonKey::String(KEY0.to_string()),
+      JsonKey::String(KEY1.to_string()),
+      JsonKey::Num(0),
+      JsonKey::String(KEY2.to_string()),
+      JsonKey::String(KEY3.to_string()),
+    ];
+
+    let value = json_value_digest(&json_bytes_padded, &keys).unwrap();
+    assert_eq!(value, b"Taylor Swift");
   }
 }

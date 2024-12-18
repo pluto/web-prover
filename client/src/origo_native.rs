@@ -70,9 +70,8 @@ pub async fn proxy_and_sign_and_generate_proof(
 fn generate_proof(
   program_data: ProgramData<Online, Expanded>,
 ) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
-  debug!("starting request recursive proving");
   let program_output = program::run(&program_data)?;
-  debug!("starting request proof compression");
+  debug!("starting proof compression");
   let compressed_snark_proof =
     program::compress_proof(&program_output, &program_data.public_params)?;
   debug!("serialize");
@@ -118,6 +117,7 @@ fn construct_request_program_data_and_proof(
   }
   .into_expanded()?;
 
+  debug!("starting request recursive proving");
   let proof = generate_proof(program_data)?;
 
   Ok(proof)
@@ -140,7 +140,7 @@ fn construct_response_program_data_and_proof(
   let public_params = program::setup(&setup_data);
 
   let NivcCircuitInputs { private_inputs, fold_inputs, initial_nivc_input } =
-    manifest_response.build_inputs(inputs);
+    manifest_response.build_inputs(inputs)?;
   let NIVCRom { circuit_data, rom } = manifest_response.build_rom();
 
   debug!("Generating response's `ProgramData`...");
@@ -155,6 +155,7 @@ fn construct_response_program_data_and_proof(
   }
   .into_expanded()?;
 
+  debug!("starting response recursive proving");
   let proof = generate_proof(program_data)?;
 
   Ok(proof)
