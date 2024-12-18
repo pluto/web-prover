@@ -39,6 +39,10 @@ jobs:
           path: proofs/web_proof_circuits
           key: ${{ needs.setup.outputs.cache-key }}
 
+      - name: Prepare parameters
+        run: |
+          cd proofs && make params && cd ../
+
       - run: |
           RUST_LOG=DEBUG cargo +nightly-2024-10-28 run --release -p notary -- --config ./fixture/notary-config.toml &
           sleep 30

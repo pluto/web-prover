@@ -65,51 +65,51 @@ const EXTRACT_VALUE_512B_R1CS: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_512b/json_extract_value_512b.r1cs");
 
 pub fn construct_setup_data_512() -> SetupData {
-    SetupData {
-        r1cs_types:              vec![
-          R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
-          R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
-          R1CSType::Raw(JSON_MASK_OBJECT_512B_R1CS.to_vec()),
-          R1CSType::Raw(JSON_MASK_ARRAY_INDEX_512B_R1CS.to_vec()),
-          R1CSType::Raw(EXTRACT_VALUE_512B_R1CS.to_vec()),
-        ],
-        witness_generator_types: vec![WitnessGeneratorType::Browser; 5],
-        max_rom_length:          MAX_ROM_LENGTH_512,
-      }
+  SetupData {
+    r1cs_types:              vec![
+      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_OBJECT_512B_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_512B_R1CS.to_vec()),
+      R1CSType::Raw(EXTRACT_VALUE_512B_R1CS.to_vec()),
+    ],
+    witness_generator_types: vec![WitnessGeneratorType::Browser; 5],
+    max_rom_length:          MAX_ROM_LENGTH_512,
+  }
 }
 
 pub fn construct_setup_data_1024() -> SetupData {
-    SetupData {
-        r1cs_types:              vec![
-          R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
-          R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
-          R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
-          R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
-          R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
-        ],
-        witness_generator_types: vec![
-          WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
-          WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
-          WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
-          WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
-          WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
-        ],
-        max_rom_length:          MAX_ROM_LENGTH,
-      }
+  SetupData {
+    r1cs_types:              vec![
+      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_OBJECT_R1CS.to_vec()),
+      R1CSType::Raw(JSON_MASK_ARRAY_INDEX_R1CS.to_vec()),
+      R1CSType::Raw(EXTRACT_VALUE_R1CS.to_vec()),
+    ],
+    witness_generator_types: vec![
+      WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_OBJECT_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_MASK_ARRAY_INDEX_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(EXTRACT_VALUE_GRAPH.to_vec()),
+    ],
+    max_rom_length:          MAX_ROM_LENGTH,
+  }
 }
 
 pub fn construct_setup_data(plaintext_length: usize) -> SetupData {
-    let circuit_size = if plaintext_length <= 512 {
-        512
-    } else if plaintext_length <= 1024 {
-        1024
-    } else {
-        panic!("plaintext is too large");
-    };
+  let circuit_size = if plaintext_length <= 512 {
+    512
+  } else if plaintext_length <= 1024 {
+    1024
+  } else {
+    panic!("plaintext is too large");
+  };
 
-    match circuit_size {
-      512 => construct_setup_data_512(),
-      1024 => construct_setup_data_1024(),
-      _ => panic!("not supported plaintext length > 1KB"),
-    }
+  match circuit_size {
+    512 => construct_setup_data_512(),
+    1024 => construct_setup_data_1024(),
+    _ => panic!("not supported plaintext length > 1KB"),
+  }
 }

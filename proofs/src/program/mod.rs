@@ -208,7 +208,10 @@ pub fn compress_proof_no_setup(
     vk_digest_secondary,
   )
   .unwrap();
-  debug!("initialized pk pk_primary.digest={:?}, pk_secondary.digest={:?}", pk.pk_primary.vk_digest, pk.pk_secondary.vk_digest);
+  debug!(
+    "initialized pk pk_primary.digest={:?}, pk_secondary.digest={:?}",
+    pk.pk_primary.vk_digest, pk.pk_secondary.vk_digest
+  );
 
   debug!("`CompressedSNARK::prove STARTING PROVING!");
   let proof = Proof(CompressedSNARK::<E1, S1, S2>::prove(&public_params, &pk, recursive_snark)?);

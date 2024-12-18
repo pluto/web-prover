@@ -116,16 +116,16 @@ pub struct CircuitData {
 
 #[derive(Debug)]
 pub struct ProgramData<S: SetupStatus, W: WitnessStatus> {
-  pub public_params:      S::PublicParams,
+  pub public_params:       S::PublicParams,
   // TODO: Refactor this onto the PublicParams object and share the ProvingParams abstraction
-  pub vk_digest_primary:   <E1 as Engine>::Scalar, 
+  pub vk_digest_primary:   <E1 as Engine>::Scalar,
   pub vk_digest_secondary: <Dual<E1> as Engine>::Scalar,
-  pub setup_data:         SetupData,
-  pub rom_data:           HashMap<String, CircuitData>,
-  pub rom:                Vec<String>,
-  pub initial_nivc_input: Vec<F<G1>>,
-  pub inputs:             W::PrivateInputs,
-  pub witnesses:          Vec<Vec<F<G1>>>, // TODO: Ideally remove this
+  pub setup_data:          SetupData,
+  pub rom_data:            HashMap<String, CircuitData>,
+  pub rom:                 Vec<String>,
+  pub initial_nivc_input:  Vec<F<G1>>,
+  pub inputs:              W::PrivateInputs,
+  pub witnesses:           Vec<Vec<F<G1>>>, // TODO: Ideally remove this
 }
 
 impl<S: SetupStatus> ProgramData<S, NotExpanded> {
@@ -196,7 +196,16 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
 
     assert!(private_inputs.len() == self.rom.len());
 
-    let Self { public_params, vk_digest_primary, vk_digest_secondary, setup_data, rom_data, initial_nivc_input, witnesses, .. } = self;
+    let Self {
+      public_params,
+      vk_digest_primary,
+      vk_digest_secondary,
+      setup_data,
+      rom_data,
+      initial_nivc_input,
+      witnesses,
+      ..
+    } = self;
     Ok(ProgramData {
       public_params,
       vk_digest_primary,
@@ -263,7 +272,8 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
     let circuit_shapes = get_circuit_shapes(&memory);
 
     info!("public params from parts");
-    let public_params = PublicParams::<E1>::from_parts_unchecked(circuit_shapes, proving_params.aux_params);
+    let public_params =
+      PublicParams::<E1>::from_parts_unchecked(circuit_shapes, proving_params.aux_params);
     let Self { setup_data, rom, initial_nivc_input, inputs, witnesses, rom_data, .. } = self;
 
     Ok(ProgramData {
@@ -315,11 +325,8 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
     let (_, aux_params) = self.public_params.into_parts();
     let vk_digest_primary = self.vk_digest_primary;
     let vk_digest_secondary = self.vk_digest_secondary;
-    let proving_param_bytes = ProvingParams {
-      aux_params,
-      vk_digest_primary,
-      vk_digest_secondary,
-    }.to_bytes();
+    let proving_param_bytes =
+      ProvingParams { aux_params, vk_digest_primary, vk_digest_secondary }.to_bytes();
 
     if let Some(parent) = path.parent() {
       fs::create_dir_all(parent)?;

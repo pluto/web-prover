@@ -13,6 +13,7 @@ use axum::{
   routing::{get, post},
   Router,
 };
+use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
 use errors::NotaryServerError;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
@@ -20,7 +21,7 @@ use k256::ecdsa::SigningKey as Secp256k1SigningKey;
 use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
 use proofs::{
   program::data::{CircuitData, NotExpanded, Offline, Online, ProgramData},
-  F, G1, G2
+  E1, F, G1, G2, S1, S2,
 };
 use rustls::{
   pki_types::{CertificateDer, PrivateKeyDer},
@@ -34,8 +35,6 @@ use tower_http::cors::CorsLayer;
 use tower_service::Service;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use proofs::{E1, S1, S2};
-use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
 
 mod axum_websocket;
 mod circuits;
@@ -47,12 +46,12 @@ mod tlsn;
 mod websocket_proxy;
 
 struct SharedState {
-  notary_signing_key: SigningKey,
-  origo_signing_key:  Secp256k1SigningKey,
-  tlsn_max_sent_data: usize,
-  tlsn_max_recv_data: usize,
-  origo_sessions:     Arc<Mutex<HashMap<String, OrigoSession>>>,
-  verifier_param_bytes:    Vec<u8>,
+  notary_signing_key:   SigningKey,
+  origo_signing_key:    Secp256k1SigningKey,
+  tlsn_max_sent_data:   usize,
+  tlsn_max_recv_data:   usize,
+  origo_sessions:       Arc<Mutex<HashMap<String, OrigoSession>>>,
+  verifier_param_bytes: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -108,12 +107,12 @@ async fn main() -> Result<(), NotaryServerError> {
   let proving_param_bytes =
     std::fs::read("proofs/web_proof_circuits/serialized_setup_aes.bytes").unwrap();
   let shared_state = Arc::new(SharedState {
-    notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
-    origo_signing_key:  load_origo_signing_key(&c.origo_signing_key),
-    tlsn_max_sent_data: c.tlsn_max_sent_data,
-    tlsn_max_recv_data: c.tlsn_max_recv_data,
-    origo_sessions:     Default::default(),
-    verifier_param_bytes:    proving_param_bytes,
+    notary_signing_key:   load_notary_signing_key(&c.notary_signing_key),
+    origo_signing_key:    load_origo_signing_key(&c.origo_signing_key),
+    tlsn_max_sent_data:   c.tlsn_max_sent_data,
+    tlsn_max_recv_data:   c.tlsn_max_recv_data,
+    origo_sessions:       Default::default(),
+    verifier_param_bytes: proving_param_bytes,
   });
 
   let router = Router::new()

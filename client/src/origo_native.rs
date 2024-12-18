@@ -6,14 +6,14 @@ use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
   program::{
     self,
-    data::{Expanded, NotExpanded, Online, Offline, ProgramData},
+    data::{Expanded, NotExpanded, Offline, Online, ProgramData},
     manifest::{
       EncryptionInput, NIVCRom, NivcCircuitInputs, Request as ManifestRequest,
       Response as ManifestResponse, TLSEncryption,
     },
   },
   proof::Proof as CompressedSNARKProof,
-  F, G1, G2
+  F, G1, G2,
 };
 use tls_client2::origo::OrigoConnection;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
@@ -30,7 +30,7 @@ use crate::{
 /// - takes TLS transcripts along with client [`Manifest`] and generates NIVC [`Proof`]
 pub async fn proxy_and_sign_and_generate_proof(
   mut config: config::Config,
-  proving_params: Option<Vec<u8>>
+  proving_params: Option<Vec<u8>>,
 ) -> Result<Proof, ClientErrors> {
   let session_id = config.session_id();
   let mut origo_conn = proxy(config.clone(), session_id.clone()).await?;
@@ -56,12 +56,24 @@ pub async fn proxy_and_sign_and_generate_proof(
   // TODO (tracy): cloning proving params here is likely quite expensive.
   let manifest = config.proving.manifest.unwrap();
   let (request_proof, response_proof) = rayon::join(
-    || construct_request_program_data_and_proof(&manifest.request, request_inputs, proving_params.clone().unwrap()),
-    || construct_response_program_data_and_proof(&manifest.response, response_inputs, proving_params.clone().unwrap()),
+    || {
+      construct_request_program_data_and_proof(
+        &manifest.request,
+        request_inputs,
+        proving_params.clone().unwrap(),
+      )
+    },
+    || {
+      construct_response_program_data_and_proof(
+        &manifest.response,
+        response_inputs,
+        proving_params.clone().unwrap(),
+      )
+    },
   );
 
   // TODO(Sambhav): handle request and response into one proof
-  // TODO(Tracy): Dropped the request proof to easily pass through extra ciphertext data. Fix this. 
+  // TODO(Tracy): Dropped the request proof to easily pass through extra ciphertext data. Fix this.
   Ok(crate::Proof::Origo(request_proof?.0))
 }
 
@@ -73,9 +85,13 @@ fn generate_proof(
   program_data: ProgramData<Online, Expanded>,
 ) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
   let program_output = program::run(&program_data)?;
-  debug!("starting proof compression");
-  let compressed_snark_proof =
-    program::compress_proof_no_setup(&program_output, &program_data.public_params, program_data.vk_digest_primary, program_data.vk_digest_secondary)?;
+  debug!("starting request proof compression");
+  let compressed_snark_proof = program::compress_proof_no_setup(
+    &program_output,
+    &program_data.public_params,
+    program_data.vk_digest_primary,
+    program_data.vk_digest_secondary,
+  )?;
   Ok(compressed_snark_proof.serialize_and_compress())
 }
 
@@ -101,7 +117,7 @@ fn construct_request_program_data_and_proof(
 ) -> Result<CompressedSNARKProof<(Vec<u8>, Vec<u8>)>, ClientErrors> {
   debug!("Setting up request's `PublicParams`... (this may take a moment)");
   let setup_data = construct_setup_data();
-  
+
   let NivcCircuitInputs { fold_inputs, private_inputs, initial_nivc_input } =
     manifest_request.build_inputs(&inputs);
   let NIVCRom { circuit_data, rom } = manifest_request.build_rom();
@@ -163,7 +179,7 @@ fn construct_response_program_data_and_proof(
 
   debug!("starting response recursive proving");
   let proof = generate_proof(program_data)?;
-  
+
   Ok(proof)
 }
 

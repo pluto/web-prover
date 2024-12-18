@@ -15,7 +15,7 @@ use proofs::{
     data::{Expanded, NotExpanded, Offline, Online, ProgramData},
     manifest::{EncryptionInput, NIVCRom, NivcCircuitInputs, TLSEncryption},
   },
-  F, G1, G2
+  F, G1, G2,
 };
 use serde::{Deserialize, Serialize};
 use tls_client2::{origo::WitnessData, CipherSuiteKey};
@@ -113,8 +113,12 @@ pub async fn proxy_and_sign_and_generate_proof(
 
   debug!("compressing proof!");
 
-  let compressed_snark_proof =
-    program::compress_proof_no_setup(&program_output, &program_data.public_params, program_data.vk_digest_primary, program_data.vk_digest_secondary)?;
+  let compressed_snark_proof = program::compress_proof_no_setup(
+    &program_output,
+    &program_data.public_params,
+    program_data.vk_digest_primary,
+    program_data.vk_digest_secondary,
+  )?;
 
   debug!("running compressed verifier!");
   let proof = compressed_snark_proof.serialize_and_compress();

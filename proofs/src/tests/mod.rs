@@ -13,7 +13,7 @@ use crate::{
     data::{CircuitData, NotExpanded},
     manifest::to_chacha_input,
   },
-  witness::{compute_http_witness, ByteOrPad},
+  witness::{compute_http_witness, data_hasher, ByteOrPad},
 };
 
 mod witnesscalc;
@@ -314,12 +314,19 @@ fn test_end_to_end_proofs() {
 
   let recursive_snark = program::run(&program_data).unwrap();
 
-  let proof = program::compress_proof_no_setup(&recursive_snark, &program_data.public_params, vk_digest_primary, vk_digest_secondary).unwrap();
-  assert_eq!(*recursive_snark.zi_primary().first().unwrap(), *value_digest);
+  let proof = program::compress_proof_no_setup(
+    &recursive_snark,
+    &program_data.public_params,
+    vk_digest_primary,
+    vk_digest_secondary,
+  )
+  .unwrap();
 
   // TODO (autoparallel): This is redundant, we call the setup inside compress_proof. We should
   // likely just store the vk and pk
   let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
+
+  assert_eq!(*recursive_snark.zi_primary().first().unwrap(), *value_digest);
 
   let (z0_primary, _) = program_data.extend_public_inputs().unwrap();
 
@@ -354,6 +361,7 @@ fn test_offline_proofs() {
     max_rom_length:          MAX_ROM_LENGTH_512,
   };
   let public_params = program::setup(&setup_data);
+  let (pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
 
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
@@ -396,7 +404,7 @@ fn test_compressed_proof_params() {
     ],
     max_rom_length:          MAX_ROM_LENGTH,
   };
-  
+
   let public_params = program::setup(&setup_data);
   let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
   let program_data = ProgramData::<Online, NotExpanded> {

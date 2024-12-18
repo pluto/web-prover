@@ -76,7 +76,7 @@ pub struct SignBody {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct VerifyBody {
-  proof: Vec<u8>,
+  proof:           Vec<u8>,
   ciphertext_hash: Vec<u8>,
 }
 
@@ -176,7 +176,7 @@ pub async fn sign(
   for msg in encrypted_messages {
     match msg.payload {
       Payload(bytes) => ciphertext.push(bytes.clone()),
-      _ => panic!("invalid payload")
+      _ => panic!("invalid payload"),
     }
   }
   debug!("Prepared ciphertext={:?}", ciphertext);
@@ -257,7 +257,10 @@ fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
 ///
 /// # Returns
 /// * `Result<Vec<Message>, ProxyError>` - Vector of parsed TLS messages or error
-fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<(Vec<Message>, Vec<OpaqueMessage>), ProxyError> {
+fn extract_tls_handshake(
+  bytes: &[u8],
+  payload: SignBody,
+) -> Result<(Vec<Message>, Vec<OpaqueMessage>), ProxyError> {
   let server_hs_key = hex::decode(payload.handshake_server_key).unwrap();
   let server_hs_iv = hex::decode(payload.handshake_server_iv).unwrap();
   info!("key_as_string: {:?}, length: {}", server_hs_key, server_hs_key.len());
@@ -330,7 +333,7 @@ fn extract_tls_handshake(bytes: &[u8], payload: SignBody) -> Result<(Vec<Message
     }
   }
 
-  // TODO: This thing needs to actually output the application ciphertext. 
+  // TODO: This thing needs to actually output the application ciphertext.
   debug!("found encrypted messages={:?}", encrypted_messages);
 
   if !messages.is_empty() {
@@ -668,13 +671,16 @@ pub async fn proxy(
     }),
   }
 }
-use proofs::{
-  proof::Proof, E1, F, G1, G2, S1, S2,
-  witness::{data_hasher, ByteOrPad},
-  program::data::{CircuitData, NotExpanded, Offline, Online, ProgramData},
-};
 use std::collections::HashMap;
+
 use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
+use proofs::{
+  program::data::{CircuitData, NotExpanded, Offline, Online, ProgramData},
+  proof::Proof,
+  witness::{data_hasher, ByteOrPad},
+  E1, F, G1, G2, S1, S2,
+};
+
 use crate::circuits;
 
 pub async fn verify(
@@ -684,7 +690,8 @@ pub async fn verify(
   let proof = Proof(payload.proof).decompress_and_serialize();
 
   let max_ciphertext = 1024;
-  // TODO (tracy): Move this into a method on the proofs crate, probably also move the circuits.rs file.
+  // TODO (tracy): Move this into a method on the proofs crate, probably also move the circuits.rs
+  // file.
   let setup_data_large = circuits::construct_setup_data(max_ciphertext);
   let decryption_label = String::from("PLAINTEXT_AUTHENTICATION");
   let http_label = String::from("HTTP_VERIFICATION");
@@ -692,8 +699,8 @@ pub async fn verify(
     (decryption_label.clone(), CircuitData { opcode: 0 }),
     (http_label.clone(), CircuitData { opcode: 1 }),
   ]);
-    
-  // TODO (tracy): Need to form the real ciphertext, for now just accept a hash. 
+
+  // TODO (tracy): Need to form the real ciphertext, for now just accept a hash.
   let ciphertext = vec![];
   let padded_ciphertext = ByteOrPad::from_bytes_with_padding(
     &ciphertext,
@@ -701,14 +708,16 @@ pub async fn verify(
   );
   use client_side_prover::traits::Engine;
   // let initial_nivc_input = vec![data_hasher(&padded_ciphertext)];
-  let initial_nivc_input =  vec![<E1 as Engine>::Scalar::from_bytes(&payload.ciphertext_hash.try_into().unwrap()).unwrap()];
+  let initial_nivc_input =
+    vec![<E1 as Engine>::Scalar::from_bytes(&payload.ciphertext_hash.try_into().unwrap()).unwrap()];
 
-  // TODO (tracy): We are re-initializing this everytime we verify a proof, which slows down this API.
-  // We did it this way due to initial_nivc_input being static on the object. Add getter/setter. 
+  // TODO (tracy): We are re-initializing this everytime we verify a proof, which slows down this
+  // API. We did it this way due to initial_nivc_input being static on the object. Add
+  // getter/setter.
   let rom = vec![decryption_label, http_label];
   let local_params = ProgramData::<Offline, NotExpanded> {
     public_params: state.verifier_param_bytes.clone(),
-    vk_digest_primary: F::<G1>::from(0), // TODO: This is gross. 
+    vk_digest_primary: F::<G1>::from(0), // TODO: This is gross.
     vk_digest_secondary: F::<G2>::from(0),
     setup_data: setup_data_large,
     rom,
@@ -721,7 +730,10 @@ pub async fn verify(
   .unwrap();
 
   let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&local_params.public_params).unwrap();
-  debug!("initialized vk_primary.digest={:?}, vk_secondary.digest={:?}, ck_s={:?}", vk.vk_primary.digest, vk.vk_secondary.digest, vk.vk_secondary.vk_ee.ck_s);
+  debug!(
+    "initialized vk_primary.digest={:?}, vk_secondary.digest={:?}, ck_s={:?}",
+    vk.vk_primary.digest, vk.vk_secondary.digest, vk.vk_secondary.vk_ee.ck_s
+  );
   let (z0_primary, _) = local_params.extend_public_inputs().unwrap();
   let z0_secondary = vec![F::<G2>::from(0)];
 

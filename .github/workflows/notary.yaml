@@ -11,6 +11,8 @@ on:
     branches: [ "main" ]
 
 jobs:
+  setup:
+    uses: ./.github/workflows/download-circuits.yaml
   build:
     strategy:
       fail-fast: false
@@ -27,6 +29,21 @@ jobs:
       - uses: actions/checkout@v4
 
       - run: rustup toolchain install nightly-2024-10-28
+      - run: sudo apt install -y protobuf-compiler
+        if: matrix.os == 'ubuntu-latest'
+
+      - name: Install LLVM and Clang to support 'ring' crate and protobuf
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
+          echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
+          brew install protobuf
+
+      - name: Restore circuit artifacts
+        uses: actions/cache@v3
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ needs.setup.outputs.cache-key }}
 
       - run: cargo +nightly-2024-10-28 build -p notary --release
       - uses: Swatinem/rust-cache@v2

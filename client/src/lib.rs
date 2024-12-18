@@ -78,11 +78,11 @@ pub async fn prover_inner_origo(
   #[cfg(not(target_arch = "wasm32"))]
   let proof = origo_native::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await;
 
-  // TODO (tracy): Handle verify of response proofs. 
+  // TODO (tracy): Handle verify of response proofs.
   let r = proof.unwrap();
   let (real_proof, ciphertext_hash) = match &r {
     Proof::Origo(proof) => (proof.0.clone(), proof.1.clone()),
-    _ => (Vec::new(), Vec::new())
+    _ => (Vec::new(), Vec::new()),
   };
 
   // TODO: Actually propagate errors up to the client
