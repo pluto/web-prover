@@ -8,7 +8,6 @@ use std::{
 
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::StatusCode;
-use js_sys::Promise;
 use proofs::{
   circom::witness::load_witness_from_bin_reader,
   program::{
@@ -19,10 +18,8 @@ use proofs::{
   F, G1,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 use tls_client2::{origo::WitnessData, CipherSuiteKey};
 use tracing::{debug, info};
-use tracing_subscriber::field::debug;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
@@ -160,7 +157,7 @@ async fn generate_program_data(
 
   // now we call the js FFI to generate the witness in wasm with snarkjs
   debug!("generating witness in wasm");
-  /// now we pass witness input type to generate program data
+  // now we pass witness input type to generate program data
   let witnesses = build_witness_data_from_wasm(
     &request_inputs,
     proving.manifest.unwrap().request.headers.clone(),

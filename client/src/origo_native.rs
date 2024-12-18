@@ -15,7 +15,6 @@ use proofs::{
   proof::Proof as CompressedSNARKProof,
   F, G1,
 };
-use serde_wasm_bindgen::from_value;
 use tls_client2::origo::OrigoConnection;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;

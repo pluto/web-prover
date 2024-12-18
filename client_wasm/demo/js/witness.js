@@ -138,7 +138,7 @@ function toInput(bytes) {
 }
 
 const getWitnessGenerator = async function (circuit) {
-  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/target_1024b/${circuit}_js/`).toString();
+  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/target_512b/${circuit}_js/`).toString();
   const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
   return wasm;
 }
@@ -154,7 +154,7 @@ async function generateWitness(input, wasm) {
   console.log("witness", wtns);
   return wtns;
 }
-const TOTAL_BYTES_ACROSS_NIVC = 1024;
+const TOTAL_BYTES_ACROSS_NIVC = 512;
 
 const make_nonce = function (iv, seq) {
   let nonce = new Uint8Array(12);
@@ -280,7 +280,7 @@ export const generateWitnessBytesForRequest = async function (circuits, inputs) 
   let httpStartLine = computeHttpWitnessStartline(extendedHTTPInput);
   let httpStartLineDigest = PolynomialDigest(httpStartLine, ciphertextDigest);
 
-  let mainDigests = Array(25 + 1).fill(0);
+  let mainDigests = Array(10 + 1).fill(0);
   mainDigests[0] = httpStartLineDigest;
   console.log("before 4 loop in http");
   for (let key in inputs.headers) {
@@ -360,7 +360,7 @@ export function byteArrayToObject(byteArray) {
 export const witness = {
   createWitness: async (input) => {
     console.log("createWitness", input);
-    var circuits = ["plaintext_authentication_1024b", "http_verification_1024b", "json_extraction_1024b"];
+    var circuits = ["plaintext_authentication_512b", "http_verification_512b", "json_extraction_512b"];
     var witnesses = await generateWitnessBytesForRequest(circuits, input);
     let witnesses_typed = new WitnessOutput(witnesses);
     console.log("witness", witnesses_typed);
