@@ -1,5 +1,6 @@
 use std::{
   clone,
+  collections::HashMap,
   io::{BufReader, Cursor},
   ops::Deref,
   sync::Arc,
@@ -31,7 +32,7 @@ use crate::{
   tls_client_async2::bind_client, Proof,
 };
 
-#[wasm_bindgen(getter_with_clone)]
+// #[wasm_bindgen(getter_with_clone)]
 #[derive(Serialize, Clone, Deserialize)]
 pub struct WitnessInput {
   pub key:        Vec<u8>,
@@ -39,7 +40,7 @@ pub struct WitnessInput {
   pub aad:        Vec<u8>,
   pub plaintext:  Vec<u8>,
   pub ciphertext: Vec<u8>,
-  pub headers:    Vec<String>,
+  pub headers:    HashMap<String, String>,
 }
 
 #[wasm_bindgen(getter_with_clone)]
@@ -63,11 +64,11 @@ extern "C" {
 
 // #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
-pub async fn create_witness(input: WitnessInput) -> Result<WitnessOutput, JsValue> {
+pub async fn create_witness(input: JsValue) -> Result<WitnessOutput, JsValue> {
   // Convert the Rust WitnessInput to a JsValue
-  let js_input = serde_wasm_bindgen::to_value(&input).unwrap();
+  // let js_input = serde_wasm_bindgen::to_value(&input).unwrap();
 
-  let js_witnesses_output = create_witness_js(&js_input).await;
+  let js_witnesses_output = create_witness_js(&input).await;
   // Call JavaScript function and await the Promise
   info!("result: {:?}", js_witnesses_output);
   let js_obj = js_sys::Object::from(js_witnesses_output);
@@ -162,7 +163,7 @@ async fn generate_program_data(
   /// now we pass witness input type to generate program data
   let witnesses = build_witness_data_from_wasm(
     &request_inputs,
-    proving.manifest.unwrap().request.headers.keys().map(clone::Clone::clone).collect(),
+    proving.manifest.unwrap().request.headers.clone(),
   )
   .await?;
 
@@ -248,7 +249,7 @@ async fn proxy(
 
 async fn build_witness_data_from_wasm(
   witness_data: &EncryptionInput,
-  headers: Vec<String>,
+  headers: HashMap<String, String>,
 ) -> Result<Vec<Vec<F<G1>>>, errors::ClientErrors> {
   let js_witness_input = to_js_witness_input(witness_data, headers);
   let js_witnesses_output = create_witness(js_witness_input).await.unwrap();
@@ -267,19 +268,20 @@ async fn build_witness_data_from_wasm(
   Ok(witnesses)
 }
 
-fn to_js_witness_input(witness: &EncryptionInput, headers: Vec<String>) -> WitnessInput {
+fn to_js_witness_input(witness: &EncryptionInput, headers: HashMap<String, String>) -> JsValue {
   let key_vec = match witness.key {
     CipherSuiteKey::CHACHA20POLY1305(key) => key.to_vec(),
     CipherSuiteKey::AES128GCM(key) => key.to_vec(),
   };
-  WitnessInput {
+  let input = WitnessInput {
     key: key_vec,
     iv: witness.iv.to_vec(),
     aad: witness.aad.to_vec(),
     plaintext: witness.plaintext.clone(),
     ciphertext: witness.ciphertext.clone(),
     headers,
-  }
+  };
+  serde_wasm_bindgen::to_value(&input).unwrap()
 }
 
 use core::slice;

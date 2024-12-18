@@ -2,14 +2,7 @@ import init, {
   setup_tracing,
   initThreadPool,
 } from "../pkg/client_wasm.js";
-import { poseidon2 } from "poseidon-lite";
-import { toByte, computeHttpWitnessBody, computeHttpWitnessHeader, computeHttpWitnessStartline, compute_json_witness, byteArrayToString } from "./witness.js";
-import { Buffer } from "buffer";
 import { witness } from "./witness";
-
-
-const _snarkjs = import("snarkjs");
-const snarkjs = await _snarkjs;
 
 const numConcurrency = navigator.hardwareConcurrency;
 
@@ -20,7 +13,6 @@ const memory = new WebAssembly.Memory({
   shared: true, // Enable shared memory
 });
 
-const TOTAL_BYTES_ACROSS_NIVC = 1024;
 await init(undefined, memory);
 setup_tracing("debug,tlsn_extension_rs=debug");
 await initThreadPool(numConcurrency);
@@ -129,7 +121,7 @@ let proverConfig = {
 const proofWorker = new Worker(new URL("./proof.js", import.meta.url), { type: "module" });
 console.log("sending message to worker");
 var proving_params = {
-  aux_params: await getByteParams("serialized_setup_aes", "bytes"),
+  aux_params: await getByteParams("serialized_setup", "bytes"),
 };
 proofWorker.postMessage({ proverConfig, proving_params, memory });
 console.log("message sent to worker");

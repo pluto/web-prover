@@ -69,9 +69,9 @@ pub fn construct_setup_data() -> SetupData {
   {
     SetupData {
       r1cs_types:              vec![
-        R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
-        R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
-        R1CSType::Raw(JSON_EXTRACTION_512B_R1CS.to_vec()),
+        R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
+        R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
+        R1CSType::Raw(JSON_EXTRACTION_R1CS.to_vec()),
       ],
       witness_generator_types: vec![WitnessGeneratorType::Browser; 3],
       max_rom_length:          MAX_ROM_LENGTH_512,

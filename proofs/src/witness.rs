@@ -360,10 +360,8 @@ pub fn request_initial_digest(
   // TODO: This assumes the start line format here as well.
   // Then digest the start line using the ciphertext_digest as a random input
   let start_line_bytes =
-    format!("{} {} {}", &manifest_request.method, &manifest_request.url, &manifest_request.version)
-      .as_bytes()
-      .to_vec();
-  let start_line_digest = polynomial_digest(&start_line_bytes, ciphertext_digest);
+    format!("{} {} {}", &manifest_request.method, &manifest_request.url, &manifest_request.version);
+  let start_line_digest = polynomial_digest(start_line_bytes.as_bytes(), ciphertext_digest);
 
   // Digest all the headers
   let header_bytes = headers_to_bytes(&manifest_request.headers);
@@ -394,10 +392,8 @@ pub fn response_initial_digest(
   let start_line_bytes = format!(
     "{} {} {}",
     &manifest_response.version, &manifest_response.status, &manifest_response.message
-  )
-  .as_bytes()
-  .to_vec();
-  let start_line_digest = polynomial_digest(&start_line_bytes, ciphertext_digest);
+  );
+  let start_line_digest = polynomial_digest(start_line_bytes.as_bytes(), ciphertext_digest);
 
   // Digest all the headers
   let header_bytes = headers_to_bytes(&manifest_response.headers);
