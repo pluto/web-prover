@@ -23,6 +23,9 @@ pub enum ProxyError {
   #[error("{0}")]
   TlsHandshakeExtract(String),
 
+  #[error("{0}")]
+  TlsHandshakeVerify(String),
+
   #[error("Error occurred during Sign: {0}")]
   Sign(Box<dyn std::error::Error + Send + 'static>),
 

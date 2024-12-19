@@ -44,20 +44,15 @@ mod origo;
 mod tcp;
 mod tlsn;
 mod websocket_proxy;
+mod tls_parser;
 
 struct SharedState {
   notary_signing_key:   SigningKey,
   origo_signing_key:    Secp256k1SigningKey,
   tlsn_max_sent_data:   usize,
   tlsn_max_recv_data:   usize,
-  origo_sessions:       Arc<Mutex<HashMap<String, OrigoSession>>>,
+  origo_sessions:       Arc<Mutex<HashMap<String, origo::OrigoSession>>>,
   verifier_param_bytes: Vec<u8>,
-}
-
-#[derive(Debug, Clone)]
-struct OrigoSession {
-  request:    Vec<u8>,
-  _timestamp: SystemTime,
 }
 
 /// Main entry point for the notary server application.
