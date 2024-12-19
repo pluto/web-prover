@@ -3,7 +3,6 @@ use std::{
   fs,
   io::{self},
   sync::{Arc, Mutex},
-  time::SystemTime,
 };
 
 use axum::{
@@ -13,16 +12,11 @@ use axum::{
   routing::{get, post},
   Router,
 };
-use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
 use errors::NotaryServerError;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use k256::ecdsa::SigningKey as Secp256k1SigningKey;
 use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
-use proofs::{
-  program::data::{CircuitData, NotExpanded, Offline, Online, ProgramData},
-  E1, F, G1, G2, S1, S2,
-};
 use rustls::{
   pki_types::{CertificateDer, PrivateKeyDer},
   ServerConfig,
@@ -51,7 +45,7 @@ struct SharedState {
   origo_signing_key:    Secp256k1SigningKey,
   tlsn_max_sent_data:   usize,
   tlsn_max_recv_data:   usize,
-  origo_sessions:       Arc<Mutex<HashMap<String, origo::OrigoSession>>>,
+  origo_sessions:       Arc<Mutex<HashMap<String, tls_parser::UnparsedTranscript>>>,
   verifier_param_bytes: Vec<u8>,
 }
 

@@ -6,7 +6,6 @@ use tls_client2::{
   internal::msgs::hsjoiner::HandshakeJoiner,
   tls_core::{
     msgs::{
-      base::Payload,
       codec::{self, Codec, Reader},
       enums::Compression,
       handshake::{
@@ -25,110 +24,263 @@ use tls_parser::{
 };
 use tracing::{debug, error, info, trace};
 
-use crate::{
-  axum_websocket::WebSocket,
-  errors::{NotaryServerError, ProxyError},
-  tlsn::ProtocolUpgrade,
-  SharedState,
-};
+use crate::errors::ProxyError;
 
-pub fn verify_certificate_sig(messages: Vec<Message>) -> Result<(), ProxyError> {
-  // TODO: get hash algorithm from cipher suite in a better way
-  let handshake_hash_buffer = HandshakeHashBuffer::new();
-  let mut transcript =
-    handshake_hash_buffer.start_hash(&tls_client2::tls_core::suites::HashAlgorithm::SHA256);
-  let mut server_certificate: Certificate = Certificate(vec![]);
-
-  for msg in messages {
-    match msg.payload {
-      MessagePayload::Handshake(ref handshake) => match handshake.payload {
-        HandshakePayload::ClientHello(_) => {
-          debug!("ClientHello");
-          transcript.add_message(&msg);
-        },
-        HandshakePayload::ServerHello(_) => {
-          debug!("ServerHello");
-          transcript.add_message(&msg);
-        },
-        HandshakePayload::Certificate(_) => {
-          // TODO for some reason this is not hit, but CertificateTLS13 is hit
-          debug!("Certificate");
-        },
-        HandshakePayload::CertificateTLS13(ref certificate_payload) => {
-          debug!("CertificateTLS13: {}", certificate_payload.entries.len());
-          transcript.add_message(&msg);
-          server_certificate = certificate_payload.entries[0].cert.clone();
-        },
-        HandshakePayload::CertificateVerify(ref digitally_signed_struct) => {
-          debug!("CertificateVerify");
-
-          // send error back to client if signature verification fails
-          match verify_tls13(
-            &construct_tls13_server_verify_message(&transcript.get_current_hash()),
-            &server_certificate,
-            digitally_signed_struct,
-          ) {
-            Ok(_) => (),
-            Err(e) => return Err(ProxyError::Sign(Box::new(e))),
-          };
-        },
-        HandshakePayload::EncryptedExtensions(_) => {
-          debug!("EncryptedExtensions");
-          transcript.add_message(&msg);
-        },
-        HandshakePayload::Finished(_) => {
-          debug!("Payload");
-
-          // This is verification data from either the server or client that it has
-          // finished the handshake Essentially it’s a hash of the data up to that point
-          // hmac signed by the derived handshake AES key
-          // https://github.com/rustls/rustls/blob/8c04dba680d19d203a7eda1951ad596f5fc2ae59/rustls/src/client/tls13.rs#L1234
-        },
-
-        // TODO: some of these (CertificateRequest, HelloRetryRequest) are not considered in happy
-        // path, handle later
-        _ => {
-          println!("unhandled {:?}", handshake.typ); // TODO probably just ignore
-        },
-      },
-      _ => {
-        // TODO just ignore? should be handshakes only
-        trace!("unexpected non-handshake message while verifying signature");
-      },
-    }
-  }
-
-  return Err(ProxyError::TlsHandshakeVerify(String::from("unable to parse verify data")));
+#[derive(Debug, Copy, Clone)]
+pub enum Direction {
+  Sent,
+  Received,
 }
 
-// TODO: Implement this thing.
-pub fn get_ciphertext_hashes(encrypted_messages: Vec<OpaqueMessage>) -> Vec<Vec<u8>> {
-  // Encrypted messages contains everything after the server completes its handshake,
-  // this includes
-  // - client change cipher spec,
-  // - client handshake finished message,
-  // - client request
-  // - 0..n session tickets from the server
-  // - server response
-  //
-  // To correctly form a "ciphertext" hash of the data received from the server, we must extract
-  // some structure from this encrypted data.
+#[derive(Debug)]
+pub enum WrappedPayload {
+  Encrypted(OpaqueMessage),
+  Decrypted(Message),
+}
 
-  // Tasks:
-  // - label the direction of the encrypted data
-  // -
+#[derive(Debug)]
+struct ParsedMessage {
+  direction: Direction,
+  seq:       u64,
+  payload:   WrappedPayload,
+}
 
-  let mut ciphertext = Vec::new();
-  for msg in encrypted_messages {
-    match msg.payload {
-      Payload(bytes) => ciphertext.push(bytes.clone()),
-      _ => panic!("invalid payload"),
+#[derive(Debug, Clone)]
+pub struct UnparsedMessage {
+  pub direction: Direction,
+  pub payload:   Vec<u8>,
+}
+
+pub struct ParsedTranscript {
+  messages: Vec<ParsedMessage>,
+}
+
+#[derive(Debug, Clone)]
+pub struct UnparsedTranscript {
+  pub messages: Vec<UnparsedMessage>,
+}
+
+impl UnparsedTranscript {
+  /// Transform raw data into more structured TLS data by
+  /// processing with handhsake keys.
+  ///
+  /// # Arguments
+  /// * `handshake_server_key` - Encryption key for decrypting TLS1.3 messages
+  /// * `handshake_server_iv` -  Encryption IV for decrypting TLS1.3 messages
+  ///
+  /// # Returns
+  /// * `Result<Vec<Message>, ProxyError>` - Vector of parsed TLS messages or error
+  pub fn parse_transcript(
+    &self,
+    handshake_server_key: String,
+    handshake_server_iv: String,
+  ) -> Result<ParsedTranscript, ProxyError> {
+    let server_hs_key = hex::decode(handshake_server_key).unwrap();
+    let server_hs_iv = hex::decode(handshake_server_iv).unwrap();
+    info!("key_as_string: {:?}, length: {}", server_hs_key, server_hs_key.len());
+    info!("iv_as_string: {:?}, length: {}", server_hs_iv, server_hs_iv.len());
+
+    let mut parsed_messages: Vec<ParsedMessage> = vec![];
+    let mut seq = 0u64;
+    let mut cipher_suite_key: Option<CipherSuiteKey> = None;
+
+    for m in &self.messages {
+      let mut cursor = Cursor::new(m.payload.clone());
+      while cursor.position() < m.payload.len() as u64 {
+        let current_bytes = &cursor.get_ref()[cursor.position() as usize..];
+        match local_parse_record(current_bytes) {
+          Ok((_, record)) => {
+            info!("TLS record type: {}", record.hdr.record_type);
+
+            // The first 3 messages are typically: handshake, handshake, changecipherspec.
+            // These are plaintext. The first encrypted message is an extension from the server
+            // which is labeled application data, like all subsequent encrypted messages in TLS1.3
+            if record.hdr.record_type == tls_parser::TlsRecordType::Handshake {
+              let rec = parse_tls_message_handshake(record.data);
+              match rec {
+                Ok((_data, parse_tls_message)) => match parse_tls_message {
+                  TlsMessage::Handshake(TlsMessageHandshake::ClientHello(ch)) => {
+                    debug!("parsing ClientHello");
+                    parsed_messages.push(ParsedMessage {
+                      seq,
+                      direction: m.direction,
+                      payload: WrappedPayload::Decrypted(handle_client_hello(ch)?),
+                    });
+                  },
+                  TlsMessage::Handshake(TlsMessageHandshake::ServerHello(sh)) => {
+                    debug!("parsing ServerHello");
+                    parsed_messages.push(ParsedMessage {
+                      seq,
+                      direction: m.direction,
+                      payload: WrappedPayload::Decrypted(handle_server_hello(sh.clone())?),
+                    });
+
+                    cipher_suite_key =
+                      Some(set_key(server_hs_key.clone(), CipherSuite::from(sh.cipher.0))?);
+                  },
+                  _ => {
+                    info!("{:?}", parse_tls_message);
+                  },
+                },
+                Err(err) => {
+                  error!("can't parse tls raw record: {}", err);
+                },
+              }
+            }
+
+            // this is encrypted handshake data.
+            if record.hdr.record_type == tls_parser::TlsRecordType::ApplicationData {
+              parsed_messages.push(ParsedMessage {
+                seq,
+                direction: m.direction,
+                payload: handle_application_data(
+                  record.data.to_vec(),
+                  server_hs_iv.clone(),
+                  cipher_suite_key.clone(),
+                  seq,
+                )?,
+              });
+
+              seq += 1;
+            }
+
+            // 5 is the record header length
+            cursor.set_position(cursor.position() + 5 + record.hdr.len as u64);
+          },
+          Err(e) => {
+            let remaining = cursor.get_ref().len() - (cursor.position() as usize);
+            return Err(ProxyError::TlsParser {
+              position: cursor.position(),
+              remaining,
+              e: e.to_string(),
+            });
+          },
+        }
+      }
     }
-  }
-  debug!("Prepared ciphertext={:?}", ciphertext);
 
-  // TODO
-  return vec![vec![]];
+    if parsed_messages.is_empty() {
+      return Err(ProxyError::TlsHandshakeExtract(String::from("empty transcript messages")));
+    }
+
+    Ok(ParsedTranscript { messages: parsed_messages })
+  }
+}
+
+impl ParsedTranscript {
+  pub fn verify_certificate_sig(&self) -> Result<(), ProxyError> {
+    // TODO: get hash algorithm from cipher suite in a better way
+    let handshake_hash_buffer = HandshakeHashBuffer::new();
+    let mut transcript_digest =
+      handshake_hash_buffer.start_hash(&tls_client2::tls_core::suites::HashAlgorithm::SHA256);
+    let mut server_certificate: Certificate = Certificate(vec![]);
+
+    let decrypted_messages = self.messages.iter().flat_map(|m| match m.payload {
+      WrappedPayload::Decrypted(ref m) => Some(m),
+      WrappedPayload::Encrypted(_) => None,
+    });
+
+    for msg in decrypted_messages {
+      match msg.payload {
+        MessagePayload::Handshake(ref handshake) => match handshake.payload {
+          HandshakePayload::ClientHello(_) => {
+            debug!("verify_certificate_sig: ClientHello");
+            transcript_digest.add_message(&msg);
+          },
+          HandshakePayload::ServerHello(_) => {
+            debug!("verify_certificate_sig:ServerHello");
+            transcript_digest.add_message(&msg);
+          },
+          HandshakePayload::Certificate(_) => {
+            // TODO for some reason this is not hit, but CertificateTLS13 is hit
+            debug!("verify_certificate_sig:Certificate");
+          },
+          HandshakePayload::CertificateTLS13(ref certificate_payload) => {
+            debug!(
+              "verify_certificate_sig:CertificateTLS13: {}",
+              certificate_payload.entries.len()
+            );
+            transcript_digest.add_message(&msg);
+            server_certificate = certificate_payload.entries[0].cert.clone();
+          },
+          HandshakePayload::CertificateVerify(ref digitally_signed_struct) => {
+            debug!("verify_certificate_sig:CertificateVerify");
+
+            // send error back to client if signature verification fails
+            match verify_tls13(
+              &construct_tls13_server_verify_message(&transcript_digest.get_current_hash()),
+              &server_certificate,
+              digitally_signed_struct,
+            ) {
+              Ok(_) => return Ok(()),
+              Err(e) => return Err(ProxyError::Sign(Box::new(e))),
+            };
+          },
+          HandshakePayload::EncryptedExtensions(_) => {
+            debug!("verify_certificate_sig:EncryptedExtensions");
+            transcript_digest.add_message(&msg);
+          },
+          HandshakePayload::Finished(_) => {
+            debug!("verify_certificate_sig:Payload");
+
+            // This is verification data from either the server or client that it has
+            // finished the handshake Essentially it’s a hash of the data up to that point
+            // hmac signed by the derived handshake AES key
+            // https://github.com/rustls/rustls/blob/8c04dba680d19d203a7eda1951ad596f5fc2ae59/rustls/src/client/tls13.rs#L1234
+          },
+
+          // TODO: some of these (CertificateRequest, HelloRetryRequest) are not considered in happy
+          // path, handle later
+          _ => {
+            println!("verify_certificate_sig: unhandled {:?}", handshake.typ); // TODO probably just
+                                                                               // ignore
+          },
+        },
+        _ => {
+          // TODO just ignore? should be handshakes only
+          trace!(
+            "verify_certificate_sig: unexpected non-handshake message while verifying signature"
+          );
+        },
+      }
+    }
+
+    return Err(ProxyError::TlsHandshakeVerify(String::from("unable to parse verify data")));
+  }
+
+  /// Retrieve a hash of the request ciphertext. We require a very specific structure
+  /// that matches for nearly all well formed TLS 1.3 sessions.  There may be more
+  /// robust approaches here.
+  pub fn get_request_ciphertext() -> Vec<u8> { return vec![]; }
+
+  pub fn get_response_hashes() -> Vec<Vec<u8>> {
+    // Encrypted messages contains everything after the server completes its handshake,
+    // this includes
+    // - client change cipher spec,
+    // - client handshake finished message,
+    // - client request
+    // - 0..n session tickets from the server
+    // - server response
+    //
+    // To correctly form a "ciphertext" hash of the data received from the server, we must extract
+    // some structure from this encrypted data.
+
+    // Tasks:
+    // - label the direction of the encrypted data
+    // -
+
+    // let mut ciphertext = Vec::new();
+    // for msg in encrypted_messages {
+    //     match msg.payload {
+    //     Payload(bytes) => ciphertext.push(bytes.clone()),
+    //     _ => panic!("invalid payload"),
+    //     }
+    // }
+    // debug!("Prepared ciphertext={:?}", ciphertext);
+
+    // TODO
+    return vec![vec![]];
+  }
 }
 
 /// Due to a bug in the tls_parser, we must override.
@@ -141,96 +293,6 @@ fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
 
   let (i, data) = take(hdr.len as usize)(i)?;
   Ok((i, tls_parser::TlsRawRecord { hdr, data }))
-}
-
-/// Extracts and processes TLS handshake messages from raw bytes
-///
-/// # Arguments
-/// * `bytes` - Raw TLS message bytes to parse
-/// * `payload` - Contains encryption keys and IVs for decrypting TLS1.3 messages
-///
-/// # Returns
-/// * `Result<Vec<Message>, ProxyError>` - Vector of parsed TLS messages or error
-pub fn extract_tls_handshake(
-  tls_transcript: &[u8],
-  handshake_server_key: String,
-  handshake_server_iv: String,
-) -> Result<(Vec<Message>, Vec<OpaqueMessage>), ProxyError> {
-  let server_hs_key = hex::decode(handshake_server_key).unwrap();
-  let server_hs_iv = hex::decode(handshake_server_iv).unwrap();
-  info!("key_as_string: {:?}, length: {}", server_hs_key, server_hs_key.len());
-  info!("iv_as_string: {:?}, length: {}", server_hs_iv, server_hs_iv.len());
-
-  let mut cursor = Cursor::new(tls_transcript);
-  let mut messages: Vec<Message> = vec![];
-  let mut encrypted_messages: Vec<OpaqueMessage> = vec![];
-  let mut seq = 0u64;
-
-  let mut cipher_suite_key: Option<CipherSuiteKey> = None;
-  while cursor.position() < tls_transcript.len() as u64 {
-    let current_bytes = &cursor.get_ref()[cursor.position() as usize..];
-    match local_parse_record(current_bytes) {
-      Ok((_, record)) => {
-        info!("TLS record type: {}", record.hdr.record_type);
-
-        // The first 3 messages are typically: handshake, handshake, changecipherspec.
-        // These are plaintext. The first encrypted message is an extension from the server
-        // which is labeled application data, like all subsequent encrypted messages in TLS1.3
-        if record.hdr.record_type == tls_parser::TlsRecordType::Handshake {
-          let rec = parse_tls_message_handshake(record.data);
-          match rec {
-            Ok((_data, parse_tls_message)) => match parse_tls_message {
-              TlsMessage::Handshake(TlsMessageHandshake::ClientHello(ch)) => {
-                debug!("parsing ClientHello");
-                handle_client_hello(ch, &mut messages)?;
-              },
-              TlsMessage::Handshake(TlsMessageHandshake::ServerHello(sh)) => {
-                debug!("parsing ServerHello");
-                handle_server_hello(sh.clone(), &mut messages)?;
-                cipher_suite_key =
-                  Some(set_key(server_hs_key.clone(), CipherSuite::from(sh.cipher.0))?);
-              },
-              _ => {
-                info!("{:?}", parse_tls_message);
-              },
-            },
-            Err(err) => {
-              error!("can't parse tls raw record: {}", err);
-            },
-          }
-        }
-        // this is encrypted handshake data.
-        if record.hdr.record_type == tls_parser::TlsRecordType::ApplicationData {
-          handle_application_data(
-            record.data.to_vec(),
-            &mut messages,
-            &mut encrypted_messages,
-            server_hs_iv.clone(),
-            cipher_suite_key.clone(),
-            seq,
-          )?;
-          seq += 1;
-        }
-
-        // 5 is the record header length
-        cursor.set_position(cursor.position() + 5 + record.hdr.len as u64);
-      },
-      Err(e) => {
-        let remaining = cursor.get_ref().len() - (cursor.position() as usize);
-        return Err(ProxyError::TlsParser {
-          position: cursor.position(),
-          remaining,
-          e: e.to_string(),
-        });
-      },
-    }
-  }
-
-  if messages.is_empty() || encrypted_messages.is_empty() {
-    return Err(ProxyError::TlsHandshakeExtract(String::from("empty transcript messages")));
-  }
-
-  Ok((messages, encrypted_messages))
 }
 
 /// Handles encrypted TLS 1.3 application data by decrypting it and processing any contained
@@ -259,12 +321,10 @@ pub fn extract_tls_handshake(
 /// * `TLS13_CHACHA20_POLY1305_SHA256` - Uses ChaCha20-Poly1305 decryption
 fn handle_application_data(
   record: Vec<u8>,
-  decrypted_messages: &mut Vec<Message>,
-  encrypted_messages: &mut Vec<OpaqueMessage>,
   server_hs_iv: Vec<u8>,
   cipher_suite_key: Option<CipherSuiteKey>,
   seq: u64,
-) -> Result<(), ProxyError> {
+) -> Result<WrappedPayload, ProxyError> {
   let msg = OpaqueMessage {
     typ:     tls_client2::tls_core::msgs::enums::ContentType::ApplicationData,
     version: tls_client2::ProtocolVersion::TLSv1_3,
@@ -286,12 +346,12 @@ fn handle_application_data(
               let mut handshake_joiner = HandshakeJoiner::new();
               handshake_joiner.take_message(plain_message);
               while let Some(msg) = handshake_joiner.frames.pop_front() {
-                decrypted_messages.push(msg);
+                return Ok(WrappedPayload::Decrypted(msg));
               }
             },
             Err(_) => {
-              encrypted_messages.push(msg);
-              trace!("Unable to decrypt record. Skipping.");
+              trace!("reached non-decryptable message");
+              return Ok(WrappedPayload::Encrypted(msg));
             },
           };
         },
@@ -307,26 +367,26 @@ fn handle_application_data(
               let mut handshake_joiner = HandshakeJoiner::new();
               handshake_joiner.take_message(plain_message);
               while let Some(msg) = handshake_joiner.frames.pop_front() {
-                decrypted_messages.push(msg);
+                return Ok(WrappedPayload::Decrypted(msg));
               }
             },
             Err(_) => {
               // This occurs once we pass the handshake records, we will no longer
               // have the correct keys to decrypt. We want to continue logging the
               // ciphertext.
-              encrypted_messages.push(msg);
-              trace!("Unable to decrypt record. Skipping.");
+              trace!("reached non-decryptable message");
+              return Ok(WrappedPayload::Encrypted(msg));
             },
           };
         },
       }
     },
     None => {
-      trace!("No cipher suite key set. Skipping record.");
-      return Ok(());
+      panic!("should not happen");
     },
   };
-  Ok(())
+
+  Ok(WrappedPayload::Encrypted(msg))
 }
 
 /// Processes a TLS ClientHello message and converts it into the internal message format.
@@ -355,10 +415,7 @@ fn handle_application_data(
 ///    - Prepends 2-byte length
 ///    - Decodes into ClientExtension types
 /// 5. Constructs final Message with ClientHello payload
-fn handle_client_hello(
-  client_hello: TlsClientHelloContents,
-  messages: &mut Vec<Message>,
-) -> Result<(), ProxyError> {
+fn handle_client_hello(client_hello: TlsClientHelloContents) -> Result<Message, ProxyError> {
   let ch_random = process_random_bytes(client_hello.random)?;
   let session_id = process_session_id(client_hello.session_id)?;
 
@@ -379,7 +436,7 @@ fn handle_client_hello(
   let extensions = codec::read_vec_u16::<ClientExtension>(&mut r)
     .ok_or(ProxyError::TlsHandshakeExtract("Failed to read server extension".to_string()))?;
 
-  let client_hello_message = Message {
+  Ok(Message {
     version: tls_client2::ProtocolVersion::from(client_hello.version.0),
     payload: MessagePayload::Handshake(HandshakeMessagePayload {
       typ:     tls_client2::tls_core::msgs::enums::HandshakeType::ClientHello,
@@ -392,9 +449,7 @@ fn handle_client_hello(
         extensions,
       }),
     }),
-  };
-  messages.push(client_hello_message);
-  Ok(())
+  })
 }
 
 /// Handles the TLS ServerHello message by processing its contents and adding it to the message
@@ -419,10 +474,7 @@ fn handle_client_hello(
 /// 2. Extracts and formats extension bytes
 /// 3. Reads server extensions
 /// 4. Constructs a new Message with all components
-fn handle_server_hello(
-  server_hello: TlsServerHelloContents,
-  messages: &mut Vec<Message>,
-) -> Result<(), ProxyError> {
+fn handle_server_hello(server_hello: TlsServerHelloContents) -> Result<Message, ProxyError> {
   let sh_random = process_random_bytes(server_hello.random)?;
   let session_id = process_session_id(server_hello.session_id)?;
 
@@ -437,7 +489,7 @@ fn handle_server_hello(
     .ok_or(ProxyError::TlsHandshakeExtract("Failed to read server extension".to_string()))?;
   debug!("cipher: {:?}", server_hello.cipher.0);
 
-  let server_hello_message = Message {
+  Ok(Message {
     version: tls_client2::ProtocolVersion::from(server_hello.version.0),
     payload: MessagePayload::Handshake(HandshakeMessagePayload {
       typ:     tls_client2::tls_core::msgs::enums::HandshakeType::ServerHello,
@@ -450,9 +502,7 @@ fn handle_server_hello(
         extensions,
       }),
     }),
-  };
-  messages.push(server_hello_message);
-  Ok(())
+  })
 }
 
 /// Shared helper functions for TLS message processing

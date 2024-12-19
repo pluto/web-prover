@@ -1,7 +1,4 @@
-use std::{
-  sync::{Arc, Mutex},
-  time::SystemTime,
-};
+use std::sync::{Arc, Mutex};
 
 use alloy_primitives::utils::keccak256;
 use axum::{
@@ -18,44 +15,16 @@ use tokio::{
   net::TcpStream,
 };
 use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info};
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
   axum_websocket::WebSocket,
   errors::{NotaryServerError, ProxyError},
-  tls_parser,
+  tls_parser::{Direction, UnparsedMessage, UnparsedTranscript},
   tlsn::ProtocolUpgrade,
   SharedState,
 };
-
-#[derive(Debug, Clone)]
-pub enum Direction {
-  Sent,
-  Received,
-}
-
-#[derive(Debug, Clone)]
-struct Message {
-  direction: Direction,
-  payload:   Vec<u8>,
-}
-
-#[derive(Debug, Clone)]
-pub struct OrigoSession {
-  messages:   Vec<Message>,
-  _timestamp: SystemTime,
-}
-
-impl OrigoSession {
-  pub fn get_transcript(&self) -> Vec<u8> {
-    let mut out = Vec::new();
-    for m in self.messages.clone() {
-      out.extend(m.payload);
-    }
-    out
-  }
-}
 
 #[derive(Deserialize)]
 pub struct SignQuery {
@@ -96,15 +65,25 @@ pub async fn sign(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<SignBody>,
 ) -> Result<Json<SignReply>, ProxyError> {
-  let session = state.origo_sessions.lock().unwrap().get(&query.session_id).unwrap().clone();
-  let (messages, encrypted_messages) = tls_parser::extract_tls_handshake(
-    &session.get_transcript(),
-    payload.handshake_server_key,
-    payload.handshake_server_iv,
-  )?;
+  let transcript = state.origo_sessions.lock().unwrap().get(&query.session_id).cloned().unwrap();
+
+  let r = transcript.parse_transcript(payload.handshake_server_key, payload.handshake_server_iv);
+  let parsed_transcript = match r {
+    Ok(p) => p,
+    Err(e) => {
+      info!("error parsing transcript: {:?}", e);
+      return Err(e);
+    },
+  };
 
   // Ensure the TLS certificate is valid and we're communicating with the correct server.
-  let result = tls_parser::verify_certificate_sig(messages);
+  match parsed_transcript.verify_certificate_sig() {
+    Ok(_) => (),
+    Err(e) => {
+      info!("error verifying certificate sig: {:?}", e);
+      return Err(e);
+    },
+  }
 
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
@@ -209,9 +188,9 @@ pub async fn proxy(
 }
 use std::collections::HashMap;
 
-use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
+use client_side_prover::supernova::snark::CompressedSNARK;
 use proofs::{
-  program::data::{CircuitData, NotExpanded, Offline, Online, ProgramData},
+  program::data::{CircuitData, NotExpanded, Offline, ProgramData},
   proof::Proof,
   witness::{data_hasher, ByteOrPad},
   E1, F, G1, G2, S1, S2,
@@ -351,7 +330,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
           debug!("sending to server len={:?}, data={:?}", n, hex::encode(&buf[..n]));
           tcp_write.write_all(&buf[..n]).await?;
           let mut buffer = messages.lock().unwrap();
-          buffer.push(Message { direction: Direction::Sent, payload: buf[..n].to_vec() })
+          buffer.push(UnparsedMessage { direction: Direction::Sent, payload: buf[..n].to_vec() })
         },
         Err(e) => return Err(e),
       }
@@ -369,7 +348,8 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
           debug!("sending to client len={:?}, data={:?}", n, hex::encode(&buf[..n]));
           socket_write.write_all(&buf[..n]).await?;
           let mut buffer = messages.lock().unwrap();
-          buffer.push(Message { direction: Direction::Received, payload: buf[..n].to_vec() })
+          buffer
+            .push(UnparsedMessage { direction: Direction::Received, payload: buf[..n].to_vec() })
         },
         Err(e) => return Err(e),
       }
@@ -382,9 +362,8 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   pin_mut!(client_to_server, server_to_client);
   let _ = select(client_to_server, server_to_client).await.factor_first().0;
 
-  state.origo_sessions.lock().unwrap().insert(session_id.to_string(), OrigoSession {
-    messages:   messages.lock().unwrap().to_vec(),
-    _timestamp: SystemTime::now(),
+  state.origo_sessions.lock().unwrap().insert(session_id.to_string(), UnparsedTranscript {
+    messages: messages.lock().unwrap().to_vec(),
   });
 
   Ok(())

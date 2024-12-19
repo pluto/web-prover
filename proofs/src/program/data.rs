@@ -3,10 +3,7 @@ use std::{
   io::Write,
 };
 
-use client_side_prover::{
-  fast_serde::FastSerde,
-  supernova::{get_circuit_shapes, AuxParams},
-};
+use client_side_prover::{fast_serde::FastSerde, supernova::get_circuit_shapes};
 use serde_json::json;
 
 use super::*;

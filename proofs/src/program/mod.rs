@@ -2,7 +2,7 @@ use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
 use client_side_prover::{
   supernova::{NonUniformCircuit, RecursiveSNARK, StepCircuit},
-  traits::{snark::default_ck_hint, TranscriptReprTrait},
+  traits::{snark::default_ck_hint, Dual},
 };
 use data::Expanded;
 use proof::Proof;
@@ -192,9 +192,6 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
 
   Ok(recursive_snark?)
 }
-
-use client_side_prover::{provider::Bn256EngineKZG, traits::Dual};
-use hex;
 
 pub fn compress_proof_no_setup(
   recursive_snark: &RecursiveSNARK<E1>,
