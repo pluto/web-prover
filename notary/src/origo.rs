@@ -24,8 +24,9 @@ use ws_stream_tungstenite::WsStream;
 use crate::{
   axum_websocket::WebSocket,
   errors::{NotaryServerError, ProxyError},
+  tls_parser,
   tlsn::ProtocolUpgrade,
-  SharedState, tls_parser,
+  SharedState,
 };
 
 #[derive(Debug, Clone)]
@@ -37,12 +38,12 @@ pub enum Direction {
 #[derive(Debug, Clone)]
 struct Message {
   direction: Direction,
-  payload: Vec<u8>
+  payload:   Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
 pub struct OrigoSession {
-  messages: Vec<Message>,
+  messages:   Vec<Message>,
   _timestamp: SystemTime,
 }
 
@@ -96,11 +97,14 @@ pub async fn sign(
   extract::Json(payload): extract::Json<SignBody>,
 ) -> Result<Json<SignReply>, ProxyError> {
   let session = state.origo_sessions.lock().unwrap().get(&query.session_id).unwrap().clone();
-  let (messages, encrypted_messages) = tls_parser::extract_tls_handshake(&session.get_transcript(), payload.handshake_server_key, payload.handshake_server_iv)?;
+  let (messages, encrypted_messages) = tls_parser::extract_tls_handshake(
+    &session.get_transcript(),
+    payload.handshake_server_key,
+    payload.handshake_server_iv,
+  )?;
 
   // Ensure the TLS certificate is valid and we're communicating with the correct server.
   let result = tls_parser::verify_certificate_sig(messages);
-
 
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
@@ -347,10 +351,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
           debug!("sending to server len={:?}, data={:?}", n, hex::encode(&buf[..n]));
           tcp_write.write_all(&buf[..n]).await?;
           let mut buffer = messages.lock().unwrap();
-          buffer.push(Message{
-            direction: Direction::Sent,
-            payload: buf[..n].to_vec()
-          })
+          buffer.push(Message { direction: Direction::Sent, payload: buf[..n].to_vec() })
         },
         Err(e) => return Err(e),
       }
@@ -368,10 +369,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
           debug!("sending to client len={:?}, data={:?}", n, hex::encode(&buf[..n]));
           socket_write.write_all(&buf[..n]).await?;
           let mut buffer = messages.lock().unwrap();
-          buffer.push(Message{
-            direction: Direction::Received,
-            payload: buf[..n].to_vec()
-          })
+          buffer.push(Message { direction: Direction::Received, payload: buf[..n].to_vec() })
         },
         Err(e) => return Err(e),
       }
@@ -385,7 +383,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let _ = select(client_to_server, server_to_client).await.factor_first().0;
 
   state.origo_sessions.lock().unwrap().insert(session_id.to_string(), OrigoSession {
-    messages:    messages.lock().unwrap().to_vec(),
+    messages:   messages.lock().unwrap().to_vec(),
     _timestamp: SystemTime::now(),
   });
 

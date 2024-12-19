@@ -42,9 +42,9 @@ mod config;
 mod errors;
 mod origo;
 mod tcp;
+mod tls_parser;
 mod tlsn;
 mod websocket_proxy;
-mod tls_parser;
 
 struct SharedState {
   notary_signing_key:   SigningKey,
