@@ -52,4 +52,7 @@ pub enum ProofError {
 
   #[error(transparent)]
   SuperNova(#[from] client_side_prover::supernova::error::SuperNovaError),
+
+  #[error("json key not found: {0}")]
+  JsonKeyError(String),
 }

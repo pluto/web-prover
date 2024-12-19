@@ -2,7 +2,7 @@
 name   ="proofs"
 version="0.2.0"
 edition="2021"
-publish = false
+publish=false
 
 [[bin]]
 name="test-prove"
@@ -23,7 +23,8 @@ byteorder ="1.5"
 num-bigint="0.4"
 itertools ="0.13"
 
-clap                        ={ version="4.5", features=["derive"] }
+# CLI & logs
+clap                        ={ workspace=true }
 tracing.workspace           =true
 tracing-subscriber.workspace=true
 

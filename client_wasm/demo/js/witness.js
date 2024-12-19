@@ -1,56 +1,14 @@
 import { Buffer } from "buffer";
-import { poseidon2 } from "poseidon-lite";
+import { poseidon2, poseidon1 } from "poseidon-lite";
 import { WitnessOutput } from "../pkg/client_wasm";
 const _snarkjs = import("snarkjs");
 const snarkjs = await _snarkjs;
 
-
-export function compute_json_witness(padded_plaintext, key) {
-  let plaintext = padded_plaintext.filter(isNullOrSpace);
-
-  let plaintext_as_json = byteArrayToObject(plaintext);
-  console.log()
-  let data = JSON.stringify(plaintext_as_json[key]);
-  let data_bytes = toByte(data);
-  data_bytes = data_bytes.filter(isNullOrSpace);
-
-  let startIdx = 0;
-  let endIdx = 0;
-  for (var i = 0; i < padded_plaintext.length; i++) {
-    let filtered_body = padded_plaintext.slice(i, padded_plaintext.length).filter(isNullOrSpace);
-    filtered_body = filtered_body.slice(0, data_bytes.length);
-    if (arraysEqual(filtered_body, data_bytes) && filtered_body[0] === padded_plaintext[i]) {
-      startIdx = i;
-    }
-  }
-
-  for (var i = 0; i < padded_plaintext.length; i++) {
-    let filtered_body = padded_plaintext.slice(0, i + 1).filter(isNullOrSpace);
-    filtered_body.reverse();
-    filtered_body = filtered_body.slice(0, data_bytes.length);
-    filtered_body.reverse();
-    if (arraysEqual(filtered_body, data_bytes) && filtered_body[data_bytes.length - 1] === padded_plaintext[i]) {
-      endIdx = i;
-    }
-  }
-
+export function computeHttpWitnessStartline(paddedPlaintext) {
   let result = [];
-  for (var i = 0; i < padded_plaintext.length; i++) {
-    if (i >= startIdx && i <= endIdx) {
-      result.push(padded_plaintext[i]);
-    } else {
-      result.push(0);
-    }
-  }
-
-  return result;
-}
-
-export function computeHttpWitnessStartline(paddedPlaintext, httpMaskType) {
-  let result = Array(paddedPlaintext.length).fill(0);
   for (var i = 0; i < paddedPlaintext.length - 1; i++) {
     if (paddedPlaintext[i] === '\r'.charCodeAt(0) && paddedPlaintext[i + 1] === '\n'.charCodeAt(0)) {
-      result.splice(0, i + 2, ...paddedPlaintext.slice(0, i + 2));
+      result = paddedPlaintext.slice(0, i);
       break;
     }
   }
@@ -59,7 +17,7 @@ export function computeHttpWitnessStartline(paddedPlaintext, httpMaskType) {
 }
 
 export function computeHttpWitnessHeader(paddedPlaintext, headerName) {
-  let result = Array(paddedPlaintext.length).fill(0);
+  let result = [];
   let currentHeader = 0;
   let currentHeaderName = [];
   let startPos = 0;
@@ -80,7 +38,7 @@ export function computeHttpWitnessHeader(paddedPlaintext, headerName) {
 
     if (paddedPlaintext[i] === '\r'.charCodeAt(0) && paddedPlaintext[i + 1] === '\n'.charCodeAt(0)) {
       if (arraysEqual(currentHeaderName, headerName)) {
-        result.splice(headerStartPos, i + 2 - headerStartPos, ...paddedPlaintext.slice(headerStartPos, i + 2));
+        result = paddedPlaintext.slice(headerStartPos, i);
         break;
       }
 
@@ -98,11 +56,11 @@ export function computeHttpWitnessHeader(paddedPlaintext, headerName) {
 }
 
 export function computeHttpWitnessBody(paddedPlaintext) {
-  let result = Array(paddedPlaintext.length).fill(0);
+  let result = [];
   for (var i = 0; i < paddedPlaintext.length - 3; i++) {
     if (paddedPlaintext[i] === '\r'.charCodeAt(0) && paddedPlaintext[i + 1] === '\n'.charCodeAt(0) && paddedPlaintext[i + 2] === '\r'.charCodeAt(0) && paddedPlaintext[i + 3] === '\n'.charCodeAt(0)) {
       if (i + 4 < paddedPlaintext.length) {
-        result.splice(i + 4, paddedPlaintext.length - i + 4, ...paddedPlaintext.slice(i + 4));
+        result = paddedPlaintext.slice(i + 4, paddedPlaintext.length);
       }
       break;
     }
@@ -210,44 +168,132 @@ const make_nonce = function (iv, seq) {
   return nonce;
 }
 
+function headersToBytes(headers) {
+  const result = [];
+
+  for (const [key, values] of Object.entries(headers)) {
+    for (const value of values) {
+      // In HTTP/1.1, headers are formatted as "key: value"
+      const headerLine = `${key}: ${value}`;
+      result.push(strToBytes(headerLine));
+    }
+  }
+
+  return result;
+}
+
+function strToBytes(str) {
+  return Array.from(str.split('').map(c => c.charCodeAt(0)));
+}
+
+const PRIME = BigInt("21888242871839275222246405745257275088548364400416034343698204186575808495617");
+const ONE = BigInt(1);
+const ZERO = BigInt(0);
+
+function PolynomialDigest(coeffs, input) {
+  let result = BigInt(0);
+  let power = BigInt(1);
+
+  for (let i = 0; i < coeffs.length; i++) {
+    result = (result + BigInt(coeffs[i]) * power) % PRIME;
+    power = (power * input) % PRIME;
+  }
+
+  return result;
+}
+
+function modAdd(a, b) {
+  return ((a + b) % PRIME + PRIME) % PRIME;
+}
+
+function modMul(a, b) {
+  return (a * b) % PRIME;
+}
+
+function RequestInitialDigest(
+  plaintext,
+  headers,
+  ciphertext,
+) {
+  // Create a digest of the ciphertext itself
+  const ciphertextDigest = DataHasher(ciphertext);
+
+  // Digest the start line using the ciphertext_digest as a random input
+  const startLineBytes = computeHttpWitnessStartline(plaintext);
+  const startLineDigest = PolynomialDigest(startLineBytes, ciphertextDigest);
+
+  // Digest all the headers
+  const headerBytes = headersToBytes(headers);
+  const headersDigest = headerBytes.map(bytes =>
+    PolynomialDigest(bytes, ciphertextDigest)
+  );
+
+  // Put all the digests into an array
+  const allDigests = [startLineDigest, ...headersDigest];
+
+  // Calculate manifest digest
+  const manifestDigest = modAdd(
+    ciphertextDigest,
+    allDigests.map(d => poseidon1([d])).reduce((a, b) => modAdd(a, b), ZERO)
+  );
+
+  return [ciphertextDigest, manifestDigest];
+}
+
 export const generateWitnessBytesForRequest = async function (circuits, inputs) {
   let witnesses = [];
 
   let plaintext = inputs.plaintext;
   let ciphertext = inputs.ciphertext;
   let extendedHTTPInput = plaintext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(-1));
+  let extendedHTTPInput0Padded = plaintext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(0));
   let paddedCiphertext = ciphertext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - ciphertext.length).fill(-1));
+
+  let [ciphertextDigest, initNivcInput] = RequestInitialDigest(
+    inputs.plaintext,
+    inputs.headers,
+    paddedCiphertext,
+  );
+
 
   console.log("CHACHA");
   let chachaInputs = {};
   chachaInputs["key"] = toInput(Buffer.from(inputs.key));
   chachaInputs["nonce"] = toInput(Buffer.from(make_nonce(inputs.iv, 0)));
-  chachaInputs["plainText"] = extendedHTTPInput;
+  chachaInputs["plaintext"] = extendedHTTPInput;
   chachaInputs["counter"] = uintArray32ToBits([1])[0];
-  chachaInputs["step_in"] = DataHasher(paddedCiphertext);
+  chachaInputs["step_in"] = initNivcInput;
   console.log("input generated 4", chachaInputs);
 
-  // we get here in the dbg logs in the console. 
+  // we get here in the dbg logs in the console.
   let chachaWtns = await generateWitness(chachaInputs, await getWitnessGenerator(circuits[0]));
   witnesses.push(chachaWtns.data);
   console.log("witnesses after CHACHA", witnesses);
 
   // HTTP
-
   let httpInputs = {};
-  httpInputs["start_line_hash"] = DataHasher(computeHttpWitnessStartline(extendedHTTPInput));
-  httpInputs["header_hashes"] = Array(10).fill(0);
+
+  let httpResponsePlaintextDigest = PolynomialDigest(extendedHTTPInput0Padded, ciphertextDigest);
+  let httpResponsePlaintextDigestHashed = poseidon1([httpResponsePlaintextDigest]);
+  let httpStepIn = modAdd(initNivcInput - ciphertextDigest, httpResponsePlaintextDigestHashed);
+
+  let httpStartLine = computeHttpWitnessStartline(extendedHTTPInput);
+  let httpStartLineDigest = PolynomialDigest(httpStartLine, ciphertextDigest);
+
+  let mainDigests = Array(10 + 1).fill(0);
+  mainDigests[0] = httpStartLineDigest;
   console.log("before 4 loop in http");
-  for (var i = 0; i < inputs.headers.length; i++) {
-    let computedHttpHeaderWitness = computeHttpWitnessHeader(extendedHTTPInput, toByte(inputs.headers[i]));
-    let httpHeaderHash = DataHasher(computedHttpHeaderWitness[1]);
-    httpInputs["header_hashes"][computedHttpHeaderWitness[0]] = httpHeaderHash;
+  for (let key in inputs.headers) {
+    let [index, computedHttpHeaderWitness] = computeHttpWitnessHeader(extendedHTTPInput, toByte(key));
+    let httpHeaderDigest = PolynomialDigest(computedHttpHeaderWitness, ciphertextDigest);
+    httpInputs["main_digests"][index + 1] = httpHeaderDigest;
   }
   console.log("after 4 loop in http");
-  let httpBody = computeHttpWitnessBody(extendedHTTPInput);
+  // let httpBody = computeHttpWitnessBody(extendedHTTPInput);
   console.log("after computehttpwitnesbody in http");
-  httpInputs["body_hash"] = DataHasher(httpBody);
-  httpInputs["step_in"] = DataHasher(extendedHTTPInput);
+  httpInputs["ciphertext_digest"] = ciphertextDigest;
+  httpInputs["main_digests"] = mainDigests;
+  httpInputs["step_in"] = httpStepIn;
   httpInputs["data"] = extendedHTTPInput;
   console.log("before generatewitness in http");
   let wtns = await generateWitness(httpInputs, await getWitnessGenerator(circuits[1]));
@@ -314,8 +360,7 @@ export function byteArrayToObject(byteArray) {
 export const witness = {
   createWitness: async (input) => {
     console.log("createWitness", input);
-    // circuits need to be 512b
-    var circuits = ["plaintext_authentication_512b", "http_verification_512b", "json_mask_object_512b", "json_mask_array_index_512b", "json_extract_value_512b"];
+    var circuits = ["plaintext_authentication_512b", "http_verification_512b", "json_extraction_512b"];
     var witnesses = await generateWitnessBytesForRequest(circuits, input);
     let witnesses_typed = new WitnessOutput(witnesses);
     console.log("witness", witnesses_typed);

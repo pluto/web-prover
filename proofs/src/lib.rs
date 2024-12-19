@@ -22,7 +22,7 @@ pub mod circom;
 pub mod errors;
 pub mod program;
 pub mod proof;
-#[cfg(test)] mod tests;
+#[cfg(test)] pub(crate) mod tests;
 pub mod witness;
 
 pub type E1 = client_side_prover::provider::Bn256EngineKZG;
@@ -31,7 +31,6 @@ pub type G1 = <E1 as Engine>::GE;
 pub type G2 = <E2 as Engine>::GE;
 pub type EE1 =
   client_side_prover::provider::hyperkzg::EvaluationEngine<halo2curves::bn256::Bn256, E1>;
-// TODO (Sambhav): check with colin, why are we using ipa pc for second circuit?
 pub type EE2 = client_side_prover::provider::ipa_pc::EvaluationEngine<E2>;
 pub type S1 = BatchedRelaxedR1CSSNARK<E1, EE1>;
 pub type S2 = BatchedRelaxedR1CSSNARK<E2, EE2>;

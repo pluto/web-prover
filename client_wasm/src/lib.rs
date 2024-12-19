@@ -4,7 +4,10 @@ use base64::prelude::*;
 use client::config::{self, Config};
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::Full;
-use hyper::{body::Bytes, Body, Request};
+use hyper::{
+  body::{Body, Bytes},
+  Request,
+};
 use serde::{Deserialize, Serialize};
 use tlsn_core::{commitment::CommitmentKind, proof::TlsProof};
 use tlsn_prover::tls::{Prover, ProverConfig};
