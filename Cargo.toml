@@ -7,6 +7,7 @@ resolver="2"
 [workspace.dependencies]
 # Local re-exporting
 client={ path="client" }
+proofs={ path="proofs" }
 # Serde
 serde     ={ version="1.0.204", features=["derive"] }
 serde_json="1.0.120"
@@ -20,9 +21,26 @@ tlsn-prover={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4",
 tlsn-core={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
 tls-client={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4", package="tlsn-tls-client" }
 
-tls-client2={ git="https://github.com/pluto/tls-origo-legacy", package="tls-client" }
-tls-core   ={ git="https://github.com/pluto/tls-origo-legacy", package="tls-core" }
-rayon      ="1.10.0"
+tls-client2       ={ git="https://github.com/pluto/tls-origo-legacy", package="tls-client" }
+tls-core          ={ git="https://github.com/pluto/tls-origo-legacy", package="tls-core" }
+rayon             ="1.10.0"
+wasm-bindgen-rayon="=1.2.1"
+futures           ="0.3"
+
+# CLI
+clap={ version="4.5.13", features=["derive"] }
+# errors
+thiserror="1.0.61"
+
+# HTTP
+hyper         ={ version="1.4", features=["full"] }
+hyper-util    ={ version="0.1", features=["full"] }
+http-body-util="0.1"
+
+# Async
+tokio       ={ version="1.39.1", features=["full"] }
+tokio-util  ={ version="0.7" }
+tokio-rustls={ version="0.26.0", default-features=false, features=["logging", "tls12"] }
 
 [package]
 name   ="webprover"
@@ -34,16 +52,16 @@ path="bin/mock_server.rs"
 
 [dependencies]
 # Dependancies for the binaries
-tokio         ={ version="1.39.0", features=["full"] }
-hyper         ={ version="1.4", features=["full"] }
-hyper-util    ={ version="0.1", features=["full"] }
-http-body-util="0.1"
+
+hyper         ={ workspace=true }
+hyper-util    ={ workspace=true }
+http-body-util={ workspace=true }
 pki-types     ={ package="rustls-pki-types", version="1.7" }
 rustls        ={ version="0.23.11", default-features=false, features=["logging", "tls12", "std", "ring"] }
 rustls-pemfile={ version="2.0.0" }
-tokio-rustls  ={ version="0.26.0", default-features=false, features=["logging", "tls12"] }
-serde         ={ version="1.0.204", features=["derive"] }
-serde_json    ="1.0.120"
+tokio         ={ workspace=true }
+tokio-rustls  ={ workspace=true }
+serde_json    ={ workspace=true }
 
 [profile.dev]
 opt-level      =1

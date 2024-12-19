@@ -3,7 +3,7 @@ name   ="client_ios"
 version="0.2.0"
 edition="2021"
 build  ="../build.rs"
-publish = false
+publish=false
 
 [lib]
 crate-type=["staticlib"]
@@ -18,4 +18,4 @@ serde_json.workspace=true
 tracing.workspace           =true
 tracing-subscriber.workspace=true
 # Async
-tokio="1.39.1"
+tokio={ workspace=true }

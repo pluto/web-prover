@@ -745,9 +745,9 @@ dependencies = [
  "bytes",
  "futures-util",
  "http 1.2.0",
- "http-body 1.0.1",
+ "http-body",
  "http-body-util",
- "hyper 1.5.1",
+ "hyper",
  "hyper-util",
  "itoa",
  "matchit",
@@ -780,7 +780,7 @@ dependencies = [
  "bytes",
  "futures-util",
  "http 1.2.0",
- "http-body 1.0.1",
+ "http-body",
  "http-body-util",
  "mime",
  "pin-project-lite",
@@ -1279,7 +1279,7 @@ dependencies = [
  "getrandom 0.2.15",
  "hex",
  "http-body-util",
- "hyper 1.5.1",
+ "hyper",
  "hyper-util",
  "js-sys",
  "p256",
@@ -1388,7 +1388,7 @@ dependencies = [
  "futures-util",
  "getrandom 0.2.15",
  "http-body-util",
- "hyper 0.14.31",
+ "hyper",
  "js-sys",
  "p256",
  "rayon",
@@ -2702,17 +2702,6 @@ dependencies = [
 
 [[package]]
 name = "http-body"
-version = "0.4.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ceab25649e9960c0311ea418d17bee82c0dcec1bd053b5f9a66e265a693bed2"
-dependencies = [
- "bytes",
- "http 0.2.12",
- "pin-project-lite",
-]
-
-[[package]]
-name = "http-body"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1efedce1fb8e6913f23e0c92de8e62cd5b772a67e7b3946df930a62566c93184"
@@ -2730,7 +2719,7 @@ dependencies = [
  "bytes",
  "futures-util",
  "http 1.2.0",
- "http-body 1.0.1",
+ "http-body",
  "pin-project-lite",
 ]
 
@@ -2748,28 +2737,6 @@ checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
 name = "hyper"
-version = "0.14.31"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c08302e8fa335b151b788c775ff56e7a03ae64ff85c548ee820fecb70356e85"
-dependencies = [
- "bytes",
- "futures-channel",
- "futures-core",
- "futures-util",
- "http 0.2.12",
- "http-body 0.4.6",
- "httparse",
- "httpdate",
- "itoa",
- "pin-project-lite",
- "tokio",
- "tower-service",
- "tracing",
- "want",
-]
-
-[[package]]
-name = "hyper"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97818827ef4f364230e16705d4706e2897df2bb60617d6ca15d598025a3c481f"
@@ -2779,7 +2746,7 @@ dependencies = [
  "futures-util",
  "h2",
  "http 1.2.0",
- "http-body 1.0.1",
+ "http-body",
  "httparse",
  "httpdate",
  "itoa",
@@ -2797,7 +2764,7 @@ checksum = "08afdbb5c31130e3034af566421053ab03787c640246a446327f550d11bcb333"
 dependencies = [
  "futures-util",
  "http 1.2.0",
- "hyper 1.5.1",
+ "hyper",
  "hyper-util",
  "rustls 0.23.19",
  "rustls-pki-types",
@@ -2815,7 +2782,7 @@ checksum = "70206fc6890eaca9fde8a0bf71caa2ddfc9fe045ac9e5c70df101a7dbde866e0"
 dependencies = [
  "bytes",
  "http-body-util",
- "hyper 1.5.1",
+ "hyper",
  "hyper-util",
  "native-tls",
  "tokio",
@@ -2833,8 +2800,8 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "http 1.2.0",
- "http-body 1.0.1",
- "hyper 1.5.1",
+ "http-body",
+ "hyper",
  "pin-project-lite",
  "socket2",
  "tokio",
@@ -3274,8 +3241,7 @@ dependencies = [
 [[package]]
 name = "light-poseidon"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c9a85a9752c549ceb7578064b4ed891179d20acd85f27318573b64d2d7ee7ee"
+source = "git+https://github.com/pluto/light-poseidon#6f44432cdcf60767458c599d2c7c7fde79892d84"
 dependencies = [
  "ark-bn254",
  "ark-ff 0.4.2",
@@ -3712,7 +3678,7 @@ dependencies = [
  "futures-util",
  "hex",
  "http 1.2.0",
- "hyper 1.5.1",
+ "hyper",
  "hyper-util",
  "k256",
  "nom",
@@ -4836,9 +4802,9 @@ dependencies = [
  "futures-util",
  "h2",
  "http 1.2.0",
- "http-body 1.0.1",
+ "http-body",
  "http-body-util",
- "hyper 1.5.1",
+ "hyper",
  "hyper-rustls",
  "hyper-tls",
  "hyper-util",
@@ -6429,7 +6395,7 @@ dependencies = [
  "bitflags",
  "bytes",
  "http 1.2.0",
- "http-body 1.0.1",
+ "http-body",
  "http-body-util",
  "pin-project-lite",
  "tower-layer",
@@ -7038,12 +7004,11 @@ name = "webprover"
 version = "0.0.0"
 dependencies = [
  "http-body-util",
- "hyper 1.5.1",
+ "hyper",
  "hyper-util",
  "rustls 0.23.19",
  "rustls-pemfile 2.2.0",
  "rustls-pki-types",
- "serde",
  "serde_json",
  "tokio",
  "tokio-rustls 0.26.1",
