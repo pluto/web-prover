@@ -592,7 +592,7 @@ mod tests {
     assert_eq!(manifest.response.version, "HTTP/1.1");
     assert_eq!(manifest.response.headers.len(), 1);
     assert_eq!(manifest.response.headers.get("Content-Type").unwrap(), "application/json");
-    assert_eq!(manifest.response.body.json.len(), 3);
+    assert_eq!(manifest.response.body.json.len(), 5);
   }
 
   #[test]
