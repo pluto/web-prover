@@ -11,7 +11,10 @@ use super::*;
 /// Struct representing a byte or padding.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ByteOrPad {
+  /// A byte.
   Byte(u8),
+  /// Padding byte.
+  /// substituted to `-1` for `Fr` field element and `0` for `u8` byte.
   Pad,
 }
 
@@ -23,7 +26,16 @@ impl ByteOrPad {
     result
   }
 
-  pub fn as_bytes(bytes: &[ByteOrPad]) -> Vec<u8> { bytes.iter().map(|b| u8::from(b)).collect() }
+  /// converts a slice of `ByteOrPad` to a vector of bytes. Converts `Pad` to `0`.
+  pub fn as_bytes(bytes: &[ByteOrPad]) -> Vec<u8> {
+    bytes
+      .iter()
+      .map(|b| match b {
+        ByteOrPad::Byte(b) => *b,
+        ByteOrPad::Pad => 0,
+      })
+      .collect()
+  }
 }
 
 impl From<u8> for ByteOrPad {
@@ -39,15 +51,6 @@ impl From<&ByteOrPad> for halo2curves::bn256::Fr {
     match b {
       ByteOrPad::Byte(b) => halo2curves::bn256::Fr::from(*b as u64),
       ByteOrPad::Pad => -halo2curves::bn256::Fr::one(),
-    }
-  }
-}
-
-impl From<&ByteOrPad> for u8 {
-  fn from(b: &ByteOrPad) -> Self {
-    match b {
-      ByteOrPad::Byte(b) => *b,
-      ByteOrPad::Pad => 0,
     }
   }
 }
@@ -365,7 +368,7 @@ pub fn request_initial_digest(
 
   // Digest all the headers
   let header_bytes = headers_to_bytes(&manifest_request.headers);
-  let headers_digest = header_bytes.iter().map(|bytes| polynomial_digest(bytes, ciphertext_digest));
+  let headers_digest = header_bytes.map(|bytes| polynomial_digest(&bytes, ciphertext_digest));
 
   // Put all the digests into a vec
   let mut all_digests = vec![];
@@ -378,7 +381,6 @@ pub fn request_initial_digest(
   (ciphertext_digest, manifest_digest)
 }
 
-// TODO: for now this is just doing the response
 pub fn response_initial_digest(
   manifest_response: &Response,
   ciphertext: &[ByteOrPad],
@@ -397,7 +399,7 @@ pub fn response_initial_digest(
 
   // Digest all the headers
   let header_bytes = headers_to_bytes(&manifest_response.headers);
-  let headers_digest = header_bytes.iter().map(|bytes| polynomial_digest(bytes, ciphertext_digest));
+  let headers_digest = header_bytes.map(|bytes| polynomial_digest(&bytes, ciphertext_digest));
 
   // Digest the JSON sequence
   let json_tree_hash =
@@ -418,8 +420,8 @@ pub fn response_initial_digest(
 
 // TODO: Note, HTTP does not require a `:` and space between the name and value of a header, so we
 // will have to deal with this somehow, but for now I'm assuming there's a space
-fn headers_to_bytes(headers: &HashMap<String, String>) -> Vec<Vec<u8>> {
-  headers.iter().map(|(k, v)| format!("{}: {}", k.clone(), v.clone()).as_bytes().to_vec()).collect()
+fn headers_to_bytes(headers: &HashMap<String, String>) -> impl Iterator<Item = Vec<u8>> + '_ {
+  headers.iter().map(|(k, v)| format!("{}: {}", k.clone(), v.clone()).as_bytes().to_vec())
 }
 
 #[cfg(test)]
@@ -535,7 +537,7 @@ mod tests {
       &TEST_HTTP_BYTES.iter().copied().map(ByteOrPad::from).collect::<Vec<ByteOrPad>>(),
       "pluto-rocks".as_bytes(),
     );
-    assert_eq!(bytes_from_name, vec![0; TEST_HTTP_BYTES.len()]);
+    assert!(bytes_from_name.is_empty());
   }
 
   #[test]
@@ -633,7 +635,7 @@ mod tests {
       JsonKey::String(KEY2.to_string()),
       JsonKey::String(KEY3.to_string()),
     ];
-    let target_value = b"Taylor Swift";
+
     let polynomial_input = poseidon::<2>(&[F::<G1>::from(69), F::<G1>::from(420)]);
     println!("polynomial_input: {:?}", BigUint::from_bytes_le(&polynomial_input.to_bytes()));
     let stack_and_tree_hashes = json_tree_hasher(polynomial_input, &key_sequence, 10);

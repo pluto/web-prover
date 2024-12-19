@@ -568,7 +568,9 @@ mod tests {
               "json": [
                   "data",
                   "items",
-                  0
+                  0,
+                  "profile",
+                  "name"
               ],
               "contains": "this_string_exists_in_body"
           }
