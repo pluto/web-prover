@@ -9,6 +9,7 @@ use proofs::program::data::{NotExpanded, R1CSType, SetupData, WitnessGeneratorTy
 
 // -------------------------------------- 1024B circuits -------------------------------------- //
 pub const MAX_ROM_LENGTH: usize = 80;
+pub const MAX_ROM_LENGTH_512: usize = 10;
 pub const PROVING_PARAMS_512: &str = "proofs/web_proof_circuits/serialized_setup_512.bytes";
 pub const PROVING_PARAMS_1024: &str = "proofs/web_proof_circuits/serialized_setup_1024.bytes";
 
@@ -44,7 +45,6 @@ const EXTRACT_VALUE_GRAPH: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_1024b/json_extract_value_1024b.bin");
 
 // -------------------------------------- 512B circuits -------------------------------------- //
-const MAX_ROM_LENGTH_512: usize = 80;
 
 // Circuit 0
 const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] =

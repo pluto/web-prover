@@ -26,7 +26,7 @@ use ws_stream_wasm::WsMeta;
 
 use crate::{
   circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
-  tls_client_async2::bind_client, Proof,
+  tls_client_async2::bind_client, Proof, OrigoProof
 };
 
 // #[wasm_bindgen(getter_with_clone)]
@@ -90,7 +90,7 @@ pub async fn proxy_and_sign_and_generate_proof(
   mut config: config::Config,
   proving_params: Option<Vec<u8>>,
 ) -> Result<Proof, errors::ClientErrors> {
-  let sesion_id = config.session_id;
+  let session_id = config.session_id.clone();
   let mut origo_conn = proxy(config.clone(), session_id.clone()).await?;
 
   let sb = SignBody {
