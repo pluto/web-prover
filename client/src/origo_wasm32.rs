@@ -26,7 +26,7 @@ use ws_stream_wasm::WsMeta;
 
 use crate::{
   circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
-  tls_client_async2::bind_client, Proof, OrigoProof
+  tls_client_async2::bind_client, OrigoProof, Proof,
 };
 
 // #[wasm_bindgen(getter_with_clone)]
