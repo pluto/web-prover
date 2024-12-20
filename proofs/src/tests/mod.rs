@@ -338,7 +338,7 @@ fn test_end_to_end_proofs() {
 #[tracing_test::traced_test]
 #[ignore]
 fn test_offline_proofs() {
-  // Deduplicate this. We have it in 3 different places. 
+  // Deduplicate this. We have it in 3 different places.
   let setup_data_1024 = SetupData {
     r1cs_types:              vec![
       R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
@@ -358,10 +358,10 @@ fn test_offline_proofs() {
     witness_generator_types: vec![WitnessGeneratorType::Browser; 3],
     max_rom_length:          MAX_ROM_LENGTH,
   };
-  
+
   for (setup_data, path) in vec![
     (setup_data_1024, "serialized_setup_1024.bytes"),
-    (setup_data_512, "serialized_setup_512.bytes")
+    (setup_data_512, "serialized_setup_512.bytes"),
   ] {
     let public_params = program::setup(&setup_data);
     let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
@@ -377,7 +377,6 @@ fn test_offline_proofs() {
       witnesses: vec![vec![F::<G1>::from(0)]],
     };
     let path = format!("web_proof_circuits/{}", path);
-    let _ = program_data
-      .into_offline(PathBuf::from_str(path.as_str()).unwrap());
-  };
+    let _ = program_data.into_offline(PathBuf::from_str(path.as_str()).unwrap());
+  }
 }

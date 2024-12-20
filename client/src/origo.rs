@@ -47,10 +47,10 @@ pub async fn sign(
 
 #[derive(Serialize, Debug, Clone)]
 pub struct VerifyBody {
-  pub session_id:     String,
+  pub session_id:              String,
   pub request_verifier_digest: String,
-  pub request_proof:  Vec<u8>,
-  pub response_proof: Vec<u8>,
+  pub request_proof:           Vec<u8>,
+  pub response_proof:          Vec<u8>,
 }
 
 #[derive(Deserialize, Debug, Clone)]

@@ -121,10 +121,7 @@ pub async fn proxy_and_sign_and_generate_proof(
   let proof = compressed_snark_proof.serialize();
 
   // TODO(sambhav): Add real response proving
-  Ok(crate::Proof::Origo(OrigoProof{
-    request_proof: Some(proof),
-    response_proof: None
-  }))
+  Ok(crate::Proof::Origo(OrigoProof { request_proof: Some(proof), response_proof: None }))
 }
 
 /// takes TLS transcripts and [`ProvingData`] and generates NIVC [`ProgramData`] for request and

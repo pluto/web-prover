@@ -20,7 +20,8 @@ use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
 use crate::{
-  circuits::*, config, errors::ClientErrors, origo::SignBody, tls::decrypt_tls_ciphertext, OrigoProof, Proof
+  circuits::*, config, errors::ClientErrors, origo::SignBody, tls::decrypt_tls_ciphertext,
+  OrigoProof, Proof,
 };
 
 /// Runs TLS proxy and generates NIVC proof
@@ -72,9 +73,9 @@ pub async fn proxy_and_sign_and_generate_proof(
   );
 
   // TODO(Sambhav): handle request and response into one proof
-  Ok(crate::Proof::Origo(OrigoProof{
-    request_proof: Some(request_proof?),
-    response_proof: Some(response_proof?)
+  Ok(crate::Proof::Origo(OrigoProof {
+    request_proof:  Some(request_proof?),
+    response_proof: Some(response_proof?),
   }))
 }
 

@@ -117,6 +117,7 @@ pub fn construct_setup_data(plaintext_length: usize) -> SetupData {
 }
 
 use std::collections::HashMap;
+
 use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
 use proofs::{
   program::data::{CircuitData, Offline, Online, ProgramData},
@@ -129,7 +130,7 @@ pub struct Verifier {
 }
 
 pub fn get_initialized_verifiers() -> HashMap<String, Verifier> {
-  // TODO: Update to support all 3 circuits in 1024. 
+  // TODO: Update to support all 3 circuits in 1024.
   let decryption_label = String::from("PLAINTEXT_AUTHENTICATION");
   let http_label = String::from("HTTP_VERIFICATION");
 
@@ -144,7 +145,7 @@ pub fn get_initialized_verifiers() -> HashMap<String, Verifier> {
     (http_label.clone(), CircuitData { opcode: 1 }),
   ]);
   let rom_1024 = vec![decryption_label.clone(), http_label.clone()];
-  
+
   let params_1024 = (PROVING_PARAMS_1024, 1024, rom_data_1024, rom_1024);
   let params_512 = (PROVING_PARAMS_512, 512, rom_data_512, rom_512);
 
@@ -156,7 +157,7 @@ pub fn get_initialized_verifiers() -> HashMap<String, Verifier> {
       public_params: bytes,
       // TODO: These are incorrect, but we don't know them until the internal parser completes.
       // during the transition to `into_online` they're populated.
-      vk_digest_primary: F::<G1>::from(0), 
+      vk_digest_primary: F::<G1>::from(0),
       vk_digest_secondary: F::<G2>::from(0),
       setup_data,
       rom,
@@ -168,14 +169,11 @@ pub fn get_initialized_verifiers() -> HashMap<String, Verifier> {
     .into_online()
     .unwrap();
 
-    let (_pk, verifier_key) = CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
+    let (_pk, verifier_key) =
+      CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
     let verifier_digest = hex::encode(program_data.vk_digest_primary.to_bytes());
-    let _ = verifiers.insert(verifier_digest, Verifier{
-      program_data,
-      verifier_key,
-    });
+    let _ = verifiers.insert(verifier_digest, Verifier { program_data, verifier_key });
   }
 
-  return verifiers
-
+  return verifiers;
 }

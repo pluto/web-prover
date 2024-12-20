@@ -127,11 +127,8 @@ fn test_run_serialized_verify() {
   // Create the compressed proof with the offlined `PublicParams`
   let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
 
-  // Serialize the proof and zlib compress further
-  let serialized_compressed_proof = proof.serialize_and_compress();
-
-  // Decompress and deserialize
-  let proof = serialized_compressed_proof.decompress_and_serialize();
+  let serialized_compressed_proof = proof.serialize();
+  let proof = serialized_compressed_proof.deserialize();
 
   // Extend the initial state input with the ROM (happens internally inside of `program::run`, so
   // we do it out here just for the test)

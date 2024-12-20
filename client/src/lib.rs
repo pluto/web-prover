@@ -19,11 +19,10 @@ use tracing::info;
 
 use crate::errors::ClientErrors;
 
-
 #[derive(Debug, Serialize)]
 pub struct OrigoProof {
-  request_proof: Option<FoldingProof<Vec<u8>, String>>,
-  response_proof: Option<FoldingProof<Vec<u8>, String>>
+  request_proof:  Option<FoldingProof<Vec<u8>, String>>,
+  response_proof: Option<FoldingProof<Vec<u8>, String>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -90,15 +89,19 @@ pub async fn prover_inner_origo(
   // TODO (tracy): Handle verify of response proofs.
   let r = proof.unwrap();
   let request_proof = match &r {
-    Proof::Origo(p) => p.request_proof.unwrap(),
-    _ => panic!("no request proof")
+    Proof::Origo(p) => p.request_proof.as_ref().unwrap(),
+    _ => panic!("no request proof"),
   };
 
   // TODO: Actually propagate errors up to the client
-  let verify_response =
-    origo::verify(config, origo::VerifyBody { request_proof: request_proof.proof.clone(), response_proof: Vec::new(), session_id, request_verifier_digest: request_proof.verifier_digest.clone() })
-      .await
-      .unwrap();
+  let verify_response = origo::verify(config, origo::VerifyBody {
+    request_proof: request_proof.proof.clone(),
+    response_proof: Vec::new(),
+    session_id,
+    request_verifier_digest: request_proof.verifier_digest.clone(),
+  })
+  .await
+  .unwrap();
 
   // TODO: Don't assert?
   use tracing::debug;

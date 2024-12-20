@@ -355,10 +355,10 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   ///    - The initial NIVC (Non-Interactive Verifiable Computation) input
   ///    - An initial ROM index of zero
   ///    - The expanded ROM opcodes converted to field elements
-  /// 
+  ///
   /// # Arguments
   /// - `input_override`: Optional override for the initial_nivc_input
-  /// used during verification. 
+  /// used during verification.
   ///
   /// # Returns
   ///
@@ -370,7 +370,10 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   ///
   /// Returns a `ProofError` if:
   /// - Any opcode configuration specified in the ROM is not found in `rom_data`
-  pub fn extend_public_inputs(&self, input_override: Option<Vec<F<G1>>>) -> Result<(Vec<F<G1>>, Vec<u64>), ProofError> {
+  pub fn extend_public_inputs(
+    &self,
+    input_override: Option<Vec<F<G1>>>,
+  ) -> Result<(Vec<F<G1>>, Vec<u64>), ProofError> {
     // TODO: This is currently enabled for _either_ Expanded or NotExpanded
     let mut rom = self
       .rom
@@ -389,8 +392,8 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
     rom.resize(self.setup_data.max_rom_length, u64::MAX);
 
     let mut z0_primary: Vec<F<G1>> = match input_override {
-        Some(input) => input,
-        None => self.initial_nivc_input.clone()
+      Some(input) => input,
+      None => self.initial_nivc_input.clone(),
     };
     z0_primary.push(F::<G1>::ZERO); // rom_index = 0
     z0_primary.extend(rom.iter().map(|opcode| <E1 as Engine>::Scalar::from(*opcode)));

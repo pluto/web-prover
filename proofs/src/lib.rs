@@ -16,7 +16,7 @@ use tracing::{debug, error, info};
 
 use crate::{
   errors::ProofError,
-  program::data::{Expanded, Online, ProgramData, R1CSType, SetupData, WitnessGeneratorType},
+  program::data::{Online, ProgramData, R1CSType, SetupData, WitnessGeneratorType},
 };
 
 pub mod circom;

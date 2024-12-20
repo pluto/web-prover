@@ -12,6 +12,7 @@ use axum::{
   routing::{get, post},
   Router,
 };
+use circuits::Verifier;
 use errors::NotaryServerError;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
@@ -29,7 +30,6 @@ use tower_http::cors::CorsLayer;
 use tower_service::Service;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use circuits::Verifier;
 
 mod axum_websocket;
 mod circuits;
@@ -42,13 +42,13 @@ mod tlsn;
 mod websocket_proxy;
 
 struct SharedState {
-  notary_signing_key:   SigningKey,
-  origo_signing_key:    Secp256k1SigningKey,
-  tlsn_max_sent_data:   usize,
-  tlsn_max_recv_data:   usize,
-  origo_sessions:       Arc<Mutex<HashMap<String, tls_parser::UnparsedTranscript>>>,
-  verifier_sessions:    Arc<Mutex<HashMap<String, origo::VerifierInputs>>>,
-  verifiers:            HashMap<String, Verifier>,
+  notary_signing_key: SigningKey,
+  origo_signing_key:  Secp256k1SigningKey,
+  tlsn_max_sent_data: usize,
+  tlsn_max_recv_data: usize,
+  origo_sessions:     Arc<Mutex<HashMap<String, tls_parser::UnparsedTranscript>>>,
+  verifier_sessions:  Arc<Mutex<HashMap<String, origo::VerifierInputs>>>,
+  verifiers:          HashMap<String, Verifier>,
 }
 
 /// Main entry point for the notary server application.
@@ -95,15 +95,15 @@ async fn main() -> Result<(), NotaryServerError> {
 
   let listener = TcpListener::bind(&c.listen).await?;
   info!("Listening on https://{}", &c.listen);
-  
+
   let shared_state = Arc::new(SharedState {
-    notary_signing_key:   load_notary_signing_key(&c.notary_signing_key),
-    origo_signing_key:    load_origo_signing_key(&c.origo_signing_key),
-    tlsn_max_sent_data:   c.tlsn_max_sent_data,
-    tlsn_max_recv_data:   c.tlsn_max_recv_data,
-    origo_sessions:       Default::default(),
-    verifier_sessions:    Default::default(),
-    verifiers:      circuits::get_initialized_verifiers(),
+    notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
+    origo_signing_key:  load_origo_signing_key(&c.origo_signing_key),
+    tlsn_max_sent_data: c.tlsn_max_sent_data,
+    tlsn_max_recv_data: c.tlsn_max_recv_data,
+    origo_sessions:     Default::default(),
+    verifier_sessions:  Default::default(),
+    verifiers:          circuits::get_initialized_verifiers(),
   });
 
   let router = Router::new()

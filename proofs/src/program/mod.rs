@@ -211,9 +211,9 @@ pub fn compress_proof_no_setup(
   );
 
   debug!("`CompressedSNARK::prove STARTING PROVING!");
-  let proof = Proof{
-    proof: CompressedSNARK::<E1, S1, S2>::prove(&public_params, &pk, recursive_snark)?,
-    verifier_digest: vk_digest_primary, 
+  let proof = Proof {
+    proof:           CompressedSNARK::<E1, S1, S2>::prove(&public_params, &pk, recursive_snark)?,
+    verifier_digest: vk_digest_primary,
   };
   debug!("`CompressedSNARK::prove completed!");
 
@@ -235,8 +235,8 @@ pub fn compress_proof(
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
 
-  let proof = Proof{
-    proof: CompressedSNARK::<E1, S1, S2>::prove(public_params, &pk, recursive_snark)?,
+  let proof = Proof {
+    proof:           CompressedSNARK::<E1, S1, S2>::prove(public_params, &pk, recursive_snark)?,
     verifier_digest: pk.pk_primary.vk_digest,
   };
   debug!("`CompressedSNARK::prove completed!");

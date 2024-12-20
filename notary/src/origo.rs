@@ -50,11 +50,11 @@ pub struct SignBody {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct VerifyBody {
-  session_id:     String,
+  session_id:              String,
   request_verifier_digest: String,
-  // TODO: Also add response side. 
-  request_proof:  Vec<u8>,
-  response_proof: Vec<u8>,
+  // TODO: Also add response side.
+  request_proof:           Vec<u8>,
+  response_proof:          Vec<u8>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -207,9 +207,9 @@ pub async fn proxy(
   }
 }
 
-use proofs::proof::Proof;
 use proofs::{
   program::data::{CircuitData, Offline, Online, ProgramData},
+  proof::Proof,
   E1, F, G1, G2, S1, S2,
 };
 
@@ -217,13 +217,14 @@ pub async fn verify(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<VerifyBody>,
 ) -> Result<Json<VerifyReply>, ProxyError> {
-  let proof = Proof{
-    proof: payload.request_proof,
+  let proof = Proof {
+    proof:           payload.request_proof,
     verifier_digest: payload.request_verifier_digest.clone(),
-  }.deserialize();
+  }
+  .deserialize();
 
   // TODO (tracy): Right now this only verifies the request, we need to accept
-  // digest for req/resp and set intersect with verifier_inputs. 
+  // digest for req/resp and set intersect with verifier_inputs.
 
   // Form verifier inputs
   let verifier_inputs =
@@ -233,7 +234,12 @@ pub async fn verify(
   let (z0_primary, _) = verifier.program_data.extend_public_inputs(initial_nivc_input).unwrap();
   let z0_secondary = vec![F::<G2>::from(0)];
 
-  let valid = match proof.proof.verify(&verifier.program_data.public_params, &verifier.verifier_key, &z0_primary, &z0_secondary) {
+  let valid = match proof.proof.verify(
+    &verifier.program_data.public_params,
+    &verifier.verifier_key,
+    &z0_primary,
+    &z0_secondary,
+  ) {
     Ok(_) => true,
     Err(e) => {
       error!("Error verifying proof: {:?}", e);
