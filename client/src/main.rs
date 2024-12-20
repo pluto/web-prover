@@ -28,7 +28,8 @@ async fn main() -> Result<(), ClientErrors> {
   tracing_subscriber::fmt().with_max_level(log_level).with_line_number(true).init();
 
   let config_json = std::fs::read_to_string(args.config)?;
-  let config: Config = serde_json::from_str(&config_json)?;
+  let mut config: Config = serde_json::from_str(&config_json)?;
+  config.session_id();
 
   let proving_params =
     std::fs::read("proofs/web_proof_circuits/serialized_setup_aes.bytes").unwrap();

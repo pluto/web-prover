@@ -46,7 +46,7 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, erro
     .ok_or_else(|| ClientErrors::Other("max_recv_data is missing".to_string()))?;
 
   let prover_config = ProverConfig::builder()
-    .id(config.session_id())
+    .id(config.session_id.clone())
     .root_cert_store(root_store)
     .server_dns(config.target_host()?)
     .max_transcript_size(max_sent_data + max_recv_data)
@@ -72,6 +72,7 @@ pub async fn prover_inner_origo(
   config: config::Config,
   proving_params: Option<Vec<u8>>,
 ) -> Result<Proof, errors::ClientErrors> {
+  let session_id = config.session_id.clone();
   #[cfg(target_arch = "wasm32")]
   let proof = origo_wasm32::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await;
 
@@ -80,15 +81,16 @@ pub async fn prover_inner_origo(
 
   // TODO (tracy): Handle verify of response proofs.
   let r = proof.unwrap();
-  let (real_proof, ciphertext_hash) = match &r {
+  let (request_proof, response_proof) = match &r {
     Proof::Origo(proof) => (proof.0.clone(), proof.1.clone()),
     _ => (Vec::new(), Vec::new()),
   };
 
   // TODO: Actually propagate errors up to the client
-  // TODO: Do not pass the ciphertext hash like this (it's unauthenticated)
   let verify_response =
-    origo::verify(config, origo::VerifyBody { proof: real_proof, ciphertext_hash }).await.unwrap();
+    origo::verify(config, origo::VerifyBody { request_proof, response_proof, session_id })
+      .await
+      .unwrap();
 
   // TODO: Don't assert?
   use tracing::debug;

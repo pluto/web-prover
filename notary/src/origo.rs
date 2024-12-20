@@ -50,14 +50,21 @@ pub struct SignBody {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct VerifyBody {
-  proof:           Vec<u8>,
-  ciphertext_hash: Vec<u8>,
+  session_id:     String,
+  request_proof:  Vec<u8>,
+  response_proof: Vec<u8>,
 }
 
 #[derive(Serialize, Debug, Clone)]
 pub struct VerifyReply {
   valid: bool,
   // TODO: need a signature
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct VerifierInputs {
+  request_hashes:  Vec<F<G1>>,
+  response_hashes: Vec<F<G1>>,
 }
 
 pub async fn sign(
@@ -84,6 +91,17 @@ pub async fn sign(
       return Err(e);
     },
   }
+
+  // Determine possible request hash and response hash
+  let (request_hashes, response_hashes) = parsed_transcript.get_ciphertext_hashes();
+
+  // Log a verifier session for public inputs
+  debug!("inserting with session_id={:?}", query.session_id);
+  state
+    .verifier_sessions
+    .lock()
+    .unwrap()
+    .insert(query.session_id.clone(), VerifierInputs { request_hashes, response_hashes });
 
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
@@ -192,22 +210,21 @@ use client_side_prover::supernova::snark::CompressedSNARK;
 use proofs::{
   program::data::{CircuitData, NotExpanded, Offline, ProgramData},
   proof::Proof,
-  witness::{data_hasher, ByteOrPad},
   E1, F, G1, G2, S1, S2,
 };
 
-use crate::circuits;
+use crate::{circuits, tls_parser::CIRCUIT_SIZE_MAX};
 
 pub async fn verify(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<VerifyBody>,
 ) -> Result<Json<VerifyReply>, ProxyError> {
-  let proof = Proof(payload.proof).decompress_and_serialize();
+  // TODO (tracy): Right now we are only verifying the request proof.
+  let proof = Proof(payload.request_proof).decompress_and_serialize();
 
-  let max_ciphertext = 1024;
   // TODO (tracy): Move this into a method on the proofs crate, probably also move the circuits.rs
   // file.
-  let setup_data_large = circuits::construct_setup_data(max_ciphertext);
+  let setup_data_large = circuits::construct_setup_data(CIRCUIT_SIZE_MAX);
   let decryption_label = String::from("PLAINTEXT_AUTHENTICATION");
   let http_label = String::from("HTTP_VERIFICATION");
   let rom_data = HashMap::from([
@@ -215,16 +232,10 @@ pub async fn verify(
     (http_label.clone(), CircuitData { opcode: 1 }),
   ]);
 
-  // TODO (tracy): Need to form the real ciphertext, for now just accept a hash.
-  let ciphertext = vec![];
-  let padded_ciphertext = ByteOrPad::from_bytes_with_padding(
-    &ciphertext,
-    max_ciphertext - ciphertext.len(), // TODO: support different sizes.
-  );
-  use client_side_prover::traits::Engine;
-  // let initial_nivc_input = vec![data_hasher(&padded_ciphertext)];
-  let initial_nivc_input =
-    vec![<E1 as Engine>::Scalar::from_bytes(&payload.ciphertext_hash.try_into().unwrap()).unwrap()];
+  debug!("session_id={:?}", payload.session_id);
+
+  let verifier_inputs =
+    state.verifier_sessions.lock().unwrap().get(&payload.session_id).cloned().unwrap();
 
   // TODO (tracy): We are re-initializing this everytime we verify a proof, which slows down this
   // API. We did it this way due to initial_nivc_input being static on the object. Add
@@ -237,7 +248,7 @@ pub async fn verify(
     setup_data: setup_data_large,
     rom,
     rom_data,
-    initial_nivc_input,
+    initial_nivc_input: vec![verifier_inputs.request_hashes.get(0).cloned().unwrap()],
     inputs: (vec![HashMap::new()], HashMap::new()),
     witnesses: vec![],
   }

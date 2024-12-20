@@ -46,6 +46,7 @@ struct SharedState {
   tlsn_max_sent_data:   usize,
   tlsn_max_recv_data:   usize,
   origo_sessions:       Arc<Mutex<HashMap<String, tls_parser::UnparsedTranscript>>>,
+  verifier_sessions:    Arc<Mutex<HashMap<String, origo::VerifierInputs>>>,
   verifier_param_bytes: Vec<u8>,
 }
 
@@ -101,6 +102,7 @@ async fn main() -> Result<(), NotaryServerError> {
     tlsn_max_sent_data:   c.tlsn_max_sent_data,
     tlsn_max_recv_data:   c.tlsn_max_recv_data,
     origo_sessions:       Default::default(),
+    verifier_sessions:    Default::default(),
     verifier_param_bytes: proving_param_bytes,
   });
 

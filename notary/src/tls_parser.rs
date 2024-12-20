@@ -1,6 +1,10 @@
 use std::io::Cursor;
 
 use nom::{bytes::streaming::take, IResult};
+use proofs::{
+  witness::{data_hasher, ByteOrPad},
+  F, G1,
+};
 use tls_client2::{
   hash_hs::HandshakeHashBuffer,
   internal::msgs::hsjoiner::HandshakeJoiner,
@@ -25,6 +29,11 @@ use tls_parser::{
 use tracing::{debug, error, info, trace};
 
 use crate::errors::ProxyError;
+
+const TRIMMED_BYTES: usize = 17;
+// TODO: Relocate and consolidate with circuits.rs
+pub const CIRCUIT_SIZE_SMALL: usize = 512;
+pub const CIRCUIT_SIZE_MAX: usize = 1024;
 
 #[derive(Debug, Copy, Clone)]
 pub enum Direction {
@@ -232,15 +241,12 @@ impl ParsedTranscript {
           // TODO: some of these (CertificateRequest, HelloRetryRequest) are not considered in happy
           // path, handle later
           _ => {
-            println!("verify_certificate_sig: unhandled {:?}", handshake.typ); // TODO probably just
-                                                                               // ignore
+            println!("verify_certificate_sig: unhandled {:?}", handshake.typ);
           },
         },
         _ => {
           // TODO just ignore? should be handshakes only
-          trace!(
-            "verify_certificate_sig: unexpected non-handshake message while verifying signature"
-          );
+          trace!("verify_certificate_sig: unexpected non-handshake message");
         },
       }
     }
@@ -248,38 +254,157 @@ impl ParsedTranscript {
     return Err(ProxyError::TlsHandshakeVerify(String::from("unable to parse verify data")));
   }
 
-  /// Retrieve a hash of the request ciphertext. We require a very specific structure
-  /// that matches for nearly all well formed TLS 1.3 sessions.  There may be more
-  /// robust approaches here.
-  pub fn get_request_ciphertext() -> Vec<u8> { return vec![]; }
+  /// Given chunks of possible request or response data, compute
+  /// the valid subsequences and hash them.
+  ///
+  /// Example:
+  /// Given as input three chunks of bytes [1,2,3]
+  ///
+  /// Output:
+  /// [H([1]), H([1,2]), H([1,2,3]), H([2]), H([2,3]), H([3])]
+  fn get_permutations(input: &Vec<Vec<u8>>) -> Vec<F<G1>> {
+    let mut result = Vec::new();
 
-  pub fn get_response_hashes() -> Vec<Vec<u8>> {
-    // Encrypted messages contains everything after the server completes its handshake,
-    // this includes
-    // - client change cipher spec,
-    // - client handshake finished message,
-    // - client request
-    // - 0..n session tickets from the server
-    // - server response
+    fn get_hashes(bytes: Vec<u8>) -> Vec<F<G1>> {
+      vec![CIRCUIT_SIZE_SMALL, CIRCUIT_SIZE_MAX]
+        .into_iter()
+        .filter(|&size| bytes.len() <= size)
+        .map(|size| data_hasher(&ByteOrPad::from_bytes_with_padding(&bytes, size - bytes.len())))
+        .collect()
+    }
+
+    for i in 0..input.len() {
+      let mut current = Vec::new();
+      result.extend(get_hashes(input[i].clone()));
+      current.extend(&input[i]);
+
+      for j in (i + 1)..input.len() {
+        let mut combined = current.clone();
+        combined.extend(&input[j]);
+        result.extend(get_hashes(combined.clone()));
+      }
+    }
+
+    result.dedup();
+    result
+  }
+
+  /// Retrieve possible valid hashes of ciphertext. Unfortunately using encrypted
+  /// TLS 1.3 data as input, there is not a deterministic way to extract the
+  /// request and response data.  There can be a variable number of either request
+  /// or response messages and they exist in an indeterminate spot in the transcript.
+  ///
+  /// To overcome this, we identify the potential subsequences of bytes and then hash
+  /// all of them. The verifier will check all hashes to determine if one of the correct
+  /// ones was observed.
+  ///
+  /// To skip redundant verification in the future, we could accept a possible target hash
+  /// from the client and check if it is in the set of valid hashes.
+  pub fn get_ciphertext_hashes(&self) -> (Vec<F<G1>>, Vec<F<G1>>) {
+    // State machine for extracting request response
+    // Transcript Structure:
+    // - Encrypted 1: server sends back verify data
+    // - Encrypted 2: client sends back verify data => drop first one from client
+    // - Encrypted 2..i: client sends back real request
+    // - Encrypted i..j: server sends back session ticket 0..m
+    // - Encrypted j..k: server sends back real response
+    // - Encrypted k: server sends close notify => drop message
     //
-    // To correctly form a "ciphertext" hash of the data received from the server, we must extract
-    // some structure from this encrypted data.
+    enum State {
+      SeekingRequest,
+      ParsingRequest,
+      ParsingResponse,
+    }
 
-    // Tasks:
-    // - label the direction of the encrypted data
-    // -
+    fn process_msg(
+      m: &ParsedMessage,
+      bytes: Vec<u8>,
+      s: State,
+      idx: usize,
+      last_msg_idx: usize,
+      req: &mut Vec<Vec<u8>>,
+      resp: &mut Vec<Vec<u8>>,
+    ) -> State {
+      let trim = bytes.len() - TRIMMED_BYTES;
+      let trimmed_bytes = bytes[..trim].to_vec();
+      match s {
+        State::SeekingRequest => {
+          return if matches!(m.direction, Direction::Received) {
+            State::SeekingRequest
+          } else {
+            // Drop the first non-received message. It's verify data from the client.
+            State::ParsingRequest
+          };
+        },
+        State::ParsingRequest => {
+          return if matches!(m.direction, Direction::Sent) {
+            // Case: more request messages
+            req.push(trimmed_bytes);
+            State::ParsingRequest
+          } else {
+            // Case: first message from server after request
+            resp.push(trimmed_bytes);
+            State::ParsingResponse
+          };
+        },
+        State::ParsingResponse => {
+          return if matches!(m.direction, Direction::Received) {
+            // Case: receiving message & not the last message. Drop last message, it's close notify.
+            if idx < last_msg_idx {
+              resp.push(trimmed_bytes);
+            }
+            State::ParsingResponse
+          } else {
+            panic!("expected only response data");
+          };
+        },
+      }
+    }
 
-    // let mut ciphertext = Vec::new();
-    // for msg in encrypted_messages {
-    //     match msg.payload {
-    //     Payload(bytes) => ciphertext.push(bytes.clone()),
-    //     _ => panic!("invalid payload"),
-    //     }
-    // }
-    // debug!("Prepared ciphertext={:?}", ciphertext);
+    let mut request_messages: Vec<Vec<u8>> = Vec::new();
+    let mut response_messages: Vec<Vec<u8>> = Vec::new();
+    let mut current_state = State::SeekingRequest;
+    for (m_idx, m) in self.messages.iter().enumerate() {
+      match &m.payload {
+        WrappedPayload::Encrypted(e) => {
+          info!(
+            "Encrypted Message: direction={:?}, seq={:?}, typ={:?}, version={:?}, payload={:?}",
+            m.direction,
+            m.seq,
+            e.typ,
+            e.version,
+            hex::encode(e.payload.0.clone())
+          );
+          current_state = process_msg(
+            m,
+            e.payload.0.clone(),
+            current_state,
+            m_idx,
+            self.messages.len() - 1,
+            &mut request_messages,
+            &mut response_messages,
+          );
+        },
+        WrappedPayload::Decrypted(d) => {
+          info!(
+            "Decrypted Message: direction={:?}, seq={:?}, content_type={:?}, version={:?}",
+            m.direction,
+            m.seq,
+            d.version,
+            d.payload.content_type()
+          );
+          continue;
+        },
+      };
+    }
 
-    // TODO
-    return vec![vec![]];
+    let request_hashes = ParsedTranscript::get_permutations(&request_messages);
+    let response_hashes = ParsedTranscript::get_permutations(&response_messages);
+
+    debug!("request_hashes={:?}", request_hashes);
+    debug!("response_hashes={:?}", response_hashes);
+
+    (request_hashes, response_hashes)
   }
 }
 

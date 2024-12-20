@@ -32,8 +32,7 @@ pub async fn proxy_and_sign_and_generate_proof(
   mut config: config::Config,
   proving_params: Option<Vec<u8>>,
 ) -> Result<Proof, ClientErrors> {
-  let session_id = config.session_id();
-  let mut origo_conn = proxy(config.clone(), session_id.clone()).await?;
+  let mut origo_conn = proxy(config.clone(), config.session_id.clone()).await?;
 
   let sb = SignBody {
     handshake_server_iv:  hex::encode(
@@ -44,7 +43,7 @@ pub async fn proxy_and_sign_and_generate_proof(
     ),
   };
 
-  let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb).await;
+  let sign_data = crate::origo::sign(config.clone(), config.session_id.clone(), sb).await;
 
   let witness = origo_conn.to_witness_data();
 
@@ -73,8 +72,7 @@ pub async fn proxy_and_sign_and_generate_proof(
   );
 
   // TODO(Sambhav): handle request and response into one proof
-  // TODO(Tracy): Dropped the request proof to easily pass through extra ciphertext data. Fix this.
-  Ok(crate::Proof::Origo(request_proof?.0))
+  Ok(crate::Proof::Origo((request_proof?.0, response_proof?.0)))
 }
 
 /// generates NIVC proof from [`ProgramData`]
@@ -114,7 +112,7 @@ fn construct_request_program_data_and_proof(
   manifest_request: &ManifestRequest,
   inputs: EncryptionInput,
   proving_params: Vec<u8>,
-) -> Result<CompressedSNARKProof<(Vec<u8>, Vec<u8>)>, ClientErrors> {
+) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
   debug!("Setting up request's `PublicParams`... (this may take a moment)");
   let setup_data = construct_setup_data();
 
@@ -130,16 +128,17 @@ fn construct_request_program_data_and_proof(
     setup_data,
     rom,
     rom_data: circuit_data,
-    initial_nivc_input: initial_nivc_input.clone(), // vec![F::<G1>::from(0)], // TODO: Temporarily override, see if we can verify this. 
+    initial_nivc_input: initial_nivc_input.clone(),
     inputs: (private_inputs, fold_inputs),
     witnesses: vec![vec![F::<G1>::from(0)]],
-  }.into_online()?.into_expanded()?;
+  }
+  .into_online()?
+  .into_expanded()?;
 
   debug!("starting request recursive proving");
   let proof = generate_proof(program_data)?;
 
-  // TODO (tracy): Fix this janky ciphertext passthrough
-  Ok(CompressedSNARKProof((proof.0, initial_nivc_input[0].clone().to_bytes().to_vec())))
+  Ok(CompressedSNARKProof(proof.0))
 }
 
 /// takes TLS transcripts and [`ProvingData`] and generates NIVC [`ProgramData`] for request and

@@ -48,7 +48,7 @@ pub struct Config {
   pub proving: ProvingData,
 
   #[serde(skip)]
-  session_id: String,
+  pub session_id: String,
 }
 
 impl Config {

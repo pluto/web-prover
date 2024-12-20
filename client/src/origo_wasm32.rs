@@ -90,7 +90,7 @@ pub async fn proxy_and_sign_and_generate_proof(
   mut config: config::Config,
   proving_params: Option<Vec<u8>>,
 ) -> Result<Proof, errors::ClientErrors> {
-  let session_id = config.session_id();
+  let sesion_id = config.session_id;
   let mut origo_conn = proxy(config.clone(), session_id.clone()).await?;
 
   let sb = SignBody {

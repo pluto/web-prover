@@ -31,7 +31,8 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
       assert!(!config_json.is_null());
       CStr::from_ptr(config_json).to_str().unwrap()
     };
-    let config: Config = serde_json::from_str(config_str).unwrap();
+    let mut config: Config = serde_json::from_str(config_str).unwrap();
+    config.session_id();
     let rt = tokio::runtime::Runtime::new().unwrap();
     let start = Instant::now();
     debug!("starting proving");
