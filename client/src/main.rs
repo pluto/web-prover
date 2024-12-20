@@ -2,6 +2,8 @@ use clap::Parser;
 use client::{config::Config, errors::ClientErrors};
 use tracing::Level;
 
+pub mod circuits;
+
 #[derive(Parser)]
 #[clap(name = "Web Proof Client")]
 #[clap(about = "A client to generate Web Proofs.", long_about = None)]
@@ -32,7 +34,7 @@ async fn main() -> Result<(), ClientErrors> {
   config.session_id();
 
   let proving_params =
-    std::fs::read("proofs/web_proof_circuits/serialized_setup_aes.bytes").unwrap();
+    std::fs::read(circuits::PROVING_PARAMS_1024).unwrap();
   let proof = client::prover_inner(config, Some(proving_params)).await?;
   let proof_json = serde_json::to_string_pretty(&proof)?;
   println!("Proving Successful: proof_len={:?}", proof_json.len());

@@ -355,6 +355,10 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   ///    - The initial NIVC (Non-Interactive Verifiable Computation) input
   ///    - An initial ROM index of zero
   ///    - The expanded ROM opcodes converted to field elements
+  /// 
+  /// # Arguments
+  /// - `input_override`: Optional override for the initial_nivc_input
+  /// used during verification. 
   ///
   /// # Returns
   ///
@@ -366,7 +370,7 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   ///
   /// Returns a `ProofError` if:
   /// - Any opcode configuration specified in the ROM is not found in `rom_data`
-  pub fn extend_public_inputs(&self) -> Result<(Vec<F<G1>>, Vec<u64>), ProofError> {
+  pub fn extend_public_inputs(&self, input_override: Option<Vec<F<G1>>>) -> Result<(Vec<F<G1>>, Vec<u64>), ProofError> {
     // TODO: This is currently enabled for _either_ Expanded or NotExpanded
     let mut rom = self
       .rom
@@ -383,7 +387,11 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
       .collect::<Result<Vec<u64>, ProofError>>()?;
 
     rom.resize(self.setup_data.max_rom_length, u64::MAX);
-    let mut z0_primary: Vec<F<G1>> = self.initial_nivc_input.clone();
+
+    let mut z0_primary: Vec<F<G1>> = match input_override {
+        Some(input) => input,
+        None => self.initial_nivc_input.clone()
+    };
     z0_primary.push(F::<G1>::ZERO); // rom_index = 0
     z0_primary.extend(rom.iter().map(|opcode| <E1 as Engine>::Scalar::from(*opcode)));
     Ok((z0_primary, rom.clone()))
@@ -463,7 +471,7 @@ mod tests {
     let program_data = create_test_program_data();
 
     // Test successful case
-    let result = program_data.extend_public_inputs();
+    let result = program_data.extend_public_inputs(None);
     assert!(result.is_ok());
 
     let (z0_primary, expanded_rom) = result.unwrap();
@@ -489,7 +497,7 @@ mod tests {
     // Add an opcode config that doesn't exist in rom_data
     program_data.rom.push("nonexistent".to_string());
 
-    let result = program_data.extend_public_inputs();
+    let result = program_data.extend_public_inputs(None);
     assert!(result.is_err());
     assert!(matches!(
         result.unwrap_err(),

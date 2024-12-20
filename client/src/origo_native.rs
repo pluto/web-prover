@@ -20,7 +20,7 @@ use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
 use crate::{
-  circuits::*, config, errors::ClientErrors, origo::SignBody, tls::decrypt_tls_ciphertext, Proof,
+  circuits::*, config, errors::ClientErrors, origo::SignBody, tls::decrypt_tls_ciphertext, OrigoProof, Proof
 };
 
 /// Runs TLS proxy and generates NIVC proof
@@ -72,7 +72,10 @@ pub async fn proxy_and_sign_and_generate_proof(
   );
 
   // TODO(Sambhav): handle request and response into one proof
-  Ok(crate::Proof::Origo((request_proof?.0, response_proof?.0)))
+  Ok(crate::Proof::Origo(OrigoProof{
+    request_proof: Some(request_proof?),
+    response_proof: Some(response_proof?)
+  }))
 }
 
 /// generates NIVC proof from [`ProgramData`]
@@ -81,7 +84,8 @@ pub async fn proxy_and_sign_and_generate_proof(
 /// - serialize proof
 fn generate_proof(
   program_data: ProgramData<Online, Expanded>,
-) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
+) -> Result<CompressedSNARKProof<Vec<u8>, String>, ClientErrors> {
+  debug!("starting request recursive proving");
   let program_output = program::run(&program_data)?;
   debug!("starting request proof compression");
   let compressed_snark_proof = program::compress_proof_no_setup(
@@ -90,7 +94,7 @@ fn generate_proof(
     program_data.vk_digest_primary,
     program_data.vk_digest_secondary,
   )?;
-  Ok(compressed_snark_proof.serialize_and_compress())
+  Ok(compressed_snark_proof.serialize())
 }
 
 /// creates NIVC proof from TLS transcript and [`Manifest`] config
@@ -112,7 +116,7 @@ fn construct_request_program_data_and_proof(
   manifest_request: &ManifestRequest,
   inputs: EncryptionInput,
   proving_params: Vec<u8>,
-) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
+) -> Result<CompressedSNARKProof<Vec<u8>, String>, ClientErrors> {
   debug!("Setting up request's `PublicParams`... (this may take a moment)");
   let setup_data = construct_setup_data();
 
@@ -138,7 +142,7 @@ fn construct_request_program_data_and_proof(
   debug!("starting request recursive proving");
   let proof = generate_proof(program_data)?;
 
-  Ok(CompressedSNARKProof(proof.0))
+  Ok(proof)
 }
 
 /// takes TLS transcripts and [`ProvingData`] and generates NIVC [`ProgramData`] for request and
@@ -153,7 +157,7 @@ fn construct_response_program_data_and_proof(
   manifest_response: &ManifestResponse,
   inputs: EncryptionInput,
   proving_params: Vec<u8>,
-) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
+) -> Result<CompressedSNARKProof<Vec<u8>, String>, ClientErrors> {
   debug!("Setting up response's `PublicParams`... (this may take a moment)");
   let setup_data = construct_setup_data();
 

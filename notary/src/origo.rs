@@ -51,6 +51,8 @@ pub struct SignBody {
 #[derive(Deserialize, Debug, Clone)]
 pub struct VerifyBody {
   session_id:     String,
+  request_verifier_digest: String,
+  // TODO: Also add response side. 
   request_proof:  Vec<u8>,
   response_proof: Vec<u8>,
 }
@@ -204,76 +206,42 @@ pub async fn proxy(
     }),
   }
 }
-use std::collections::HashMap;
 
-use client_side_prover::supernova::snark::CompressedSNARK;
+use proofs::proof::Proof;
 use proofs::{
-  program::data::{CircuitData, NotExpanded, Offline, ProgramData},
-  proof::Proof,
+  program::data::{CircuitData, Offline, Online, ProgramData},
   E1, F, G1, G2, S1, S2,
 };
-
-use crate::{circuits, tls_parser::CIRCUIT_SIZE_MAX};
 
 pub async fn verify(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<VerifyBody>,
 ) -> Result<Json<VerifyReply>, ProxyError> {
-  // TODO (tracy): Right now we are only verifying the request proof.
-  let proof = Proof(payload.request_proof).decompress_and_serialize();
+  let proof = Proof{
+    proof: payload.request_proof,
+    verifier_digest: payload.request_verifier_digest.clone(),
+  }.deserialize();
 
-  // TODO (tracy): Move this into a method on the proofs crate, probably also move the circuits.rs
-  // file.
-  let setup_data_large = circuits::construct_setup_data(CIRCUIT_SIZE_MAX);
-  let decryption_label = String::from("PLAINTEXT_AUTHENTICATION");
-  let http_label = String::from("HTTP_VERIFICATION");
-  let rom_data = HashMap::from([
-    (decryption_label.clone(), CircuitData { opcode: 0 }),
-    (http_label.clone(), CircuitData { opcode: 1 }),
-  ]);
+  // TODO (tracy): Right now this only verifies the request, we need to accept
+  // digest for req/resp and set intersect with verifier_inputs. 
 
-  debug!("session_id={:?}", payload.session_id);
-
+  // Form verifier inputs
   let verifier_inputs =
     state.verifier_sessions.lock().unwrap().get(&payload.session_id).cloned().unwrap();
-
-  // TODO (tracy): We are re-initializing this everytime we verify a proof, which slows down this
-  // API. We did it this way due to initial_nivc_input being static on the object. Add
-  // getter/setter.
-  let rom = vec![decryption_label, http_label];
-  let local_params = ProgramData::<Offline, NotExpanded> {
-    public_params: state.verifier_param_bytes.clone(),
-    vk_digest_primary: F::<G1>::from(0), // TODO: This is gross.
-    vk_digest_secondary: F::<G2>::from(0),
-    setup_data: setup_data_large,
-    rom,
-    rom_data,
-    initial_nivc_input: vec![verifier_inputs.request_hashes.get(0).cloned().unwrap()],
-    inputs: (vec![HashMap::new()], HashMap::new()),
-    witnesses: vec![],
-  }
-  .into_online()
-  .unwrap();
-
-  let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&local_params.public_params).unwrap();
-  debug!(
-    "initialized vk_primary.digest={:?}, vk_secondary.digest={:?}, ck_s={:?}",
-    vk.vk_primary.digest, vk.vk_secondary.digest, vk.vk_secondary.vk_ee.ck_s
-  );
-  let (z0_primary, _) = local_params.extend_public_inputs().unwrap();
+  let initial_nivc_input = Some(vec![verifier_inputs.request_hashes.get(0).cloned().unwrap()]);
+  let verifier = state.verifiers.get(&payload.request_verifier_digest).unwrap();
+  let (z0_primary, _) = verifier.program_data.extend_public_inputs(initial_nivc_input).unwrap();
   let z0_secondary = vec![F::<G2>::from(0)];
 
-  let valid = match proof.0.verify(&local_params.public_params, &vk, &z0_primary, &z0_secondary) {
+  let valid = match proof.proof.verify(&verifier.program_data.public_params, &verifier.verifier_key, &z0_primary, &z0_secondary) {
     Ok(_) => true,
     Err(e) => {
-      info!("Error verifying proof: {:?}", e);
+      error!("Error verifying proof: {:?}", e);
       false
     },
   };
 
-  let response = VerifyReply { valid };
-
-  Ok(Json(response))
+  Ok(Json(VerifyReply { valid }))
 }
 
 pub async fn websocket_notarize(

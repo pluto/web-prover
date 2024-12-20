@@ -1,17 +1,32 @@
 use super::*;
+use hex;
 
-pub struct Proof<T>(pub T);
 
-impl Proof<CompressedSNARK<E1, S1, S2>> {
-  pub fn serialize_and_compress(self) -> Proof<Vec<u8>> {
-    let bincode = bincode::serialize(&self.0).unwrap();
-    Proof(bincode)
+#[derive(Debug, Serialize)]
+pub struct Proof<T, V> {
+  pub proof: T,
+  pub verifier_digest: V,
+}
+
+impl Proof<CompressedSNARK<E1, S1, S2>, F<G1>> {
+  pub fn serialize(self) -> Proof<Vec<u8>, String> {
+    let proof = bincode::serialize(&self.proof).unwrap();
+
+    Proof{
+      proof,
+      verifier_digest: hex::encode(self.verifier_digest.to_bytes())
+    }
   }
 }
 
-// TODO (autoparallel): This needs renamed but I don't want to do it in this PR.
-impl Proof<Vec<u8>> {
-  pub fn decompress_and_serialize(self) -> Proof<CompressedSNARK<E1, S1, S2>> {
-    Proof(bincode::deserialize(&self.0[..]).unwrap())
+impl Proof<Vec<u8>, String> {
+  pub fn deserialize(self) -> Proof<CompressedSNARK<E1, S1, S2>, F<G1>> {
+    // TODO: move unwrap => err. 
+    let proof = bincode::deserialize(&self.proof[..]).unwrap();
+
+    Proof{
+      proof,
+      verifier_digest: F::<G1>::from_bytes(&hex::decode(&self.verifier_digest).unwrap().try_into().unwrap()).unwrap()
+    }
   }
 }

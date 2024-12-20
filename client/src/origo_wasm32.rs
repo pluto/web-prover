@@ -112,19 +112,19 @@ pub async fn proxy_and_sign_and_generate_proof(
   let program_output = program::run(&program_data)?;
 
   debug!("compressing proof!");
-
   let compressed_snark_proof = program::compress_proof_no_setup(
     &program_output,
     &program_data.public_params,
     program_data.vk_digest_primary,
     program_data.vk_digest_secondary,
   )?;
-
-  debug!("running compressed verifier!");
-  let proof = compressed_snark_proof.serialize_and_compress();
+  let proof = compressed_snark_proof.serialize();
 
   // TODO(sambhav): Add real response proving
-  Ok(crate::Proof::Origo((proof.0, vec![])))
+  Ok(crate::Proof::Origo(OrigoProof{
+    request_proof: Some(proof),
+    response_proof: None
+  }))
 }
 
 /// takes TLS transcripts and [`ProvingData`] and generates NIVC [`ProgramData`] for request and

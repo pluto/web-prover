@@ -29,6 +29,7 @@ use tower_http::cors::CorsLayer;
 use tower_service::Service;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use circuits::Verifier;
 
 mod axum_websocket;
 mod circuits;
@@ -47,7 +48,7 @@ struct SharedState {
   tlsn_max_recv_data:   usize,
   origo_sessions:       Arc<Mutex<HashMap<String, tls_parser::UnparsedTranscript>>>,
   verifier_sessions:    Arc<Mutex<HashMap<String, origo::VerifierInputs>>>,
-  verifier_param_bytes: Vec<u8>,
+  verifiers:            HashMap<String, Verifier>,
 }
 
 /// Main entry point for the notary server application.
@@ -94,8 +95,7 @@ async fn main() -> Result<(), NotaryServerError> {
 
   let listener = TcpListener::bind(&c.listen).await?;
   info!("Listening on https://{}", &c.listen);
-  let proving_param_bytes =
-    std::fs::read("proofs/web_proof_circuits/serialized_setup_aes.bytes").unwrap();
+  
   let shared_state = Arc::new(SharedState {
     notary_signing_key:   load_notary_signing_key(&c.notary_signing_key),
     origo_signing_key:    load_origo_signing_key(&c.origo_signing_key),
@@ -103,7 +103,7 @@ async fn main() -> Result<(), NotaryServerError> {
     tlsn_max_recv_data:   c.tlsn_max_recv_data,
     origo_sessions:       Default::default(),
     verifier_sessions:    Default::default(),
-    verifier_param_bytes: proving_param_bytes,
+    verifiers:      circuits::get_initialized_verifiers(),
   });
 
   let router = Router::new()

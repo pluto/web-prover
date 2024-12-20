@@ -150,7 +150,7 @@ fn test_run_serialized_verify() {
 
   // Check that it verifies with offlined `PublicParams` regenerated pkey vkey
   let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
-  let res = proof.0.verify(&program_data.public_params, &vk, &z0_primary, &[F::<G2>::ZERO]);
+  let res = proof.proof.verify(&program_data.public_params, &vk, &z0_primary, &[F::<G2>::ZERO]);
   assert!(res.is_ok());
   std::fs::remove_file(PathBuf::from_str(TEST_OFFLINE_PATH).unwrap()).unwrap();
 }

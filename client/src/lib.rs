@@ -11,6 +11,7 @@ pub mod config;
 pub mod errors;
 mod tls;
 pub mod tls_client_async2;
+use proofs::proof::Proof as FoldingProof;
 use serde::Serialize;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
@@ -18,10 +19,17 @@ use tracing::info;
 
 use crate::errors::ClientErrors;
 
+
+#[derive(Debug, Serialize)]
+pub struct OrigoProof {
+  request_proof: Option<FoldingProof<Vec<u8>, String>>,
+  response_proof: Option<FoldingProof<Vec<u8>, String>>
+}
+
 #[derive(Debug, Serialize)]
 pub enum Proof {
   TLSN(TlsProof),
-  Origo((Vec<u8>, Vec<u8>)),
+  Origo(OrigoProof),
 }
 
 pub async fn prover_inner(
@@ -81,14 +89,14 @@ pub async fn prover_inner_origo(
 
   // TODO (tracy): Handle verify of response proofs.
   let r = proof.unwrap();
-  let (request_proof, response_proof) = match &r {
-    Proof::Origo(proof) => (proof.0.clone(), proof.1.clone()),
-    _ => (Vec::new(), Vec::new()),
+  let request_proof = match &r {
+    Proof::Origo(p) => p.request_proof.unwrap(),
+    _ => panic!("no request proof")
   };
 
   // TODO: Actually propagate errors up to the client
   let verify_response =
-    origo::verify(config, origo::VerifyBody { request_proof, response_proof, session_id })
+    origo::verify(config, origo::VerifyBody { request_proof: request_proof.proof.clone(), response_proof: Vec::new(), session_id, request_verifier_digest: request_proof.verifier_digest.clone() })
       .await
       .unwrap();
 
