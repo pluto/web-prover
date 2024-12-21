@@ -1,8 +1,8 @@
 use std::fs;
 
 use clap::Parser;
-use serde::Deserialize;
 use proofs::program::manifest::Manifest;
+use serde::Deserialize;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -11,7 +11,7 @@ struct Args {
   config: String,
 
   #[arg(short, long, default_value = "manifest.json")]
-  manifest: String, 
+  manifest: String,
 }
 
 #[derive(Debug, Default, Deserialize, PartialEq, Eq)]
@@ -67,5 +67,5 @@ pub fn read_manifest() -> Manifest {
   let manifest_json = std::fs::read_to_string(args.manifest).unwrap();
   let manifest: Manifest = serde_json::from_str(&manifest_json).unwrap();
 
-  return manifest
+  return manifest;
 }

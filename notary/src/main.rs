@@ -18,6 +18,7 @@ use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use k256::ecdsa::SigningKey as Secp256k1SigningKey;
 use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
+use proofs::program::manifest::Manifest;
 use rustls::{
   pki_types::{CertificateDer, PrivateKeyDer},
   ServerConfig,
@@ -30,8 +31,6 @@ use tower_http::cors::CorsLayer;
 use tower_service::Service;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-use proofs::program::manifest::Manifest;
 
 mod axum_websocket;
 mod circuits;
@@ -51,7 +50,7 @@ struct SharedState {
   origo_sessions:     Arc<Mutex<HashMap<String, tls_parser::UnparsedTranscript>>>,
   verifier_sessions:  Arc<Mutex<HashMap<String, origo::VerifierInputs>>>,
   verifiers:          HashMap<String, Verifier>,
-  manifest:  Manifest
+  manifest:           Manifest,
 }
 
 /// Main entry point for the notary server application.
@@ -102,14 +101,14 @@ async fn main() -> Result<(), NotaryServerError> {
 
   let shared_state = Arc::new(SharedState {
     notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
-    origo_signing_key:  load_origo_signing_key(&c.origo_signing_key),
+    origo_signing_key: load_origo_signing_key(&c.origo_signing_key),
     tlsn_max_sent_data: c.tlsn_max_sent_data,
     tlsn_max_recv_data: c.tlsn_max_recv_data,
-    origo_sessions:     Default::default(),
-    verifier_sessions:  Default::default(),
-    verifiers:          circuits::get_initialized_verifiers(),
+    origo_sessions: Default::default(),
+    verifier_sessions: Default::default(),
+    verifiers: circuits::get_initialized_verifiers(),
     // TODO: This is obviously not sufficient, we need richer logic
-    // for informing the notary of a valid manifest. 
+    // for informing the notary of a valid manifest.
     manifest,
   });
 

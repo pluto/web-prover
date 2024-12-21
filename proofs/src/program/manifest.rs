@@ -43,8 +43,8 @@ use crate::{
     F, G1,
   },
   witness::{
-    compute_http_header_witness, compute_http_witness, request_initial_digest,
-    response_initial_digest, data_hasher, ByteOrPad,
+    compute_http_header_witness, compute_http_witness, data_hasher, request_initial_digest,
+    response_initial_digest, ByteOrPad,
   },
 };
 

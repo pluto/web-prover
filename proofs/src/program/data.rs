@@ -397,6 +397,7 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
     };
     z0_primary.push(F::<G1>::ZERO); // rom_index = 0
     z0_primary.extend(rom.iter().map(|opcode| <E1 as Engine>::Scalar::from(*opcode)));
+    debug!("z0_primary={:?}", z0_primary);
     Ok((z0_primary, rom.clone()))
   }
 }

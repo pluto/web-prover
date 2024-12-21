@@ -296,7 +296,7 @@ fn test_end_to_end_proofs() {
     ),
   ]));
 
-  let (pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
+  let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
   let vk_digest_primary = pk.pk_primary.vk_digest;
   let vk_digest_secondary = pk.pk_secondary.vk_digest;
   let program_data = ProgramData::<Online, NotExpanded> {

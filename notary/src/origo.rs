@@ -210,8 +210,8 @@ pub async fn proxy(
 use proofs::{
   program::data::{CircuitData, Offline, Online, ProgramData},
   proof::Proof,
-  E1, F, G1, G2, S1, S2,
   witness::request_initial_digest,
+  E1, F, G1, G2, S1, S2,
 };
 
 pub async fn verify(

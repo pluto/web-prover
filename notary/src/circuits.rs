@@ -87,7 +87,6 @@ pub struct Verifier {
 }
 
 pub fn get_initialized_verifiers() -> HashMap<String, Verifier> {
-
   // TODO: Update to support all 3 circuits in 1024.
   let decryption_label = String::from("PLAINTEXT_AUTHENTICATION");
   let http_label = String::from("HTTP_VERIFICATION");
@@ -131,7 +130,9 @@ pub fn get_initialized_verifiers() -> HashMap<String, Verifier> {
       CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
     debug!(
       "initialized pk pk_primary.digest={:?}, hex(primary)={:?}, pk_secondary.digest={:?}",
-      pk.pk_primary.vk_digest, hex::encode(pk.pk_primary.vk_digest.to_bytes()), pk.pk_secondary.vk_digest,
+      pk.pk_primary.vk_digest,
+      hex::encode(pk.pk_primary.vk_digest.to_bytes()),
+      pk.pk_secondary.vk_digest,
     );
     let verifier_digest = hex::encode(program_data.vk_digest_primary.to_bytes());
     let _ = verifiers.insert(verifier_digest, Verifier { program_data, verifier_key });
