@@ -10,6 +10,7 @@ proofs={ path="../proofs", package="proofs" }
 hyper={ workspace=true, features=["client", "http1", "server"] }
 hyper-util={ workspace=true }
 serde={ workspace=true }
+serde_json.workspace=true
 rustls={ version="0.23.11", default-features=false, features=["logging", "tls12", "std", "ring"] }
 tokio={ workspace=true }
 tokio-util={ workspace=true, features=["compat"] }

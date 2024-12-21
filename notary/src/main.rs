@@ -31,6 +31,8 @@ use tower_service::Service;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+use proofs::program::manifest::Manifest;
+
 mod axum_websocket;
 mod circuits;
 mod config;
@@ -49,6 +51,7 @@ struct SharedState {
   origo_sessions:     Arc<Mutex<HashMap<String, tls_parser::UnparsedTranscript>>>,
   verifier_sessions:  Arc<Mutex<HashMap<String, origo::VerifierInputs>>>,
   verifiers:          HashMap<String, Verifier>,
+  manifest:  Manifest
 }
 
 /// Main entry point for the notary server application.
@@ -92,6 +95,7 @@ async fn main() -> Result<(), NotaryServerError> {
   info!("GIT_HASH: {}", env!("GIT_HASH"));
 
   let c = config::read_config();
+  let manifest = config::read_manifest();
 
   let listener = TcpListener::bind(&c.listen).await?;
   info!("Listening on https://{}", &c.listen);
@@ -104,6 +108,9 @@ async fn main() -> Result<(), NotaryServerError> {
     origo_sessions:     Default::default(),
     verifier_sessions:  Default::default(),
     verifiers:          circuits::get_initialized_verifiers(),
+    // TODO: This is obviously not sufficient, we need richer logic
+    // for informing the notary of a valid manifest. 
+    manifest,
   });
 
   let router = Router::new()

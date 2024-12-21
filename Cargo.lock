@@ -3690,6 +3690,7 @@ dependencies = [
  "rustls-acme",
  "rustls-pemfile 2.2.0",
  "serde",
+ "serde_json",
  "sha1",
  "thiserror 1.0.69",
  "tls-client",

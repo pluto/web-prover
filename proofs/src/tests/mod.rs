@@ -13,7 +13,7 @@ use crate::{
     data::{CircuitData, NotExpanded},
     manifest::to_chacha_input,
   },
-  witness::{compute_http_witness, ByteOrPad},
+  witness::{compute_http_witness, data_hasher, ByteOrPad},
 };
 
 mod witnesscalc;
@@ -199,10 +199,11 @@ fn test_end_to_end_proofs() {
 
   assert!(padded_plaintext.len() == padded_ciphertext.len());
   assert_eq!(padded_ciphertext.len(), 1024);
+  let ciphertext_digest = data_hasher(&padded_ciphertext);
 
   let (ciphertext_digest, init_nivc_input) = crate::witness::response_initial_digest(
     &mock_manifest().response,
-    &padded_ciphertext,
+    ciphertext_digest,
     MAX_STACK_HEIGHT,
   );
   let mut private_inputs = vec![];

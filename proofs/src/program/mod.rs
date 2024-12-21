@@ -213,7 +213,7 @@ pub fn compress_proof_no_setup(
   debug!("`CompressedSNARK::prove STARTING PROVING!");
   let proof = Proof {
     proof:           CompressedSNARK::<E1, S1, S2>::prove(&public_params, &pk, recursive_snark)?,
-    verifier_digest: vk_digest_primary,
+    verifier_digest: pk.pk_primary.vk_digest,
   };
   debug!("`CompressedSNARK::prove completed!");
 

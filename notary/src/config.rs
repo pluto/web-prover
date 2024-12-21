@@ -2,12 +2,16 @@ use std::fs;
 
 use clap::Parser;
 use serde::Deserialize;
+use proofs::program::manifest::Manifest;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
   #[arg(short, long, default_value = "config.toml")]
   config: String,
+
+  #[arg(short, long, default_value = "manifest.json")]
+  manifest: String, 
 }
 
 #[derive(Debug, Default, Deserialize, PartialEq, Eq)]
@@ -55,4 +59,13 @@ pub fn read_config() -> Config {
 
   let c: Config = builder.build().unwrap().try_deserialize().unwrap();
   c
+}
+
+pub fn read_manifest() -> Manifest {
+  let args = Args::parse();
+
+  let manifest_json = std::fs::read_to_string(args.manifest).unwrap();
+  let manifest: Manifest = serde_json::from_str(&manifest_json).unwrap();
+
+  return manifest
 }

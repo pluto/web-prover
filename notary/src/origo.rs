@@ -211,6 +211,7 @@ use proofs::{
   program::data::{CircuitData, Offline, Online, ProgramData},
   proof::Proof,
   E1, F, G1, G2, S1, S2,
+  witness::request_initial_digest,
 };
 
 pub async fn verify(
@@ -226,12 +227,16 @@ pub async fn verify(
   // TODO (tracy): Right now this only verifies the request, we need to accept
   // digest for req/resp and set intersect with verifier_inputs.
 
+  debug!("request_verifier_digest: {:?}", payload.request_verifier_digest.clone());
+  debug!("verifiers.keys()={:?}", state.verifiers.keys());
+
   // Form verifier inputs
   let verifier_inputs =
     state.verifier_sessions.lock().unwrap().get(&payload.session_id).cloned().unwrap();
-  let initial_nivc_input = Some(vec![verifier_inputs.request_hashes.get(0).cloned().unwrap()]);
+  let ciphertext_digest = verifier_inputs.request_hashes.get(0).cloned().unwrap();
+  let (_, nivc_input) = request_initial_digest(&state.manifest.request, ciphertext_digest);
   let verifier = state.verifiers.get(&payload.request_verifier_digest).unwrap();
-  let (z0_primary, _) = verifier.program_data.extend_public_inputs(initial_nivc_input).unwrap();
+  let (z0_primary, _) = verifier.program_data.extend_public_inputs(Some(vec![nivc_input])).unwrap();
   let z0_secondary = vec![F::<G2>::from(0)];
 
   let valid = match proof.proof.verify(
