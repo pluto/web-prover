@@ -87,24 +87,18 @@ pub struct Verifier {
 }
 
 pub fn get_initialized_verifiers() -> HashMap<String, Verifier> {
-  // TODO: Update to support all 3 circuits in 1024.
+  // TODO: Update to support response verification.
   let decryption_label = String::from("PLAINTEXT_AUTHENTICATION");
   let http_label = String::from("HTTP_VERIFICATION");
 
-  let rom_data_512 = HashMap::from([
+  let rom_data = HashMap::from([
     (decryption_label.clone(), CircuitData { opcode: 0 }),
     (http_label.clone(), CircuitData { opcode: 1 }),
   ]);
-  let rom_512 = vec![decryption_label.clone(), http_label.clone()];
+  let rom = vec![decryption_label.clone(), http_label.clone()];
 
-  let rom_data_1024 = HashMap::from([
-    (decryption_label.clone(), CircuitData { opcode: 0 }),
-    (http_label.clone(), CircuitData { opcode: 1 }),
-  ]);
-  let rom_1024 = vec![decryption_label.clone(), http_label.clone()];
-
-  let params_1024 = (PROVING_PARAMS_1024, 1024, rom_data_1024, rom_1024);
-  let params_512 = (PROVING_PARAMS_512, 512, rom_data_512, rom_512);
+  let params_1024 = (PROVING_PARAMS_1024, 1024, rom_data.clone(), rom.clone());
+  let params_512 = (PROVING_PARAMS_512, 512, rom_data.clone(), rom.clone());
 
   let mut verifiers = HashMap::new();
   for (path, circuit_size, rom_data, rom) in vec![params_1024, params_512] {

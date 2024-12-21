@@ -151,10 +151,6 @@ async fn generate_program_data(
   let NIVCRom { circuit_data: request_rom_data, rom: request_rom } =
     proving.manifest.as_ref().unwrap().request.build_rom();
 
-  // // pad AES response ciphertext
-  // let (response_rom_data, response_rom, response_fold_inputs) =
-  // proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
-
   // TODO (tracy): Today we are carrying witness data on the proving object,
   // it's not obviously the right place for it. This code path needs a larger
   // refactor.
