@@ -37,6 +37,7 @@ mod errors;
 mod origo;
 mod tcp;
 mod tlsn;
+mod tee;
 mod websocket_proxy;
 
 #[derive(Debug, Clone)]
@@ -94,6 +95,8 @@ async fn main() -> Result<(), NotaryServerError> {
 
   info!("GIT_HASH: {}", env!("GIT_HASH"));
 
+  let _ = rustls::crypto::ring::default_provider().install_default();
+
   let c = config::read_config();
 
   let listener = TcpListener::bind(&c.listen).await?;
@@ -112,6 +115,7 @@ async fn main() -> Result<(), NotaryServerError> {
     .route("/v1/tlsnotary", get(tlsn::notarize))
     .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
     .route("/v1/origo", get(origo::proxy))
+    .route("/v1/tee", get(tee::proxy))
     .route("/v1/origo/sign", post(origo::sign))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);

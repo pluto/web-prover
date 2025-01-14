@@ -55,6 +55,9 @@ pub enum NotaryServerError {
   #[error(transparent)]
   Io(#[from] std::io::Error),
 
+  #[error(transparent)]
+  TeeTlsAcceptorError(#[from] caratls::server::TeeTlsAcceptorError),
+
   #[error("Error occurred from reading certificates: {0}")]
   CertificateError(String),
 
