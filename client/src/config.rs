@@ -20,6 +20,8 @@ pub enum NotaryMode {
   Origo,
   /// TLS notary MPC-TLS mode
   TLSN,
+  // TEE proxy mode
+  TEE,
 }
 
 /// Proving data containing [`Manifest`] and serialized witnesses used for WASM

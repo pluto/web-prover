@@ -6,6 +6,10 @@ pub mod origo;
 #[cfg(not(target_arch = "wasm32"))] mod origo_native;
 #[cfg(target_arch = "wasm32")] mod origo_wasm32;
 
+pub mod tee;
+#[cfg(not(target_arch = "wasm32"))] mod tee_native;
+#[cfg(target_arch = "wasm32")] mod tee_wasm32;
+
 mod circuits;
 pub mod config;
 pub mod errors;
@@ -32,6 +36,7 @@ pub async fn prover_inner(
   match config.mode {
     config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
     config::NotaryMode::Origo => prover_inner_origo(config, proving_params).await,
+    config::NotaryMode::TEE => prover_inner_tee(config).await,
   }
 }
 
@@ -77,4 +82,14 @@ pub async fn prover_inner_origo(
 
   #[cfg(not(target_arch = "wasm32"))]
   return origo_native::proxy_and_sign_and_generate_proof(config).await;
+}
+
+pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
+  // #[cfg(target_arch = "wasm32")]
+  // return tee_wasm32::proxy(config).await;
+
+  // #[cfg(not(target_arch = "wasm32"))]
+  // return tee_native::proxy(config).await;
+
+  todo!("prover_inner_tee")
 }

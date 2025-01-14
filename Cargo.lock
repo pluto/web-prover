@@ -1335,6 +1335,7 @@ dependencies = [
  "async-tungstenite 0.25.1",
  "base64 0.22.1",
  "bytes",
+ "caratls",
  "chrono",
  "clap",
  "console_error_panic_hook",

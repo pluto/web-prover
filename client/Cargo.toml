@@ -24,6 +24,8 @@ tls-core   ={ workspace=true }
 tlsn-prover={ workspace=true }
 tlsn-core  ={ workspace=true }
 
+caratls = {workspace = true}
+
 bytes ="1"
 proofs={ workspace=true }
 

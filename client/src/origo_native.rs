@@ -1,5 +1,6 @@
 use std::{ops::Deref, sync::Arc};
 
+use caratls::client::TeeTlsConnector;
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
@@ -196,8 +197,11 @@ async fn proxy(
     .connect(rustls::ServerName::try_from(config.notary_host.as_str())?, notary_socket)
     .await?;
 
-  let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
+  // verify TEE
+  let tee_tls_connector = TeeTlsConnector::new("example.com"); // TODO example.com
+  let tee_tls_stream = tee_tls_connector.connect(notary_tls_socket).await?;
 
+  let notary_tls_socket = hyper_util::rt::TokioIo::new(tee_tls_stream);
   let (mut request_sender, connection) =
     hyper::client::conn::http1::handshake(notary_tls_socket).await?;
   let connection_task = tokio::spawn(connection.without_shutdown());
