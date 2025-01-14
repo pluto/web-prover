@@ -23,6 +23,8 @@ use tracing::{debug, info};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
+use caratls::client::TeeTlsConnector;
+use tokio_util::compat::TokioAsyncReadCompatExt;
 
 use crate::{
   circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
@@ -210,7 +212,10 @@ async fn proxy(
 
   let (_, ws_stream) = WsMeta::connect(wss_url.to_string(), None).await?;
 
-  let (mut client_tls_conn, tls_fut) = bind_client(ws_stream.into_io(), client);
+  let tee_tls_connector = TeeTlsConnector::new("example.com"); // TODO example.com
+  let tee_tls_stream = tee_tls_connector.connect(ws_stream.into_io()).await?;
+
+  let (mut client_tls_conn, tls_fut) = bind_client(tee_tls_stream.compat(), client);
 
   let client_tls_conn = unsafe { FuturesIo::new(client_tls_conn) };
 
