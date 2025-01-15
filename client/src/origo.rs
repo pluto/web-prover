@@ -66,6 +66,7 @@ pub async fn verify(
     config.notary_port.clone(),
   );
 
+  #[allow(unused_variables)]
   let client = reqwest::ClientBuilder::new().build()?;
 
   #[cfg(feature = "notary_ca_cert")]

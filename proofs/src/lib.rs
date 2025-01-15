@@ -2,11 +2,10 @@ use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use circom::CircomCircuit;
 use client_side_prover::{
-  fast_serde::{self, FastSerde},
   provider::GrumpkinEngine,
   spartan::batched::BatchedRelaxedR1CSSNARK,
   supernova::{snark::CompressedSNARK, PublicParams, TrivialCircuit},
-  traits::{Dual, Engine, Group},
+  traits::{Engine, Group},
 };
 use ff::Field;
 use num_bigint::BigInt;
