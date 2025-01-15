@@ -26,7 +26,7 @@ tls-core          ={ git="https://github.com/pluto/tls-origo-legacy", package="t
 rayon             ="1.10.0"
 wasm-bindgen-rayon="=1.2.1"
 futures           ="0.3"
-caratls           ={ git="https://github.com/pluto/caratls.git", rev="5ecd6010b1079b9504d148ee5521b2c388353616" }
+caratls           ={ git="https://github.com/pluto/caratls.git", rev="b900d0d5eb5f92f656e01bf717b6a17ea1775152" }
 
 # CLI
 clap={ version="4.5.13", features=["derive"] }
