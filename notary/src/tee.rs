@@ -51,14 +51,14 @@ pub async fn websocket_notarize(
   target_port: u16,
   state: Arc<SharedState>,
 ) {
-  debug!("Upgraded to websocket connection");
+  debug!("Upgraded to TEE TLS via websocket connection");
   let stream = WsStream::new(socket.into_inner()).compat();
   match tee_proxy_service(stream, &session_id, &target_host, target_port, state).await {
     Ok(_) => {
-      info!(?session_id, "Successful notarization using websocket!");
+      info!(?session_id, "Successful notarization using TEE TLS via websocket!");
     },
     Err(err) => {
-      error!(?session_id, "Failed notarization using websocket: {err}");
+      error!(?session_id, "Failed notarization using TEE TLS via websocket: {err}");
     },
   }
 }
@@ -70,13 +70,13 @@ pub async fn tcp_notarize(
   target_port: u16,
   state: Arc<SharedState>,
 ) {
-  debug!("Upgraded to tcp connection");
+  debug!("Upgraded to TEE TLS connection");
   match tee_proxy_service(stream, &session_id, &target_host, target_port, state).await {
     Ok(_) => {
-      info!(?session_id, "Successful notarization using tcp!");
+      info!(?session_id, "Successful notarization using TEE TLS!");
     },
     Err(err) => {
-      error!(?session_id, "Failed notarization using tcp: {err}");
+      error!(?session_id, "Failed notarization using TEE TLS: {err}");
     },
   }
 }
@@ -90,6 +90,5 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
 ) -> Result<(), NotaryServerError> {
   let tee_tls_acceptor = TeeTlsAcceptor::new_with_ephemeral_cert("example.com"); // TODO example.com
   let tee_tls_stream = tee_tls_acceptor.accept(socket).await?;
-  debug!("Upgraded to TEE TLS connection");
   proxy_service(tee_tls_stream, session_id, target_host, target_port, state).await
 }
