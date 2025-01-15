@@ -18,7 +18,7 @@ wasm-debug: params
 	  rustup run nightly-2024-10-28 ~/.cargo/bin/wasm-pack build --debug --target web ./ -- \
 	    -Z build-std=panic_abort,std
 
-ios-sim:
+ios-sim: params
 	-cargo install cbindgen
 	rustup target add aarch64-apple-ios-sim --toolchain nightly-2024-10-28
 	NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" RUSTFLAGS="-C panic=unwind" cargo +nightly-2024-10-28 build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
@@ -29,7 +29,7 @@ ios-sim:
 		-headers client_ios/headers/ \
 		-output target/aarch64-apple-ios-sim/release/libclient_ios.xcframework
 
-ios:
+ios: params
 	-cargo install cbindgen
 	rustup target add aarch64-apple-ios-sim --toolchain nightly-2024-10-28
 	# rustup target add aarch64-apple-ios-sim
