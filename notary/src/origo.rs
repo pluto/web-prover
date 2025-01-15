@@ -25,6 +25,10 @@ use crate::{
   tlsn::ProtocolUpgrade,
   SharedState,
 };
+use proofs::{
+  proof::FoldingProof,
+  witness::request_initial_digest, F, G1, G2
+};
 
 #[derive(Deserialize)]
 pub struct SignQuery {
@@ -207,18 +211,11 @@ pub async fn proxy(
   }
 }
 
-use proofs::{
-  program::data::{CircuitData, Offline, Online, ProgramData},
-  proof::Proof,
-  witness::request_initial_digest,
-  E1, F, G1, G2, S1, S2,
-};
-
 pub async fn verify(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<VerifyBody>,
 ) -> Result<Json<VerifyReply>, ProxyError> {
-  let proof = Proof {
+  let proof = FoldingProof {
     proof:           payload.request_proof,
     verifier_digest: payload.request_verifier_digest.clone(),
   }
