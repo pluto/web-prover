@@ -1,20 +1,7 @@
-use std::{ops::Range, panic, time::Duration};
-
-use elliptic_curve::pkcs8::DecodePublicKey;
 use futures::{channel::oneshot, AsyncWriteExt};
-use hyper::{Request, StatusCode};
-use js_sys::{Array, JSON};
-use strum::EnumMessage;
-use strum_macros;
-use tlsn_core::proof::{SessionProof, TlsProof};
 use tlsn_prover::tls::{
-  state::{Closed, Notarize},
+  state::Closed,
   Prover, ProverConfig,
-};
-use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tracing_subscriber::{
-  fmt::{format::Pretty, time::UtcTime},
-  prelude::*,
 };
 use tracing_web::{performance_layer, MakeConsoleWriter};
 use url::Url;

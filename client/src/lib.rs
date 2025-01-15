@@ -27,7 +27,7 @@ pub struct OrigoProof {
 
 #[derive(Debug, Serialize)]
 pub enum Proof {
-  TLSN(TlsProof),
+  TLSN(Box<TlsProof>),
   Origo(OrigoProof),
 }
 
@@ -71,7 +71,7 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, erro
   };
 
   let p = tlsn::notarize(prover).await?;
-  Ok(Proof::TLSN(p))
+  Ok(Proof::TLSN(Box::new(p)))
 }
 
 #[allow(unused_variables)]

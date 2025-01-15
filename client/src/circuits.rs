@@ -34,14 +34,17 @@ const JSON_EXTRACTION_GRAPH: &[u8] =
 
 // -------------------------------------- 512B circuits -------------------------------------- //
 // Circuit 0
+#[allow(dead_code)]
 const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_512b/plaintext_authentication_512b.r1cs");
 
 // Circuit 1
+#[allow(dead_code)]
 const HTTP_VERIFICATION_512B_R1CS: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_512b/http_verification_512b.r1cs");
 
 // Circuit 2
+#[allow(dead_code)]
 const JSON_EXTRACTION_512B_R1CS: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_512b/json_extraction_512b.r1cs");
 

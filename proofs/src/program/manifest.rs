@@ -275,7 +275,7 @@ fn build_http_verification_circuit_inputs(
       .to_str_radix(10);
 
   for header_name in headers.keys() {
-    let (index, masked_header) = compute_http_header_witness(&inputs, header_name.as_bytes());
+    let (index, masked_header) = compute_http_header_witness(inputs, header_name.as_bytes());
     let header_digest = polynomial_digest(&ByteOrPad::as_bytes(&masked_header), ciphertext_digest);
     main_digests[index + 1] =
       BigInt::from_bytes_le(num_bigint::Sign::Plus, &header_digest.to_bytes()).to_str_radix(10);
@@ -292,7 +292,7 @@ fn build_http_verification_circuit_inputs(
     (String::from("main_digests"), json!(main_digests)),
   ]));
 
-  compute_http_witness(&inputs, crate::witness::HttpMaskType::Body)
+  compute_http_witness(inputs, crate::witness::HttpMaskType::Body)
 }
 
 /// Build JSON extraction circuit inputs
@@ -383,13 +383,13 @@ impl Request {
     let mut fold_inputs: HashMap<String, FoldInput> = HashMap::new();
 
     let EncryptionCircuitInput { plaintext, ciphertext } =
-      pad_plaintext_authentication_inputs(&inputs);
+      pad_plaintext_authentication_inputs(inputs);
 
     let ciphertext_digest = data_hasher(&ciphertext);
     let (ciphertext_digest, init_nivc_input) = request_initial_digest(self, ciphertext_digest);
 
     build_plaintext_authentication_circuit_inputs(
-      &inputs,
+      inputs,
       &plaintext,
       &mut private_inputs,
       &mut fold_inputs,

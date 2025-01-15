@@ -8,6 +8,8 @@ use serde_json::Value;
 
 use super::*;
 
+type StackAndTreeHashes = (Vec<[F<G1>; 2]>, Vec<[F<G1>; 2]>);
+
 /// Struct representing a byte or padding.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ByteOrPad {
@@ -280,7 +282,7 @@ pub fn json_tree_hasher(
   polynomial_input: F<G1>,
   key_sequence: &[JsonKey],
   max_stack_height: usize,
-) -> (Vec<[F<G1>; 2]>, Vec<[F<G1>; 2]>) {
+) -> StackAndTreeHashes {
   assert!(key_sequence.len() <= max_stack_height); // TODO: This should be an error
   let mut stack = Vec::new();
   let mut tree_hashes = Vec::new();
@@ -307,7 +309,7 @@ pub fn json_tree_hasher(
 
 pub fn compress_tree_hash(
   polynomial_input: F<G1>,
-  stack_and_tree_hashes: (Vec<[F<G1>; 2]>, Vec<[F<G1>; 2]>),
+  stack_and_tree_hashes: StackAndTreeHashes,
 ) -> F<G1> {
   assert!(stack_and_tree_hashes.0.len() == stack_and_tree_hashes.1.len()); // TODO: This should be an error
   let mut accumulated = F::<G1>::ZERO;
