@@ -16,10 +16,12 @@ on:
     branches: [ "main" ]
 
 env:
-  CARGO_TERM_COLOR: always # pretty colors
 
 jobs:
+  setup:
+    uses: ./.github/workflows/download-circuits.yaml
   clippy:
+    needs: setup
     name: clippy
     runs-on: macos-latest
     strategy:
@@ -46,6 +48,7 @@ jobs:
           brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
           echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
           brew install protobuf
+
 
       - name: cargo clippy for ${{ matrix.crate }}
         run: cargo clippy -p ${{ matrix.crate }}

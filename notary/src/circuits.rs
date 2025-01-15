@@ -102,7 +102,7 @@ pub fn get_initialized_verifiers() -> HashMap<String, Verifier> {
   let params_512 = (PROVING_PARAMS_512, 512, rom_data.clone(), rom.clone());
 
   let mut verifiers = HashMap::new();
-  for (path, circuit_size, rom_data, rom) in vec![params_1024, params_512] {
+  for (path, circuit_size, rom_data, rom) in [params_1024, params_512] {
     let bytes = std::fs::read(path).unwrap();
     let setup_data = construct_setup_data(circuit_size);
     let program_data = ProgramData::<Offline, NotExpanded> {
@@ -133,5 +133,5 @@ pub fn get_initialized_verifiers() -> HashMap<String, Verifier> {
     let _ = verifiers.insert(verifier_digest, Verifier { program_data, verifier_key });
   }
 
-  return verifiers;
+  verifiers
 }

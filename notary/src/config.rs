@@ -69,5 +69,5 @@ pub fn read_manifest() -> Result<Manifest, NotaryServerError> {
   let manifest_json = std::fs::read_to_string(args.manifest)?;
   let manifest: Manifest = serde_json::from_str(&manifest_json)?;
 
-  return Ok(manifest);
+  Ok(manifest)
 }

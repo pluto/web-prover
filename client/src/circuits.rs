@@ -7,7 +7,9 @@ use proofs::program::data::{R1CSType, SetupData, WitnessGeneratorType};
 
 // -------------------------------------- 1024B circuits -------------------------------------- //
 pub const MAX_ROM_LENGTH: usize = 3;
+#[allow(dead_code)]
 pub const PROVING_PARAMS_512: &str = "proofs/web_proof_circuits/serialized_setup_512.bytes";
+#[allow(dead_code)]
 pub const PROVING_PARAMS_1024: &str = "proofs/web_proof_circuits/serialized_setup_1024.bytes";
 
 // Circuit 0

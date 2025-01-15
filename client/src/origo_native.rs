@@ -30,7 +30,7 @@ use crate::{
 /// - decrypts TLS ciphertext in [`tls_client2::backend::origo::WitnessData`]
 /// - takes TLS transcripts along with client [`Manifest`] and generates NIVC [`Proof`]
 pub async fn proxy_and_sign_and_generate_proof(
-  mut config: config::Config,
+  config: config::Config,
   proving_params: Option<Vec<u8>>,
 ) -> Result<OrigoProof, ClientErrors> {
   let mut origo_conn = proxy(config.clone(), config.session_id.clone()).await?;
