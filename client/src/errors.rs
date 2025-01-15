@@ -88,7 +88,7 @@ pub enum ClientErrors {
 
   #[cfg(not(target_arch = "wasm32"))]
   #[error(transparent)]
-  InvalidDnsNameError(#[from] rustls::client::InvalidDnsNameError),
+  InvalidDnsNameError(#[from] rustls::pki_types::InvalidDnsNameError),
 
   #[error(transparent)]
   Error(#[from] tls_client2::Error),

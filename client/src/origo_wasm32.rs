@@ -6,6 +6,7 @@ use std::{
   sync::Arc,
 };
 
+use caratls::client::TeeTlsConnector;
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::StatusCode;
 use proofs::{
@@ -19,12 +20,11 @@ use proofs::{
 };
 use serde::{Deserialize, Serialize};
 use tls_client2::{origo::WitnessData, CipherSuiteKey};
+use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{debug, info};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
-use caratls::client::TeeTlsConnector;
-use tokio_util::compat::TokioAsyncReadCompatExt;
 
 use crate::{
   circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
@@ -188,7 +188,7 @@ async fn proxy(
 ) -> Result<tls_client2::origo::OrigoConnection, errors::ClientErrors> {
   // TODO build sanitized query
   let wss_url = format!(
-    "wss://{}:{}/v1/origo?session_id={}&target_host={}&target_port={}",
+    "wss://{}:{}/v1/tee?session_id={}&target_host={}&target_port={}",
     config.notary_host,
     config.notary_port,
     session_id.clone(),
