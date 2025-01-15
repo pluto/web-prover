@@ -36,8 +36,8 @@ mod config;
 mod errors;
 mod origo;
 mod tcp;
-mod tlsn;
 mod tee;
+mod tlsn;
 mod websocket_proxy;
 
 #[derive(Debug, Clone)]

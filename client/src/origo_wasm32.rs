@@ -27,8 +27,14 @@ use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
 use crate::{
-  circuits::*, config, config::{ProvingData, NotaryMode}, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
-  tls_client_async2::bind_client, Proof,
+  circuits::*,
+  config,
+  config::{NotaryMode, ProvingData},
+  errors,
+  origo::SignBody,
+  tls::decrypt_tls_ciphertext,
+  tls_client_async2::bind_client,
+  Proof,
 };
 
 // #[wasm_bindgen(getter_with_clone)]

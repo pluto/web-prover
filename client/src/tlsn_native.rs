@@ -26,9 +26,8 @@ pub async fn setup_tcp_connection(
   let session_id = config.session_id();
   let root_store = crate::tls::rustls_default_root_store();
 
-  let client_notary_config = ClientConfig::builder()
-    .with_root_certificates(root_store)
-    .with_no_client_auth();
+  let client_notary_config =
+    ClientConfig::builder().with_root_certificates(root_store).with_no_client_auth();
 
   let notary_connector = TlsConnector::from(Arc::new(client_notary_config));
 
@@ -38,7 +37,10 @@ pub async fn setup_tcp_connection(
       .unwrap();
 
   let notary_tls_socket = notary_connector
-    .connect(rustls::pki_types::ServerName::try_from(config.notary_host.clone()).unwrap(), notary_socket)
+    .connect(
+      rustls::pki_types::ServerName::try_from(config.notary_host.clone()).unwrap(),
+      notary_socket,
+    )
     .await
     .unwrap();
 
