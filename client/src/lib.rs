@@ -6,10 +6,6 @@ pub mod origo;
 #[cfg(not(target_arch = "wasm32"))] mod origo_native;
 #[cfg(target_arch = "wasm32")] mod origo_wasm32;
 
-pub mod tee;
-#[cfg(not(target_arch = "wasm32"))] mod tee_native;
-#[cfg(target_arch = "wasm32")] mod tee_wasm32;
-
 mod circuits;
 pub mod config;
 pub mod errors;
@@ -26,6 +22,7 @@ use crate::errors::ClientErrors;
 pub enum Proof {
   TLSN(TlsProof),
   Origo((Vec<u8>, Vec<u8>)),
+  TEE(), // TODO
 }
 
 pub async fn prover_inner(
@@ -85,13 +82,16 @@ pub async fn prover_inner_origo(
 }
 
 pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
-  #[cfg(target_arch = "wasm32")]
-  origo_wasm32::proxy(config, "foobar32".to_string()).await.unwrap();
+  let session_id = config.session_id();
 
-  todo!("prover_inner_tee wasm");
+  // TEE mode uses Origo networking stack with minimal changes
+
+  #[cfg(target_arch = "wasm32")]
+  let _origo_conn = origo_wasm32::proxy(config, session_id).await?;
 
   #[cfg(not(target_arch = "wasm32"))]
-  origo_native::proxy(config, "foobarsession".to_string()).await.unwrap();
+  let _origo_conn = origo_native::proxy(config, session_id).await?;
 
-  todo!("prover_inner_tee")
+  // TODO proof
+  Ok(Proof::TEE())
 }

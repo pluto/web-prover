@@ -27,7 +27,7 @@ use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
 use crate::{
-  circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
+  circuits::*, config, config::{ProvingData, NotaryMode}, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
   tls_client_async2::bind_client, Proof,
 };
 
@@ -182,15 +182,16 @@ async fn generate_program_data(
   Ok(program_data?.into_expanded()?)
 }
 
-pub async fn proxy(
+pub(crate) async fn proxy(
   config: config::Config,
   session_id: String,
 ) -> Result<tls_client2::origo::OrigoConnection, errors::ClientErrors> {
   // TODO build sanitized query
   let wss_url = format!(
-    "wss://{}:{}/v1/tee?session_id={}&target_host={}&target_port={}",
+    "wss://{}:{}/v1/{}?session_id={}&target_host={}&target_port={}",
     config.notary_host,
     config.notary_port,
+    if config.mode == NotaryMode::TEE { "tee" } else { "origo" },
     session_id.clone(),
     config.target_host()?,
     config.target_port()?,
@@ -212,10 +213,14 @@ pub async fn proxy(
 
   let (_, ws_stream) = WsMeta::connect(wss_url.to_string(), None).await?;
 
-  let tee_tls_connector = TeeTlsConnector::new("example.com"); // TODO example.com
-  let tee_tls_stream = tee_tls_connector.connect(ws_stream.into_io()).await?;
-
-  let (mut client_tls_conn, tls_fut) = bind_client(tee_tls_stream.compat(), client);
+  // Either bind client to TEE TLS connection or plain websocket connection
+  let (mut client_tls_conn, tls_fut) = if config.mode == NotaryMode::TEE {
+    let tee_tls_connector = TeeTlsConnector::new("example.com"); // TODO example.com
+    let tee_tls_stream = tee_tls_connector.connect(ws_stream.into_io()).await?;
+    bind_client(tee_tls_stream.compat(), client)
+  } else {
+    bind_client(ws_stream.into_io(), client)
+  };
 
   let client_tls_conn = unsafe { FuturesIo::new(client_tls_conn) };
 
