@@ -278,7 +278,7 @@ impl ParsedTranscript {
       result.extend(get_hashes(input[i].clone()));
       current.extend(&input[i]);
 
-      for item in input[i+1..].iter() {
+      for item in input[i + 1..].iter() {
         let mut combined = current.clone();
         combined.extend(item);
         result.extend(get_hashes(combined.clone()));

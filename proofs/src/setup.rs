@@ -53,7 +53,7 @@ impl FastSerde for ProvingParams {
     Self::write_section_bytes(&mut out, 2, &self.vk_digest_primary.to_bytes().to_vec());
     Self::write_section_bytes(&mut out, 3, &self.vk_digest_secondary.to_bytes().to_vec());
 
-    return out;
+    out
   }
 }
 
@@ -94,10 +94,10 @@ pub fn setup(r1cs_files: &[R1CSType], rom_length: usize) -> Vec<u8> {
   let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
   let (_, aux_params) = public_params.into_parts();
 
-  return ProvingParams {
+  ProvingParams {
     aux_params,
     vk_digest_primary: pk.pk_primary.vk_digest,
     vk_digest_secondary: pk.pk_secondary.vk_digest,
   }
-  .to_bytes();
+  .to_bytes()
 }
