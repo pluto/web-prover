@@ -61,7 +61,7 @@ export function numToBitsNumerical(num, bitCount = 32) {
 start();
 
 let proverConfig = {
-  mode: "TEE",
+  mode: "Origo",
   notary_host: "localhost",
   notary_port: 7443,
   target_method: "GET",
