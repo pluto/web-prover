@@ -182,7 +182,7 @@ async fn generate_program_data(
   Ok(program_data?.into_expanded()?)
 }
 
-async fn proxy(
+pub async fn proxy(
   config: config::Config,
   session_id: String,
 ) -> Result<tls_client2::origo::OrigoConnection, errors::ClientErrors> {

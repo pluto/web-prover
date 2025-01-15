@@ -53,7 +53,7 @@ pub async fn websocket_notarize(
 ) {
   debug!("Upgraded to websocket connection");
   let stream = WsStream::new(socket.into_inner()).compat();
-  match proxy_service(stream, &session_id, &target_host, target_port, state).await {
+  match tee_proxy_service(stream, &session_id, &target_host, target_port, state).await {
     Ok(_) => {
       info!(?session_id, "Successful notarization using websocket!");
     },

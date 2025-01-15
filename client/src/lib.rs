@@ -85,8 +85,10 @@ pub async fn prover_inner_origo(
 }
 
 pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
-  // #[cfg(target_arch = "wasm32")]
-  // return tee_wasm32::proxy(config).await;
+  #[cfg(target_arch = "wasm32")]
+  origo_wasm32::proxy(config, "foobar32".to_string()).await.unwrap();
+
+  todo!("prover_inner_tee wasm");
 
   #[cfg(not(target_arch = "wasm32"))]
   origo_native::proxy(config, "foobarsession".to_string()).await.unwrap();
