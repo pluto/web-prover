@@ -15,7 +15,7 @@ use proofs::{
     data::{Expanded, NotExpanded, Offline, Online, ProgramData},
     manifest::{EncryptionInput, NIVCRom, NivcCircuitInputs, TLSEncryption},
   },
-  F, G1,
+  F, G1, G2,
 };
 use serde::{Deserialize, Serialize};
 use tls_client2::{origo::WitnessData, CipherSuiteKey};
@@ -26,7 +26,7 @@ use ws_stream_wasm::WsMeta;
 
 use crate::{
   circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
-  tls_client_async2::bind_client, Proof,
+  tls_client_async2::bind_client, OrigoProof,
 };
 
 // #[wasm_bindgen(getter_with_clone)]
@@ -89,8 +89,8 @@ pub async fn create_witness(input: JsValue) -> Result<WitnessOutput, JsValue> {
 pub async fn proxy_and_sign_and_generate_proof(
   mut config: config::Config,
   proving_params: Option<Vec<u8>>,
-) -> Result<Proof, errors::ClientErrors> {
-  let session_id = config.session_id();
+) -> Result<OrigoProof, errors::ClientErrors> {
+  let session_id = config.session_id.clone();
   let mut origo_conn = proxy(config.clone(), session_id.clone()).await?;
 
   let sb = SignBody {
@@ -112,14 +112,18 @@ pub async fn proxy_and_sign_and_generate_proof(
   let program_output = program::run(&program_data)?;
 
   debug!("compressing proof!");
-  let compressed_snark_proof =
-    program::compress_proof(&program_output, &program_data.public_params)?;
-
-  debug!("running compressed verifier!");
+  let compressed_snark_proof = program::compress_proof_no_setup(
+    &program_output,
+    &program_data.public_params,
+    program_data.vk_digest_primary,
+    program_data.vk_digest_secondary,
+  )?;
   let proof = compressed_snark_proof.serialize();
 
-  Ok(crate::Proof::Origo((proof.0, vec![])))
+  // TODO(sambhav): Add real response proving
+  Ok(OrigoProof { request: proof, response: None })
 }
+
 /// takes TLS transcripts and [`ProvingData`] and generates NIVC [`ProgramData`] for request and
 /// response separately
 /// - decrypts TLS ciphertext in [`WitnessData`]
@@ -147,10 +151,6 @@ async fn generate_program_data(
   let NIVCRom { circuit_data: request_rom_data, rom: request_rom } =
     proving.manifest.as_ref().unwrap().request.build_rom();
 
-  // // pad AES response ciphertext
-  // let (response_rom_data, response_rom, response_fold_inputs) =
-  // proving.manifest.as_ref().unwrap().rom_from_response(response_inputs);
-
   // TODO (tracy): Today we are carrying witness data on the proving object,
   // it's not obviously the right place for it. This code path needs a larger
   // refactor.
@@ -167,6 +167,8 @@ async fn generate_program_data(
   debug!("initializing public params");
   let program_data = ProgramData::<Offline, NotExpanded> {
     public_params: proving_params.unwrap(),
+    vk_digest_primary: proofs::F::<G1>::from(0),
+    vk_digest_secondary: proofs::F::<G2>::from(0),
     setup_data: request_setup_data,
     rom: request_rom,
     rom_data: request_rom_data,

@@ -37,6 +37,9 @@ pub enum ProofError {
   #[error("Other error: {0}")]
   Other(String),
 
+  #[error("Failed to verify proof")]
+  VerifyFailed(),
+
   #[error(transparent)]
   Parse(#[from] num_bigint::ParseBigIntError),
 

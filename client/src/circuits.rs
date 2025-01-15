@@ -7,6 +7,8 @@ use proofs::program::data::{R1CSType, SetupData, WitnessGeneratorType};
 
 // -------------------------------------- 1024B circuits -------------------------------------- //
 pub const MAX_ROM_LENGTH: usize = 3;
+pub const PROVING_PARAMS_512: &str = "proofs/web_proof_circuits/serialized_setup_512.bytes";
+pub const PROVING_PARAMS_1024: &str = "proofs/web_proof_circuits/serialized_setup_1024.bytes";
 
 // Circuit 0
 const PLAINTEXT_AUTHENTICATION_R1CS: &[u8] = include_bytes!(

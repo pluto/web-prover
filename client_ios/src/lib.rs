@@ -8,6 +8,10 @@ use std::{
 use client::{config::Config, errors::ClientErrors};
 use tracing::debug;
 
+// TODO: Load from server.
+const PROVING_PARAM_BYTES: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/serialized_setup_1024.bytes");
+
 #[derive(serde::Serialize)]
 struct Output {
   proof: Option<String>,
@@ -31,11 +35,15 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
       assert!(!config_json.is_null());
       CStr::from_ptr(config_json).to_str().unwrap()
     };
-    let config: Config = serde_json::from_str(config_str).unwrap();
+
+    let mut config: Config = serde_json::from_str(config_str).unwrap();
+    config.session_id();
     let rt = tokio::runtime::Runtime::new().unwrap();
     let start = Instant::now();
     debug!("starting proving");
-    let proof = rt.block_on(client::prover_inner(config, None)).unwrap();
+
+    let proof =
+      rt.block_on(client::prover_inner(config, Some(PROVING_PARAM_BYTES.to_vec()))).unwrap();
     debug!("done proving: {:?}", Instant::now() - start);
     serde_json::to_string_pretty(&proof).unwrap()
   }));

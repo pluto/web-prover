@@ -1325,7 +1325,7 @@ dependencies = [
 [[package]]
 name = "client-side-prover"
 version = "0.1.0"
-source = "git+https://github.com/pluto/client-side-prover?rev=9576f74208cd64e10d5159471ba7c71a2292ed2f#9576f74208cd64e10d5159471ba7c71a2292ed2f"
+source = "git+https://github.com/pluto/client-side-prover?rev=8e7eb839e901dcee416179116bb0f9c4f7ae683c#8e7eb839e901dcee416179116bb0f9c4f7ae683c"
 dependencies = [
  "bellpepper",
  "bellpepper-core",
@@ -3672,6 +3672,7 @@ dependencies = [
  "axum-core",
  "base64 0.21.7",
  "clap",
+ "client-side-prover",
  "config",
  "eyre",
  "futures",
@@ -3683,11 +3684,13 @@ dependencies = [
  "k256",
  "nom",
  "p256",
+ "proofs",
  "rs_merkle",
  "rustls 0.23.19",
  "rustls-acme",
  "rustls-pemfile 2.2.0",
  "serde",
+ "serde_json",
  "sha1",
  "thiserror 1.0.69",
  "tls-client",
@@ -4401,6 +4404,7 @@ dependencies = [
  "client-side-prover",
  "ff",
  "halo2curves",
+ "hex",
  "itertools 0.13.0",
  "light-poseidon",
  "num-bigint 0.4.6",

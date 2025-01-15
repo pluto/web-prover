@@ -6,21 +6,22 @@ use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
   program::{
     self,
-    data::{Expanded, NotExpanded, Online, ProgramData},
+    data::{Expanded, NotExpanded, Offline, Online, ProgramData},
     manifest::{
       EncryptionInput, NIVCRom, NivcCircuitInputs, Request as ManifestRequest,
       Response as ManifestResponse, TLSEncryption,
     },
   },
-  proof::Proof as CompressedSNARKProof,
-  F, G1,
+  proof::FoldingProof,
+  F, G1, G2,
 };
 use tls_client2::origo::OrigoConnection;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
 use crate::{
-  circuits::*, config, errors::ClientErrors, origo::SignBody, tls::decrypt_tls_ciphertext, Proof,
+  circuits::*, config, errors::ClientErrors, origo::SignBody, tls::decrypt_tls_ciphertext,
+  OrigoProof,
 };
 
 /// Runs TLS proxy and generates NIVC proof
@@ -30,9 +31,9 @@ use crate::{
 /// - takes TLS transcripts along with client [`Manifest`] and generates NIVC [`Proof`]
 pub async fn proxy_and_sign_and_generate_proof(
   mut config: config::Config,
-) -> Result<Proof, ClientErrors> {
-  let session_id = config.session_id();
-  let mut origo_conn = proxy(config.clone(), session_id.clone()).await?;
+  proving_params: Option<Vec<u8>>,
+) -> Result<OrigoProof, ClientErrors> {
+  let mut origo_conn = proxy(config.clone(), config.session_id.clone()).await?;
 
   let sb = SignBody {
     handshake_server_iv:  hex::encode(
@@ -43,7 +44,7 @@ pub async fn proxy_and_sign_and_generate_proof(
     ),
   };
 
-  let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb).await;
+  let sign_data = crate::origo::sign(config.clone(), config.session_id.clone(), sb).await;
 
   let witness = origo_conn.to_witness_data();
 
@@ -52,14 +53,27 @@ pub async fn proxy_and_sign_and_generate_proof(
     decrypt_tls_ciphertext(&witness)?;
 
   // generate NIVC proofs for request and response
+  // TODO (tracy): cloning proving params here is likely quite expensive.
   let manifest = config.proving.manifest.unwrap();
   let (request_proof, response_proof) = rayon::join(
-    || construct_request_program_data_and_proof(&manifest.request, request_inputs),
-    || construct_response_program_data_and_proof(&manifest.response, response_inputs),
+    || {
+      construct_request_program_data_and_proof(
+        &manifest.request,
+        request_inputs,
+        proving_params.clone().unwrap(),
+      )
+    },
+    || {
+      construct_response_program_data_and_proof(
+        &manifest.response,
+        response_inputs,
+        proving_params.clone().unwrap(),
+      )
+    },
   );
 
   // TODO(Sambhav): handle request and response into one proof
-  Ok(crate::Proof::Origo((request_proof?.0, response_proof?.0)))
+  Ok(OrigoProof { request: request_proof?, response: Some(response_proof?) })
 }
 
 /// generates NIVC proof from [`ProgramData`]
@@ -68,12 +82,17 @@ pub async fn proxy_and_sign_and_generate_proof(
 /// - serialize proof
 fn generate_proof(
   program_data: ProgramData<Online, Expanded>,
-) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
+) -> Result<FoldingProof<Vec<u8>, String>, ClientErrors> {
+  debug!("starting recursive proving");
   let program_output = program::run(&program_data)?;
+
   debug!("starting proof compression");
-  let compressed_snark_proof =
-    program::compress_proof(&program_output, &program_data.public_params)?;
-  debug!("serialize");
+  let compressed_snark_proof = program::compress_proof_no_setup(
+    &program_output,
+    &program_data.public_params,
+    program_data.vk_digest_primary,
+    program_data.vk_digest_secondary,
+  )?;
   Ok(compressed_snark_proof.serialize())
 }
 
@@ -95,25 +114,28 @@ fn generate_proof(
 fn construct_request_program_data_and_proof(
   manifest_request: &ManifestRequest,
   inputs: EncryptionInput,
-) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
+  proving_params: Vec<u8>,
+) -> Result<FoldingProof<Vec<u8>, String>, ClientErrors> {
   debug!("Setting up request's `PublicParams`... (this may take a moment)");
   let setup_data = construct_setup_data();
-  let public_params = program::setup(&setup_data);
 
   let NivcCircuitInputs { fold_inputs, private_inputs, initial_nivc_input } =
     manifest_request.build_inputs(&inputs);
   let NIVCRom { circuit_data, rom } = manifest_request.build_rom();
 
   debug!("Generating request's `ProgramData`...");
-  let program_data = ProgramData::<Online, NotExpanded> {
-    public_params,
+  let program_data = ProgramData::<Offline, NotExpanded> {
+    public_params: proving_params,
+    vk_digest_primary: F::<G1>::from(0),
+    vk_digest_secondary: F::<G2>::from(0),
     setup_data,
     rom,
     rom_data: circuit_data,
-    initial_nivc_input,
+    initial_nivc_input: initial_nivc_input.clone(),
     inputs: (private_inputs, fold_inputs),
     witnesses: vec![vec![F::<G1>::from(0)]],
   }
+  .into_online()?
   .into_expanded()?;
 
   debug!("starting request recursive proving");
@@ -133,18 +155,20 @@ fn construct_request_program_data_and_proof(
 fn construct_response_program_data_and_proof(
   manifest_response: &ManifestResponse,
   inputs: EncryptionInput,
-) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
+  proving_params: Vec<u8>,
+) -> Result<FoldingProof<Vec<u8>, String>, ClientErrors> {
   debug!("Setting up response's `PublicParams`... (this may take a moment)");
   let setup_data = construct_setup_data();
-  let public_params = program::setup(&setup_data);
 
   let NivcCircuitInputs { private_inputs, fold_inputs, initial_nivc_input } =
     manifest_response.build_inputs(inputs)?;
   let NIVCRom { circuit_data, rom } = manifest_response.build_rom();
 
   debug!("Generating response's `ProgramData`...");
-  let program_data = ProgramData::<Online, NotExpanded> {
-    public_params,
+  let program_data = ProgramData::<Offline, NotExpanded> {
+    public_params: proving_params,
+    vk_digest_primary: F::<G1>::from(0),
+    vk_digest_secondary: F::<G2>::from(0),
     setup_data,
     rom,
     rom_data: circuit_data,
@@ -152,6 +176,7 @@ fn construct_response_program_data_and_proof(
     inputs: (private_inputs, fold_inputs),
     witnesses: vec![vec![F::<G1>::from(0)]],
   }
+  .into_online()?
   .into_expanded()?;
 
   debug!("starting response recursive proving");

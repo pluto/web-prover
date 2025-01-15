@@ -23,6 +23,9 @@ pub enum ProxyError {
   #[error("{0}")]
   TlsHandshakeExtract(String),
 
+  #[error("{0}")]
+  TlsHandshakeVerify(String),
+
   #[error("Error occurred during Sign: {0}")]
   Sign(Box<dyn std::error::Error + Send + 'static>),
 
@@ -54,6 +57,9 @@ pub enum NotaryServerError {
 
   #[error(transparent)]
   Io(#[from] std::io::Error),
+
+  #[error(transparent)]
+  SerdeJson(#[from] serde_json::Error),
 
   #[error("Error occurred from reading certificates: {0}")]
   CertificateError(String),

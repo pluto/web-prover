@@ -43,7 +43,7 @@ use crate::{
     F, G1,
   },
   witness::{
-    compute_http_header_witness, compute_http_witness, request_initial_digest,
+    compute_http_header_witness, compute_http_witness, data_hasher, request_initial_digest,
     response_initial_digest, ByteOrPad,
   },
 };
@@ -385,7 +385,8 @@ impl Request {
     let EncryptionCircuitInput { plaintext, ciphertext } =
       pad_plaintext_authentication_inputs(&inputs);
 
-    let (ciphertext_digest, init_nivc_input) = request_initial_digest(self, &ciphertext);
+    let ciphertext_digest = data_hasher(&ciphertext);
+    let (ciphertext_digest, init_nivc_input) = request_initial_digest(self, ciphertext_digest);
 
     build_plaintext_authentication_circuit_inputs(
       &inputs,
@@ -438,8 +439,10 @@ impl Response {
     let EncryptionCircuitInput { plaintext, ciphertext } =
       pad_plaintext_authentication_inputs(&inputs);
 
+    let ciphertext_digest = data_hasher(&ciphertext);
+
     let (ciphertext_digest, init_nivc_input) =
-      response_initial_digest(self, &ciphertext, MAX_STACK_HEIGHT);
+      response_initial_digest(self, ciphertext_digest, MAX_STACK_HEIGHT);
 
     build_plaintext_authentication_circuit_inputs(
       &inputs,

@@ -48,6 +48,7 @@ pub async fn prover(config: JsValue, proving_params: ProvingParamsWasm) -> Resul
 
   debug!("start config serde");
   let mut config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
+  config.session_id();
   debug!("end config serde");
 
   let proof = client::prover_inner(config, Some(proving_params.aux_params.to_vec()))

@@ -11,6 +11,7 @@ pub mod config;
 pub mod errors;
 mod tls;
 pub mod tls_client_async2;
+use proofs::{errors::ProofError, proof::FoldingProof};
 use serde::Serialize;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
@@ -19,9 +20,15 @@ use tracing::info;
 use crate::errors::ClientErrors;
 
 #[derive(Debug, Serialize)]
+pub struct OrigoProof {
+  request:  FoldingProof<Vec<u8>, String>,
+  response: Option<FoldingProof<Vec<u8>, String>>,
+}
+
+#[derive(Debug, Serialize)]
 pub enum Proof {
   TLSN(TlsProof),
-  Origo((Vec<u8>, Vec<u8>)),
+  Origo(OrigoProof),
 }
 
 pub async fn prover_inner(
@@ -46,7 +53,7 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, erro
     .ok_or_else(|| ClientErrors::Other("max_recv_data is missing".to_string()))?;
 
   let prover_config = ProverConfig::builder()
-    .id(config.session_id())
+    .id(config.session_id.clone())
     .root_cert_store(root_store)
     .server_dns(config.target_host()?)
     .max_transcript_size(max_sent_data + max_recv_data)
@@ -72,9 +79,26 @@ pub async fn prover_inner_origo(
   config: config::Config,
   proving_params: Option<Vec<u8>>,
 ) -> Result<Proof, errors::ClientErrors> {
+  let session_id = config.session_id.clone();
   #[cfg(target_arch = "wasm32")]
-  return origo_wasm32::proxy_and_sign_and_generate_proof(config, proving_params).await;
+  let proof =
+    origo_wasm32::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
 
   #[cfg(not(target_arch = "wasm32"))]
-  return origo_native::proxy_and_sign_and_generate_proof(config).await;
+  let proof =
+    origo_native::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
+
+  let verify_response = origo::verify(config, origo::VerifyBody {
+    request_proof: proof.request.proof.clone(),
+    response_proof: Vec::new(),
+    session_id,
+    request_verifier_digest: proof.request.verifier_digest.clone(),
+  })
+  .await?;
+
+  if !verify_response.valid {
+    Err(ProofError::VerifyFailed().into())
+  } else {
+    Ok(Proof::Origo(proof))
+  }
 }

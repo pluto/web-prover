@@ -13,7 +13,7 @@ use crate::{
     data::{CircuitData, NotExpanded},
     manifest::to_chacha_input,
   },
-  witness::{compute_http_witness, ByteOrPad},
+  witness::{compute_http_witness, data_hasher, ByteOrPad},
 };
 
 mod witnesscalc;
@@ -199,10 +199,11 @@ fn test_end_to_end_proofs() {
 
   assert!(padded_plaintext.len() == padded_ciphertext.len());
   assert_eq!(padded_ciphertext.len(), 1024);
+  let ciphertext_digest = data_hasher(&padded_ciphertext);
 
   let (ciphertext_digest, init_nivc_input) = crate::witness::response_initial_digest(
     &mock_manifest().response,
-    &padded_ciphertext,
+    ciphertext_digest,
     MAX_STACK_HEIGHT,
   );
   let mut private_inputs = vec![];
@@ -295,8 +296,13 @@ fn test_end_to_end_proofs() {
     ),
   ]));
 
+  let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
+  let vk_digest_primary = pk.pk_primary.vk_digest;
+  let vk_digest_secondary = pk.pk_secondary.vk_digest;
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params,
+    vk_digest_primary,
+    vk_digest_secondary,
     setup_data,
     rom_data: rom_data.clone(),
     rom: rom.clone(),
@@ -309,56 +315,69 @@ fn test_end_to_end_proofs() {
 
   let recursive_snark = program::run(&program_data).unwrap();
 
-  let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
-  assert_eq!(*recursive_snark.zi_primary().first().unwrap(), *value_digest);
+  let proof = program::compress_proof_no_setup(
+    &recursive_snark,
+    &program_data.public_params,
+    vk_digest_primary,
+    vk_digest_secondary,
+  )
+  .unwrap();
 
   // TODO (autoparallel): This is redundant, we call the setup inside compress_proof. We should
   // likely just store the vk and pk
   let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
 
-  let (z0_primary, _) = program_data.extend_public_inputs().unwrap();
+  assert_eq!(*recursive_snark.zi_primary().first().unwrap(), *value_digest);
+
+  let (z0_primary, _) = program_data.extend_public_inputs(None).unwrap();
 
   let z0_secondary = vec![F::<G2>::ZERO];
-  proof.0.verify(&program_data.public_params, &vk, &z0_primary, &z0_secondary).unwrap();
+  proof.proof.verify(&program_data.public_params, &vk, &z0_primary, &z0_secondary).unwrap();
 }
 
 #[test]
 #[tracing_test::traced_test]
 #[ignore]
 fn test_offline_proofs() {
-  let setup_data = SetupData {
+  // Deduplicate this. We have it in 3 different places.
+  let setup_data_1024 = SetupData {
+    r1cs_types:              vec![
+      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
+      R1CSType::Raw(JSON_EXTRACTION_R1CS.to_vec()),
+    ],
+    witness_generator_types: vec![WitnessGeneratorType::Browser; 3],
+    max_rom_length:          MAX_ROM_LENGTH,
+  };
+
+  let setup_data_512 = SetupData {
     r1cs_types:              vec![
       R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
       R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
       R1CSType::Raw(JSON_EXTRACTION_512B_R1CS.to_vec()),
     ],
-    witness_generator_types: vec![
-      WitnessGeneratorType::Wasm {
-        path:      String::from("../proofs"),
-        wtns_path: String::from("witness.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from("../proofs"),
-        wtns_path: String::from("witness.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from("../proofs"),
-        wtns_path: String::from("witness.wtns"),
-      },
-    ],
-    max_rom_length:          MAX_ROM_LENGTH_512,
+    witness_generator_types: vec![WitnessGeneratorType::Browser; 3],
+    max_rom_length:          MAX_ROM_LENGTH,
   };
-  let public_params = program::setup(&setup_data);
 
-  let program_data = ProgramData::<Online, NotExpanded> {
-    public_params,
-    setup_data,
-    rom_data: HashMap::new(),
-    rom: vec![],
-    initial_nivc_input: vec![],
-    inputs: (vec![], HashMap::new()),
-    witnesses: vec![vec![F::<G1>::from(0)]],
-  };
-  let _ = program_data
-    .into_offline(PathBuf::from_str("web_proof_circuits/serialized_setup.bin").unwrap());
+  for (setup_data, path) in vec![
+    (setup_data_1024, "serialized_setup_1024.bytes"),
+    (setup_data_512, "serialized_setup_512.bytes"),
+  ] {
+    let public_params = program::setup(&setup_data);
+    let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
+    let program_data = ProgramData::<Online, NotExpanded> {
+      public_params,
+      vk_digest_primary: pk.pk_primary.vk_digest,
+      vk_digest_secondary: pk.pk_secondary.vk_digest,
+      setup_data,
+      rom_data: HashMap::new(),
+      rom: vec![],
+      initial_nivc_input: vec![],
+      inputs: (vec![], HashMap::new()),
+      witnesses: vec![vec![F::<G1>::from(0)]],
+    };
+    let path = format!("web_proof_circuits/{}", path);
+    let _ = program_data.into_offline(PathBuf::from_str(path.as_str()).unwrap());
+  }
 }

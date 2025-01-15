@@ -2,10 +2,11 @@ use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use circom::CircomCircuit;
 use client_side_prover::{
+  fast_serde::{self, FastSerde},
   provider::GrumpkinEngine,
   spartan::batched::BatchedRelaxedR1CSSNARK,
   supernova::{snark::CompressedSNARK, PublicParams, TrivialCircuit},
-  traits::{Engine, Group},
+  traits::{Dual, Engine, Group},
 };
 use ff::Field;
 use num_bigint::BigInt;
@@ -15,7 +16,7 @@ use tracing::{debug, error, info};
 
 use crate::{
   errors::ProofError,
-  program::data::{Expanded, Online, ProgramData, R1CSType, SetupData, WitnessGeneratorType},
+  program::data::{Online, ProgramData, R1CSType, SetupData, WitnessGeneratorType},
 };
 
 pub mod circom;
@@ -37,35 +38,6 @@ pub type S2 = BatchedRelaxedR1CSSNARK<E2, EE2>;
 
 pub type F<G> = <G as Group>::Scalar;
 
-/// Computes a web proof from the given program data.
-///
-/// This function runs the program using the provided `program_data`, generates a recursive SNARK,
-/// compresses the proof, and serializes it into a compressed format.
-///
-/// # Arguments
-///
-/// * `program_data` - A reference to the `ProgramData` containing the setup and public parameters.
-///
-/// # Returns
-///
-/// A `Result` containing a vector of bytes representing the serialized and compressed proof,
-/// or a `ProofError` if an error occurs during the computation.
-///
-/// # Errors
-///
-/// This function will return a `ProofError` if:
-/// - The program fails to run with the provided `program_data`.
-/// - The proof compression fails.
-pub fn compute_web_proof(
-  program_data: &ProgramData<Online, Expanded>,
-) -> Result<Vec<u8>, ProofError> {
-  let recursive_snark = program::run(program_data)?;
-  // TODO: Unecessary 2x generation of pk,vk, but it is cheap. Refactor later if need be!
-  let proof = program::compress_proof(&recursive_snark, &program_data.public_params)?;
-  let serialized_proof = proof.serialize();
-  Ok(serialized_proof.0)
-}
-
 /// Represents the params needed to create `PublicParams` alongside the circuits' R1CSs.
 /// Specifically typed to the `proofs` crate choices of curves and engines.
 pub type AuxParams = client_side_prover::supernova::AuxParams<E1>;
@@ -76,22 +48,70 @@ pub type ProverKey = client_side_prover::supernova::snark::ProverKey<E1, S1, S2>
 /// curves and engines.
 pub type VerifierKey = client_side_prover::supernova::snark::VerifierKey<E1, S1, S2>;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BackendData {
-  pub aux_params:   AuxParams,
-  pub prover_key:   ProverKey,
-  pub verifier_key: VerifierKey,
+use std::io::Cursor;
+
+use client_side_prover::fast_serde::{SerdeByteError, SerdeByteTypes};
+
+#[derive(Debug)]
+pub struct ProvingParams {
+  pub aux_params:          AuxParams,
+  pub vk_digest_primary:   <E1 as Engine>::Scalar,
+  pub vk_digest_secondary: <Dual<E1> as Engine>::Scalar,
 }
 
-/// Method used externally to setup all the backend data needed to create a verifiable proof with
-/// [`client_side_prover`] and `proofs` crate. Intended to be used to create these values offline
-/// and then be loaded at or before proof creation or verification.
-///
-/// # Arguments
-/// - `setup_data`: the data that defines what types of supernova programs can be run, i.e.,
-///   specified by a list of circuit R1CS and max ROM length.
-pub fn setup_backend(setup_data: SetupData) -> Result<BackendData, ProofError> {
-  let public_params = program::setup(&setup_data);
-  let (prover_key, verifier_key) = CompressedSNARK::<E1, S1, S2>::setup(&public_params)?;
-  Ok(BackendData { aux_params: public_params.aux_params(), prover_key, verifier_key })
+impl FastSerde for ProvingParams {
+  /// Initialize ProvingParams from an efficiently serializable data format.
+  fn from_bytes(bytes: &Vec<u8>) -> Result<Self, SerdeByteError> {
+    let mut cursor = Cursor::new(bytes);
+    Self::validate_header(&mut cursor, SerdeByteTypes::ProverParams, 3)?;
+
+    let aux_params =
+      Self::read_section_bytes(&mut cursor, 1).map(|bytes| AuxParams::from_bytes(&bytes))??;
+
+    let vk_digest_primary = Self::read_section_bytes(&mut cursor, 2)
+      .and_then(|bytes| bytes.try_into().map_err(|_| SerdeByteError::G1DecodeError))
+      .map(|bytes| <E1 as Engine>::Scalar::from_bytes(&bytes))?
+      .into_option()
+      .ok_or(SerdeByteError::G1DecodeError)?;
+
+    let vk_digest_secondary = Self::read_section_bytes(&mut cursor, 3)
+      .and_then(|bytes| bytes.try_into().map_err(|_| SerdeByteError::G2DecodeError))
+      .map(|bytes| <Dual<E1> as Engine>::Scalar::from_bytes(&bytes))?
+      .into_option()
+      .ok_or(SerdeByteError::G1DecodeError)?;
+
+    Ok(ProvingParams { aux_params, vk_digest_primary, vk_digest_secondary })
+  }
+
+  /// Convert ProvingParams to an efficient serialization.
+  fn to_bytes(&self) -> Vec<u8> {
+    let mut out = Vec::new();
+    out.extend_from_slice(&fast_serde::MAGIC_NUMBER);
+    out.push(SerdeByteTypes::ProverParams as u8);
+    out.push(3); // num_sections
+
+    Self::write_section_bytes(&mut out, 1, &self.aux_params.to_bytes());
+    Self::write_section_bytes(&mut out, 2, &self.vk_digest_primary.to_bytes().to_vec());
+    Self::write_section_bytes(&mut out, 3, &self.vk_digest_secondary.to_bytes().to_vec());
+
+    return out;
+  }
+}
+
+impl ProvingParams {
+  /// Method used externally to initialize all the backend data needed to create a verifiable proof
+  /// with [`client_side_prover`] and `proofs` crate. Intended to be used to create these values
+  /// offline and then be loaded at or before proof creation or verification.
+  ///
+  /// # Arguments
+  /// - `aux_params`: the data that defines what types of supernova programs can be run, i.e.,
+  ///   specified by a list of circuit R1CS and max ROM length.
+  /// - `prover_key`: The key used for generating proofs, allows us to pin a specific verifier.
+  pub fn new(aux_params: AuxParams, prover_key: ProverKey) -> Result<ProvingParams, ProofError> {
+    Ok(ProvingParams {
+      aux_params,
+      vk_digest_primary: prover_key.pk_primary.vk_digest,
+      vk_digest_secondary: prover_key.pk_secondary.vk_digest,
+    })
+  }
 }

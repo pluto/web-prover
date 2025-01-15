@@ -2,10 +2,10 @@ use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
 use client_side_prover::{
   supernova::{NonUniformCircuit, RecursiveSNARK, StepCircuit},
-  traits::snark::default_ck_hint,
+  traits::{snark::default_ck_hint, Dual},
 };
 use data::Expanded;
-use proof::Proof;
+use proof::FoldingProof;
 #[cfg(feature = "timing")] use tracing::trace;
 use utils::into_input_json;
 
@@ -108,7 +108,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
   info!("Starting SuperNova program...");
 
   // Resize the rom to be the `max_rom_length` committed to in the `SetupData`
-  let (z0_primary, resized_rom) = program_data.extend_public_inputs()?;
+  let (z0_primary, resized_rom) = program_data.extend_public_inputs(None)?;
   let z0_secondary = vec![F::<G2>::ZERO];
 
   let mut recursive_snark_option = None;
@@ -193,10 +193,37 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
   Ok(recursive_snark?)
 }
 
+pub fn compress_proof_no_setup(
+  recursive_snark: &RecursiveSNARK<E1>,
+  public_params: &PublicParams<E1>,
+  vk_digest_primary: <E1 as Engine>::Scalar,
+  vk_digest_secondary: <Dual<E1> as Engine>::Scalar,
+) -> Result<FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>>, ProofError> {
+  let pk = CompressedSNARK::<E1, S1, S2>::initialize_pk(
+    &public_params,
+    vk_digest_primary,
+    vk_digest_secondary,
+  )
+  .unwrap();
+  debug!(
+    "initialized pk pk_primary.digest={:?}, pk_secondary.digest={:?}",
+    pk.pk_primary.vk_digest, pk.pk_secondary.vk_digest
+  );
+
+  debug!("`CompressedSNARK::prove STARTING PROVING!");
+  let proof = FoldingProof {
+    proof:           CompressedSNARK::<E1, S1, S2>::prove(&public_params, &pk, recursive_snark)?,
+    verifier_digest: pk.pk_primary.vk_digest,
+  };
+  debug!("`CompressedSNARK::prove completed!");
+
+  Ok(proof)
+}
+
 pub fn compress_proof(
   recursive_snark: &RecursiveSNARK<E1>,
   public_params: &PublicParams<E1>,
-) -> Result<Proof<CompressedSNARK<E1, S1, S2>>, ProofError> {
+) -> Result<FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>>, ProofError> {
   debug!("Setting up `CompressedSNARK`");
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
@@ -208,7 +235,10 @@ pub fn compress_proof(
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
 
-  let proof = Proof(CompressedSNARK::<E1, S1, S2>::prove(public_params, &pk, recursive_snark)?);
+  let proof = FoldingProof {
+    proof:           CompressedSNARK::<E1, S1, S2>::prove(public_params, &pk, recursive_snark)?,
+    verifier_digest: pk.pk_primary.vk_digest,
+  };
   debug!("`CompressedSNARK::prove completed!");
 
   #[cfg(feature = "timing")]
