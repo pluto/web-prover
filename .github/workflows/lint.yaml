@@ -41,6 +41,12 @@ jobs:
           components: clippy
           override: true
 
+      - name: Install LLVM and Clang to support 'ring' crate and protobuf
+        run: |
+          brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
+          echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
+          brew install protobuf
+
       - name: cargo clippy for ${{ matrix.crate }}
         run: cargo clippy -p ${{ matrix.crate }}
 
