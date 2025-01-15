@@ -86,7 +86,7 @@ pub async fn create_witness(input: JsValue) -> Result<WitnessOutput, JsValue> {
 }
 
 pub async fn proxy_and_sign_and_generate_proof(
-  mut config: config::Config,
+  config: config::Config,
   proving_params: Option<Vec<u8>>,
 ) -> Result<OrigoProof, errors::ClientErrors> {
   let session_id = config.session_id.clone();

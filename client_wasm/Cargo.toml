@@ -30,12 +30,13 @@ tlsn-core={ workspace=true }
 # Use the patched ws_stream_wasm to fix the issue https://github.com/najamelan/ws_stream_wasm/issues/12#issuecomment-1711902958
 # ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wasm", rev="2ed12aad9f0236e5321f577672f309920b2aef51" }
 
-[dev-dependencies]
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
 # all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
 # code size when deploying.
 console_error_panic_hook={ version="0.1.7" }
+
+[dev-dependencies]
 wasm-bindgen-test       ="0.3.34"
 
 [package.metadata.wasm-pack.profile.release]
