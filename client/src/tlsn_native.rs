@@ -23,7 +23,7 @@ pub async fn setup_tcp_connection(
   config: &mut Config,
   prover_config: ProverConfig,
 ) -> Prover<Closed> {
-  let session_id = config.session_id();
+  let session_id = config.set_session_id();
   let root_store = crate::tls::rustls_default_root_store();
 
   let client_notary_config = ClientConfig::builder()

@@ -31,7 +31,7 @@ async fn main() -> Result<(), ClientErrors> {
 
   let config_json = std::fs::read_to_string(args.config)?;
   let mut config: Config = serde_json::from_str(&config_json)?;
-  config.session_id();
+  config.set_session_id();
 
   let proving_params = std::fs::read(circuits::PROVING_PARAMS_1024).unwrap();
   let proof = client::prover_inner(config, Some(proving_params)).await?;
