@@ -194,11 +194,11 @@ impl ParsedTranscript {
         MessagePayload::Handshake(ref handshake) => match handshake.payload {
           HandshakePayload::ClientHello(_) => {
             debug!("verify_certificate_sig: ClientHello");
-            transcript_digest.add_message(&msg);
+            transcript_digest.add_message(msg);
           },
           HandshakePayload::ServerHello(_) => {
             debug!("verify_certificate_sig:ServerHello");
-            transcript_digest.add_message(&msg);
+            transcript_digest.add_message(msg);
           },
           HandshakePayload::Certificate(_) => {
             // TODO for some reason this is not hit, but CertificateTLS13 is hit
@@ -209,7 +209,7 @@ impl ParsedTranscript {
               "verify_certificate_sig:CertificateTLS13: {}",
               certificate_payload.entries.len()
             );
-            transcript_digest.add_message(&msg);
+            transcript_digest.add_message(msg);
             server_certificate = certificate_payload.entries[0].cert.clone();
           },
           HandshakePayload::CertificateVerify(ref digitally_signed_struct) => {
@@ -227,7 +227,7 @@ impl ParsedTranscript {
           },
           HandshakePayload::EncryptedExtensions(_) => {
             debug!("verify_certificate_sig:EncryptedExtensions");
-            transcript_digest.add_message(&msg);
+            transcript_digest.add_message(msg);
           },
           HandshakePayload::Finished(_) => {
             debug!("verify_certificate_sig:Payload");
@@ -251,7 +251,7 @@ impl ParsedTranscript {
       }
     }
 
-    return Err(ProxyError::TlsHandshakeVerify(String::from("unable to parse verify data")));
+    Err(ProxyError::TlsHandshakeVerify(String::from("unable to parse verify data")))
   }
 
   /// Given chunks of possible request or response data, compute
@@ -262,7 +262,7 @@ impl ParsedTranscript {
   ///
   /// Output:
   /// [H([1]), H([1,2]), H([1,2,3]), H([2]), H([2,3]), H([3])]
-  fn get_permutations(input: &Vec<Vec<u8>>) -> Vec<F<G1>> {
+  fn get_permutations(input: &[Vec<u8>]) -> Vec<F<G1>> {
     let mut result = Vec::new();
 
     fn get_hashes(bytes: Vec<u8>) -> Vec<F<G1>> {
@@ -278,9 +278,9 @@ impl ParsedTranscript {
       result.extend(get_hashes(input[i].clone()));
       current.extend(&input[i]);
 
-      for j in (i + 1)..input.len() {
+      for item in input[i + 1..].iter() {
         let mut combined = current.clone();
-        combined.extend(&input[j]);
+        combined.extend(item);
         result.extend(get_hashes(combined.clone()));
       }
     }
@@ -329,15 +329,15 @@ impl ParsedTranscript {
       let trimmed_bytes = bytes[..trim].to_vec();
       match s {
         State::SeekingRequest => {
-          return if matches!(m.direction, Direction::Received) {
+          if matches!(m.direction, Direction::Received) {
             State::SeekingRequest
           } else {
             // Drop the first non-received message. It's verify data from the client.
             State::ParsingRequest
-          };
+          }
         },
         State::ParsingRequest => {
-          return if matches!(m.direction, Direction::Sent) {
+          if matches!(m.direction, Direction::Sent) {
             // Case: more request messages
             req.push(trimmed_bytes);
             State::ParsingRequest
@@ -345,10 +345,10 @@ impl ParsedTranscript {
             // Case: first message from server after request
             resp.push(trimmed_bytes);
             State::ParsingResponse
-          };
+          }
         },
         State::ParsingResponse => {
-          return if matches!(m.direction, Direction::Received) {
+          if matches!(m.direction, Direction::Received) {
             // Case: receiving message & not the last message. Drop last message, it's close notify.
             if idx < last_msg_idx {
               resp.push(trimmed_bytes);
@@ -356,7 +356,7 @@ impl ParsedTranscript {
             State::ParsingResponse
           } else {
             panic!("expected only response data");
-          };
+          }
         },
       }
     }
@@ -470,7 +470,7 @@ fn handle_application_data(
             Ok((plain_message, _meta)) => {
               let mut handshake_joiner = HandshakeJoiner::new();
               handshake_joiner.take_message(plain_message);
-              while let Some(msg) = handshake_joiner.frames.pop_front() {
+              if let Some(msg) = handshake_joiner.frames.pop_front() {
                 return Ok(WrappedPayload::Decrypted(msg));
               }
             },
@@ -491,7 +491,7 @@ fn handle_application_data(
             Ok((plain_message, _meta)) => {
               let mut handshake_joiner = HandshakeJoiner::new();
               handshake_joiner.take_message(plain_message);
-              while let Some(msg) = handshake_joiner.frames.pop_front() {
+              if let Some(msg) = handshake_joiner.frames.pop_front() {
                 return Ok(WrappedPayload::Decrypted(msg));
               }
             },

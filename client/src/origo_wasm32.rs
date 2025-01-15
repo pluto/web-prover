@@ -1,5 +1,4 @@
 use std::{
-  clone,
   collections::HashMap,
   io::{BufReader, Cursor},
   ops::Deref,
@@ -87,7 +86,7 @@ pub async fn create_witness(input: JsValue) -> Result<WitnessOutput, JsValue> {
 }
 
 pub async fn proxy_and_sign_and_generate_proof(
-  mut config: config::Config,
+  config: config::Config,
   proving_params: Option<Vec<u8>>,
 ) -> Result<OrigoProof, errors::ClientErrors> {
   let session_id = config.session_id.clone();
@@ -102,7 +101,7 @@ pub async fn proxy_and_sign_and_generate_proof(
     ),
   };
 
-  let sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb).await;
+  let _sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb).await;
 
   debug!("generating program data!");
   let witness = origo_conn.to_witness_data();
@@ -137,7 +136,7 @@ async fn generate_program_data(
   proving: ProvingData,
   proving_params: Option<Vec<u8>>,
 ) -> Result<ProgramData<Online, Expanded>, errors::ClientErrors> {
-  let TLSEncryption { request: request_inputs, response: response_inputs } =
+  let TLSEncryption { request: request_inputs, response: _response_inputs } =
     decrypt_tls_ciphertext(witness)?;
 
   let request_setup_data = construct_setup_data();
@@ -212,11 +211,11 @@ async fn proxy(
 
   let (_, ws_stream) = WsMeta::connect(wss_url.to_string(), None).await?;
 
-  let (mut client_tls_conn, tls_fut) = bind_client(ws_stream.into_io(), client);
+  let (client_tls_conn, tls_fut) = bind_client(ws_stream.into_io(), client);
 
   let client_tls_conn = unsafe { FuturesIo::new(client_tls_conn) };
 
-  let (tls_sender, tls_receiver) = oneshot::channel();
+  let (tls_sender, _tls_receiver) = oneshot::channel();
   let handled_tls_fut = async {
     let result = tls_fut.await;
     // Triggered when the server shuts the connection.

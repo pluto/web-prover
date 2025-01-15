@@ -10,7 +10,6 @@
 #![forbid(unsafe_code)]
 
 mod conn;
-
 use std::{
   pin::Pin,
   task::{Context, Poll},
@@ -23,6 +22,7 @@ use futures::{
   AsyncWriteExt, Future, FutureExt, SinkExt, StreamExt,
 };
 use tls_client2::ClientConnection;
+use tracing::warn;
 #[cfg(feature = "tracing")]
 use tracing::{debug, debug_span, error, trace, warn, Instrument};
 
@@ -205,7 +205,6 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
               } else {
                   if !server_closed {
                       if let Err(e) = send_close_notify(&mut client, &mut server_tx).await {
-                          #[cfg(feature = "tracing")]
                           warn!("failed to send close_notify to server: {}", e);
                       }
                   }

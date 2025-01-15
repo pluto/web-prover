@@ -1,29 +1,16 @@
-use std::{collections::HashMap, panic};
+use std::panic;
 
-use base64::prelude::*;
-use client::config::{self, Config};
-use futures::{channel::oneshot, AsyncWriteExt};
-use http_body_util::Full;
-use hyper::{
-  body::{Body, Bytes},
-  Request,
-};
-use serde::{Deserialize, Serialize};
-use tlsn_core::{commitment::CommitmentKind, proof::TlsProof};
-use tlsn_prover::tls::{Prover, ProverConfig};
-use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tracing::{debug, info, trace};
+use client::config::Config;
+use tlsn_core::proof::TlsProof;
+use tracing::debug;
 use tracing_subscriber::{
   fmt::{format::Pretty, time::UtcTime},
   prelude::*,
   EnvFilter,
 };
 use tracing_web::{performance_layer, MakeWebConsoleWriter};
-use url::Url;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::spawn_local;
 pub use wasm_bindgen_rayon::init_thread_pool;
-use ws_stream_wasm::WsMeta;
 
 /// ProvingParamsWasm interface is for efficiently moving data between
 /// the javascript and wasm runtime. Using wasm_bindgen creates a
@@ -47,8 +34,7 @@ pub async fn prover(config: JsValue, proving_params: ProvingParamsWasm) -> Resul
   panic::set_hook(Box::new(console_error_panic_hook::hook));
 
   debug!("start config serde");
-  let mut config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
-  config.session_id();
+  let config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
   debug!("end config serde");
 
   let proof = client::prover_inner(config, Some(proving_params.aux_params.to_vec()))

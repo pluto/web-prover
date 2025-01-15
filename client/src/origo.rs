@@ -1,6 +1,5 @@
 // logic common to wasm32 and native
 use serde::{Deserialize, Serialize};
-use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
 use tracing::debug;
 
 #[derive(Serialize)]
@@ -67,6 +66,7 @@ pub async fn verify(
     config.notary_port.clone(),
   );
 
+  #[allow(unused_variables)]
   let client = reqwest::ClientBuilder::new().build()?;
 
   #[cfg(feature = "notary_ca_cert")]

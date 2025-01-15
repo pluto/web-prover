@@ -55,6 +55,7 @@ pub struct VerifyBody {
   request_verifier_digest: String,
   // TODO: Also implement response verifier digest.
   request_proof:           Vec<u8>,
+  #[allow(unused)]
   response_proof:          Vec<u8>,
 }
 
@@ -227,7 +228,7 @@ pub async fn verify(
   // Form verifier inputs
   let verifier_inputs =
     state.verifier_sessions.lock().unwrap().get(&payload.session_id).cloned().unwrap();
-  let ciphertext_digest = verifier_inputs.request_hashes.get(0).cloned().unwrap();
+  let ciphertext_digest = verifier_inputs.request_hashes.first().cloned().unwrap();
   let (_, nivc_input) = request_initial_digest(&state.manifest.request, ciphertext_digest);
   let verifier = state.verifiers.get(&payload.request_verifier_digest).unwrap();
   let (z0_primary, _) = verifier.program_data.extend_public_inputs(Some(vec![nivc_input])).unwrap();

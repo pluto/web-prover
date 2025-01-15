@@ -7,10 +7,13 @@ use proofs::program::data::{R1CSType, SetupData, WitnessGeneratorType};
 
 // -------------------------------------- 1024B circuits -------------------------------------- //
 pub const MAX_ROM_LENGTH: usize = 3;
+#[allow(dead_code)]
 pub const PROVING_PARAMS_512: &str = "proofs/web_proof_circuits/serialized_setup_512.bytes";
+#[allow(dead_code)]
 pub const PROVING_PARAMS_1024: &str = "proofs/web_proof_circuits/serialized_setup_1024.bytes";
 
 // Circuit 0
+#[allow(dead_code)]
 const PLAINTEXT_AUTHENTICATION_R1CS: &[u8] = include_bytes!(
   "../../proofs/web_proof_circuits/target_1024b/plaintext_authentication_1024b.r1cs"
 );
@@ -19,6 +22,7 @@ const PLAINTEXT_AUTHENTICATION_GRAPH: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_1024b/plaintext_authentication_1024b.bin");
 
 // Circuit 1
+#[allow(dead_code)]
 const HTTP_VERIFICATION_R1CS: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_1024b/http_verification_1024b.r1cs");
 #[cfg(not(target_arch = "wasm32"))]
@@ -26,6 +30,7 @@ const HTTP_VERIFICATION_GRAPH: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_1024b/http_verification_1024b.bin");
 
 // Circuit 2
+#[allow(dead_code)]
 const JSON_EXTRACTION_R1CS: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_1024b/json_extraction_1024b.r1cs");
 #[cfg(not(target_arch = "wasm32"))]
@@ -34,14 +39,17 @@ const JSON_EXTRACTION_GRAPH: &[u8] =
 
 // -------------------------------------- 512B circuits -------------------------------------- //
 // Circuit 0
+#[allow(dead_code)]
 const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_512b/plaintext_authentication_512b.r1cs");
 
 // Circuit 1
+#[allow(dead_code)]
 const HTTP_VERIFICATION_512B_R1CS: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_512b/http_verification_512b.r1cs");
 
 // Circuit 2
+#[allow(dead_code)]
 const JSON_EXTRACTION_512B_R1CS: &[u8] =
   include_bytes!("../../proofs/web_proof_circuits/target_512b/json_extraction_512b.r1cs");
 

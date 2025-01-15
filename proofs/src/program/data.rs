@@ -358,8 +358,7 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   ///    - The expanded ROM opcodes converted to field elements
   ///
   /// # Arguments
-  /// - `input_override`: Optional override for the initial_nivc_input
-  /// used during verification.
+  /// - `input_override`: Optional override for the initial_nivc_input used during verification.
   ///
   /// # Returns
   ///

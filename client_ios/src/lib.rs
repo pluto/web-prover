@@ -1,11 +1,9 @@
 use std::{
-  collections::HashMap,
   ffi::{c_char, CStr, CString},
-  path::PathBuf,
   time::Instant,
 };
 
-use client::{config::Config, errors::ClientErrors};
+use client::config::Config;
 use tracing::debug;
 
 // TODO: Load from server.

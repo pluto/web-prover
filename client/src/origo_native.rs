@@ -30,21 +30,21 @@ use crate::{
 /// - decrypts TLS ciphertext in [`tls_client2::backend::origo::WitnessData`]
 /// - takes TLS transcripts along with client [`Manifest`] and generates NIVC [`Proof`]
 pub async fn proxy_and_sign_and_generate_proof(
-  mut config: config::Config,
+  config: config::Config,
   proving_params: Option<Vec<u8>>,
 ) -> Result<OrigoProof, ClientErrors> {
   let mut origo_conn = proxy(config.clone(), config.session_id.clone()).await?;
 
   let sb = SignBody {
     handshake_server_iv:  hex::encode(
-      origo_conn.secret_map.get("Handshake:server_iv").unwrap().clone().to_vec(),
+      origo_conn.secret_map.get("Handshake:server_iv").unwrap().clone(),
     ),
     handshake_server_key: hex::encode(
-      origo_conn.secret_map.get("Handshake:server_key").unwrap().clone().to_vec(),
+      origo_conn.secret_map.get("Handshake:server_key").unwrap().clone(),
     ),
   };
 
-  let sign_data = crate::origo::sign(config.clone(), config.session_id.clone(), sb).await;
+  let _sign_data = crate::origo::sign(config.clone(), config.session_id.clone(), sb).await;
 
   let witness = origo_conn.to_witness_data();
 
@@ -214,8 +214,7 @@ async fn proxy(
     tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));
 
   let notary_socket =
-    tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port.clone()))
-      .await?;
+    tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port)).await?;
 
   let notary_tls_socket = notary_connector
     .connect(rustls::ServerName::try_from(config.notary_host.as_str())?, notary_socket)

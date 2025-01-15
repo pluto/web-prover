@@ -1379,40 +1379,20 @@ dependencies = [
 name = "client_wasm"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
- "chrono",
  "client",
  "console_error_panic_hook",
- "elliptic-curve",
- "futures",
- "futures-util",
- "getrandom 0.2.15",
- "http-body-util",
- "hyper",
  "js-sys",
- "p256",
- "rayon",
- "ring",
- "serde",
  "serde-wasm-bindgen",
  "serde_json",
- "strum",
- "strum_macros",
  "time",
  "tlsn-core",
- "tlsn-prover",
- "tokio-util",
  "tracing",
  "tracing-subscriber",
  "tracing-web",
- "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-rayon",
  "wasm-bindgen-test",
- "web-sys",
- "web-time 1.1.0",
- "ws_stream_wasm",
 ]
 
 [[package]]
@@ -6717,7 +6697,6 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
- "serde",
 ]
 
 [[package]]
