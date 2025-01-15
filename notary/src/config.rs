@@ -3,6 +3,7 @@ use std::fs;
 use clap::Parser;
 use proofs::program::manifest::Manifest;
 use serde::Deserialize;
+
 use crate::errors::NotaryServerError;
 
 #[derive(Parser, Debug)]

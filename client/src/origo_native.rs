@@ -73,10 +73,7 @@ pub async fn proxy_and_sign_and_generate_proof(
   );
 
   // TODO(Sambhav): handle request and response into one proof
-  Ok(OrigoProof {
-    request:  request_proof?,
-    response: Some(response_proof?),
-  })
+  Ok(OrigoProof { request: request_proof?, response: Some(response_proof?) })
 }
 
 /// generates NIVC proof from [`ProgramData`]
@@ -88,7 +85,7 @@ fn generate_proof(
 ) -> Result<FoldingProof<Vec<u8>, String>, ClientErrors> {
   debug!("starting recursive proving");
   let program_output = program::run(&program_data)?;
-  
+
   debug!("starting proof compression");
   let compressed_snark_proof = program::compress_proof_no_setup(
     &program_output,

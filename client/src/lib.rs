@@ -11,10 +11,7 @@ pub mod config;
 pub mod errors;
 mod tls;
 pub mod tls_client_async2;
-use proofs::{
-  errors::ProofError, 
-  proof::FoldingProof,
-};
+use proofs::{errors::ProofError, proof::FoldingProof};
 use serde::Serialize;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
@@ -24,7 +21,7 @@ use crate::errors::ClientErrors;
 
 #[derive(Debug, Serialize)]
 pub struct OrigoProof {
-  request: FoldingProof<Vec<u8>, String>,
+  request:  FoldingProof<Vec<u8>, String>,
   response: Option<FoldingProof<Vec<u8>, String>>,
 }
 
@@ -84,10 +81,12 @@ pub async fn prover_inner_origo(
 ) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id.clone();
   #[cfg(target_arch = "wasm32")]
-  let proof = origo_wasm32::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
+  let proof =
+    origo_wasm32::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
 
   #[cfg(not(target_arch = "wasm32"))]
-  let proof = origo_native::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
+  let proof =
+    origo_native::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
 
   let verify_response = origo::verify(config, origo::VerifyBody {
     request_proof: proof.request.proof.clone(),

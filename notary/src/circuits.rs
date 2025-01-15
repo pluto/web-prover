@@ -3,14 +3,17 @@
 //! - AES: AES encryption
 //! - HTTP: HTTP parsing and locking
 //! - JSON: JSON extract
-use proofs::program::data::{NotExpanded, R1CSType, SetupData, WitnessGeneratorType};
-use tracing::debug;
 use std::collections::HashMap;
+
 use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
 use proofs::{
-  program::data::{CircuitData, Offline, Online, ProgramData},
+  program::data::{
+    CircuitData, NotExpanded, Offline, Online, ProgramData, R1CSType, SetupData,
+    WitnessGeneratorType,
+  },
   E1, F, G1, G2, S1, S2,
 };
+use tracing::debug;
 
 pub const MAX_ROM_LENGTH: usize = 3;
 pub const PROVING_PARAMS_512: &str = "proofs/web_proof_circuits/serialized_setup_512.bytes";

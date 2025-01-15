@@ -9,9 +9,8 @@ use client::{config::Config, errors::ClientErrors};
 use tracing::debug;
 
 // TODO: Load from server.
-const PROVING_PARAM_BYTES: &[u8] = include_bytes!(
-  "../../proofs/web_proof_circuits/serialized_setup_1024.bytes"
-);
+const PROVING_PARAM_BYTES: &[u8] =
+  include_bytes!("../../proofs/web_proof_circuits/serialized_setup_1024.bytes");
 
 #[derive(serde::Serialize)]
 struct Output {
@@ -36,7 +35,7 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
       assert!(!config_json.is_null());
       CStr::from_ptr(config_json).to_str().unwrap()
     };
-    
+
     let mut config: Config = serde_json::from_str(config_str).unwrap();
     config.session_id();
     let rt = tokio::runtime::Runtime::new().unwrap();

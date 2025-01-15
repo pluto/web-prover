@@ -71,12 +71,14 @@ impl FastSerde for ProvingParams {
     let vk_digest_primary = Self::read_section_bytes(&mut cursor, 2)
       .and_then(|bytes| bytes.try_into().map_err(|_| SerdeByteError::G1DecodeError))
       .map(|bytes| <E1 as Engine>::Scalar::from_bytes(&bytes))?
-      .into_option().ok_or(SerdeByteError::G1DecodeError)?;
+      .into_option()
+      .ok_or(SerdeByteError::G1DecodeError)?;
 
     let vk_digest_secondary = Self::read_section_bytes(&mut cursor, 3)
       .and_then(|bytes| bytes.try_into().map_err(|_| SerdeByteError::G2DecodeError))
       .map(|bytes| <Dual<E1> as Engine>::Scalar::from_bytes(&bytes))?
-      .into_option().ok_or(SerdeByteError::G1DecodeError)?;
+      .into_option()
+      .ok_or(SerdeByteError::G1DecodeError)?;
 
     Ok(ProvingParams { aux_params, vk_digest_primary, vk_digest_secondary })
   }
