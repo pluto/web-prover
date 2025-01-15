@@ -7,6 +7,7 @@ use client_side_prover::{fast_serde::FastSerde, supernova::get_circuit_shapes};
 use serde_json::json;
 
 use super::*;
+use crate::setup::ProvingParams;
 
 /// Fold input for any circuit containing signals name and vector of values. Inputs are distributed
 /// evenly across folds after the ROM is finalised by the prover.

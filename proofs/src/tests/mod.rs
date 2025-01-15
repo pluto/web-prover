@@ -2,6 +2,8 @@
 
 // TODO: (Colin): I'm noticing this module could use some TLC. There's a lot of lint here!
 
+use std::{fs, fs::File, io::Write};
+
 use client_side_prover::supernova::RecursiveSNARK;
 use program::manifest::JsonKey;
 use serde_json::json;
@@ -13,6 +15,7 @@ use crate::{
     data::{CircuitData, NotExpanded},
     manifest::to_chacha_input,
   },
+  setup,
   witness::{compute_http_witness, data_hasher, ByteOrPad},
 };
 
@@ -40,8 +43,6 @@ const JSON_EXTRACTION_R1CS: &[u8] =
   include_bytes!("../../web_proof_circuits/target_1024b/json_extraction_1024b.r1cs");
 const JSON_EXTRACTION_GRAPH: &[u8] =
   include_bytes!("../../web_proof_circuits/target_1024b/json_extraction_1024b.bin");
-
-const MAX_ROM_LENGTH_512: usize = 3;
 
 // Circuit 0
 const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] =
@@ -339,45 +340,29 @@ fn test_end_to_end_proofs() {
 #[tracing_test::traced_test]
 #[ignore]
 fn test_offline_proofs() {
-  // Deduplicate this. We have it in 3 different places.
-  let setup_data_1024 = SetupData {
-    r1cs_types:              vec![
-      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
-      R1CSType::Raw(JSON_EXTRACTION_R1CS.to_vec()),
-    ],
-    witness_generator_types: vec![WitnessGeneratorType::Browser; 3],
-    max_rom_length:          MAX_ROM_LENGTH,
-  };
-
-  let setup_data_512 = SetupData {
-    r1cs_types:              vec![
+  let setups = vec![
+    ("serialized_setup_512.bytes", vec![
       R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
       R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
       R1CSType::Raw(JSON_EXTRACTION_512B_R1CS.to_vec()),
-    ],
-    witness_generator_types: vec![WitnessGeneratorType::Browser; 3],
-    max_rom_length:          MAX_ROM_LENGTH,
-  };
+    ]),
+    ("serialized_setup_1024.bytes", vec![
+      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
+      R1CSType::Raw(JSON_EXTRACTION_R1CS.to_vec()),
+    ]),
+  ];
 
-  for (setup_data, path) in vec![
-    (setup_data_1024, "serialized_setup_1024.bytes"),
-    (setup_data_512, "serialized_setup_512.bytes"),
-  ] {
-    let public_params = program::setup(&setup_data);
-    let (pk, _vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
-    let program_data = ProgramData::<Online, NotExpanded> {
-      public_params,
-      vk_digest_primary: pk.pk_primary.vk_digest,
-      vk_digest_secondary: pk.pk_secondary.vk_digest,
-      setup_data,
-      rom_data: HashMap::new(),
-      rom: vec![],
-      initial_nivc_input: vec![],
-      inputs: (vec![], HashMap::new()),
-      witnesses: vec![vec![F::<G1>::from(0)]],
-    };
+  for (path, r1cs_files) in setups {
+    let bytes = setup::setup(&r1cs_files, MAX_ROM_LENGTH);
     let path = format!("web_proof_circuits/{}", path);
-    let _ = program_data.into_offline(PathBuf::from_str(path.as_str()).unwrap());
+    let path = PathBuf::from_str(path.as_str()).unwrap();
+
+    if let Some(parent) = path.parent() {
+      fs::create_dir_all(parent).unwrap();
+    }
+
+    debug!("bytes_path={:?}", path);
+    File::create(&path).unwrap().write_all(&bytes).unwrap();
   }
 }
