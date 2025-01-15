@@ -8,6 +8,7 @@ use axum::{
 };
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
+use proofs::{proof::FoldingProof, witness::request_initial_digest, F, G1, G2};
 use rs_merkle::{Hasher, MerkleTree};
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -24,10 +25,6 @@ use crate::{
   tls_parser::{Direction, UnparsedMessage, UnparsedTranscript},
   tlsn::ProtocolUpgrade,
   SharedState,
-};
-use proofs::{
-  proof::FoldingProof,
-  witness::request_initial_digest, F, G1, G2
 };
 
 #[derive(Deserialize)]
