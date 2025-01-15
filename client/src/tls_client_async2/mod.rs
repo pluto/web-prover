@@ -10,7 +10,6 @@
 #![forbid(unsafe_code)]
 
 mod conn;
-use tracing::warn;
 use std::{
   pin::Pin,
   task::{Context, Poll},
@@ -23,6 +22,7 @@ use futures::{
   AsyncWriteExt, Future, FutureExt, SinkExt, StreamExt,
 };
 use tls_client2::ClientConnection;
+use tracing::warn;
 #[cfg(feature = "tracing")]
 use tracing::{debug, debug_span, error, trace, warn, Instrument};
 

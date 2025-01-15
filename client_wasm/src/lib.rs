@@ -1,4 +1,5 @@
 use std::panic;
+
 use client::config::Config;
 use tlsn_core::proof::TlsProof;
 use tracing::debug;

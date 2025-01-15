@@ -214,8 +214,7 @@ async fn proxy(
     tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));
 
   let notary_socket =
-    tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port))
-      .await?;
+    tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port)).await?;
 
   let notary_tls_socket = notary_connector
     .connect(rustls::ServerName::try_from(config.notary_host.as_str())?, notary_socket)

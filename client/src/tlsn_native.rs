@@ -34,9 +34,7 @@ pub async fn setup_tcp_connection(
   let notary_connector = TlsConnector::from(Arc::new(client_notary_config));
 
   let notary_socket =
-    tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port))
-      .await
-      .unwrap();
+    tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port)).await.unwrap();
 
   let notary_tls_socket = notary_connector
     .connect(rustls::ServerName::try_from(config.notary_host.as_str()).unwrap(), notary_socket)
