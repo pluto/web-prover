@@ -3,6 +3,7 @@ use std::fs;
 use clap::Parser;
 use proofs::program::manifest::Manifest;
 use serde::Deserialize;
+use crate::errors::NotaryServerError;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -61,11 +62,11 @@ pub fn read_config() -> Config {
   c
 }
 
-pub fn read_manifest() -> Manifest {
+pub fn read_manifest() -> Result<Manifest, NotaryServerError> {
   let args = Args::parse();
 
-  let manifest_json = std::fs::read_to_string(args.manifest).unwrap();
-  let manifest: Manifest = serde_json::from_str(&manifest_json).unwrap();
+  let manifest_json = std::fs::read_to_string(args.manifest)?;
+  let manifest: Manifest = serde_json::from_str(&manifest_json)?;
 
-  return manifest;
+  return Ok(manifest);
 }

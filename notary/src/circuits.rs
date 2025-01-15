@@ -5,6 +5,12 @@
 //! - JSON: JSON extract
 use proofs::program::data::{NotExpanded, R1CSType, SetupData, WitnessGeneratorType};
 use tracing::debug;
+use std::collections::HashMap;
+use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
+use proofs::{
+  program::data::{CircuitData, Offline, Online, ProgramData},
+  E1, F, G1, G2, S1, S2,
+};
 
 pub const MAX_ROM_LENGTH: usize = 3;
 pub const PROVING_PARAMS_512: &str = "proofs/web_proof_circuits/serialized_setup_512.bytes";
@@ -73,14 +79,6 @@ pub fn construct_setup_data(plaintext_length: usize) -> SetupData {
   }
 }
 
-use std::collections::HashMap;
-
-use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
-use proofs::{
-  program::data::{CircuitData, Offline, Online, ProgramData},
-  E1, F, G1, G2, S1, S2,
-};
-
 pub struct Verifier {
   pub program_data: ProgramData<Online, NotExpanded>,
   pub verifier_key: VerifierKey<E1, S1, S2>,
@@ -114,7 +112,7 @@ pub fn get_initialized_verifiers() -> HashMap<String, Verifier> {
       rom,
       rom_data,
       initial_nivc_input: vec![F::<G1>::from(0)],
-      inputs: (vec![HashMap::new()], HashMap::new()),
+      inputs: (Vec::new(), HashMap::new()),
       witnesses: vec![],
     }
     .into_online()

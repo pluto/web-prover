@@ -11,7 +11,10 @@ pub mod config;
 pub mod errors;
 mod tls;
 pub mod tls_client_async2;
-use proofs::proof::Proof as FoldingProof;
+use proofs::{
+  errors::ProofError, 
+  proof::FoldingProof,
+};
 use serde::Serialize;
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
@@ -21,8 +24,8 @@ use crate::errors::ClientErrors;
 
 #[derive(Debug, Serialize)]
 pub struct OrigoProof {
-  request_proof:  Option<FoldingProof<Vec<u8>, String>>,
-  response_proof: Option<FoldingProof<Vec<u8>, String>>,
+  request: FoldingProof<Vec<u8>, String>,
+  response: Option<FoldingProof<Vec<u8>, String>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -81,32 +84,22 @@ pub async fn prover_inner_origo(
 ) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id.clone();
   #[cfg(target_arch = "wasm32")]
-  let proof = origo_wasm32::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await;
+  let proof = origo_wasm32::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
 
   #[cfg(not(target_arch = "wasm32"))]
-  let proof = origo_native::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await;
+  let proof = origo_native::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
 
-  // TODO (tracy): Handle verify of response proofs.
-  let r = proof.unwrap();
-  let request_proof = match &r {
-    Proof::Origo(p) => p.request_proof.as_ref().unwrap(),
-    _ => panic!("no request proof"),
-  };
-
-  // TODO: Actually propagate errors up to the client
   let verify_response = origo::verify(config, origo::VerifyBody {
-    request_proof: request_proof.proof.clone(),
+    request_proof: proof.request.proof.clone(),
     response_proof: Vec::new(),
     session_id,
-    request_verifier_digest: request_proof.verifier_digest.clone(),
+    request_verifier_digest: proof.request.verifier_digest.clone(),
   })
-  .await
-  .unwrap();
+  .await?;
 
-  // TODO: Don't assert?
-  use tracing::debug;
-  debug!("response={:?}", verify_response);
-  assert!(verify_response.valid);
-
-  Ok(r)
+  if !verify_response.valid {
+    Err(ProofError::VerifyFailed().into())
+  } else {
+    Ok(Proof::Origo(proof))
+  }
 }

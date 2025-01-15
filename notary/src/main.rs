@@ -94,7 +94,7 @@ async fn main() -> Result<(), NotaryServerError> {
   info!("GIT_HASH: {}", env!("GIT_HASH"));
 
   let c = config::read_config();
-  let manifest = config::read_manifest();
+  let manifest = config::read_manifest()?;
 
   let listener = TcpListener::bind(&c.listen).await?;
   info!("Listening on https://{}", &c.listen);

@@ -52,7 +52,7 @@ pub struct SignBody {
 pub struct VerifyBody {
   session_id:              String,
   request_verifier_digest: String,
-  // TODO: Also add response side.
+  // TODO: Also implement response verifier digest.
   request_proof:           Vec<u8>,
   response_proof:          Vec<u8>,
 }

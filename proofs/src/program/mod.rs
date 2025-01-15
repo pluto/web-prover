@@ -5,7 +5,7 @@ use client_side_prover::{
   traits::{snark::default_ck_hint, Dual},
 };
 use data::Expanded;
-use proof::Proof;
+use proof::FoldingProof;
 #[cfg(feature = "timing")] use tracing::trace;
 use utils::into_input_json;
 
@@ -198,7 +198,7 @@ pub fn compress_proof_no_setup(
   public_params: &PublicParams<E1>,
   vk_digest_primary: <E1 as Engine>::Scalar,
   vk_digest_secondary: <Dual<E1> as Engine>::Scalar,
-) -> Result<Proof<CompressedSNARK<E1, S1, S2>, F<G1>>, ProofError> {
+) -> Result<FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>>, ProofError> {
   let pk = CompressedSNARK::<E1, S1, S2>::initialize_pk(
     &public_params,
     vk_digest_primary,
@@ -211,7 +211,7 @@ pub fn compress_proof_no_setup(
   );
 
   debug!("`CompressedSNARK::prove STARTING PROVING!");
-  let proof = Proof {
+  let proof = FoldingProof {
     proof:           CompressedSNARK::<E1, S1, S2>::prove(&public_params, &pk, recursive_snark)?,
     verifier_digest: pk.pk_primary.vk_digest,
   };
@@ -223,7 +223,7 @@ pub fn compress_proof_no_setup(
 pub fn compress_proof(
   recursive_snark: &RecursiveSNARK<E1>,
   public_params: &PublicParams<E1>,
-) -> Result<Proof<CompressedSNARK<E1, S1, S2>, F<G1>>, ProofError> {
+) -> Result<FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>>, ProofError> {
   debug!("Setting up `CompressedSNARK`");
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
@@ -235,7 +235,7 @@ pub fn compress_proof(
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
 
-  let proof = Proof {
+  let proof = FoldingProof {
     proof:           CompressedSNARK::<E1, S1, S2>::prove(public_params, &pk, recursive_snark)?,
     verifier_digest: pk.pk_primary.vk_digest,
   };

@@ -65,15 +65,18 @@ impl FastSerde for ProvingParams {
     let mut cursor = Cursor::new(bytes);
     Self::validate_header(&mut cursor, SerdeByteTypes::ProverParams, 3)?;
 
-    // TODO: Clean up these messy unwraps?
     let aux_params =
-      Self::read_section_bytes(&mut cursor, 1).map(|bytes| AuxParams::from_bytes(&bytes))?.unwrap();
+      Self::read_section_bytes(&mut cursor, 1).map(|bytes| AuxParams::from_bytes(&bytes))??;
+
     let vk_digest_primary = Self::read_section_bytes(&mut cursor, 2)
-      .map(|bytes| <E1 as Engine>::Scalar::from_bytes(&bytes.try_into().unwrap()))?
-      .unwrap();
+      .and_then(|bytes| bytes.try_into().map_err(|_| SerdeByteError::G1DecodeError))
+      .map(|bytes| <E1 as Engine>::Scalar::from_bytes(&bytes))?
+      .into_option().ok_or(SerdeByteError::G1DecodeError)?;
+
     let vk_digest_secondary = Self::read_section_bytes(&mut cursor, 3)
-      .map(|bytes| <Dual<E1> as Engine>::Scalar::from_bytes(&bytes.try_into().unwrap()))?
-      .unwrap();
+      .and_then(|bytes| bytes.try_into().map_err(|_| SerdeByteError::G2DecodeError))
+      .map(|bytes| <Dual<E1> as Engine>::Scalar::from_bytes(&bytes))?
+      .into_option().ok_or(SerdeByteError::G1DecodeError)?;
 
     Ok(ProvingParams { aux_params, vk_digest_primary, vk_digest_secondary })
   }
@@ -99,17 +102,10 @@ impl ProvingParams {
   /// offline and then be loaded at or before proof creation or verification.
   ///
   /// # Arguments
-  /// - `setup_data`: the data that defines what types of supernova programs can be run, i.e.,
+  /// - `aux_params`: the data that defines what types of supernova programs can be run, i.e.,
   ///   specified by a list of circuit R1CS and max ROM length.
+  /// - `prover_key`: The key used for generating proofs, allows us to pin a specific verifier.
   pub fn new(aux_params: AuxParams, prover_key: ProverKey) -> Result<ProvingParams, ProofError> {
-    // TODO: How do we abstract this correctly?
-    //
-    // let public_params = program::setup(&setup_data);
-    // let (prover_key, _vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params)?;
-
-    // debug!("initialized pk_primary.digest={:?}, pk_secondary.digest={:?}",
-    // hex::encode(pk.pk_primary.vk_digest.to_bytes()),
-    // hex::encode(pk.pk_secondary.vk_digest.to_bytes()));
     Ok(ProvingParams {
       aux_params,
       vk_digest_primary: prover_key.pk_primary.vk_digest,

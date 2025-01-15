@@ -26,7 +26,7 @@ use ws_stream_wasm::WsMeta;
 
 use crate::{
   circuits::*, config, config::ProvingData, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
-  tls_client_async2::bind_client, OrigoProof, Proof,
+  tls_client_async2::bind_client, OrigoProof
 };
 
 // #[wasm_bindgen(getter_with_clone)]
@@ -89,7 +89,7 @@ pub async fn create_witness(input: JsValue) -> Result<WitnessOutput, JsValue> {
 pub async fn proxy_and_sign_and_generate_proof(
   mut config: config::Config,
   proving_params: Option<Vec<u8>>,
-) -> Result<Proof, errors::ClientErrors> {
+) -> Result<OrigoProof, errors::ClientErrors> {
   let session_id = config.session_id.clone();
   let mut origo_conn = proxy(config.clone(), session_id.clone()).await?;
 
@@ -121,7 +121,7 @@ pub async fn proxy_and_sign_and_generate_proof(
   let proof = compressed_snark_proof.serialize();
 
   // TODO(sambhav): Add real response proving
-  Ok(crate::Proof::Origo(OrigoProof { request_proof: Some(proof), response_proof: None }))
+  Ok(OrigoProof { request: proof, response: None })
 }
 
 /// takes TLS transcripts and [`ProvingData`] and generates NIVC [`ProgramData`] for request and

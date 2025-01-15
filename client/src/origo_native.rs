@@ -12,7 +12,7 @@ use proofs::{
       Response as ManifestResponse, TLSEncryption,
     },
   },
-  proof::Proof as CompressedSNARKProof,
+  proof::FoldingProof,
   F, G1, G2,
 };
 use tls_client2::origo::OrigoConnection;
@@ -21,7 +21,7 @@ use tracing::debug;
 
 use crate::{
   circuits::*, config, errors::ClientErrors, origo::SignBody, tls::decrypt_tls_ciphertext,
-  OrigoProof, Proof,
+  OrigoProof,
 };
 
 /// Runs TLS proxy and generates NIVC proof
@@ -32,7 +32,7 @@ use crate::{
 pub async fn proxy_and_sign_and_generate_proof(
   mut config: config::Config,
   proving_params: Option<Vec<u8>>,
-) -> Result<Proof, ClientErrors> {
+) -> Result<OrigoProof, ClientErrors> {
   let mut origo_conn = proxy(config.clone(), config.session_id.clone()).await?;
 
   let sb = SignBody {
@@ -73,10 +73,10 @@ pub async fn proxy_and_sign_and_generate_proof(
   );
 
   // TODO(Sambhav): handle request and response into one proof
-  Ok(crate::Proof::Origo(OrigoProof {
-    request_proof:  Some(request_proof?),
-    response_proof: Some(response_proof?),
-  }))
+  Ok(OrigoProof {
+    request:  request_proof?,
+    response: Some(response_proof?),
+  })
 }
 
 /// generates NIVC proof from [`ProgramData`]
@@ -85,10 +85,11 @@ pub async fn proxy_and_sign_and_generate_proof(
 /// - serialize proof
 fn generate_proof(
   program_data: ProgramData<Online, Expanded>,
-) -> Result<CompressedSNARKProof<Vec<u8>, String>, ClientErrors> {
-  debug!("starting request recursive proving");
+) -> Result<FoldingProof<Vec<u8>, String>, ClientErrors> {
+  debug!("starting recursive proving");
   let program_output = program::run(&program_data)?;
-  debug!("starting request proof compression");
+  
+  debug!("starting proof compression");
   let compressed_snark_proof = program::compress_proof_no_setup(
     &program_output,
     &program_data.public_params,
@@ -117,7 +118,7 @@ fn construct_request_program_data_and_proof(
   manifest_request: &ManifestRequest,
   inputs: EncryptionInput,
   proving_params: Vec<u8>,
-) -> Result<CompressedSNARKProof<Vec<u8>, String>, ClientErrors> {
+) -> Result<FoldingProof<Vec<u8>, String>, ClientErrors> {
   debug!("Setting up request's `PublicParams`... (this may take a moment)");
   let setup_data = construct_setup_data();
 
@@ -158,7 +159,7 @@ fn construct_response_program_data_and_proof(
   manifest_response: &ManifestResponse,
   inputs: EncryptionInput,
   proving_params: Vec<u8>,
-) -> Result<CompressedSNARKProof<Vec<u8>, String>, ClientErrors> {
+) -> Result<FoldingProof<Vec<u8>, String>, ClientErrors> {
   debug!("Setting up response's `PublicParams`... (this may take a moment)");
   let setup_data = construct_setup_data();
 
