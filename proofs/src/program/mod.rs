@@ -15,6 +15,7 @@ pub mod data;
 pub mod manifest;
 pub mod utils;
 
+type CompressedProof = FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>>;
 pub struct Memory {
   pub circuits: Vec<RomCircuit>,
   pub rom:      Vec<u64>,
@@ -198,9 +199,9 @@ pub fn compress_proof_no_setup(
   public_params: &PublicParams<E1>,
   vk_digest_primary: <E1 as Engine>::Scalar,
   vk_digest_secondary: <Dual<E1> as Engine>::Scalar,
-) -> Result<FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>>, ProofError> {
+) -> Result<CompressedProof, ProofError> {
   let pk = CompressedSNARK::<E1, S1, S2>::initialize_pk(
-    &public_params,
+    public_params,
     vk_digest_primary,
     vk_digest_secondary,
   )
@@ -212,7 +213,7 @@ pub fn compress_proof_no_setup(
 
   debug!("`CompressedSNARK::prove STARTING PROVING!");
   let proof = FoldingProof {
-    proof:           CompressedSNARK::<E1, S1, S2>::prove(&public_params, &pk, recursive_snark)?,
+    proof:           CompressedSNARK::<E1, S1, S2>::prove(public_params, &pk, recursive_snark)?,
     verifier_digest: pk.pk_primary.vk_digest,
   };
   debug!("`CompressedSNARK::prove completed!");
@@ -223,7 +224,7 @@ pub fn compress_proof_no_setup(
 pub fn compress_proof(
   recursive_snark: &RecursiveSNARK<E1>,
   public_params: &PublicParams<E1>,
-) -> Result<FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>>, ProofError> {
+) -> Result<CompressedProof, ProofError> {
   debug!("Setting up `CompressedSNARK`");
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();

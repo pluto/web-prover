@@ -662,7 +662,7 @@ mod tests {
       TEST_CIPHERTEXT.iter().map(|x| ByteOrPad::Byte(*x)).collect::<Vec<ByteOrPad>>();
     let ciphertext_digest = data_hasher(&test_ciphertext_padded);
     let (ct_digest, manifest_digest) =
-      response_initial_digest(&mock_manifest().response, ciphertext_digest.clone(), 5);
+      response_initial_digest(&mock_manifest().response, ciphertext_digest, 5);
     println!("\nManifest Digest (decimal):");
     println!("  {}", BigUint::from_bytes_le(&manifest_digest.to_bytes()));
 
@@ -675,7 +675,7 @@ mod tests {
     );
 
     let (ct_digest, _manifest_digest) =
-      request_initial_digest(&mock_manifest().request, ciphertext_digest.clone());
+      request_initial_digest(&mock_manifest().request, ciphertext_digest);
     assert_eq!(
       BigUint::from_bytes_le(&ct_digest.to_bytes()),
       BigUint::from_str(
