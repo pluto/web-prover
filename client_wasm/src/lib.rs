@@ -34,7 +34,7 @@ pub async fn prover(config: JsValue, proving_params: ProvingParamsWasm) -> Resul
   panic::set_hook(Box::new(console_error_panic_hook::hook));
 
   debug!("start config serde");
-  let config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
+  let mut config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
   config.set_session_id();
   debug!("end config serde");
 
