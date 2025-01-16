@@ -45,7 +45,7 @@ cargo test --release -- tests::test_offline_proofs --exact --show-output
 
 - run notary:
 ```
-RUST_LOG=debug cargo run --release -p notary -- --config ./fixture/notary-config.toml
+RUST_LOG=debug cargo run --release -p notary -- --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json
 ```
 
 - run `make wasm` or `make wasm-debug` (for better stacktraces in wasm (really necessary to debug))

@@ -9,65 +9,26 @@ publish=false
 crate-type=["cdylib", "rlib"]
 
 [dependencies]
-client        ={ workspace=true, features=["websocket"] }
-futures       ={ workspace=true }
-chrono        ="0.4"
-elliptic-curve={ version="0.13.5", features=["pkcs8"] }
-futures-util  ="0.3.28"
-getrandom     ={ version="0.2", features=["js"] }
-
-js-sys="0.3.64"
-p256  ={ version="0.13", features=["pem", "ecdsa"] }
-
-rayon               ={ workspace=true }
-serde               ={ workspace=true }
+client              ={ workspace=true, features=["websocket"] }
+js-sys              ="0.3.64"
 serde-wasm-bindgen  ="0.6.1"
 serde_json          ={ workspace=true }
-tokio-util          ={ workspace=true }
 tracing             ={ workspace=true }
-url                 ={ version="2.0", features=["serde"] }
 wasm-bindgen        ="=0.2.93"
-wasm-bindgen-futures="=0.4.43"
 wasm-bindgen-rayon  ={ workspace=true }
-
-hyper             ={ workspace=true, features=["client", "http1"] }
-tracing-subscriber={ workspace=true, features=["time"] }
-tracing-web       ="0.1.2"
-
-ring={ version="0.17", features=["wasm32_unknown_unknown_js"] }
+wasm-bindgen-futures="=0.4.43"
+tracing-subscriber  ={ workspace=true, features=["time"] }
+tracing-web         ="0.1.2"
 
 # time crate: https://crates.io/crates/time
 # NOTE: It is required, otherwise "time not implemented on this platform" error happens right after "!@# 2".
 # Probably due to tokio's time feature is used in tlsn-prover?
-time={ version="0.3.34", features=["wasm-bindgen"] }
-# Used to calculate elapsed time.
-web-time   ="1.0"
-tlsn-prover={ workspace=true }
-tlsn-core  ={ workspace=true }
+time     ={ version="0.3.34", features=["wasm-bindgen"] }
+tlsn-core={ workspace=true }
 
-web-sys={ version="0.3.4", features=[
-  "BinaryType",
-  "Blob",
-  "ErrorEvent",
-  "FileReader",
-  "MessageEvent",
-  "ProgressEvent",
-  "WebSocket",
-  "console",
-  'Document',
-  'HtmlElement',
-  'HtmlInputElement',
-  'Window',
-  'Worker',
-  'Headers',
-  'Request',
-  'RequestInit',
-  'RequestMode',
-  'Response',
-] }
-
+# NOTE: Leacing this here in case we still need it for tlsn flow.
 # Use the patched ws_stream_wasm to fix the issue https://github.com/najamelan/ws_stream_wasm/issues/12#issuecomment-1711902958
-ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wasm", rev="2ed12aad9f0236e5321f577672f309920b2aef51" }
+# ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wasm", rev="2ed12aad9f0236e5321f577672f309920b2aef51" }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
@@ -75,14 +36,8 @@ ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wa
 # code size when deploying.
 console_error_panic_hook={ version="0.1.7" }
 
-strum       ={ version="0.26.1" }
-strum_macros="0.26.1"
-
-base64        ="0.22.0"
-http-body-util="0.1"
-
 [dev-dependencies]
-wasm-bindgen-test="0.3.34"
+wasm-bindgen-test       ="0.3.34"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt=["-Oz", "--enable-threads", "--enable-mutable-globals", "--enable-bulk-memory"]

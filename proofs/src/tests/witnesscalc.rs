@@ -72,6 +72,8 @@ fn run_entry(
     setup_data,
     rom_data,
     rom,
+    vk_digest_primary: F::<G1>::ZERO,
+    vk_digest_secondary: F::<G2>::ZERO,
     initial_nivc_input: vec![F::<G1>::from(1), F::<G1>::from(2)],
     inputs: (private_inputs, HashMap::new()),
     witnesses: vec![],
@@ -125,10 +127,7 @@ fn test_run_serialized_verify() {
   // Create the compressed proof with the offlined `PublicParams`
   let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
 
-  // Serialize the proof and zlib compress further
   let serialized_compressed_proof = proof.serialize();
-
-  // Decompress and deserialize
   let proof = serialized_compressed_proof.deserialize();
 
   // Extend the initial state input with the ROM (happens internally inside of `program::run`, so
@@ -148,7 +147,7 @@ fn test_run_serialized_verify() {
 
   // Check that it verifies with offlined `PublicParams` regenerated pkey vkey
   let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
-  let res = proof.0.verify(&program_data.public_params, &vk, &z0_primary, &[F::<G2>::ZERO]);
+  let res = proof.proof.verify(&program_data.public_params, &vk, &z0_primary, &[F::<G2>::ZERO]);
   assert!(res.is_ok());
   std::fs::remove_file(PathBuf::from_str(TEST_OFFLINE_PATH).unwrap()).unwrap();
 }

@@ -121,7 +121,7 @@ let proverConfig = {
 const proofWorker = new Worker(new URL("./proof.js", import.meta.url), { type: "module" });
 console.log("sending message to worker");
 var proving_params = {
-  aux_params: await getByteParams("serialized_setup", "bytes"),
+  aux_params: await getByteParams("serialized_setup_512", "bytes"),
 };
 proofWorker.postMessage({ proverConfig, proving_params, memory });
 console.log("message sent to worker");

@@ -1,28 +1,6 @@
-use std::{ops::Range, panic, time::Duration};
-
-use elliptic_curve::pkcs8::DecodePublicKey;
 use futures::{channel::oneshot, AsyncWriteExt};
-use hyper::{Request, StatusCode};
-use js_sys::{Array, JSON};
-use strum::EnumMessage;
-use strum_macros;
-use tlsn_core::proof::{SessionProof, TlsProof};
-use tlsn_prover::tls::{
-  state::{Closed, Notarize},
-  Prover, ProverConfig,
-};
-use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tracing_subscriber::{
-  fmt::{format::Pretty, time::UtcTime},
-  prelude::*,
-};
-use tracing_web::{performance_layer, MakeConsoleWriter};
-use url::Url;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::{spawn_local, JsFuture};
-pub use wasm_bindgen_rayon::init_thread_pool;
-use web_sys::{Headers, Request as WebsysRequest, RequestInit, RequestMode, Response};
-use web_time::Instant;
+use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
+use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::*;
 
 use crate::{config::Config, errors::ClientErrors, tlsn::send_request};
@@ -32,7 +10,7 @@ pub async fn setup_connection(
   config: &mut Config,
   prover_config: ProverConfig,
 ) -> Result<Prover<Closed>, ClientErrors> {
-  let session_id = config.session_id();
+  let session_id = config.set_session_id();
 
   let websocket_proxy_url = config.websocket_proxy_url.clone();
   let websocket_proxy_url = websocket_proxy_url
@@ -76,7 +54,7 @@ pub async fn setup_connection(
 
   let mpc_tls_connection = unsafe { FuturesIo::new(mpc_tls_connection) };
 
-  let (mut request_sender, connection) =
+  let (request_sender, connection) =
     hyper::client::conn::http1::handshake(mpc_tls_connection).await?;
 
   let (connection_sender, connection_receiver) = oneshot::channel();

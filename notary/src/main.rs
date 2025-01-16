@@ -3,7 +3,6 @@ use std::{
   fs,
   io::{self},
   sync::{Arc, Mutex},
-  time::SystemTime,
 };
 
 use axum::{
@@ -13,11 +12,13 @@ use axum::{
   routing::{get, post},
   Router,
 };
+use circuits::Verifier;
 use errors::NotaryServerError;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use k256::ecdsa::SigningKey as Secp256k1SigningKey;
 use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
+use proofs::program::manifest::Manifest;
 use rustls::{
   pki_types::{CertificateDer, PrivateKeyDer},
   ServerConfig,
@@ -32,27 +33,25 @@ use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod axum_websocket;
+mod circuits;
 mod config;
 mod errors;
 mod origo;
 mod tcp;
 mod tee;
+mod tls_parser;
 mod tlsn;
 mod websocket_proxy;
 
-#[derive(Debug, Clone)]
 struct SharedState {
   notary_signing_key: SigningKey,
   origo_signing_key:  Secp256k1SigningKey,
   tlsn_max_sent_data: usize,
   tlsn_max_recv_data: usize,
-  origo_sessions:     Arc<Mutex<HashMap<String, OrigoSession>>>,
-}
-
-#[derive(Debug, Clone)]
-struct OrigoSession {
-  request:    Vec<u8>,
-  _timestamp: SystemTime,
+  origo_sessions:     Arc<Mutex<HashMap<String, tls_parser::UnparsedTranscript>>>,
+  verifier_sessions:  Arc<Mutex<HashMap<String, origo::VerifierInputs>>>,
+  verifiers:          HashMap<String, Verifier>,
+  manifest:           Manifest,
 }
 
 /// Main entry point for the notary server application.
@@ -98,16 +97,22 @@ async fn main() -> Result<(), NotaryServerError> {
   let _ = rustls::crypto::ring::default_provider().install_default();
 
   let c = config::read_config();
+  let manifest = config::read_manifest()?;
 
   let listener = TcpListener::bind(&c.listen).await?;
   info!("Listening on https://{}", &c.listen);
 
   let shared_state = Arc::new(SharedState {
     notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
-    origo_signing_key:  load_origo_signing_key(&c.origo_signing_key),
+    origo_signing_key: load_origo_signing_key(&c.origo_signing_key),
     tlsn_max_sent_data: c.tlsn_max_sent_data,
     tlsn_max_recv_data: c.tlsn_max_recv_data,
-    origo_sessions:     Default::default(),
+    origo_sessions: Default::default(),
+    verifier_sessions: Default::default(),
+    verifiers: circuits::get_initialized_verifiers(),
+    // TODO: This is obviously not sufficient, we need richer logic
+    // for informing the notary of a valid manifest.
+    manifest,
   });
 
   let router = Router::new()
@@ -117,6 +122,7 @@ async fn main() -> Result<(), NotaryServerError> {
     .route("/v1/origo", get(origo::proxy))
     .route("/v1/tee", get(tee::proxy))
     .route("/v1/origo/sign", post(origo::sign))
+    .route("/v1/origo/verify", post(origo::verify))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
 

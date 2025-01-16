@@ -73,6 +73,7 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
 
   // Get the request ciphertext, request plaintext, and AAD
   let request_ciphertext = hex::decode(witness.request.ciphertext[0].as_bytes())?;
+
   let (plaintext, meta) = match key {
     CipherSuiteKey::AES128GCM(_) => {
       debug!("Decrypting AES");
@@ -157,6 +158,10 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
 
     // push ciphertext
     let pt = plaintext.payload.0.to_vec();
+
+    // TODO (tracy): This appears to always trims 17 bytes. Trimming 16 bytes
+    // would mean we trim the AEAD. It seems to be a bug to trim this number of bytes.
+    // For now, we replicate the logic in the notary so it verifies.
     response_ciphertext.extend_from_slice(&ct_chunk[..pt.len()]);
 
     response_plaintext.extend(pt);
@@ -164,7 +169,7 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
     let mut padded_aad = vec![0; 16 - aad.len()];
     padded_aad.extend(&aad);
   }
-  trace!("response plaintext: {:?}", response_plaintext);
+
   assert_eq!(response_plaintext.len(), response_ciphertext.len());
 
   Ok(TLSEncryption {

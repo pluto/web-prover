@@ -8,6 +8,8 @@ use serde_json::Value;
 
 use super::*;
 
+type StackAndTreeHashes = (Vec<[F<G1>; 2]>, Vec<[F<G1>; 2]>);
+
 /// Struct representing a byte or padding.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ByteOrPad {
@@ -280,7 +282,7 @@ pub fn json_tree_hasher(
   polynomial_input: F<G1>,
   key_sequence: &[JsonKey],
   max_stack_height: usize,
-) -> (Vec<[F<G1>; 2]>, Vec<[F<G1>; 2]>) {
+) -> StackAndTreeHashes {
   assert!(key_sequence.len() <= max_stack_height); // TODO: This should be an error
   let mut stack = Vec::new();
   let mut tree_hashes = Vec::new();
@@ -307,7 +309,7 @@ pub fn json_tree_hasher(
 
 pub fn compress_tree_hash(
   polynomial_input: F<G1>,
-  stack_and_tree_hashes: (Vec<[F<G1>; 2]>, Vec<[F<G1>; 2]>),
+  stack_and_tree_hashes: StackAndTreeHashes,
 ) -> F<G1> {
   assert!(stack_and_tree_hashes.0.len() == stack_and_tree_hashes.1.len()); // TODO: This should be an error
   let mut accumulated = F::<G1>::ZERO;
@@ -355,11 +357,8 @@ pub fn json_value_digest(plaintext: &[ByteOrPad], keys: &[JsonKey]) -> Result<Ve
 
 pub fn request_initial_digest(
   manifest_request: &Request,
-  ciphertext: &[ByteOrPad],
+  ciphertext_digest: F<G1>,
 ) -> (F<G1>, F<G1>) {
-  // First create a digest of the ciphertext itself
-  let ciphertext_digest = data_hasher(&ciphertext);
-
   // TODO: This assumes the start line format here as well.
   // Then digest the start line using the ciphertext_digest as a random input
   let start_line_bytes =
@@ -383,12 +382,9 @@ pub fn request_initial_digest(
 
 pub fn response_initial_digest(
   manifest_response: &Response,
-  ciphertext: &[ByteOrPad],
+  ciphertext_digest: F<G1>,
   max_stack_height: usize,
 ) -> (F<G1>, F<G1>) {
-  // First create a digest of the ciphertext itself
-  let ciphertext_digest = data_hasher(&ciphertext);
-
   // TODO: This assumes the start line format here as well.
   // Then digest the start line using the ciphertext_digest as a random input
   let start_line_bytes = format!(
@@ -664,9 +660,9 @@ mod tests {
   fn test_initial_digest() {
     let test_ciphertext_padded =
       TEST_CIPHERTEXT.iter().map(|x| ByteOrPad::Byte(*x)).collect::<Vec<ByteOrPad>>();
-
+    let ciphertext_digest = data_hasher(&test_ciphertext_padded);
     let (ct_digest, manifest_digest) =
-      response_initial_digest(&mock_manifest().response, &test_ciphertext_padded, 5);
+      response_initial_digest(&mock_manifest().response, ciphertext_digest, 5);
     println!("\nManifest Digest (decimal):");
     println!("  {}", BigUint::from_bytes_le(&manifest_digest.to_bytes()));
 
@@ -679,7 +675,7 @@ mod tests {
     );
 
     let (ct_digest, _manifest_digest) =
-      request_initial_digest(&mock_manifest().request, &test_ciphertext_padded);
+      request_initial_digest(&mock_manifest().request, ciphertext_digest);
     assert_eq!(
       BigUint::from_bytes_le(&ct_digest.to_bytes()),
       BigUint::from_str(

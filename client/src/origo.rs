@@ -1,5 +1,5 @@
 // logic common to wasm32 and native
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 #[derive(Serialize)]
@@ -40,4 +40,48 @@ pub async fn sign(
   debug!("\n{}\n\n", String::from_utf8(sign_response.clone())?);
 
   Ok(sign_response)
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct VerifyBody {
+  pub session_id:              String,
+  pub request_verifier_digest: String,
+  pub request_proof:           Vec<u8>,
+  pub response_proof:          Vec<u8>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct VerifyReply {
+  pub valid: bool,
+  // TODO: need a signature
+}
+
+pub async fn verify(
+  config: crate::config::Config,
+  verify_body: VerifyBody,
+) -> Result<VerifyReply, crate::errors::ClientErrors> {
+  let url = format!(
+    "https://{}:{}/v1/origo/verify",
+    config.notary_host.clone(),
+    config.notary_port.clone(),
+  );
+
+  #[allow(unused_variables)]
+  let client = reqwest::ClientBuilder::new().build()?;
+
+  #[cfg(feature = "notary_ca_cert")]
+  let client = reqwest::ClientBuilder::new()
+    .add_root_certificate(reqwest::tls::Certificate::from_der(
+      &crate::tls::NOTARY_CA_CERT.to_vec(),
+    )?)
+    .use_rustls_tls()
+    .build()?;
+
+  let response = client.post(url).json(&verify_body).send().await?;
+  assert!(response.status() == hyper::StatusCode::OK);
+  let verify_response = response.json::<VerifyReply>().await?;
+
+  debug!("\n{:?}\n\n", verify_response.clone());
+
+  Ok(verify_response)
 }

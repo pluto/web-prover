@@ -171,12 +171,15 @@ const make_nonce = function (iv, seq) {
 function headersToBytes(headers) {
   const result = [];
 
-  for (const [key, values] of Object.entries(headers)) {
-    for (const value of values) {
-      // In HTTP/1.1, headers are formatted as "key: value"
-      const headerLine = `${key}: ${value}`;
-      result.push(strToBytes(headerLine));
-    }
+  for (const [key, value] of headers) {
+      const values = Array.isArray(value) ? value : [value];
+
+      for (const val of values) {
+          // In HTTP/1.1, headers are formatted as "key: value"
+          const headerLine = `${key}: ${val}`;
+          const strBytes = strToBytes(headerLine);
+          result.push(strBytes);
+      }
   }
 
   return result;
@@ -255,7 +258,6 @@ export const generateWitnessBytesForRequest = async function (circuits, inputs) 
     paddedCiphertext,
   );
 
-
   console.log("CHACHA");
   let chachaInputs = {};
   chachaInputs["key"] = toInput(Buffer.from(inputs.key));
@@ -263,7 +265,7 @@ export const generateWitnessBytesForRequest = async function (circuits, inputs) 
   chachaInputs["plaintext"] = extendedHTTPInput;
   chachaInputs["counter"] = uintArray32ToBits([1])[0];
   chachaInputs["step_in"] = initNivcInput;
-  console.log("input generated 4", chachaInputs);
+  console.log("input generated 4", chachaInputs); 
 
   // we get here in the dbg logs in the console.
   let chachaWtns = await generateWitness(chachaInputs, await getWitnessGenerator(circuits[0]));
@@ -291,7 +293,7 @@ export const generateWitnessBytesForRequest = async function (circuits, inputs) 
   console.log("after 4 loop in http");
   // let httpBody = computeHttpWitnessBody(extendedHTTPInput);
   console.log("after computehttpwitnesbody in http");
-  httpInputs["ciphertext_digest"] = ciphertextDigest;
+  httpInputs["ciphertext_digest"] = ciphertextDigest; 
   httpInputs["main_digests"] = mainDigests;
   httpInputs["step_in"] = httpStepIn;
   httpInputs["data"] = extendedHTTPInput;

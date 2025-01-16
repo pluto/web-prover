@@ -23,7 +23,7 @@ pub async fn setup_tcp_connection(
   config: &mut Config,
   prover_config: ProverConfig,
 ) -> Prover<Closed> {
-  let session_id = config.session_id();
+  let session_id = config.set_session_id();
   let root_store = crate::tls::rustls_default_root_store();
 
   let client_notary_config =
@@ -32,9 +32,7 @@ pub async fn setup_tcp_connection(
   let notary_connector = TlsConnector::from(Arc::new(client_notary_config));
 
   let notary_socket =
-    tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port.clone()))
-      .await
-      .unwrap();
+    tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port)).await.unwrap();
 
   let notary_tls_socket = notary_connector
     .connect(
