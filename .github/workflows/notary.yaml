@@ -95,9 +95,9 @@ jobs:
       - name: "Prepare assets to be uploaded"
         run: |
           GIT_SHORT_HASH=$(git rev-parse --short HEAD) # is there a better way?
-          mv -r fixture .github/workflows/staging-deploy/
+          mv fixture .github/workflows/staging-deploy/
           mkdir .github/workflows/staging-deploy/proofs
-          mv -r proofs/web_proof_circuits .github/workflows/staging-deploy/proofs/
+          mv proofs/web_proof_circuits .github/workflows/staging-deploy/proofs/
           echo -e "\nacme_domain=\"${GIT_SHORT_HASH}.notary.pluto.dev\"\n" >> .github/workflows/staging-deploy/notary-config.toml
 
       - name: Upload assets
