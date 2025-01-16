@@ -114,7 +114,8 @@ jobs:
             --zone=us-central1-b \
             --machine-type=$MACHINE \
             --network-interface=network-tier=PREMIUM,stack-type=IPV4_ONLY,subnet=default \
-            --metadata="startup-script=.github/workflows/staging-deploy/startup-script.sh,enable-osconfig=TRUE,git-hash=${{ github.sha }},asset-bucket-name=$ASSET_BUCKET" \
+            --metadata="enable-osconfig=TRUE,git-hash=${{ github.sha }},asset-bucket-name=$ASSET_BUCKET" \
+            --metadata-from-file startup-script=.github/workflows/staging-deploy/startup-script.sh \
             --maintenance-policy=MIGRATE \
             --provisioning-model=STANDARD \
             --service-account=683425918315-compute@developer.gserviceaccount.com \
