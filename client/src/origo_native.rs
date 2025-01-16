@@ -1,5 +1,6 @@
 use std::{ops::Deref, sync::Arc};
 
+use caratls::client::TeeTlsConnector;
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
@@ -20,7 +21,11 @@ use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
 use crate::{
-  circuits::*, config, errors::ClientErrors, origo::SignBody, tls::decrypt_tls_ciphertext,
+  circuits::*,
+  config::{self, NotaryMode},
+  errors::ClientErrors,
+  origo::SignBody,
+  tls::decrypt_tls_ciphertext,
   OrigoProof,
 };
 
@@ -187,7 +192,7 @@ fn construct_response_program_data_and_proof(
 
 /// we want to be able to specify somewhere in here what cipher suite to use.
 /// Perhapse the config object should have this information.
-async fn proxy(
+pub(crate) async fn proxy(
   config: config::Config,
   session_id: String,
 ) -> Result<tls_client2::origo::OrigoConnection, ClientErrors> {
@@ -206,7 +211,6 @@ async fn proxy(
   )?;
 
   let client_notary_config = rustls::ClientConfig::builder()
-    .with_safe_defaults()
     .with_root_certificates(crate::tls::rustls_default_root_store())
     .with_no_client_auth();
 
@@ -217,11 +221,10 @@ async fn proxy(
     tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port)).await?;
 
   let notary_tls_socket = notary_connector
-    .connect(rustls::ServerName::try_from(config.notary_host.as_str())?, notary_socket)
+    .connect(rustls::pki_types::ServerName::try_from(config.notary_host.clone())?, notary_socket)
     .await?;
 
   let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
-
   let (mut request_sender, connection) =
     hyper::client::conn::http1::handshake(notary_tls_socket).await?;
   let connection_task = tokio::spawn(connection.without_shutdown());
@@ -229,9 +232,10 @@ async fn proxy(
   // TODO build sanitized query
   let request: Request<Full<Bytes>> = hyper::Request::builder()
     .uri(format!(
-      "https://{}:{}/v1/origo?session_id={}&target_host={}&target_port={}",
+      "https://{}:{}/v1/{}?session_id={}&target_host={}&target_port={}",
       config.notary_host.clone(),
       config.notary_port.clone(),
+      if config.mode == NotaryMode::TEE { "tee" } else { "origo" },
       session_id.clone(),
       config.target_host()?,
       config.target_port()?,
@@ -252,8 +256,14 @@ async fn proxy(
   // TODO notary_tls_socket needs to implement futures::AsyncRead/Write, find a better wrapper here
   let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
 
-  let (client_tls_conn, tls_fut) =
-    crate::tls_client_async2::bind_client(notary_tls_socket.compat(), client);
+  // Either bind client to TEE TLS connection or plain TLS connection
+  let (client_tls_conn, tls_fut) = if config.mode == NotaryMode::TEE {
+    let tee_tls_connector = TeeTlsConnector::new("example.com"); // TODO example.com
+    let tee_tls_stream = tee_tls_connector.connect(notary_tls_socket).await?;
+    crate::tls_client_async2::bind_client(tee_tls_stream.compat(), client)
+  } else {
+    crate::tls_client_async2::bind_client(notary_tls_socket.compat(), client)
+  };
 
   // TODO: What do with tls_fut? what do with tls_receiver?
   let (tls_sender, _tls_receiver) = oneshot::channel();

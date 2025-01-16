@@ -29,6 +29,8 @@ async fn main() -> Result<(), ClientErrors> {
   };
   tracing_subscriber::fmt().with_max_level(log_level).with_line_number(true).init();
 
+  let _ = rustls::crypto::ring::default_provider().install_default();
+
   let config_json = std::fs::read_to_string(args.config)?;
   let mut config: Config = serde_json::from_str(&config_json)?;
   config.set_session_id();

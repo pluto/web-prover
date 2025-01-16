@@ -29,6 +29,7 @@ pub struct OrigoProof {
 pub enum Proof {
   TLSN(Box<TlsProof>),
   Origo(OrigoProof),
+  TEE(), // TODO
 }
 
 pub async fn prover_inner(
@@ -39,6 +40,7 @@ pub async fn prover_inner(
   match config.mode {
     config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
     config::NotaryMode::Origo => prover_inner_origo(config, proving_params).await,
+    config::NotaryMode::TEE => prover_inner_tee(config).await,
   }
 }
 
@@ -101,4 +103,19 @@ pub async fn prover_inner_origo(
   } else {
     Ok(Proof::Origo(proof))
   }
+}
+
+pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
+  let session_id = config.set_session_id();
+
+  // TEE mode uses Origo networking stack with minimal changes
+
+  #[cfg(target_arch = "wasm32")]
+  let _origo_conn = origo_wasm32::proxy(config, session_id).await?;
+
+  #[cfg(not(target_arch = "wasm32"))]
+  let _origo_conn = origo_native::proxy(config, session_id).await?;
+
+  // TODO proof
+  Ok(Proof::TEE())
 }

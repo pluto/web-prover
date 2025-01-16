@@ -59,6 +59,9 @@ pub enum NotaryServerError {
   Io(#[from] std::io::Error),
 
   #[error(transparent)]
+  TeeTlsAcceptorError(#[from] caratls::server::TeeTlsAcceptorError),
+
+  #[error(transparent)]
   SerdeJson(#[from] serde_json::Error),
 
   #[error("Error occurred from reading certificates: {0}")]

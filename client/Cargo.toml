@@ -24,6 +24,8 @@ tls-core   ={ workspace=true }
 tlsn-prover={ workspace=true }
 tlsn-core  ={ workspace=true }
 
+caratls = {workspace = true}
+
 bytes ="1"
 proofs={ workspace=true }
 
@@ -67,9 +69,9 @@ clap ={ workspace=true }
 # Web
 hyper-util={ workspace=true }
 # Async
-tokio-rustls={ version="0.24", default-features=false, features=["logging", "tls12"] }
+tokio-rustls={ version="0.26", default-features=false, features=["logging", "tls12"] }
 tokio       ={ workspace=true, features=["rt", "rt-multi-thread", "macros", "net", "io-std", "fs"] }
-rustls      ={ version="0.21", default-features=false }
+rustls      ={ version="0.23", default-features=false, features = ["ring"]}
 # TLSN
 async-tungstenite    ={ version="0.25.1", features=["async-std-runtime", "async-tls"] }
 ws_stream_tungstenite={ version="0.13.0", features=["tokio_io"] }
@@ -80,7 +82,7 @@ reqwest              ={ version="0.12", features=["json", "rustls-tls"] }
 # Web
 hyper-util={ version="0.1", features=["http1"] }
 ## Use the patched ws_stream_wasm to fix the issue https://github.com/najamelan/ws_stream_wasm/issues/12#issuecomment-1711902958
-ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wasm", rev="2ed12aad9f0236e5321f577672f309920b2aef51" }
+ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wasm", rev="2ed12aad9f0236e5321f577672f309920b2aef51", features = ["tokio_io"]}
 # Serde
 serde-wasm-bindgen="0.6.5"
 reqwest           ={ version="0.12", features=["json"] }
