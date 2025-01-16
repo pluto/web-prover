@@ -33,6 +33,7 @@ pub async fn sign(
     .build()?;
 
   let response = client.post(url).json(&sb).send().await?;
+  debug!("response: {:?}", response.status());
   assert!(response.status() == hyper::StatusCode::OK);
 
   // TODO: Actually use this input in the proofs.

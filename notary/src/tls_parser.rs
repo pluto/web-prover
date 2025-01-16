@@ -157,6 +157,7 @@ impl UnparsedTranscript {
             cursor.set_position(cursor.position() + 5 + record.hdr.len as u64);
           },
           Err(e) => {
+            debug!("got here");
             let remaining = cursor.get_ref().len() - (cursor.position() as usize);
             return Err(ProxyError::TlsParser {
               position: cursor.position(),
