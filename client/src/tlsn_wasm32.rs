@@ -10,7 +10,7 @@ pub async fn setup_connection(
   config: &mut Config,
   prover_config: ProverConfig,
 ) -> Result<Prover<Closed>, ClientErrors> {
-  let session_id = config.session_id();
+  let session_id = config.set_session_id();
 
   let websocket_proxy_url = config.websocket_proxy_url.clone();
   let websocket_proxy_url = websocket_proxy_url
