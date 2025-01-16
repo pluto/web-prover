@@ -76,6 +76,12 @@ jobs:
           name: "notary.linux.amd64"
           path: .github/workflows/staging-deploy
 
+      - name: Restore circuit artifacts
+        uses: actions/cache@v3
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ needs.setup.outputs.cache-key }}
+
       - uses: "google-github-actions/auth@v2"
         with:
           project_id: "web-prover-staging-65d502"
@@ -89,7 +95,9 @@ jobs:
       - name: "Prepare assets to be uploaded"
         run: |
           GIT_SHORT_HASH=$(git rev-parse --short HEAD) # is there a better way?
-          cp -r fixture .github/workflows/staging-deploy/
+          mv -r fixture .github/workflows/staging-deploy/
+          mkdir .github/workflows/staging-deploy/proofs
+          mv -r proofs/web_proof_circuits .github/workflows/staging-deploy/proofs/
           echo -e "\nacme_domain=\"${GIT_SHORT_HASH}.notary.pluto.dev\"\n" >> .github/workflows/staging-deploy/notary-config.toml
 
       - name: Upload assets
