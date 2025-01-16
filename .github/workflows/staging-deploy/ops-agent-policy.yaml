@@ -1,0 +1,13 @@
+# Run this once:
+# gcloud compute instances ops-agents policies create goog-ops-agent-v2-x86-template-1-4-0-us-central1-b \
+#  --project=web-prover-staging-65d502 \
+#  --zone=us-central1-b \
+#  --file=ops-agent-policy.yaml
+
+agentsRule:
+  packageState: installed
+  version: latest
+instanceFilter:
+  inclusionLabels:
+    - labels:
+        goog-ops-agent-policy: v2-x86-template-1-4-0

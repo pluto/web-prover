@@ -1,0 +1,93 @@
+name: Deploy Staging Notary
+
+on:
+  push:
+    branches:
+      - github-staging-deploy
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: "read"
+      id-token: "write"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: "google-github-actions/auth@v2"
+        with:
+          project_id: "web-prover-staging-65d502"
+          workload_identity_provider: "projects/683425918315/locations/global/workloadIdentityPools/github/providers/web-prover-deploy-test"
+
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v2"
+        with:
+          version: ">= 506.0.0"
+
+      # TODO prepare assets to be uploaded
+
+      - name: Upload assets
+        uses: "google-github-actions/upload-cloud-storage@v2"
+        with:
+          path: "assets"
+          destination: "web-prover-staging-7ff608/${{ github.sha }}"
+          parent: false
+
+      - name: Boot Notary instance
+        run: |
+          INSTANCE=notary-${{ github.sha }}
+          PROJECT=web-prover-staging-65d502
+          MACHINE=e2-highmem-2
+          ASSET_BUCKET=web-prover-staging-7ff608
+
+          echo "Delete $INSTANCE if it exists ... (ignore errors)"
+          gcloud compute instances delete "$INSTANCE" --zone=us-central1-b --quiet --verbosity=info || true
+
+          OUT=`gcloud compute instances create $INSTANCE \
+            --project=$PROJECT \
+            --zone=us-central1-b \
+            --machine-type=$MACHINE \
+            --network-interface=network-tier=PREMIUM,stack-type=IPV4_ONLY,subnet=default \
+            --metadata="startup-script=.github/workflows/staging-deploy/startup-script.sh,enable-osconfig=TRUE,git-hash=${{ github.sha }},asset-bucket-name=$ASSET_BUCKET" \
+            --maintenance-policy=MIGRATE \
+            --provisioning-model=STANDARD \
+            --service-account=683425918315-compute@developer.gserviceaccount.com \
+            --scopes=https://www.googleapis.com/auth/cloud-platform \
+            --tags=notary \
+            --create-disk=auto-delete=yes,boot=yes,device-name=$INSTANCE,image=projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-v20241219,mode=rw,size=10,type=pd-balanced \
+            --no-shielded-secure-boot \
+            --shielded-vtpm \
+            --shielded-integrity-monitoring \
+            --labels=goog-ops-agent-policy=v2-x86-template-1-4-0,goog-ec-src=vm_add-gcloud \
+            --reservation-affinity=any \
+            --format=json`
+
+          EXTERNAL_IP=$(echo $OUT | jq -r '.[0].networkInterfaces[0].accessConfigs[0].natIP')
+          echo $EXTERNAL_IP
+
+          GIT_SHORT_HASH=$(git rev-parse --short HEAD) # is there a better way?
+
+          ZONE_ID=1d20e7dd6bf74aa550038d25bd4ac8b8
+          OUT=`curl -s --request POST \
+            --url https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records \
+            --header 'Content-Type: application/json' \
+            --header "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            --data "{ \
+              \"comment\": \"Staging Notary $GIT_SHORT_HASH\", \
+              \"name\": \"$GIT_SHORT_HASH.notary\", \
+              \"proxied\": false, \
+              \"settings\": {}, \
+              \"tags\": [], \
+              \"ttl\": 3600, \
+              \"content\": \"$EXTERNAL_IP\", \
+              \"type\": \"A\" \
+            }"`
+
+          echo $OUT
+          if [ "$(echo $OUT | jq -r .success)" != "true" ]; then
+            echo "Error: Cloudflare API call failed."
+            exit 1
+          fi
+
+          echo https://$GIT_SHORT_HASH.notary.pluto.dev/health

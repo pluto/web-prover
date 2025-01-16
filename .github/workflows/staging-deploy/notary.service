@@ -1,0 +1,13 @@
+[Unit]
+Description=Notary Service
+After=network.target
+
+[Service]
+User=notary
+Group=notary
+ExecStart=/opt/notary/bin/notary
+Restart=always
+EnvironmentFile=/opt/notary/etc/.env
+
+[Install]
+WantedBy=multi-user.target
