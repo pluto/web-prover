@@ -16,7 +16,7 @@ tracing="0.1.40"
 tracing-subscriber={ version="0.3.18", features=["env-filter"] }
 tlsn-verifier={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
 tlsn-prover={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4", features=[
-  "tracing",
+	"tracing",
 ] }
 tlsn-core={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4" }
 tls-client={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.4", package="tlsn-tls-client" }
@@ -26,7 +26,7 @@ tls-core          ={ git="https://github.com/pluto/tls-origo-legacy", package="t
 rayon             ="1.10.0"
 wasm-bindgen-rayon="=1.2.1"
 futures           ="0.3"
-caratls           ={ git="https://github.com/pluto/caratls.git", rev="b900d0d5eb5f92f656e01bf717b6a17ea1775152" }
+caratls           ={ git="https://github.com/pluto/caratls.git", rev="fb6d7c7f73a080b08abac63cf6bb2d08433e5f9c" }
 
 # CLI
 clap={ version="4.5.13", features=["derive"] }
