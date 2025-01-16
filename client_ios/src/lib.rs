@@ -3,12 +3,10 @@ use std::{
   time::Instant,
 };
 
+use client::circuits::PROVING_PARAMS_BYTES_1024;
 use client::config::Config;
 use tracing::debug;
 
-// TODO: Load from server.
-const PROVING_PARAM_BYTES: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/serialized_setup_1024.bytes");
 
 #[derive(serde::Serialize)]
 struct Output {
@@ -41,7 +39,7 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
     debug!("starting proving");
 
     let proof =
-      rt.block_on(client::prover_inner(config, Some(PROVING_PARAM_BYTES.to_vec()))).unwrap();
+      rt.block_on(client::prover_inner(config, Some(PROVING_PARAMS_BYTES_1024.to_vec()))).unwrap();
     debug!("done proving: {:?}", Instant::now() - start);
     serde_json::to_string_pretty(&proof).unwrap()
   }));

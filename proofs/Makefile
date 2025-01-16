@@ -16,7 +16,6 @@ web-prover-circuits-1024:
 
 web-prover-circuits: web-prover-circuits-512 web-prover-circuits-1024
 
-
 test-circuits:
 	# Test circuits
 	circom examples/circuit_data/add_external.circom --r1cs -o examples/circuit_data -l node_modules
@@ -29,9 +28,3 @@ test-circuits:
 
 proof: web-prover-circuits-1024
 	cargo test --release --features timing -- tests::test_end_to_end_proofs --exact --show-output
-
-params:
-	cargo test --release -- tests::test_offline_proofs --exact --show-output --ignored
-
-compressed_params:
-	cargo test --release -- tests::test_compressed_proof_params --exact --show-output --ignored

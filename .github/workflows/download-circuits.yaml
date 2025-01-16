@@ -38,4 +38,3 @@ jobs:
         if: steps.cache-circuits.outputs.cache-hit != 'true'
         run: |
           cd proofs && make web-prover-circuits
-          make params
