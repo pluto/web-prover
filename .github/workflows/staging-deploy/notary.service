@@ -5,9 +5,9 @@ After=network.target
 [Service]
 User=notary
 Group=notary
-ExecStart=/opt/notary/bin/notary
+ExecStart=/opt/notary/bin/notary --config /opt/notary/etc/notary-config.toml --manifest /opt/notary/etc/fixture/notary.origo_tcp_local.json
 Restart=always
-EnvironmentFile=/opt/notary/etc/.env
+Environment="RUST_LOG=info"
 
 [Install]
 WantedBy=multi-user.target

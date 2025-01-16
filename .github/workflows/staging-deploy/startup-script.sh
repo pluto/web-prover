@@ -21,17 +21,14 @@ else
   log "User 'notary' already exists"
 fi
 
-
-log "Creating /opt/notary directories"
-mkdir /opt/notary
-mkdir /opt/notary/bin
-chown notary:notary /opt/notary
-chown notary:notary /opt/notary/bin
-
-log "Move assets"
-mv /opt/notary/assets/notary /opt/notary/bin/notary
-# TODO what else
+log "Move assets to /opt/notary"
+mkdir -p /opt/notary/{bin,etc}
+mv /opt/notary/assets/notary.linux.amd64 /opt/notary/bin/notary
+mv /opt/notary/assets/notary-config.toml /opt/notary/etc/
+mv /opt/notary/assets/fixture /opt/notary/etc/
 chmod 0755 /opt/notary/bin/notary
+chown -R notary:notary /opt/notary
+setcap 'cap_net_bind_service=+ep' /opt/notary/bin/notary
 
 
 log "Deploying systemd service file"
@@ -46,10 +43,6 @@ rm -r /opt/notary/assets
 
 log "Reloading systemd daemon"
 systemctl daemon-reload
-
-
-log "Setting capabilities for the binary"
-setcap 'cap_net_bind_service=+ep' /opt/notary/bin/notary
 
 
 log "Starting and enabling Notary service"
