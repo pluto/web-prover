@@ -23,7 +23,7 @@ fi
 
 log "Move assets to /opt/notary"
 mkdir -p /opt/notary/{bin,etc}
-mv /opt/notary/assets/notary.linux.amd64 /opt/notary/bin/notary
+mv /opt/notary/assets/notary /opt/notary/bin/notary
 mv /opt/notary/assets/notary-config.toml /opt/notary/etc/
 mv /opt/notary/assets/fixture /opt/notary/etc/
 chmod 0755 /opt/notary/bin/notary

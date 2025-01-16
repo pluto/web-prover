@@ -48,7 +48,7 @@ jobs:
           key: ${{ needs.setup.outputs.cache-key }}
 
       - run: cargo +nightly-2024-10-28 build -p notary --release
-      - uses: Swatinem/rust-cache@v2
+      # - uses: Swatinem/rust-cache@v2 # TODO has no effect
 
       - uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-latest'
