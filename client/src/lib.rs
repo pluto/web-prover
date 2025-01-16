@@ -106,7 +106,7 @@ pub async fn prover_inner_origo(
 }
 
 pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
-  let session_id = config.session_id();
+  let session_id = config.set_session_id();
 
   // TEE mode uses Origo networking stack with minimal changes
 
