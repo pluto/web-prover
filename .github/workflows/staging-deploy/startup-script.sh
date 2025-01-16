@@ -11,7 +11,7 @@ ASSET_BUCKET_NAME=$(curl -s "http://169.254.169.254/computeMetadata/v1/instance/
 
 log "Download assets"
 mkdir -p /opt/notary/assets
-gcloud storage cp -r gs://$ASSET_BUCKET_NAME/$GIT_HASH /opt/notary/assets
+gcloud storage cp -r "gs://$ASSET_BUCKET_NAME/$GIT_HASH/*" /opt/notary/assets
 
 
 log "Creating notary user"

@@ -90,7 +90,7 @@ jobs:
         run: |
           GIT_SHORT_HASH=$(git rev-parse --short HEAD) # is there a better way?
           cp -r fixture .github/workflows/staging-deploy/
-          echo "\nacme_domain=\"${GIT_SHORT_HASH}.notary.pluto.dev\"\n" >> .github/workflows/staging-deploy/notary-config.toml
+          echo -e "\nacme_domain=\"${GIT_SHORT_HASH}.notary.pluto.dev\"\n" >> .github/workflows/staging-deploy/notary-config.toml
 
       - name: Upload assets
         uses: "google-github-actions/upload-cloud-storage@v2"
