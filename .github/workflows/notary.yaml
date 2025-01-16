@@ -47,8 +47,8 @@ jobs:
           path: proofs/web_proof_circuits
           key: ${{ needs.setup.outputs.cache-key }}
 
+      - uses: Swatinem/rust-cache@v2
       - run: cargo +nightly-2024-10-28 build -p notary --release
-      # - uses: Swatinem/rust-cache@v2 # TODO has no effect
 
       - uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-latest'
@@ -59,7 +59,7 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    needs: build
+    needs: ["setup", "build"]
     permissions:
       contents: "read"
       id-token: "write"
