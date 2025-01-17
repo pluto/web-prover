@@ -6,9 +6,9 @@ concurrency:
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   setup:
@@ -39,9 +39,10 @@ jobs:
           path: proofs/web_proof_circuits
           key: ${{ needs.setup.outputs.cache-key }}
 
+      - uses: Swatinem/rust-cache@v2
+
       - run: |
           RUST_LOG=DEBUG cargo +nightly-2024-10-28 run --release -p notary -- --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json &
           sleep 30
           NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer cargo +nightly-2024-10-28 run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
           NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer cargo +nightly-2024-10-28 run --release -p client -- --config ./fixture/client.origo_tcp_local.json
-      # - uses: Swatinem/rust-cache@v2 # TODO has no effect
