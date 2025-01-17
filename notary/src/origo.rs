@@ -82,7 +82,7 @@ pub async fn sign(
   let parsed_transcript = match r {
     Ok(p) => p,
     Err(e) => {
-      info!("error parsing transcript: {:?}", e);
+      error!("error parsing transcript: {:?}", e);
       return Err(e);
     },
   };
@@ -91,7 +91,7 @@ pub async fn sign(
   match parsed_transcript.verify_certificate_sig() {
     Ok(_) => (),
     Err(e) => {
-      info!("error verifying certificate sig: {:?}", e);
+      error!("error verifying certificate sig: {:?}", e);
       return Err(e);
     },
   }
