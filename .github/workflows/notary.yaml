@@ -164,4 +164,5 @@ jobs:
             exit 1
           fi
 
-          echo https://$GIT_SHORT_HASH.notary.pluto.dev/health
+          echo "##[notice]https://$GIT_SHORT_HASH.notary.pluto.dev/health"
+
