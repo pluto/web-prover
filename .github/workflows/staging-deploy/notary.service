@@ -1,0 +1,15 @@
+[Unit]
+Description=Notary Service
+After=network.target
+
+[Service]
+User=notary
+Group=notary
+# TODO once web-prover-circuits paths is a config, change this
+WorkingDirectory=/opt/notary/bin
+ExecStart=/opt/notary/bin/notary --config /opt/notary/etc/notary-config.toml --manifest /opt/notary/etc/fixture/notary.origo_tcp_local.json
+Restart=always
+Environment="RUST_LOG=info"
+
+[Install]
+WantedBy=multi-user.target

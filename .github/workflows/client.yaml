@@ -6,9 +6,9 @@ concurrency:
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   setup:
@@ -21,6 +21,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
@@ -44,4 +46,3 @@ jobs:
           sleep 30
           NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer cargo +nightly-2024-10-28 run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
           NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer cargo +nightly-2024-10-28 run --release -p client -- --config ./fixture/client.origo_tcp_local.json
-      - uses: Swatinem/rust-cache@v2
