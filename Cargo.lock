@@ -1137,7 +1137,7 @@ dependencies = [
 [[package]]
 name = "caratls"
 version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=e440cc71ece67fa3a53d7fd37d06d64d44840f01#e440cc71ece67fa3a53d7fd37d06d64d44840f01"
+source = "git+https://github.com/pluto/caratls.git?rev=580e575a4b0266a504c9355b58569d41a6ed7b32#580e575a4b0266a504c9355b58569d41a6ed7b32"
 dependencies = [
  "rcgen",
  "rustls 0.23.19",
