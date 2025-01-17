@@ -22,39 +22,39 @@ use crate::{
 mod witnesscalc;
 
 const CIRCUIT_SIZE: usize = 1024;
-const MAX_ROM_LENGTH: usize = 3;
+const MAX_ROM_LENGTH: usize = 5;
 const MAX_STACK_HEIGHT: usize = 10;
 const MAX_HTTP_HEADERS: usize = 25;
 
 // Circuit 0
 const PLAINTEXT_AUTHENTICATION_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_1024b/plaintext_authentication_1024b.r1cs");
+  include_bytes!("../../web_proof_circuits/circom-artifacts-1024b-v0.7.2/plaintext_authentication_1024b.r1cs");
 const PLAINTEXT_AUTHENTICATION_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_1024b/plaintext_authentication_1024b.bin");
+  include_bytes!("../../web_proof_circuits/circom-artifacts-1024b-v0.7.2/plaintext_authentication_1024b.bin");
 
 // Circuit 1
 const HTTP_VERIFICATION_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_1024b/http_verification_1024b.r1cs");
+  include_bytes!("../../web_proof_circuits/circom-artifacts-1024b-v0.7.2/http_verification_1024b.r1cs");
 const HTTP_VERIFICATION_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_1024b/http_verification_1024b.bin");
+  include_bytes!("../../web_proof_circuits/circom-artifacts-1024b-v0.7.2/http_verification_1024b.bin");
 
 // Circuit 2
 const JSON_EXTRACTION_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_1024b/json_extraction_1024b.r1cs");
+  include_bytes!("../../web_proof_circuits/circom-artifacts-1024b-v0.7.2/json_extraction_1024b.r1cs");
 const JSON_EXTRACTION_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_1024b/json_extraction_1024b.bin");
+  include_bytes!("../../web_proof_circuits/circom-artifacts-1024b-v0.7.2/json_extraction_1024b.bin");
 
 // Circuit 0
 const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/plaintext_authentication_512b.r1cs");
+  include_bytes!("../../web_proof_circuits/circom-artifacts-512b-v0.7.2/plaintext_authentication_512b.r1cs");
 
 // Circuit 1
 const HTTP_VERIFICATION_512B_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/http_verification_512b.r1cs");
+  include_bytes!("../../web_proof_circuits/circom-artifacts-512b-v0.7.2/http_verification_512b.r1cs");
 
 // Circuit 2
 const JSON_EXTRACTION_512B_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/target_512b/json_extraction_512b.r1cs");
+  include_bytes!("../../web_proof_circuits/circom-artifacts-512b-v0.7.2/json_extraction_512b.r1cs");
 
 // HTTP/1.1 200 OK
 // content-type: application/json; charset=utf-8
@@ -334,35 +334,4 @@ fn test_end_to_end_proofs() {
 
   let z0_secondary = vec![F::<G2>::ZERO];
   proof.proof.verify(&program_data.public_params, &vk, &z0_primary, &z0_secondary).unwrap();
-}
-
-#[test]
-#[tracing_test::traced_test]
-#[ignore]
-fn test_offline_proofs() {
-  let setups = vec![
-    ("serialized_setup_512.bytes", vec![
-      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
-      R1CSType::Raw(JSON_EXTRACTION_512B_R1CS.to_vec()),
-    ]),
-    ("serialized_setup_1024.bytes", vec![
-      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
-      R1CSType::Raw(JSON_EXTRACTION_R1CS.to_vec()),
-    ]),
-  ];
-
-  for (path, r1cs_files) in setups {
-    let bytes = setup::setup(&r1cs_files, MAX_ROM_LENGTH);
-    let path = format!("web_proof_circuits/{}", path);
-    let path = PathBuf::from_str(path.as_str()).unwrap();
-
-    if let Some(parent) = path.parent() {
-      fs::create_dir_all(parent).unwrap();
-    }
-
-    debug!("bytes_path={:?}", path);
-    File::create(&path).unwrap().write_all(&bytes).unwrap();
-  }
 }

@@ -39,8 +39,8 @@ function end() {
 }
 
 
-const getByteParams = async function (setupFile, additionalPath) {
-  const ppUrl = new URL(`${setupFile}.${additionalPath}`, "https://localhost:8090/build/").toString();
+const getByteParams = async function (setupFile) {
+  const ppUrl = new URL(`${setupFile}`, "https://localhost:8090/build/").toString();
   const pp = await fetch(ppUrl).then((r) => r.arrayBuffer());
   console.log("byte_params", pp);
   return pp;
@@ -121,7 +121,7 @@ let proverConfig = {
 const proofWorker = new Worker(new URL("./proof.js", import.meta.url), { type: "module" });
 console.log("sending message to worker");
 var proving_params = {
-  aux_params: await getByteParams("serialized_setup_512", "bytes"),
+  aux_params: await getByteParams("circom-artifacts-512b-v0.7.2/serialized_setup_512b_rom_length_5.bin"),
 };
 proofWorker.postMessage({ proverConfig, proving_params, memory });
 console.log("message sent to worker");

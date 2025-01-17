@@ -19,7 +19,8 @@ client/.rustc_info.json
 # exclude ios/wasm build files
 client_ios/headers/libclient_ios.h
 client_wasm/demo/static/build
-client_ios/demo/demo.xcodeproj/project.xcworkspace/xcuserdata/*.xcuserdatad/UserInterfaceState.xcuserstate
+client_ios/demo/demo.xcodeproj/project.xcworkspace/xcuserdata/*
+client_ios/demo/demo.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
 
 # artifacts zipfile
 *.zip

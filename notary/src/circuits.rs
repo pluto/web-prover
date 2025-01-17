@@ -15,32 +15,32 @@ use proofs::{
 };
 use tracing::debug;
 
-pub const MAX_ROM_LENGTH: usize = 3;
-pub const PROVING_PARAMS_512: &str = "proofs/web_proof_circuits/serialized_setup_512.bytes";
-pub const PROVING_PARAMS_1024: &str = "proofs/web_proof_circuits/serialized_setup_1024.bytes";
+pub const MAX_ROM_LENGTH: usize = 5;
+pub const PROVING_PARAMS_512: &str = "proofs/web_proof_circuits/circom-artifacts-512b-v0.7.2/serialized_setup_512b_rom_length_5.bin";
+pub const PROVING_PARAMS_1024: &str = "proofs/web_proof_circuits/circom-artifacts-1024b-v0.7.2/serialized_setup_1024b_rom_length_5.bin";
 
 // -------------------------------------- 1024B circuits -------------------------------------- //
 // Circuit 0
 const PLAINTEXT_AUTHENTICATION_R1CS: &[u8] = include_bytes!(
-  "../../proofs/web_proof_circuits/target_1024b/plaintext_authentication_1024b.r1cs"
+  "../../proofs/web_proof_circuits/circom-artifacts-1024b-v0.7.2/plaintext_authentication_1024b.r1cs"
 );
 // Circuit 1
 const HTTP_VERIFICATION_R1CS: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/target_1024b/http_verification_1024b.r1cs");
+  include_bytes!("../../proofs/web_proof_circuits/circom-artifacts-1024b-v0.7.2/http_verification_1024b.r1cs");
 // Circuit 2
 const JSON_EXTRACTION_R1CS: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/target_1024b/json_extraction_1024b.r1cs");
+  include_bytes!("../../proofs/web_proof_circuits/circom-artifacts-1024b-v0.7.2/json_extraction_1024b.r1cs");
 
 // -------------------------------------- 512B circuits -------------------------------------- //
 // Circuit 0
 const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/target_512b/plaintext_authentication_512b.r1cs");
+  include_bytes!("../../proofs/web_proof_circuits/circom-artifacts-512b-v0.7.2/plaintext_authentication_512b.r1cs");
 // Circuit 1
 const HTTP_VERIFICATION_512B_R1CS: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/target_512b/http_verification_512b.r1cs");
+  include_bytes!("../../proofs/web_proof_circuits/circom-artifacts-512b-v0.7.2/http_verification_512b.r1cs");
 // Circuit 2
 const JSON_EXTRACTION_512B_R1CS: &[u8] =
-  include_bytes!("../../proofs/web_proof_circuits/target_512b/json_extraction_512b.r1cs");
+  include_bytes!("../../proofs/web_proof_circuits/circom-artifacts-512b-v0.7.2/json_extraction_512b.r1cs");
 
 pub fn construct_setup_data_512() -> SetupData {
   SetupData {

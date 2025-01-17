@@ -1,7 +1,7 @@
-params:
-	cd proofs && make params
+artifacts:
+	cd proofs && make web-prover-circuits
 
-wasm: params
+wasm: artifacts
 	@# NOTE: This build depends on RUSTFLAGS in the client_wasm/.cargo/config.toml
 	-cargo install wasm-pack
 	-cd client_wasm/demo/static && rm -f build && ln -s ../../../proofs/web_proof_circuits build && cd ../../..
@@ -10,7 +10,7 @@ wasm: params
 	  rustup run nightly-2024-10-28 ~/.cargo/bin/wasm-pack build --release --target web ./ -- \
 	    -Z build-std=panic_abort,std
 
-wasm-debug: params
+wasm-debug: artifacts
 	-cargo install wasm-pack
 	-cd client_wasm/demo/static && rm -f build && ln -s ../../../proofs/web_proof_circuits build && cd ../../..
 	cd client_wasm && \
@@ -18,7 +18,7 @@ wasm-debug: params
 	  rustup run nightly-2024-10-28 ~/.cargo/bin/wasm-pack build --debug --target web ./ -- \
 	    -Z build-std=panic_abort,std
 
-ios-sim: params
+ios-sim: artifacts
 	-cargo install cbindgen
 	rustup target add aarch64-apple-ios-sim --toolchain nightly-2024-10-28
 	NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" RUSTFLAGS="-C panic=unwind" cargo +nightly-2024-10-28 build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
@@ -29,7 +29,7 @@ ios-sim: params
 		-headers client_ios/headers/ \
 		-output target/aarch64-apple-ios-sim/release/libclient_ios.xcframework
 
-ios: params
+ios: artifacts
 	-cargo install cbindgen
 	rustup target add aarch64-apple-ios-sim --toolchain nightly-2024-10-28
 	# rustup target add aarch64-apple-ios-sim
