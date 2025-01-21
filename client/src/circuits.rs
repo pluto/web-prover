@@ -88,21 +88,21 @@ pub fn construct_setup_data() -> SetupData {
         // WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
         WitnessGeneratorType::Wasm {
           path:      String::from(
-            "proofs/web_proof_circuits/target_1024b/plaintext_authentication_1024b_js/\
-             plaintext_authentication_1024b.wasm",
+            "proofs/web_proof_circuits/circom-artifacts-1024b-v0.7.3/\
+             plaintext_authentication_1024b_js/plaintext_authentication_1024b.wasm",
           ),
           wtns_path: String::from("witness.wtns"),
         },
         WitnessGeneratorType::Wasm {
           path:      String::from(
-            "proofs/web_proof_circuits/target_1024b/http_verification_1024b_js/\
+            "proofs/web_proof_circuits/circom-artifacts-1024b-v0.7.3/http_verification_1024b_js/\
              http_verification_1024b.wasm",
           ),
           wtns_path: String::from("witness.wtns"),
         },
         WitnessGeneratorType::Wasm {
           path:      String::from(
-            "proofs/web_proof_circuits/target_1024b/json_extraction_1024b_js/\
+            "proofs/web_proof_circuits/circom-artifacts-1024b-v0.7.3/json_extraction_1024b_js/\
              json_extraction_1024b.wasm",
           ),
           wtns_path: String::from("witness.wtns"),

@@ -2,7 +2,7 @@ use hex;
 
 use super::*;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FoldingProof<T, V> {
   pub proof:           T,
   pub verifier_digest: V,

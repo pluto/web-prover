@@ -409,6 +409,7 @@ pub fn request_initial_digest(
   (ciphertext_digest, manifest_digest)
 }
 
+// TODO (Sambhav): move this to manifest.rs
 pub fn response_initial_digest(
   manifest_response: &Response,
   ciphertext: &[Vec<ByteOrPad>],
@@ -692,7 +693,7 @@ mod tests {
   fn test_initial_digest() {
     let test_ciphertext_padded =
       TEST_CIPHERTEXT.iter().map(|x| ByteOrPad::Byte(*x)).collect::<Vec<ByteOrPad>>();
-    let ciphertext_digest = data_hasher(&test_ciphertext_padded);
+
     let (ct_digest, manifest_digest) =
       response_initial_digest(&mock_manifest().response, &[test_ciphertext_padded.clone()], 5);
     println!("\nManifest Digest (decimal):");

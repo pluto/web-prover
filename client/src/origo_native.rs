@@ -16,7 +16,6 @@ use proofs::{
   proof::FoldingProof,
   F, G1, G2,
 };
-use serde_wasm_bindgen::from_value;
 use tls_client2::origo::OrigoConnection;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
@@ -73,7 +72,7 @@ pub async fn proxy_and_sign_and_generate_proof(
   );
 
   // TODO(Sambhav): handle request and response into one proof
-  Ok(OrigoProof { request: request_proof?, response: Some(response_proof?) })
+  Ok(OrigoProof { request: request_proof?, response: response_proof? })
 }
 
 /// generates NIVC proof from [`ProgramData`]

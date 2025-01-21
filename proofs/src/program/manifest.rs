@@ -42,9 +42,9 @@ use crate::{
     F, G1,
   },
   witness::{
-    compute_http_header_witness, compute_http_witness, data_hasher, request_initial_digest,
-    response_initial_digest, ByteOrPad, compress_tree_hash, json_tree_hasher, 
-    json_value_digest, polynomial_digest, poseidon,
+    compress_tree_hash, compute_http_header_witness, compute_http_witness, data_hasher,
+    json_tree_hasher, json_value_digest, polynomial_digest, poseidon, request_initial_digest,
+    response_initial_digest, ByteOrPad,
   },
 };
 

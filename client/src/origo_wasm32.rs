@@ -55,7 +55,6 @@ impl WitnessOutput {
   pub fn new(wit: Vec<js_sys::Uint8Array>) -> WitnessOutput { Self { data: wit } }
 }
 // TODO(WJ 2024-12-12): move to wasm client lib?
-// #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 extern "C" {
   #[wasm_bindgen(js_namespace = witness, js_name = createWitness)]
@@ -112,9 +111,6 @@ pub async fn proxy_and_sign_and_generate_proof(
 
   // generate NIVC proofs for request and response
   let manifest = config.proving.manifest.unwrap();
-  // TODO(WJ 2024-12-16): Can we do parrallel processing with wasm somehow here?
-  // okay wtf, let me bisec this.
-  // okay so the request proof on it's own works fines
   let request_proof = construct_request_program_data_and_proof(
     &manifest.request,
     request_inputs,
@@ -127,7 +123,7 @@ pub async fn proxy_and_sign_and_generate_proof(
       .await?;
 
   // TODO(Sambhav): handle request and response into one proof
-  Ok(crate::Proof::Origo((request_proof.0, response_proof.0)))
+  Ok(OrigoProof { request: request_proof?, response: response_proof? })
 }
 
 /// creates NIVC proof from TLS transcript and [`Manifest`] config

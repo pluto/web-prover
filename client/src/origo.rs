@@ -2,10 +2,24 @@
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
-#[derive(Serialize)]
+use crate::OrigoProof;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SignBody {
   pub handshake_server_iv:  String,
   pub handshake_server_key: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VerifyBody {
+  pub session_id:  String,
+  pub origo_proof: OrigoProof,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VerifyReply {
+  pub valid: bool,
+  // TODO: need a signature
 }
 
 pub async fn sign(
@@ -40,20 +54,6 @@ pub async fn sign(
   debug!("\n{}\n\n", String::from_utf8(sign_response.clone())?);
 
   Ok(sign_response)
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub struct VerifyBody {
-  pub session_id:              String,
-  pub request_verifier_digest: String,
-  pub request_proof:           Vec<u8>,
-  pub response_proof:          Vec<u8>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct VerifyReply {
-  pub valid: bool,
-  // TODO: need a signature
 }
 
 pub async fn verify(

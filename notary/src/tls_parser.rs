@@ -300,7 +300,7 @@ impl ParsedTranscript {
   ///
   /// To skip redundant verification in the future, we could accept a possible target hash
   /// from the client and check if it is in the set of valid hashes.
-  pub fn get_ciphertext_hashes(&self) -> (Vec<F<G1>>, Vec<F<G1>>) {
+  pub fn get_ciphertext_hashes(&self) -> (Vec<F<G1>>, Vec<F<G1>>, Vec<Vec<u8>>, Vec<Vec<u8>>) {
     // State machine for extracting request response
     // Transcript Structure:
     // - Encrypted 1: server sends back verify data
@@ -398,6 +398,9 @@ impl ParsedTranscript {
       };
     }
 
+    debug!("request_messages={:?}", request_messages);
+    debug!("response_messages={:?}", response_messages);
+
     let request_hashes = ParsedTranscript::get_permutations(&request_messages);
     let response_hashes = ParsedTranscript::get_permutations(&response_messages);
 
@@ -412,7 +415,7 @@ impl ParsedTranscript {
       response_hashes.clone().into_iter().map(|f| hex::encode(f.to_bytes())).collect::<Vec<_>>()
     );
 
-    (request_hashes, response_hashes)
+    (request_hashes, response_hashes, request_messages, response_messages)
   }
 }
 

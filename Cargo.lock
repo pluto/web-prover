@@ -3761,6 +3761,7 @@ dependencies = [
  "base64 0.21.7",
  "caratls",
  "clap",
+ "client",
  "client-side-prover",
  "config",
  "eyre",

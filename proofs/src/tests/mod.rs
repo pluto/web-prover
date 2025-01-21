@@ -2,8 +2,6 @@
 
 // TODO: (Colin): I'm noticing this module could use some TLC. There's a lot of lint here!
 
-use std::{fs, fs::File, io::Write};
-
 use client_side_prover::supernova::RecursiveSNARK;
 use program::manifest::JsonKey;
 use serde_json::json;
@@ -15,8 +13,7 @@ use crate::{
     data::{CircuitData, NotExpanded},
     manifest::to_chacha_input,
   },
-  setup,
-  witness::{compute_http_witness, data_hasher, ByteOrPad},
+  witness::{compute_http_witness, ByteOrPad},
 };
 
 mod witnesscalc;
@@ -49,20 +46,6 @@ const JSON_EXTRACTION_R1CS: &[u8] = include_bytes!(
 const JSON_EXTRACTION_GRAPH: &[u8] = include_bytes!(
   "../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/json_extraction_1024b.bin"
 );
-
-// Circuit 0
-const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] = include_bytes!(
-  "../../web_proof_circuits/circom-artifacts-512b-v0.7.3/plaintext_authentication_512b.r1cs"
-);
-
-// Circuit 1
-const HTTP_VERIFICATION_512B_R1CS: &[u8] = include_bytes!(
-  "../../web_proof_circuits/circom-artifacts-512b-v0.7.3/http_verification_512b.r1cs"
-);
-
-// Circuit 2
-const JSON_EXTRACTION_512B_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/circom-artifacts-512b-v0.7.3/json_extraction_512b.r1cs");
 
 // HTTP/1.1 200 OK
 // content-type: application/json; charset=utf-8
@@ -184,20 +167,22 @@ fn test_end_to_end_proofs() {
       // WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
       WitnessGeneratorType::Wasm {
         path:      String::from(
-          "web_proof_circuits/target_1024b/plaintext_authentication_1024b_js/\
+          "web_proof_circuits/circom-artifacts-1024b-v0.7.3/plaintext_authentication_1024b_js/\
            plaintext_authentication_1024b.wasm",
         ),
         wtns_path: "wtns.wtns".to_string(),
       },
       WitnessGeneratorType::Wasm {
         path:      String::from(
-          "web_proof_circuits/target_1024b/http_verification_1024b_js/http_verification_1024b.wasm",
+          "web_proof_circuits/circom-artifacts-1024b-v0.7.3/http_verification_1024b_js/\
+           http_verification_1024b.wasm",
         ),
         wtns_path: "wtns.wtns".to_string(),
       },
       WitnessGeneratorType::Wasm {
         path:      String::from(
-          "web_proof_circuits/target_1024b/json_extraction_1024b_js/json_extraction_1024b.wasm",
+          "web_proof_circuits/circom-artifacts-1024b-v0.7.3/json_extraction_1024b_js/\
+           json_extraction_1024b.wasm",
         ),
         wtns_path: "wtns.wtns".to_string(),
       },
@@ -227,7 +212,6 @@ fn test_end_to_end_proofs() {
 
   assert!(padded_plaintext.len() == padded_ciphertext.len());
   assert_eq!(padded_ciphertext.len(), 1024);
-  let ciphertext_digest = data_hasher(&padded_ciphertext);
 
   let (ciphertext_digest, init_nivc_input) = crate::witness::response_initial_digest(
     &mock_manifest().response,
