@@ -11,7 +11,7 @@ use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use proofs::{
   proof::FoldingProof,
-  witness::{request_initial_digest, ByteOrPad},
+  witness::{request_initial_digest, response_initial_digest, ByteOrPad},
   F, G1, G2,
 };
 use rs_merkle::{Hasher, MerkleTree};
@@ -27,7 +27,9 @@ use ws_stream_tungstenite::WsStream;
 use crate::{
   axum_websocket::WebSocket,
   errors::{NotaryServerError, ProxyError},
-  tls_parser::{Direction, UnparsedMessage, UnparsedTranscript, CIRCUIT_SIZE_MAX},
+  tls_parser::{
+    Direction, UnparsedMessage, UnparsedTranscript, CIRCUIT_SIZE_MAX, MAX_STACK_HEIGHT,
+  },
   tlsn::ProtocolUpgrade,
   SharedState,
 };
@@ -205,7 +207,11 @@ pub async fn verify(
     verifier_digest: payload.origo_proof.request.verifier_digest.clone(),
   }
   .deserialize();
-  let response_proof = payload.origo_proof.response.deserialize();
+  let response_proof = FoldingProof {
+    proof:           payload.origo_proof.response.proof.clone(),
+    verifier_digest: payload.origo_proof.response.verifier_digest.clone(),
+  }
+  .deserialize();
 
   // TODO (tracy): Right now this only verifies the request, we need to accept
   // digest for req/resp and set intersect with verifier_inputs.
@@ -216,7 +222,6 @@ pub async fn verify(
   // Form verifier inputs
   let verifier_inputs =
     state.verifier_sessions.lock().unwrap().get(&payload.session_id).cloned().unwrap();
-  let ciphertext_digest = verifier_inputs.request_hashes.first().cloned().unwrap();
 
   // DEBUG: Use this digest to pin the proving behavior. You must also override
   // `client/src/tls.rs#decrypt_tls_ciphertext`
@@ -225,18 +230,25 @@ pub async fn verify(
   //   "66ab857c95c11767913c36e9341dbe4d46915616a67a5f47379e06848411b32b"
   // ).unwrap().try_into().unwrap()).unwrap();
 
-  let mut ciphertext_packets = vec![];
+  let mut request_ciphertext_packets = vec![];
+  let mut response_ciphertext_packets = vec![];
   for message in verifier_inputs.request_messages.iter() {
-    ciphertext_packets
+    request_ciphertext_packets
+      .push(ByteOrPad::from_bytes_with_padding(&message, CIRCUIT_SIZE_MAX - message.len()));
+  }
+  for message in verifier_inputs.response_messages.iter() {
+    response_ciphertext_packets
       .push(ByteOrPad::from_bytes_with_padding(&message, CIRCUIT_SIZE_MAX - message.len()));
   }
 
-  let (_, nivc_input) = request_initial_digest(&state.manifest.request, &ciphertext_packets);
+  // request verification
+  let (_, nivc_input) =
+    request_initial_digest(&state.manifest.request, &request_ciphertext_packets);
   let verifier = state.verifiers.get(&payload.origo_proof.request.verifier_digest).unwrap();
   let (z0_primary, _) = verifier.program_data.extend_public_inputs(Some(vec![nivc_input])).unwrap();
   let z0_secondary = vec![F::<G2>::from(0)];
 
-  let valid = match request_proof.proof.verify(
+  let request_valid = match request_proof.proof.verify(
     &verifier.program_data.public_params,
     &verifier.verifier_key,
     &z0_primary,
@@ -244,12 +256,34 @@ pub async fn verify(
   ) {
     Ok(_) => true,
     Err(e) => {
-      error!("Error verifying proof: {:?}", e);
+      error!("Error verifying request proof: {:?}", e);
       false
     },
   };
 
-  Ok(Json(VerifyReply { valid }))
+  // response verification
+  let (_, nivc_input) = response_initial_digest(
+    &state.manifest.response,
+    &response_ciphertext_packets,
+    MAX_STACK_HEIGHT,
+  );
+  let verifier = state.verifiers.get(&payload.origo_proof.response.verifier_digest).unwrap();
+  let (z0_primary, _) = verifier.program_data.extend_public_inputs(Some(vec![nivc_input])).unwrap();
+
+  let valid = match response_proof.proof.verify(
+    &verifier.program_data.public_params,
+    &verifier.verifier_key,
+    &z0_primary,
+    &z0_secondary,
+  ) {
+    Ok(_) => true,
+    Err(e) => {
+      error!("Error verifying response proof: {:?}", e);
+      false
+    },
+  };
+
+  Ok(Json(VerifyReply { valid: valid && request_valid }))
 }
 
 pub async fn websocket_notarize(

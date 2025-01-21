@@ -34,6 +34,7 @@ const TRIMMED_BYTES: usize = 17;
 // TODO: Relocate and consolidate with circuits.rs
 pub const CIRCUIT_SIZE_SMALL: usize = 512;
 pub const CIRCUIT_SIZE_MAX: usize = 1024;
+pub const MAX_STACK_HEIGHT: usize = 10;
 
 #[derive(Debug, Copy, Clone)]
 pub enum Direction {

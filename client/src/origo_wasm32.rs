@@ -11,21 +11,21 @@ use std::{
 use caratls::client::TeeTlsConnector;
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::StatusCode;
-use js_sys::Promise;
 use proofs::{
   circom::witness::load_witness_from_bin_reader,
   program::{
     self,
     data::{Expanded, NotExpanded, Offline, Online, ProgramData},
     manifest::{
-      EncryptionInput, JsonKey, NIVCRom, NivcCircuitInputs, Request as ManifestRequest,
+      EncryptionInput, NIVCRom, NivcCircuitInputs, Request as ManifestRequest,
       Response as ManifestResponse, TLSEncryption,
     },
   },
+  proof::FoldingProof,
+  witness::field_element_to_base10_string,
   F, G1, G2,
 };
-use serde::{Deserialize, Serialize};
-use tls_client2::{origo::WitnessData, CipherSuiteKey};
+use serde_json::{json, Value};
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{debug, info};
 use wasm_bindgen::prelude::*;
@@ -33,14 +33,8 @@ use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
 use crate::{
-  circuits::*,
-  config,
-  config::{NotaryMode, ProvingData},
-  errors,
-  origo::SignBody,
-  tls::decrypt_tls_ciphertext,
-  tls_client_async2::bind_client,
-  OrigoProof,
+  circuits::*, config, config::NotaryMode, errors, origo::SignBody, tls::decrypt_tls_ciphertext,
+  tls_client_async2::bind_client, ClientErrors, OrigoProof,
 };
 
 #[wasm_bindgen(getter_with_clone)]
@@ -123,7 +117,7 @@ pub async fn proxy_and_sign_and_generate_proof(
       .await?;
 
   // TODO(Sambhav): handle request and response into one proof
-  Ok(OrigoProof { request: request_proof?, response: response_proof? })
+  Ok(OrigoProof { request: request_proof, response: response_proof })
 }
 
 /// creates NIVC proof from TLS transcript and [`Manifest`] config
@@ -145,7 +139,7 @@ async fn construct_request_program_data_and_proof(
   manifest_request: &ManifestRequest,
   inputs: EncryptionInput,
   proving_params: Option<Vec<u8>>,
-) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
+) -> Result<FoldingProof<Vec<u8>, String>, ClientErrors> {
   let setup_data = construct_setup_data();
 
   let NivcCircuitInputs { fold_inputs, private_inputs, initial_nivc_input } =
@@ -168,6 +162,8 @@ async fn construct_request_program_data_and_proof(
   debug!("Generating request's `ProgramData`...");
   let program_data = ProgramData::<Offline, NotExpanded> {
     public_params: proving_params.unwrap(),
+    vk_digest_primary: F::<G1>::from(0),
+    vk_digest_secondary: F::<G2>::from(0),
     setup_data,
     rom,
     rom_data: circuit_data,
@@ -197,7 +193,7 @@ async fn construct_response_program_data_and_proof(
   manifest_response: &ManifestResponse,
   inputs: EncryptionInput,
   proving_params: Option<Vec<u8>>,
-) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
+) -> Result<FoldingProof<Vec<u8>, String>, ClientErrors> {
   let setup_data = construct_setup_data();
 
   // - construct private inputs and program layout for circuits for TLS request -
@@ -246,13 +242,14 @@ async fn construct_response_program_data_and_proof(
   Ok(proof)
 }
 
+// TODO (Sambhav): this can be removed, duplicate from origo_native
 /// generates NIVC proof from [`ProgramData`]
 /// - run NIVC recursive proving
 /// - run CompressedSNARK to compress proof
 /// - serialize proof
 fn generate_proof(
   program_data: ProgramData<Online, Expanded>,
-) -> Result<CompressedSNARKProof<Vec<u8>>, ClientErrors> {
+) -> Result<FoldingProof<Vec<u8>, String>, ClientErrors> {
   let program_output = program::run(&program_data)?;
   debug!("compressing proof!");
   let compressed_snark_proof = program::compress_proof_no_setup(
