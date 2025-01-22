@@ -1,0 +1,14 @@
+{
+  "name": "client-wasm-tests",
+  "private": true,
+  "scripts": {
+    "start": "node e2e/server.js",
+    "test": "npx playwright test --config=e2e/playwright.config.ts"
+  },
+  "devDependencies": {},
+  "dependencies": {
+    "@playwright/test": "^1.49.1",
+    "comlink": "^4.4.2",
+    "express": "^4.21.2"
+  }
+}

@@ -1,0 +1,72 @@
+<!-- public/test.html -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>WASM Testing</title>
+  </head>
+  <body>
+    <h1>Test Page for WASM</h1>
+    <script type="module">
+      import init, { initThreadPool } from '/pkg/client_wasm.js'
+
+      async function doMainThreadWasmSetup() {
+        const numConcurrency = navigator.hardwareConcurrency || 2
+        const memory = new WebAssembly.Memory({
+          initial: 16384,
+          maximum: 65536,
+          shared: true
+        })
+
+        const wasmURL = '/pkg/client_wasm_bg.wasm'
+        await init({ url: wasmURL, memory })
+
+        await initThreadPool(numConcurrency)
+        console.log('Main thread: initialized thread pool')
+
+        const wasmBytes = await fetch(wasmURL).then((r) => r.arrayBuffer())
+
+        return {
+          memory,
+          wasmBytes,
+          concurrency: numConcurrency
+        }
+      }
+
+      window.runWasmTest = async function () {
+        return new Promise(async (resolve, reject) => {
+          try {
+            const dataForWorker = await doMainThreadWasmSetup()
+
+            const worker = new Worker('./test-worker.js', { type: 'module' })
+
+            worker.postMessage({
+              concurrency: dataForWorker.concurrency,
+              shared_memory: dataForWorker.memory,
+              wasm_bytes: dataForWorker.wasmBytes,
+              proving_params: dataForWorker.provingParams
+              // circuit_wasm_bytes: dataForWorker.circuitWasmBytes
+            })
+
+            // 4. Listen for success
+            worker.onmessage = (e) => {
+              if (e.data === 'worker done') {
+                resolve('worker success')
+              } else if (e.data && e.data.type === 'error') {
+                reject('Worker error: ' + e.data.data)
+              } else {
+                reject('Unexpected message from worker: ' + JSON.stringify(e.data))
+              }
+            }
+
+            worker.onerror = (err) => {
+              reject('Worker error event: ' + err.message)
+            }
+          } catch (outerErr) {
+            reject('Main thread error: ' + outerErr.message)
+          }
+        })
+      }
+    </script>
+  </body>
+</html>

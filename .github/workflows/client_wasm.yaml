@@ -6,9 +6,9 @@ concurrency:
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ['main']
   pull_request:
-    branches: [ "main" ]
+    branches: ['main']
 
 jobs:
   setup:
@@ -76,12 +76,31 @@ jobs:
         run: |
           make wasm
 
-      - run: "tar czf pkg.tar.gz ./pkg/*"
+      - name: Install Node
+        run: |
+          cd client_wasm
+          npm install
+
+      - name: Install Playwright Browsers
+        run: npx playwright install
+
+      - name: Install system deps for Playwright
+        run: npx playwright install-deps
+
+      - name: Start server and run tests
+        run: |
+          cd client_wasm
+          npm start & 
+          sleep 5 # Give server time to start
+          npm test
+          kill $(lsof -t -i:3000) || true # Cleanup server process
+
+      - run: 'tar czf pkg.tar.gz ./pkg/*'
         if: matrix.os == 'ubuntu-latest'
-        working-directory: "client_wasm"
+        working-directory: 'client_wasm'
 
       - uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-latest'
         with:
-          name: "wasm.tar.gz"
-          path: "client_wasm/pkg.tar.gz"
+          name: 'wasm.tar.gz'
+          path: 'client_wasm/pkg.tar.gz'
