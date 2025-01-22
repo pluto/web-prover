@@ -402,6 +402,26 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   }
 }
 
+impl ProgramData<Online, Expanded> {
+  /// generates NIVC proof from [`ProgramData`]
+  /// - run NIVC recursive proving
+  /// - run CompressedSNARK to compress proof
+  /// - serialize proof
+  pub fn generate_proof(self) -> Result<FoldingProof<Vec<u8>, String>, ProofError> {
+    debug!("starting recursive proving");
+    let program_output = program::run(&self)?;
+
+    debug!("starting proof compression");
+    let compressed_snark_proof = program::compress_proof_no_setup(
+      &program_output,
+      &self.public_params,
+      self.vk_digest_primary,
+      self.vk_digest_secondary,
+    )?;
+    Ok(compressed_snark_proof.serialize())
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;

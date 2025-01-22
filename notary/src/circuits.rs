@@ -3,10 +3,7 @@
 //! - AES: AES encryption
 //! - HTTP: HTTP parsing and locking
 //! - JSON: JSON extract
-use std::{
-  collections::HashMap,
-  hash::{DefaultHasher, Hash, Hasher},
-};
+use std::collections::HashMap;
 
 use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
 use proofs::{
@@ -19,8 +16,7 @@ use proofs::{
 use tracing::debug;
 
 pub const MAX_ROM_LENGTH: usize = 5;
-pub const PROVING_PARAMS_512: &str =
-  "proofs/web_proof_circuits/circom-artifacts-512b-v0.8.0/serialized_setup_512b_rom_length_5.bin";
+
 pub const PROVING_PARAMS_1024: &str =
   "proofs/web_proof_circuits/circom-artifacts-1024b-v0.8.0/serialized_setup_1024b_rom_length_5.bin";
 

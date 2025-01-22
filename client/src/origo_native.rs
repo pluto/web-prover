@@ -6,8 +6,7 @@ use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
   program::{
-    self,
-    data::{Expanded, NotExpanded, Offline, Online, ProgramData},
+    data::{NotExpanded, Offline, ProgramData},
     manifest::{
       EncryptionInput, NIVCRom, NivcCircuitInputs, Request as ManifestRequest,
       Response as ManifestResponse, TLSEncryption,
@@ -75,26 +74,6 @@ pub async fn proxy_and_sign_and_generate_proof(
   Ok(OrigoProof { request: request_proof?, response: response_proof? })
 }
 
-/// generates NIVC proof from [`ProgramData`]
-/// - run NIVC recursive proving
-/// - run CompressedSNARK to compress proof
-/// - serialize proof
-fn generate_proof(
-  program_data: ProgramData<Online, Expanded>,
-) -> Result<FoldingProof<Vec<u8>, String>, ClientErrors> {
-  debug!("starting recursive proving");
-  let program_output = program::run(&program_data)?;
-
-  debug!("starting proof compression");
-  let compressed_snark_proof = program::compress_proof_no_setup(
-    &program_output,
-    &program_data.public_params,
-    program_data.vk_digest_primary,
-    program_data.vk_digest_secondary,
-  )?;
-  Ok(compressed_snark_proof.serialize())
-}
-
 /// creates NIVC proof from TLS transcript and [`Manifest`] config
 ///
 /// # Arguments
@@ -138,7 +117,7 @@ fn construct_request_program_data_and_proof(
   .into_expanded()?;
 
   debug!("starting request recursive proving");
-  let proof = generate_proof(program_data)?;
+  let proof = program_data.generate_proof()?;
 
   Ok(proof)
 }
@@ -179,7 +158,7 @@ fn construct_response_program_data_and_proof(
   .into_expanded()?;
 
   debug!("starting response recursive proving");
-  let proof = generate_proof(program_data)?;
+  let proof = program_data.generate_proof()?;
 
   Ok(proof)
 }

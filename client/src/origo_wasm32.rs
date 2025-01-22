@@ -14,8 +14,7 @@ use hyper::StatusCode;
 use proofs::{
   circom::witness::load_witness_from_bin_reader,
   program::{
-    self,
-    data::{Expanded, NotExpanded, Offline, Online, ProgramData},
+    data::{NotExpanded, Offline, ProgramData},
     manifest::{
       EncryptionInput, NIVCRom, NivcCircuitInputs, Request as ManifestRequest,
       Response as ManifestResponse, TLSEncryption,
@@ -155,8 +154,8 @@ async fn construct_request_program_data_and_proof(
     input.insert("step_in".to_string(), json!(initial_input));
   }
 
-  debug!("generating witness in wasm");
   // now we call the js FFI to generate the witness in wasm with snarkjs
+  debug!("generating witness in wasm");
   let witnesses = build_witness_data_from_wasm(wasm_private_inputs.clone(), rom_opcodes).await?;
 
   debug!("Generating request's `ProgramData`...");
@@ -171,13 +170,11 @@ async fn construct_request_program_data_and_proof(
     inputs: (private_inputs, fold_inputs),
     witnesses,
   }
-  .into_online()?;
-
-  debug!("expanding program data");
-  let program_data = program_data.into_expanded()?;
+  .into_online()?
+  .into_expanded()?;
 
   debug!("starting request recursive proving");
-  let proof = generate_proof(program_data)?;
+  let proof = program_data.generate_proof()?;
   Ok(proof)
 }
 
@@ -231,35 +228,12 @@ async fn construct_response_program_data_and_proof(
     inputs: (private_inputs, fold_inputs),
     witnesses,
   }
-  .into_online()?;
-
-  debug!("expanding program data");
-  let program_data = program_data.into_expanded()?;
+  .into_online()?
+  .into_expanded()?;
 
   debug!("starting response recursive proving");
-  let proof = generate_proof(program_data)?;
-
+  let proof = program_data.generate_proof()?;
   Ok(proof)
-}
-
-// TODO (Sambhav): this can be removed, duplicate from origo_native
-/// generates NIVC proof from [`ProgramData`]
-/// - run NIVC recursive proving
-/// - run CompressedSNARK to compress proof
-/// - serialize proof
-fn generate_proof(
-  program_data: ProgramData<Online, Expanded>,
-) -> Result<FoldingProof<Vec<u8>, String>, ClientErrors> {
-  let program_output = program::run(&program_data)?;
-  debug!("compressing proof!");
-  let compressed_snark_proof = program::compress_proof_no_setup(
-    &program_output,
-    &program_data.public_params,
-    program_data.vk_digest_primary,
-    program_data.vk_digest_secondary,
-  )?;
-  debug!("serialize");
-  Ok(compressed_snark_proof.serialize())
 }
 
 pub(crate) async fn proxy(
@@ -341,9 +315,7 @@ async fn build_witness_data_from_wasm(
   let js_witness_input = serde_wasm_bindgen::to_value(&private_inputs).unwrap();
   let js_witness_rom = serde_wasm_bindgen::to_value(&rom_opcodes).unwrap();
 
-  // debug!("js_witness_input: {:?}, rom: {:?}", js_witness_input, js_witness_rom);
   let js_witnesses_output = create_witness(js_witness_input, js_witness_rom).await.unwrap();
-  // debug!("js_witnesses_output: {:?}", js_witnesses_output);
   let js_computed_witnesses: Vec<Vec<u8>> =
     js_witnesses_output.data.iter().map(|w| w.to_vec()).collect();
   let mut witnesses = Vec::new();
