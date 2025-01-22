@@ -138,7 +138,7 @@ function toInput(bytes) {
 }
 
 const getWitnessGenerator = async function (circuit) {
-  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/circom-artifacts-512b-v0.7.3`).toString();
+  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/circom-artifacts-512b-v0.7.3/`).toString();
   const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
   return wasm;
 }
