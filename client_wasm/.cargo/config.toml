@@ -11,5 +11,6 @@ rustflags=[
   "target-feature=+atomics,+bulk-memory,+mutable-globals",
   "-C",
   "link-args=--shared-memory --max-memory=4294967296",
-  "-Z", "threads=8",
+  "-Z",
+  "threads=8",
 ]
