@@ -213,10 +213,8 @@ pub async fn verify(
   }
   .deserialize();
 
-  // TODO (tracy): Right now this only verifies the request, we need to accept
-  // digest for req/resp and set intersect with verifier_inputs.
-
   debug!("request_verifier_digest: {:?}", request_proof.verifier_digest.clone());
+  debug!("response_verifier_digest: {:?}", response_proof.verifier_digest.clone());
   debug!("verifiers.keys()={:?}", state.verifiers.keys());
 
   // Form verifier inputs
@@ -244,7 +242,8 @@ pub async fn verify(
   // request verification
   let (_, nivc_input) =
     request_initial_digest(&state.manifest.request, &request_ciphertext_packets);
-  let verifier = state.verifiers.get(&payload.origo_proof.request.verifier_digest).unwrap();
+  let verifier_label = format!("{}_{}", "request", payload.origo_proof.request.verifier_digest);
+  let verifier = state.verifiers.get(&verifier_label).unwrap();
   let (z0_primary, _) = verifier.program_data.extend_public_inputs(Some(vec![nivc_input])).unwrap();
   let z0_secondary = vec![F::<G2>::from(0)];
 
@@ -267,10 +266,11 @@ pub async fn verify(
     &response_ciphertext_packets,
     MAX_STACK_HEIGHT,
   );
-  let verifier = state.verifiers.get(&payload.origo_proof.response.verifier_digest).unwrap();
+  let verifier_label = format!("{}_{}", "response", payload.origo_proof.response.verifier_digest);
+  let verifier = state.verifiers.get(&verifier_label).unwrap();
   let (z0_primary, _) = verifier.program_data.extend_public_inputs(Some(vec![nivc_input])).unwrap();
 
-  let valid = match response_proof.proof.verify(
+  let response_valid = match response_proof.proof.verify(
     &verifier.program_data.public_params,
     &verifier.verifier_key,
     &z0_primary,
@@ -283,7 +283,7 @@ pub async fn verify(
     },
   };
 
-  Ok(Json(VerifyReply { valid: valid && request_valid }))
+  Ok(Json(VerifyReply { valid: response_valid && request_valid }))
 }
 
 pub async fn websocket_notarize(
