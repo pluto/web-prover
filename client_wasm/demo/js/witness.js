@@ -138,10 +138,11 @@ function toInput(bytes) {
 }
 
 const getWitnessGenerator = async function (circuit) {
-  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/circom-artifacts-512b-v0.7.3/${circuit}_js/`).toString();
+  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/circom-artifacts-512b-v0.7.3/`).toString();
   const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
   return wasm;
 }
+
 async function generateWitness(input, wasm) {
   const witStart = +Date.now();
   let wtns = { type: "mem" };
@@ -246,6 +247,7 @@ function RequestInitialDigest(
 export const generateWitnessBytesForRequest = async function (circuits, inputs) {
   let witnesses = [];
 
+  console.log("inputs", inputs);
   let plaintext = inputs.plaintext;
   let ciphertext = inputs.ciphertext;
   let extendedHTTPInput = plaintext.concat(Array(TOTAL_BYTES_ACROSS_NIVC - plaintext.length).fill(-1));
@@ -280,6 +282,7 @@ export const generateWitnessBytesForRequest = async function (circuits, inputs) 
   let httpStepIn = modAdd(initNivcInput - ciphertextDigest, httpResponsePlaintextDigestHashed);
 
   let httpStartLine = computeHttpWitnessStartline(extendedHTTPInput);
+  console.log("httpStartLine", httpStartLine);
   let httpStartLineDigest = PolynomialDigest(httpStartLine, ciphertextDigest);
 
   let mainDigests = Array(10 + 1).fill(0);

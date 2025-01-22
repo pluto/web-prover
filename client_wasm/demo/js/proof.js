@@ -1,24 +1,5 @@
-import init, { prover, setup_tracing, initThreadPool, ProvingParamsWasm } from "../pkg/client_wasm";
+import init, { prover, ProvingParamsWasm } from "../pkg/client_wasm";
 import { witness } from "./witness";
-
-let wasmInitialized = false;
-let sharedMemory = null;
-const numConcurrency = navigator.hardwareConcurrency;
-
-async function initializeWasm(memory) {
-    if (!wasmInitialized) {
-        // Create a WebAssembly.Memory object
-        const memory = new WebAssembly.Memory({
-            initial: 16384, // 256 pages = 16MB
-            maximum: 65536, // 1024 pages = 64MB
-            shared: true, // Enable shared memory
-        });
-        await init(undefined, memory);
-        setup_tracing("debug,tlsn_extension_rs=debug");
-        await initThreadPool(numConcurrency);
-        wasmInitialized = true;
-    }
-}
 
 // Override console.log and console.error
 const originalConsoleLog = console.log;
@@ -55,9 +36,8 @@ function end() {
 
 self.onmessage = async function (e) {
     try {
-        const { proverConfig, proving_params, memory } = e.data;
-        sharedMemory = memory;
-        await initializeWasm(sharedMemory);
+        const { proverConfig, proving_params, shared_memory } = e.data;
+        await init(undefined, shared_memory);
         start();
         var pp = new ProvingParamsWasm(
             new Uint8Array(proving_params.aux_params),

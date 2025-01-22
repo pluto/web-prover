@@ -7,13 +7,13 @@ import { witness } from "./witness";
 const numConcurrency = navigator.hardwareConcurrency;
 
 // Create a WebAssembly.Memory object
-const memory = new WebAssembly.Memory({
+const shared_memory = new WebAssembly.Memory({
   initial: 16384, // 256 pages = 16MB
   maximum: 65536, // 1024 pages = 64MB
   shared: true, // Enable shared memory
 });
 
-await init(undefined, memory);
+await init(undefined, shared_memory);
 setup_tracing("debug,tlsn_extension_rs=debug");
 await initThreadPool(numConcurrency);
 
@@ -103,15 +103,13 @@ let proverConfig = {
         "version": "HTTP/1.1",
         "message": "OK",
         "headers": {
-          "Content-Type": "application/json"
+            "Content-Type": "text/plain"
         },
         "body": {
-          "json": [
-            "data",
-            "items",
-            0
-          ],
-          "contains": "this_string_exists_in_body"
+            "json": [
+                "hello"
+            ],
+            "contains": "this_string_exists_in_body"
         }
       }
     },
@@ -123,7 +121,7 @@ console.log("sending message to worker");
 var proving_params = {
   aux_params: await getByteParams("circom-artifacts-512b-v0.7.3/serialized_setup_512b_rom_length_5.bin"),
 };
-proofWorker.postMessage({ proverConfig, proving_params, memory });
+proofWorker.postMessage({ proverConfig, proving_params, shared_memory });
 console.log("message sent to worker");
 proofWorker.onmessage = (event) => {
   if (event.data.error) {
