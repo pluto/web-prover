@@ -50,13 +50,12 @@ jobs:
           key: ${{ needs.setup.outputs.cache-key }}
 
       - run: cargo +nightly-2024-10-28 build -p notary
-      - uses: Swatinem/rust-cache@v2
 
       - uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-latest'
         with:
           name: "notary.linux.amd64"
-          path: "target/release/notary"
+          path: "target/debug/notary"
           retention-days: 7
 
   deploy:
