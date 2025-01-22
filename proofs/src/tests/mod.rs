@@ -27,26 +27,26 @@ const MAX_HTTP_HEADERS: usize = 25;
 
 // Circuit 0
 const PLAINTEXT_AUTHENTICATION_R1CS: &[u8] = include_bytes!(
-  "../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/plaintext_authentication_1024b.r1cs"
+  "../../web_proof_circuits/circom-artifacts-1024b-v0.8.0/plaintext_authentication_1024b.r1cs"
 );
 const PLAINTEXT_AUTHENTICATION_GRAPH: &[u8] = include_bytes!(
-  "../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/plaintext_authentication_1024b.bin"
+  "../../web_proof_circuits/circom-artifacts-1024b-v0.8.0/plaintext_authentication_1024b.bin"
 );
 
 // Circuit 1
 const HTTP_VERIFICATION_R1CS: &[u8] = include_bytes!(
-  "../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/http_verification_1024b.r1cs"
+  "../../web_proof_circuits/circom-artifacts-1024b-v0.8.0/http_verification_1024b.r1cs"
 );
 const HTTP_VERIFICATION_GRAPH: &[u8] = include_bytes!(
-  "../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/http_verification_1024b.bin"
+  "../../web_proof_circuits/circom-artifacts-1024b-v0.8.0/http_verification_1024b.bin"
 );
 
 // Circuit 2
 const JSON_EXTRACTION_R1CS: &[u8] = include_bytes!(
-  "../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/json_extraction_1024b.r1cs"
+  "../../web_proof_circuits/circom-artifacts-1024b-v0.8.0/json_extraction_1024b.r1cs"
 );
 const JSON_EXTRACTION_GRAPH: &[u8] = include_bytes!(
-  "../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/json_extraction_1024b.bin"
+  "../../web_proof_circuits/circom-artifacts-1024b-v0.8.0/json_extraction_1024b.bin"
 );
 
 // HTTP/1.1 200 OK
@@ -164,30 +164,9 @@ fn test_end_to_end_proofs_res() {
       R1CSType::Raw(JSON_EXTRACTION_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      // WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
-      WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "web_proof_circuits/circom-artifacts-1024b-v0.7.3/plaintext_authentication_1024b_js/\
-           plaintext_authentication_1024b.wasm",
-        ),
-        wtns_path: "wtns.wtns".to_string(),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "web_proof_circuits/circom-artifacts-1024b-v0.7.3/http_verification_1024b_js/\
-           http_verification_1024b.wasm",
-        ),
-        wtns_path: "wtns.wtns".to_string(),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "web_proof_circuits/circom-artifacts-1024b-v0.7.3/json_extraction_1024b_js/\
-           json_extraction_1024b.wasm",
-        ),
-        wtns_path: "wtns.wtns".to_string(),
-      },
+      WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
     ],
     max_rom_length:          MAX_ROM_LENGTH,
   };
@@ -365,30 +344,9 @@ fn test_end_to_end_proofs_req() {
       R1CSType::Raw(JSON_EXTRACTION_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      // WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
-      WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "web_proof_circuits/circom-artifacts-1024b-v0.7.3/plaintext_authentication_1024b_js/\
-           plaintext_authentication_1024b.wasm",
-        ),
-        wtns_path: "wtns.wtns".to_string(),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "web_proof_circuits/circom-artifacts-1024b-v0.7.3/http_verification_1024b_js/\
-           http_verification_1024b.wasm",
-        ),
-        wtns_path: "wtns.wtns".to_string(),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "web_proof_circuits/circom-artifacts-1024b-v0.7.3/json_extraction_1024b_js/\
-           json_extraction_1024b.wasm",
-        ),
-        wtns_path: "wtns.wtns".to_string(),
-      },
+      WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
     ],
     max_rom_length:          MAX_ROM_LENGTH,
   };

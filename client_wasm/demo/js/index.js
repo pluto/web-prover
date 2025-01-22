@@ -50,7 +50,7 @@ import proverConfig from "../../../fixture/client.origo_tcp_local.json";
 const proofWorker = new Worker(new URL("./proof.js", import.meta.url), { type: "module" });
 console.log("sending message to worker");
 var proving_params = {
-  aux_params: await getByteParams("circom-artifacts-1024b-v0.7.3/serialized_setup_1024b_rom_length_5.bin"),
+  aux_params: await getByteParams("circom-artifacts-1024b-v0.8.0/serialized_setup_1024b_rom_length_5.bin"),
 };
 proofWorker.postMessage({ proverConfig, proving_params, shared_memory });
 console.log("message sent to worker");

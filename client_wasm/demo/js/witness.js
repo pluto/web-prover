@@ -3,7 +3,7 @@ const _snarkjs = import("snarkjs");
 const snarkjs = await _snarkjs;
 
 const getWitnessGenerator = async function (circuit) {
-  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/circom-artifacts-512b-v0.7.3/`).toString();
+  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/circom-artifacts-512b-v0.8.0/`).toString();
   const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
   return wasm;
 }
