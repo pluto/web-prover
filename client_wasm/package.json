@@ -1,6 +1,7 @@
 {
-  "name": "client-wasm-tests",
+  "name": "client_wasm",
   "private": true,
+  "type": "module",
   "scripts": {
     "start": "node e2e/server.js",
     "test": "npx playwright test --config=e2e/playwright.config.ts"

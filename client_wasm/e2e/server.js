@@ -1,7 +1,11 @@
-const express = require('express')
-const https = require('https')
-const fs = require('fs')
-const path = require('path')
+import express from 'express'
+import https from 'https'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const app = express()
 const PORT = 3000
