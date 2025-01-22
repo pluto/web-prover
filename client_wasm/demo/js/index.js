@@ -126,6 +126,8 @@ console.log("message sent to worker");
 proofWorker.onmessage = (event) => {
   if (event.data.error) {
     console.error("Error from worker:", event.data.error);
+  } else if (event.data.type === "log") {
+    console.log(...event.data.data);
   } else {
     console.log("proof generated!", event.data);
   }

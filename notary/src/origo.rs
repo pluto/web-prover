@@ -229,6 +229,14 @@ pub async fn verify(
   let verifier_inputs =
     state.verifier_sessions.lock().unwrap().get(&payload.session_id).cloned().unwrap();
   let ciphertext_digest = verifier_inputs.request_hashes.first().cloned().unwrap();
+
+  // DEBUG: Use this digest to pin the proving behavior. You must also override
+  // `client/src/tls.rs#decrypt_tls_ciphertext`
+  //
+  // let ciphertext_digest = F::<G1>::from_bytes(&hex::decode(
+  //   "66ab857c95c11767913c36e9341dbe4d46915616a67a5f47379e06848411b32b"
+  // ).unwrap().try_into().unwrap()).unwrap();
+
   let (_, nivc_input) = request_initial_digest(&state.manifest.request, ciphertext_digest);
   let verifier = state.verifiers.get(&payload.request_verifier_digest).unwrap();
   let (z0_primary, _) = verifier.program_data.extend_public_inputs(Some(vec![nivc_input])).unwrap();

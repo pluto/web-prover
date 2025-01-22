@@ -401,8 +401,16 @@ impl ParsedTranscript {
     let request_hashes = ParsedTranscript::get_permutations(&request_messages);
     let response_hashes = ParsedTranscript::get_permutations(&response_messages);
 
-    debug!("request_hashes={:?}", request_hashes);
-    debug!("response_hashes={:?}", response_hashes);
+    debug!(
+      "request_hashes={:?}, hex={:?}",
+      request_hashes,
+      request_hashes.clone().into_iter().map(|f| hex::encode(f.to_bytes())).collect::<Vec<_>>()
+    );
+    debug!(
+      "response_hashes={:?}, hex={:?}",
+      response_hashes,
+      response_hashes.clone().into_iter().map(|f| hex::encode(f.to_bytes())).collect::<Vec<_>>()
+    );
 
     (request_hashes, response_hashes)
   }

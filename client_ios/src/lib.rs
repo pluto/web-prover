@@ -3,10 +3,8 @@ use std::{
   time::Instant,
 };
 
-use client::circuits::PROVING_PARAMS_BYTES_1024;
-use client::config::Config;
+use client::{circuits::PROVING_PARAMS_BYTES_1024, config::Config};
 use tracing::debug;
-
 
 #[derive(serde::Serialize)]
 struct Output {
