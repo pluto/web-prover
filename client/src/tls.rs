@@ -116,6 +116,7 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
   //   "2c7db2"
   // )).unwrap();
 
+  let request_seq = 0;
   let (plaintext, meta) = match key {
     CipherSuiteKey::AES128GCM(_) => {
       debug!("Decrypting AES");
@@ -127,7 +128,7 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
           version: ProtocolVersion::TLSv1_3,
           payload: Payload::new(request_ciphertext.clone()),
         },
-        0,
+        request_seq,
       )?
     },
     CipherSuiteKey::CHACHA20POLY1305(_) => {
@@ -140,7 +141,7 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
           version: ProtocolVersion::TLSv1_3,
           payload: Payload::new(request_ciphertext.clone()),
         },
-        0,
+        request_seq,
       )?
     },
   };
@@ -166,6 +167,8 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
   let mut response_ciphertext = vec![];
   let response_key = parse_cipher_key(&witness.response.aead_key)?;
   let response_iv: [u8; 12] = witness.response.aead_iv[..12].try_into().unwrap();
+  // add the length of the request plaintext to get the response sequence number
+  let response_seq = request_seq + request_plaintext.len() as u64;
   for (i, ct_chunk) in witness.response.ciphertext.iter().enumerate() {
     let ct_chunk = hex::decode(ct_chunk)?;
 
@@ -182,7 +185,7 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
             payload: Payload::new(ct_chunk.clone()), /* TODO(WJ 2024-11-23): can we remove this
                                                       * clone */
           },
-          (i + 1) as u64,
+          i as u64 + response_seq,
         )?
       },
       CipherSuiteKey::CHACHA20POLY1305(_) => {
@@ -199,7 +202,7 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
             payload: Payload::new(ct_chunk.clone()), /* TODO(WJ 2024-11-23): can we remove this
                                                       * clone */
           },
-          (i + 1) as u64,
+          i as u64 + response_seq,
         )?
       },
     };
@@ -228,6 +231,7 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
       aad: padded_aad.clone(),
       plaintext: request_plaintext,
       ciphertext: request_ciphertext,
+      seq: request_seq,
     },
     response: EncryptionInput {
       key:        response_key,
@@ -235,6 +239,7 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
       aad:        padded_aad, // TODO: use response's AAD
       plaintext:  response_plaintext,
       ciphertext: response_ciphertext,
+      seq:        response_seq,
     },
   })
 }

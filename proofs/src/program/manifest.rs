@@ -131,6 +131,8 @@ pub struct EncryptionInput {
   pub plaintext:  Vec<Vec<u8>>,
   /// ciphertext associated with plaintext
   pub ciphertext: Vec<Vec<u8>>,
+  /// nonce sequence number
+  pub seq:        u64,
 }
 
 /// TLS encryption input for request and response proving
@@ -233,7 +235,7 @@ fn build_plaintext_authentication_circuit_inputs(
   // handle different cipher suite, currently AES-GCM-128 & ChaCha20-Poly1305
   match inputs.key {
     CipherSuiteKey::CHACHA20POLY1305(key) => {
-      let nonce = make_nonce(inputs.iv, (plaintext_circuit_counter + 1) as u64);
+      let nonce = make_nonce(inputs.iv, inputs.seq + plaintext_circuit_counter as u64);
 
       let plaintext_index_counter = if plaintext_circuit_counter == 0 {
         0
@@ -431,6 +433,12 @@ impl Request {
   pub fn build_inputs(&self, inputs: &EncryptionInput) -> NivcCircuitInputs {
     assert_eq!(inputs.plaintext.len(), inputs.ciphertext.len());
 
+    debug!("plaintext: {:?}", inputs.plaintext);
+    debug!("ciphertext: {:?}", inputs.ciphertext);
+    debug!("key: {:?}", inputs.key.as_ref());
+    debug!("iv: {:?}", inputs.iv);
+    debug!("aad: {:?}", inputs.aad);
+
     let mut private_inputs = vec![];
     let mut fold_inputs: HashMap<String, FoldInput> = HashMap::new();
     let mut public_inputs = vec![];
@@ -446,6 +454,7 @@ impl Request {
     let (ciphertext_digest, init_nivc_input) = request_initial_digest(self, &ciphertext);
     public_inputs.push(init_nivc_input);
 
+    let mut plaintext_step_outs = Fr::zero();
     for (i, pt) in plaintext.iter().enumerate() {
       let plaintext_step_out = build_plaintext_authentication_circuit_inputs(
         &inputs,
@@ -455,10 +464,17 @@ impl Request {
         &mut fold_inputs,
         i,
       );
-      let plaintext_step_out = init_nivc_input + plaintext_step_out;
+      plaintext_step_outs += plaintext_step_out;
+      let plaintext_step_out = init_nivc_input + plaintext_step_outs;
       // debug!("plaintext_step_out: {:?}", field_element_to_base10_string(plaintext_step_out));
       public_inputs.push(plaintext_step_out);
     }
+
+    assert_eq!(
+      plaintext_step_outs,
+      -ciphertext_digest
+        + polynomial_digest(&ByteOrPad::as_bytes(&combined_plaintext), ciphertext_digest, 0)
+    );
 
     let (http_step_out, _http_body) = build_http_verification_circuit_inputs(
       &combined_plaintext,
@@ -714,6 +730,7 @@ mod tests {
         aad:        AEAD_AAD.1.to_vec(),
         plaintext:  vec![TEST_MANIFEST_REQUEST.to_vec()],
         ciphertext: vec![TEST_MANIFEST_REQUEST.to_vec()],
+        seq:        0,
       });
     let NIVCRom { circuit_data: rom_data, rom } = manifest.request.build_rom();
 
@@ -754,6 +771,7 @@ mod tests {
         aad:        AEAD_AAD.1.to_vec(),
         plaintext:  vec![TEST_MANIFEST_RESPONSE.to_vec()],
         ciphertext: vec![TEST_MANIFEST_RESPONSE.to_vec()],
+        seq:        1,
       })
       .unwrap();
     let NIVCRom { circuit_data: rom_data, rom } = manifest.response.build_rom(1);

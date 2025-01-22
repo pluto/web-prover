@@ -240,6 +240,7 @@ pub async fn verify(
   }
 
   // request verification
+  debug!("request_messages {:?}", verifier_inputs.request_messages);
   let (_, nivc_input) =
     request_initial_digest(&state.manifest.request, &request_ciphertext_packets);
   let verifier_label = format!("{}_{}", "request", payload.origo_proof.request.verifier_digest);
@@ -261,6 +262,7 @@ pub async fn verify(
   };
 
   // response verification
+  debug!("response_messages {:?}", verifier_inputs.response_messages);
   let (_, nivc_input) = response_initial_digest(
     &state.manifest.response,
     &response_ciphertext_packets,
