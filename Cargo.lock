@@ -1137,7 +1137,6 @@ dependencies = [
 [[package]]
 name = "caratls_ekm_client"
 version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=e082c9634367ba07e937fe4d11d61f326cf9d02a#e082c9634367ba07e937fe4d11d61f326cf9d02a"
 dependencies = [
  "caratls_ekm_types",
  "rustls 0.23.19",
@@ -1152,7 +1151,6 @@ dependencies = [
 [[package]]
 name = "caratls_ekm_google_confidential_space_client"
 version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=e082c9634367ba07e937fe4d11d61f326cf9d02a#e082c9634367ba07e937fe4d11d61f326cf9d02a"
 dependencies = [
  "caratls_ekm_client",
  "caratls_ekm_google_confidential_space_types",
@@ -1166,7 +1164,6 @@ dependencies = [
 [[package]]
 name = "caratls_ekm_google_confidential_space_server"
 version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=e082c9634367ba07e937fe4d11d61f326cf9d02a#e082c9634367ba07e937fe4d11d61f326cf9d02a"
 dependencies = [
  "caratls_ekm_google_confidential_space_types",
  "caratls_ekm_server",
@@ -1184,7 +1181,6 @@ dependencies = [
 [[package]]
 name = "caratls_ekm_google_confidential_space_types"
 version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=e082c9634367ba07e937fe4d11d61f326cf9d02a#e082c9634367ba07e937fe4d11d61f326cf9d02a"
 dependencies = [
  "serde",
 ]
@@ -1192,7 +1188,6 @@ dependencies = [
 [[package]]
 name = "caratls_ekm_server"
 version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=e082c9634367ba07e937fe4d11d61f326cf9d02a#e082c9634367ba07e937fe4d11d61f326cf9d02a"
 dependencies = [
  "caratls_ekm_types",
  "rcgen",
@@ -1207,7 +1202,6 @@ dependencies = [
 [[package]]
 name = "caratls_ekm_types"
 version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=e082c9634367ba07e937fe4d11d61f326cf9d02a#e082c9634367ba07e937fe4d11d61f326cf9d02a"
 dependencies = [
  "serde",
 ]
