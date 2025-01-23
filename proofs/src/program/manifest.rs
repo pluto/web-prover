@@ -518,6 +518,9 @@ impl Response {
 
     debug!("plaintext: {:?}", inputs.plaintext);
     debug!("ciphertext: {:?}", inputs.ciphertext);
+    debug!("key: {:?}", inputs.key.as_ref());
+    debug!("iv: {:?}", inputs.iv);
+    debug!("aad: {:?}", inputs.aad);
 
     let mut private_inputs = vec![];
     let mut fold_inputs: HashMap<String, FoldInput> = HashMap::new();
