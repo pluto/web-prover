@@ -9,7 +9,9 @@ pub mod origo;
 pub mod circuits;
 pub mod config;
 pub mod errors;
+mod proof;
 mod tls;
+
 pub mod tls_client_async2;
 use proofs::{errors::ProofError, proof::FoldingProof};
 use serde::{Deserialize, Serialize};
@@ -82,13 +84,8 @@ pub async fn prover_inner_origo(
   proving_params: Option<Vec<u8>>,
 ) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id.clone();
-  #[cfg(target_arch = "wasm32")]
-  let proof =
-    origo_wasm32::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
 
-  #[cfg(not(target_arch = "wasm32"))]
-  let proof =
-    origo_native::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
+  let proof = origo::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
 
   debug!("sending proof to proxy for verification");
   let verify_response =
