@@ -735,9 +735,9 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "aws-lc-rs"
-version = "1.12.0"
+version = "1.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f409eb70b561706bf8abba8ca9c112729c481595893fd06a2dd9af8ed8441148"
+checksum = "4c2b7ddaa2c56a367ad27a094ad8ef4faacf8a617c2575acb2ba88949df999ca"
 dependencies = [
  "aws-lc-sys",
  "paste",
@@ -746,9 +746,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-sys"
-version = "0.24.1"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "923ded50f602b3007e5e63e3f094c479d9c8a9b42d7f4034e4afe456aa48bfd2"
+checksum = "71b2ddd3ada61a305e1d8bb6c005d1eaa7d14d903681edfc400406d523a9b491"
 dependencies = [
  "bindgen 0.69.5",
  "cc",
@@ -922,7 +922,7 @@ dependencies = [
  "bitflags",
  "cexpr",
  "clang-sys",
- "itertools 0.10.5",
+ "itertools 0.12.1",
  "lazy_static",
  "lazycell",
  "log",
@@ -1135,11 +1135,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "caratls"
+name = "caratls_ekm_client"
 version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=580e575a4b0266a504c9355b58569d41a6ed7b32#580e575a4b0266a504c9355b58569d41a6ed7b32"
+source = "git+https://github.com/pluto/caratls.git?rev=e082c9634367ba07e937fe4d11d61f326cf9d02a#e082c9634367ba07e937fe4d11d61f326cf9d02a"
 dependencies = [
- "rcgen",
+ "caratls_ekm_types",
  "rustls 0.23.19",
  "rustls-pki-types",
  "serde",
@@ -1147,6 +1147,69 @@ dependencies = [
  "thiserror 2.0.6",
  "tokio",
  "tokio-rustls",
+]
+
+[[package]]
+name = "caratls_ekm_google_confidential_space_client"
+version = "0.1.0"
+source = "git+https://github.com/pluto/caratls.git?rev=e082c9634367ba07e937fe4d11d61f326cf9d02a#e082c9634367ba07e937fe4d11d61f326cf9d02a"
+dependencies = [
+ "caratls_ekm_client",
+ "caratls_ekm_google_confidential_space_types",
+ "hex",
+ "jsonwebtoken",
+ "reqwest",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "caratls_ekm_google_confidential_space_server"
+version = "0.1.0"
+source = "git+https://github.com/pluto/caratls.git?rev=e082c9634367ba07e937fe4d11d61f326cf9d02a#e082c9634367ba07e937fe4d11d61f326cf9d02a"
+dependencies = [
+ "caratls_ekm_google_confidential_space_types",
+ "caratls_ekm_server",
+ "hex",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "jsonwebtoken",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "caratls_ekm_google_confidential_space_types"
+version = "0.1.0"
+source = "git+https://github.com/pluto/caratls.git?rev=e082c9634367ba07e937fe4d11d61f326cf9d02a#e082c9634367ba07e937fe4d11d61f326cf9d02a"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "caratls_ekm_server"
+version = "0.1.0"
+source = "git+https://github.com/pluto/caratls.git?rev=e082c9634367ba07e937fe4d11d61f326cf9d02a#e082c9634367ba07e937fe4d11d61f326cf9d02a"
+dependencies = [
+ "caratls_ekm_types",
+ "rcgen",
+ "rustls 0.23.19",
+ "rustls-pki-types",
+ "serde_cbor",
+ "thiserror 2.0.6",
+ "tokio",
+ "tokio-rustls",
+]
+
+[[package]]
+name = "caratls_ekm_types"
+version = "0.1.0"
+source = "git+https://github.com/pluto/caratls.git?rev=e082c9634367ba07e937fe4d11d61f326cf9d02a#e082c9634367ba07e937fe4d11d61f326cf9d02a"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -1336,7 +1399,8 @@ dependencies = [
  "async-tungstenite 0.25.1",
  "base64 0.22.1",
  "bytes",
- "caratls",
+ "caratls_ekm_client",
+ "caratls_ekm_google_confidential_space_client",
  "chrono",
  "clap",
  "console_error_panic_hook",
@@ -3207,6 +3271,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonwebtoken"
+version = "9.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9ae10193d25051e74945f1ea2d0b42e03cc3b890f7e4cc5faa44997d808193f"
+dependencies = [
+ "base64 0.21.7",
+ "js-sys",
+ "pem",
+ "ring",
+ "serde",
+ "serde_json",
+ "simple_asn1",
+]
+
+[[package]]
 name = "k256"
 version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3759,7 +3838,8 @@ dependencies = [
  "axum",
  "axum-core",
  "base64 0.21.7",
- "caratls",
+ "caratls_ekm_google_confidential_space_server",
+ "caratls_ekm_server",
  "clap",
  "client-side-prover",
  "config",
@@ -5527,6 +5607,18 @@ checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
 dependencies = [
  "digest 0.10.7",
  "rand_core 0.6.4",
+]
+
+[[package]]
+name = "simple_asn1"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "297f631f50729c8c99b84667867963997ec0b50f32b2a7dbcab828ef0541e8bb"
+dependencies = [
+ "num-bigint 0.4.6",
+ "num-traits",
+ "thiserror 2.0.6",
+ "time",
 ]
 
 [[package]]

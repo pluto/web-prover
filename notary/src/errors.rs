@@ -59,7 +59,7 @@ pub enum NotaryServerError {
   Io(#[from] std::io::Error),
 
   #[error(transparent)]
-  TeeTlsAcceptorError(#[from] caratls::server::TeeTlsAcceptorError),
+  TeeTlsAcceptorError(#[from] caratls_ekm_server::TeeTlsAcceptorError),
 
   #[error(transparent)]
   SerdeJson(#[from] serde_json::Error),

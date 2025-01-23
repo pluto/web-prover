@@ -1,6 +1,7 @@
 use std::{ops::Deref, sync::Arc};
 
-use caratls::client::TeeTlsConnector;
+use caratls_ekm_client::TeeTlsConnector;
+use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
@@ -258,7 +259,8 @@ pub(crate) async fn proxy(
 
   // Either bind client to TEE TLS connection or plain TLS connection
   let (client_tls_conn, tls_fut) = if config.mode == NotaryMode::TEE {
-    let tee_tls_connector = TeeTlsConnector::new("example.com"); // TODO example.com
+    let token_verifier = GoogleConfidentialSpaceTokenVerifier::new("audience").await; // TODO pass in as function input
+    let tee_tls_connector = TeeTlsConnector::new(token_verifier, "example.com"); // TODO example.com
     let tee_tls_stream = tee_tls_connector.connect(notary_tls_socket).await?;
     crate::tls_client_async2::bind_client(tee_tls_stream.compat(), client)
   } else {
