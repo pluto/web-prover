@@ -66,7 +66,7 @@ const JSON_EXTRACTION_GRAPH: &[u8] = include_bytes!(
 //        ]
 //    }
 // }
-const HTTP_RESPONSE_PLAINTEXT: (&str, [u8; 320]) = ("plaintext", [
+pub const HTTP_RESPONSE_PLAINTEXT: (&str, [u8; 320]) = ("plaintext", [
   72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101, 110,
   116, 45, 116, 121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110, 47, 106,
   115, 111, 110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13, 10, 99,
@@ -84,7 +84,7 @@ const HTTP_RESPONSE_PLAINTEXT: (&str, [u8; 320]) = ("plaintext", [
   10, 32, 32, 32, 125, 13, 10, 125,
 ]);
 
-const CHACHA20_CIPHERTEXT: (&str, [u8; 320]) = ("cipherText", [
+pub const CHACHA20_CIPHERTEXT: (&str, [u8; 320]) = ("cipherText", [
   2, 125, 219, 141, 140, 93, 49, 129, 95, 178, 135, 109, 48, 36, 194, 46, 239, 155, 160, 70, 208,
   147, 37, 212, 17, 195, 149, 190, 38, 215, 23, 241, 84, 204, 167, 184, 179, 172, 187, 145, 38, 75,
   123, 96, 81, 6, 149, 36, 135, 227, 226, 254, 177, 90, 241, 159, 0, 230, 183, 163, 210, 88, 133,
@@ -102,8 +102,8 @@ const CHACHA20_CIPHERTEXT: (&str, [u8; 320]) = ("cipherText", [
   148, 89, 30, 54, 161, 131, 230, 161, 217, 29, 229, 251, 33, 220, 230, 102, 131, 245, 27, 141,
   220, 67, 16, 26,
 ]);
-const CHACHA20_KEY: (&str, [u8; 32]) = ("key", [0; 32]);
-const CHACHA20_NONCE: (&str, [u8; 12]) = ("nonce", [0, 0, 0, 0, 0, 0, 0, 0x4a, 0, 0, 0, 0]);
+pub const CHACHA20_KEY: (&str, [u8; 32]) = ("key", [0; 32]);
+pub const CHACHA20_NONCE: (&str, [u8; 12]) = ("nonce", [0, 0, 0, 0, 0, 0, 0, 0x4a, 0, 0, 0, 0]);
 
 pub fn mock_manifest() -> Manifest {
   let request = Request {

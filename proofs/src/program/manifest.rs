@@ -621,10 +621,10 @@ impl Response {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::tests::{
+    mock_manifest, CHACHA20_CIPHERTEXT, CHACHA20_KEY, CHACHA20_NONCE, HTTP_RESPONSE_PLAINTEXT,
+  };
 
-  const AEAD_IV: (&str, [u8; 12]) = ("iv", [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49]);
-  const AEAD_AAD: (&str, [u8; 16]) = ("aad", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-  const CHACHA_KEY: (&str, [u8; 32]) = ("key", [0u8; 32]);
   const TEST_MANIFEST_REQUEST: &[u8] = &[
     71, 69, 84, 32, 104, 116, 116, 112, 115, 58, 47, 47, 103, 105, 115, 116, 46, 103, 105, 116,
     104, 117, 98, 117, 115, 101, 114, 99, 111, 110, 116, 101, 110, 116, 46, 99, 111, 109, 47, 109,
@@ -639,23 +639,7 @@ mod tests {
     111, 110, 110, 101, 99, 116, 105, 111, 110, 58, 32, 99, 108, 111, 115, 101, 13, 10, 97, 99, 99,
     101, 112, 116, 58, 32, 42, 47, 42, 0, 0,
   ];
-  const TEST_MANIFEST_RESPONSE: &[u8] = &[
-    72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101,
-    110, 116, 45, 116, 121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110,
-    47, 106, 115, 111, 110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13,
-    10, 99, 111, 110, 116, 101, 110, 116, 45, 101, 110, 99, 111, 100, 105, 110, 103, 58, 32, 103,
-    122, 105, 112, 13, 10, 84, 114, 97, 110, 115, 102, 101, 114, 45, 69, 110, 99, 111, 100, 105,
-    110, 103, 58, 32, 99, 104, 117, 110, 107, 101, 100, 13, 10, 13, 10, 123, 13, 10, 32, 32, 32,
-    34, 100, 97, 116, 97, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 34, 105, 116, 101,
-    109, 115, 34, 58, 32, 91, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 123, 13, 10, 32,
-    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34,
-    65, 114, 116, 105, 115, 116, 34, 44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-    32, 32, 32, 34, 112, 114, 111, 102, 105, 108, 101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32,
-    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121,
-    108, 111, 114, 32, 83, 119, 105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-    32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32,
-    32, 32, 32, 32, 32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125,
-  ];
+
   const TEST_MANIFEST: &str = r#"
   {
       "manifestVersion": "1",
@@ -725,9 +709,9 @@ mod tests {
 
     let NivcCircuitInputs { fold_inputs, private_inputs, .. } =
       manifest.request.build_inputs(&EncryptionInput {
-        key:        tls_client2::CipherSuiteKey::CHACHA20POLY1305(CHACHA_KEY.1),
-        iv:         AEAD_IV.1,
-        aad:        AEAD_AAD.1.to_vec(),
+        key:        tls_client2::CipherSuiteKey::CHACHA20POLY1305(CHACHA20_KEY.1),
+        iv:         CHACHA20_NONCE.1,
+        aad:        [0; 12].to_vec(),
         plaintext:  vec![TEST_MANIFEST_REQUEST.to_vec()],
         ciphertext: vec![TEST_MANIFEST_REQUEST.to_vec()],
         seq:        0,
@@ -748,6 +732,8 @@ mod tests {
     assert!(private_inputs[plaintext_authentication_len].contains_key("nonce"));
     assert!(private_inputs[plaintext_authentication_len].contains_key("key"));
     assert!(private_inputs[plaintext_authentication_len].contains_key("plaintext"));
+    assert!(private_inputs[plaintext_authentication_len].contains_key("ciphertext_digest"));
+    assert!(private_inputs[plaintext_authentication_len].contains_key("plaintext_index_counter"));
 
     // assert http verification inputs
     let http_instruction_len = 1;
@@ -756,21 +742,21 @@ mod tests {
     assert!(private_inputs[http_instruction_len].contains_key("ciphertext_digest"));
     assert!(private_inputs[http_instruction_len].contains_key("data"));
 
-    assert!(!fold_inputs.contains_key(&String::from("PLAINTEXT_AUTHENTICATION")));
+    assert!(fold_inputs.is_empty());
   }
 
   #[test]
   fn generate_rom_from_response() {
-    let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
+    let manifest: Manifest = mock_manifest();
 
     let NivcCircuitInputs { fold_inputs, private_inputs, .. } = manifest
       .response
       .build_inputs(&EncryptionInput {
-        key:        tls_client2::CipherSuiteKey::CHACHA20POLY1305(CHACHA_KEY.1),
-        iv:         AEAD_IV.1,
-        aad:        AEAD_AAD.1.to_vec(),
-        plaintext:  vec![TEST_MANIFEST_RESPONSE.to_vec()],
-        ciphertext: vec![TEST_MANIFEST_RESPONSE.to_vec()],
+        key:        tls_client2::CipherSuiteKey::CHACHA20POLY1305(CHACHA20_KEY.1),
+        iv:         CHACHA20_NONCE.1,
+        aad:        [0; 12].to_vec(),
+        plaintext:  vec![HTTP_RESPONSE_PLAINTEXT.1.to_vec()],
+        ciphertext: vec![CHACHA20_CIPHERTEXT.1.to_vec()],
         seq:        1,
       })
       .unwrap();
@@ -782,7 +768,7 @@ mod tests {
 
     // assert plaintext authentication inputs
     let plaintext_authentication_len = 0;
-    assert_eq!(rom[plaintext_authentication_len], String::from("PLAINTEXT_AUTHENTICATION"));
+    assert_eq!(rom[plaintext_authentication_len], String::from("PLAINTEXT_AUTHENTICATION_0"));
     assert!(private_inputs[plaintext_authentication_len].contains_key("counter"));
     assert!(private_inputs[plaintext_authentication_len].contains_key("nonce"));
     assert!(private_inputs[plaintext_authentication_len].contains_key("key"));
