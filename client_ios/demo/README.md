@@ -11,8 +11,11 @@ The primary method for xcode to link external libraries is via a concept called 
 2. Setup local notary via the notary docs
 3. Open xcode and the `client_ios/demo` project
 4. Run `make ios-sim` if running in the simulator, or `make ios` for on device testing
-5. Return to xcode and select `Product > Run` or `cmd+R`
-6. Click `setup tracing` to enable logging, then `generate proof`
+5. Run `make wasm-demo` to temporarily host the artifact
+6. Click demo in the upper left `Signing and Capabilities > Login` input personal cred (talk to matt to register)
+7. Select `Pluto Development` as the signing organization
+8. Return to xcode and select `Product > Run` or `cmd+R`
+9. Click `setup tracing` to enable logging, then `generate proof`
 
 ## Advanced Notes
 
