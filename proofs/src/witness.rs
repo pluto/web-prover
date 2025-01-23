@@ -393,7 +393,7 @@ pub fn request_initial_digest(
   let mut all_digests = vec![];
   all_digests.push(start_line_digest);
   headers_digest.into_iter().for_each(|d| all_digests.push(d));
-  let hashed_digests = all_digests.into_iter().map(|d| poseidon::<1>(&[d]));
+  let hashed_digests = all_digests.clone().into_iter().map(|d| poseidon::<1>(&[d]));
   debug!(
     "WITNESS (request): hashed_digests={:?}, hex={:?}",
     hashed_digests,

@@ -140,20 +140,6 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
   )
   .await?;
 
-  // let request_proof = crate::proof::construct_request_program_data_and_proof(
-  //   &manifest.request,
-  //   request_inputs,
-  //   proving_params.clone(),
-  // )
-  // .await?;
-
-  // let response_proof = crate::proof::construct_response_program_data_and_proof(
-  //   &manifest.response,
-  //   response_inputs,
-  //   proving_params,
-  // )
-  // .await?;
-
   // TODO(Sambhav): handle request and response into one proof
   Ok(OrigoProof { request: request_proof, response: response_proof })
 }

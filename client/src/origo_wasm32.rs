@@ -32,14 +32,13 @@ impl WitnessOutput {
   #[wasm_bindgen(constructor)]
   pub fn new(wit: Vec<js_sys::Uint8Array>) -> WitnessOutput { Self { data: wit } }
 }
-// TODO(WJ 2024-12-12): move to wasm client lib?
+
 #[wasm_bindgen]
 extern "C" {
   #[wasm_bindgen(js_namespace = witness, js_name = createWitness)]
   async fn create_witness_js(input: &JsValue, rom: &JsValue) -> JsValue;
 }
 
-// #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 pub async fn create_witness(input: JsValue, rom: JsValue) -> Result<WitnessOutput, JsValue> {
   // Convert the Rust WitnessInput to a JsValue
