@@ -367,8 +367,6 @@ pub fn request_initial_digest(
     hex::encode(ciphertext_digest.to_bytes())
   );
 
-  debug!("Ciphertext digest: {}", field_element_to_base10_string(ciphertext_digest));
-
   // TODO: This assumes the start line format here as well.
   // Then digest the start line using the ciphertext_digest as a random input
   let start_line_bytes =
@@ -382,7 +380,8 @@ pub fn request_initial_digest(
 
   // Digest all the headers
   let header_bytes = headers_to_bytes(&manifest_request.headers);
-  let headers_digest = header_bytes.map(|bytes| polynomial_digest(&bytes, ciphertext_digest, 0)).collect::<Vec<_>>();
+  let headers_digest =
+    header_bytes.map(|bytes| polynomial_digest(&bytes, ciphertext_digest, 0)).collect::<Vec<_>>();
   debug!(
     "WITNESS (request): headers_digest={:?}, hex={:?}",
     headers_digest,
@@ -407,11 +406,11 @@ pub fn request_initial_digest(
   // Iterate through the material and sum up poseidon hashes of each as to not mix polynomials
   let manifest_digest =
     ciphertext_digest + all_digests.into_iter().map(|d| poseidon::<1>(&[d])).sum::<F<G1>>();
-    debug!(
-      "WITNESS (request) PREP: z0_primary (init_nivc)={:?}, hex={:?}",
-      manifest_digest,
-      hex::encode(manifest_digest.to_bytes())
-    );
+  debug!(
+    "WITNESS (request) PREP: z0_primary (init_nivc)={:?}, hex={:?}",
+    manifest_digest,
+    hex::encode(manifest_digest.to_bytes())
+  );
   (ciphertext_digest, manifest_digest)
 }
 

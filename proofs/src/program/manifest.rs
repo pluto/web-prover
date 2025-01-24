@@ -36,7 +36,6 @@ use tls_client2::CipherSuiteKey;
 use tracing::debug;
 
 use crate::{
-  ProofError,
   program::{
     data::{CircuitData, FoldInput},
     F, G1,
@@ -46,6 +45,7 @@ use crate::{
     json_tree_hasher, json_value_digest, polynomial_digest, poseidon, request_initial_digest,
     response_initial_digest, ByteOrPad,
   },
+  ProofError,
 };
 
 /// HTTP

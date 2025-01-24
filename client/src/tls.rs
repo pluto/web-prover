@@ -29,7 +29,7 @@ pub fn bytes_to_ascii(bytes: Vec<u8>) -> String {
       }
     })
     .collect()
-} 
+}
 pub struct DecryptedChunk {
   plaintext: Vec<u8>,
   aad:       Vec<u8>,
@@ -148,8 +148,16 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
       let ct_chunk = hex::decode(ct_chunk)?;
       let pt_chunk = decrypt_chunk(&ct_chunk, &response_key, response_iv, i as u64 + response_seq)?;
 
-      debug!("TLS_DECRYPT (response, chunk={:?}): plaintext={:?}", i, bytes_to_ascii(pt_chunk.plaintext.clone()));
-      debug!("TLS_DECRYPT (response, chunk={:?}): ciphertext={:?}", i, hex::encode(ct_chunk.clone()));
+      debug!(
+        "TLS_DECRYPT (response, chunk={:?}): plaintext={:?}",
+        i,
+        bytes_to_ascii(pt_chunk.plaintext.clone())
+      );
+      debug!(
+        "TLS_DECRYPT (response, chunk={:?}): ciphertext={:?}",
+        i,
+        hex::encode(ct_chunk.clone())
+      );
       debug!(
         "TLS_DECRYPT (response, chunk={:?}): trimmed_bytes={:?}",
         i,
