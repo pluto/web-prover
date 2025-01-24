@@ -27,15 +27,10 @@ rayon             ="1.10.0"
 wasm-bindgen-rayon="=1.2.1"
 futures           ="0.3"
 
-caratls_ekm_server                          ={ path="/home/matt/dev/71-caratls/caratls/ekm/server" }
-caratls_ekm_google_confidential_space_server={ path="/home/matt/dev/71-caratls/caratls/ekm/providers/google_confidential_space/server" }
-caratls_ekm_client                          ={ path="/home/matt/dev/71-caratls/caratls/ekm/client" }
-caratls_ekm_google_confidential_space_client={ path="/home/matt/dev/71-caratls/caratls/ekm/providers/google_confidential_space/client" }
-
-# caratls_ekm_server                          ={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
-# caratls_ekm_google_confidential_space_server={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
-# caratls_ekm_client                          ={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
-# caratls_ekm_google_confidential_space_client={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
+caratls_ekm_server                          ={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
+caratls_ekm_google_confidential_space_server={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
+caratls_ekm_client                          ={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
+caratls_ekm_google_confidential_space_client={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
 
 # CLI
 clap={ version="4.5.13", features=["derive"] }
