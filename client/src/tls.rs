@@ -99,6 +99,8 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
   let request_seq = 0;
   let request_ct = hex::decode(witness.request.ciphertext[0].as_bytes())?;
   let request_pt = decrypt_chunk(&request_ct, &request_key, request_iv, request_seq)?;
+  let trim_bytes: usize = (TLS_13_TYPE_BYTES + TLS_13_AEAD_BYTES) as usize;
+
   let mut padded_aad = vec![0; 16 - request_pt.aad.len()];
   padded_aad.extend(request_pt.aad);
 
@@ -127,10 +129,10 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
   let request_ciphertext = vec![request_ct[..request_plaintext[0].len()].to_vec()];
   assert_eq!(request_plaintext[0].len(), request_ciphertext[0].len());
   debug!("TLS_DECRYPT (request): plaintext={:?}", bytes_to_ascii(request_plaintext[0].clone()));
-  debug!("TLS_DECRYPT (request): ciphertext={:?}", hex::encode(request_ciphertext.clone()));
+  debug!("TLS_DECRYPT (request): ciphertext={:?}", hex::encode(request_ciphertext[0].clone()));
   debug!(
     "TLS_DECRYPT (request): trimmed_bytes={:?}",
-    hex::encode(&request_ciphertext.clone()[request_ciphertext.len() - trim_bytes..])
+    hex::encode(&request_ciphertext[0].clone()[request_ciphertext[0].len() - trim_bytes..])
   );
 
   // Response Preparation
@@ -146,7 +148,7 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
       let ct_chunk = hex::decode(ct_chunk)?;
       let pt_chunk = decrypt_chunk(&ct_chunk, &response_key, response_iv, i as u64 + response_seq)?;
 
-      debug!("TLS_DECRYPT (response, chunk={:?}): plaintext={:?}", i, bytes_to_ascii(pt_chunk.clone()));
+      debug!("TLS_DECRYPT (response, chunk={:?}): plaintext={:?}", i, bytes_to_ascii(pt_chunk.plaintext.clone()));
       debug!("TLS_DECRYPT (response, chunk={:?}): ciphertext={:?}", i, hex::encode(ct_chunk.clone()));
       debug!(
         "TLS_DECRYPT (response, chunk={:?}): trimmed_bytes={:?}",

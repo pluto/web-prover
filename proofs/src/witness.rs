@@ -382,7 +382,7 @@ pub fn request_initial_digest(
 
   // Digest all the headers
   let header_bytes = headers_to_bytes(&manifest_request.headers);
-  let headers_digest = header_bytes.map(|bytes| polynomial_digest(&bytes, ciphertext_digest, 0)).collect::<Vec<_>>();;
+  let headers_digest = header_bytes.map(|bytes| polynomial_digest(&bytes, ciphertext_digest, 0)).collect::<Vec<_>>();
   debug!(
     "WITNESS (request): headers_digest={:?}, hex={:?}",
     headers_digest,
