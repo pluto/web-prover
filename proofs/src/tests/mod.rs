@@ -27,30 +27,38 @@ const MAX_STACK_HEIGHT: usize = 10;
 const MAX_HTTP_HEADERS: usize = 25;
 
 // Circuit 0
-const PLAINTEXT_AUTHENTICATION_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/plaintext_authentication_1024b.r1cs");
-const PLAINTEXT_AUTHENTICATION_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/plaintext_authentication_1024b.bin");
+const PLAINTEXT_AUTHENTICATION_R1CS: &[u8] = include_bytes!(
+  "../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/plaintext_authentication_1024b.r1cs"
+);
+const PLAINTEXT_AUTHENTICATION_GRAPH: &[u8] = include_bytes!(
+  "../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/plaintext_authentication_1024b.bin"
+);
 
 // Circuit 1
-const HTTP_VERIFICATION_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/http_verification_1024b.r1cs");
-const HTTP_VERIFICATION_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/http_verification_1024b.bin");
+const HTTP_VERIFICATION_R1CS: &[u8] = include_bytes!(
+  "../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/http_verification_1024b.r1cs"
+);
+const HTTP_VERIFICATION_GRAPH: &[u8] = include_bytes!(
+  "../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/http_verification_1024b.bin"
+);
 
 // Circuit 2
-const JSON_EXTRACTION_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/json_extraction_1024b.r1cs");
-const JSON_EXTRACTION_GRAPH: &[u8] =
-  include_bytes!("../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/json_extraction_1024b.bin");
+const JSON_EXTRACTION_R1CS: &[u8] = include_bytes!(
+  "../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/json_extraction_1024b.r1cs"
+);
+const JSON_EXTRACTION_GRAPH: &[u8] = include_bytes!(
+  "../../web_proof_circuits/circom-artifacts-1024b-v0.7.3/json_extraction_1024b.bin"
+);
 
 // Circuit 0
-const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/circom-artifacts-512b-v0.7.3/plaintext_authentication_512b.r1cs");
+const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] = include_bytes!(
+  "../../web_proof_circuits/circom-artifacts-512b-v0.7.3/plaintext_authentication_512b.r1cs"
+);
 
 // Circuit 1
-const HTTP_VERIFICATION_512B_R1CS: &[u8] =
-  include_bytes!("../../web_proof_circuits/circom-artifacts-512b-v0.7.3/http_verification_512b.r1cs");
+const HTTP_VERIFICATION_512B_R1CS: &[u8] = include_bytes!(
+  "../../web_proof_circuits/circom-artifacts-512b-v0.7.3/http_verification_512b.r1cs"
+);
 
 // Circuit 2
 const JSON_EXTRACTION_512B_R1CS: &[u8] =

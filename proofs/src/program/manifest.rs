@@ -32,6 +32,7 @@ use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tls_client2::CipherSuiteKey;
+use tracing::debug;
 
 use super::{
   witness::{compress_tree_hash, json_tree_hasher, json_value_digest, polynomial_digest},

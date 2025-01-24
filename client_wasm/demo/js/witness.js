@@ -172,16 +172,15 @@ const make_nonce = function (iv, seq) {
 function headersToBytes(headers) {
   const result = [];
 
-  for (const [key, value] of headers) {
-      const values = Array.isArray(value) ? value : [value];
-
-      for (const val of values) {
-          // In HTTP/1.1, headers are formatted as "key: value"
-          const headerLine = `${key}: ${val}`;
-          const strBytes = strToBytes(headerLine);
-          result.push(strBytes);
-      }
-  }
+  headers.forEach((value, key) => {
+    const values = Array.isArray(value) ? value : [value];
+    for (const val of values) {
+      // In HTTP/1.1, headers are formatted as "key: value"
+      const headerLine = `${key}: ${val}`;
+      const strBytes = strToBytes(headerLine);
+      result.push(strBytes);
+    }
+  });
 
   return result;
 }
@@ -221,25 +220,32 @@ function RequestInitialDigest(
 ) {
   // Create a digest of the ciphertext itself
   const ciphertextDigest = DataHasher(ciphertext);
+  console.log("STEP IN PREP: ct_digest=", ciphertextDigest);
 
   // Digest the start line using the ciphertext_digest as a random input
   const startLineBytes = computeHttpWitnessStartline(plaintext);
   const startLineDigest = PolynomialDigest(startLineBytes, ciphertextDigest);
+  console.log("STEP IN PREP: start_line_digest=", startLineDigest);
 
   // Digest all the headers
   const headerBytes = headersToBytes(headers);
   const headersDigest = headerBytes.map(bytes =>
     PolynomialDigest(bytes, ciphertextDigest)
   );
+  console.log("STEP IN PREP: headers_digest=", headersDigest);
 
   // Put all the digests into an array
   const allDigests = [startLineDigest, ...headersDigest];
 
   // Calculate manifest digest
+  const hashedDigests = allDigests.map(d => poseidon1([d])).reduce((a, b) => modAdd(a, b), ZERO);
+  console.log("STEP IN PREP: hashed_digests=", hashedDigests);
+
   const manifestDigest = modAdd(
     ciphertextDigest,
-    allDigests.map(d => poseidon1([d])).reduce((a, b) => modAdd(a, b), ZERO)
+    hashedDigests
   );
+  console.log("STEP IN PREP: z0_primary (init_nivc)=", manifestDigest);
 
   return [ciphertextDigest, manifestDigest];
 }

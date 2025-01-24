@@ -359,24 +359,52 @@ pub fn request_initial_digest(
   manifest_request: &Request,
   ciphertext_digest: F<G1>,
 ) -> (F<G1>, F<G1>) {
+  debug!(
+    "STEP IN: ct_digest={:?}, hex(ct_digest)={:?}",
+    ciphertext_digest,
+    hex::encode(ciphertext_digest.to_bytes())
+  );
+
   // TODO: This assumes the start line format here as well.
   // Then digest the start line using the ciphertext_digest as a random input
   let start_line_bytes =
     format!("{} {} {}", &manifest_request.method, &manifest_request.url, &manifest_request.version);
   let start_line_digest = polynomial_digest(start_line_bytes.as_bytes(), ciphertext_digest);
+  debug!(
+    "STEP IN: start_line_digest={:?}, hex={:?}",
+    start_line_digest,
+    hex::encode(start_line_digest.to_bytes())
+  );
 
   // Digest all the headers
   let header_bytes = headers_to_bytes(&manifest_request.headers);
-  let headers_digest = header_bytes.map(|bytes| polynomial_digest(&bytes, ciphertext_digest));
+  let headers_digest =
+    header_bytes.map(|bytes| polynomial_digest(&bytes, ciphertext_digest)).collect::<Vec<_>>();
+  debug!(
+    "STEP IN: headers_digest={:?}, hex={:?}",
+    headers_digest,
+    headers_digest.clone().into_iter().map(|f| hex::encode(f.to_bytes()))
+  );
 
   // Put all the digests into a vec
   let mut all_digests = vec![];
   all_digests.push(start_line_digest);
   headers_digest.into_iter().for_each(|d| all_digests.push(d));
+  let hashed_digests = all_digests.into_iter().map(|d| poseidon::<1>(&[d]));
+  debug!(
+    "STEP IN: hashed_digests={:?}, hex={:?}",
+    hashed_digests,
+    hashed_digests.clone().into_iter().map(|f| hex::encode(f.to_bytes()))
+  );
 
   // Iterate through the material and sum up poseidon hashes of each as to not mix polynomials
-  let manifest_digest =
-    ciphertext_digest + all_digests.into_iter().map(|d| poseidon::<1>(&[d])).sum::<F<G1>>();
+  let manifest_digest = ciphertext_digest + hashed_digests.sum::<F<G1>>();
+  debug!(
+    "STEP IN PREP: z0_primary (init_nivc)={:?}, hex={:?}",
+    manifest_digest,
+    hex::encode(manifest_digest.to_bytes())
+  );
+
   (ciphertext_digest, manifest_digest)
 }
 
