@@ -41,7 +41,7 @@ ios: artifacts
 		-headers target/aarch64-apple-ios-sim/release \
 		-library "target/aarch64-apple-ios/release/libProver.a" \
 		-headers client_ios/headers \
-		-output target/Prover.xcframework
+		-output target/PlutoProver.xcframework
 
 wasm-demo/node_modules:
 	cd client_wasm/demo && npm install
@@ -49,4 +49,4 @@ wasm-demo/node_modules:
 wasm-demo: wasm-demo/node_modules
 	cd client_wasm/demo && npm run start
 
-.PHONY: wasm wasm-debug wasm-demo ios ios-sim
+.PHONY: wasm wasm-debug wasm-demo ios
