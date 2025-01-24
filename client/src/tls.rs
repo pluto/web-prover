@@ -202,6 +202,7 @@ fn parse_cipher_key(key: &[u8]) -> Result<CipherSuiteKey, ClientErrors> {
   }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) mod unsafe_tls {
   use std::sync::Arc;
 
