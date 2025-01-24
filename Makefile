@@ -41,7 +41,7 @@ ios: artifacts
 		-headers target/aarch64-apple-ios-sim/release \
 		-library "target/aarch64-apple-ios/release/libProver.a" \
 		-headers client_ios/headers \
-		-output Prover.xcframework
+		-output target/Prover.xcframework
 
 wasm-demo/node_modules:
 	cd client_wasm/demo && npm install
