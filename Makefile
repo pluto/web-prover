@@ -18,28 +18,30 @@ wasm-debug: artifacts
 	  rustup run nightly-2024-10-28 ~/.cargo/bin/wasm-pack build --debug --target web ./ -- \
 	    -Z build-std=panic_abort,std
 
-ios-sim: artifacts
-	-cargo install cbindgen
-	rustup target add aarch64-apple-ios-sim --toolchain nightly-2024-10-28
-	NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" RUSTFLAGS="-C panic=unwind" cargo +nightly-2024-10-28 build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
-	~/.cargo/bin/cbindgen --lang c --crate client_ios --output target/aarch64-apple-ios-sim/release/libclient_ios.h
-	-rm -r target/aarch64-apple-ios-sim/release/libclient_ios.xcframework
-	xcodebuild -create-xcframework \
-		-library target/aarch64-apple-ios-sim/release/libclient_ios.a \
-		-headers client_ios/headers/ \
-		-output target/aarch64-apple-ios-sim/release/libclient_ios.xcframework
-
 ios: artifacts
 	-cargo install cbindgen
 	rustup target add aarch64-apple-ios-sim --toolchain nightly-2024-10-28
-	# rustup target add aarch64-apple-ios-sim
+	#
+	## Build simulator
+	#
+	NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" RUSTFLAGS="-C panic=unwind" cargo +nightly-2024-10-28 build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
+	~/.cargo/bin/cbindgen --lang c --crate client_ios --output target/aarch64-apple-ios-sim/release/Prover.h
+	mv target/aarch64-apple-ios-sim/release/libclient_ios.a target/aarch64-apple-ios-sim/release/libProver.a
+	#
+	## Build device
+	#
 	NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" RUSTFLAGS="-C panic=unwind" cargo +nightly-2024-10-28  build -p client_ios --release --target aarch64-apple-ios # builds target/aarch64-apple-ios/release/libclient_ios.a
-	~/.cargo/bin/cbindgen --lang c --crate client_ios --output client_ios/headers/libclient_ios.h
-	-rm -r target/aarch64-apple-ios/release/libclient_ios.xcframework
+	~/.cargo/bin/cbindgen --lang c --crate client_ios --output client_ios/headers/Prover.h
+	mv target/aarch64-apple-ios/release/libclient_ios.a target/aarch64-apple-ios/release/libProver.a
+	#
+	## Create combined xcframework
+	#
 	xcodebuild -create-xcframework \
-		-library target/aarch64-apple-ios/release/libclient_ios.a \
+		-library "target/aarch64-apple-ios-sim/release/libProver.a" \
+		-headers target/aarch64-apple-ios-sim/release \
+		-library "target/aarch64-apple-ios/release/libProver.a" \
 		-headers client_ios/headers \
-		-output target/aarch64-apple-ios/release/libclient_ios.xcframework
+		-output Prover.xcframework
 
 wasm-demo/node_modules:
 	cd client_wasm/demo && npm install
