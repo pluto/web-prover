@@ -191,119 +191,6 @@ fn construct_response_program_data_and_proof(
   Ok(proof)
 }
 
-mod skipper {
-  use std::sync::Arc;
-
-  #[derive(Debug)]
-  pub struct SkipServerVerification {
-    supported_algs: rustls::crypto::WebPkiSupportedAlgorithms,
-  }
-
-  impl SkipServerVerification {
-    pub fn new() -> std::sync::Arc<Self> {
-      std::sync::Arc::new(Self {
-        supported_algs: Arc::new(rustls::crypto::CryptoProvider::get_default().unwrap())
-          .clone()
-          .signature_verification_algorithms,
-      })
-    }
-  }
-
-  impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
-    fn verify_server_cert(
-      &self,
-      _end_entity: &pki_types::CertificateDer<'_>,
-      _intermediates: &[pki_types::CertificateDer<'_>],
-      _server_name: &pki_types::ServerName<'_>,
-      _ocsp_response: &[u8],
-      _now: pki_types::UnixTime,
-    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
-      Ok(rustls::client::danger::ServerCertVerified::assertion())
-    }
-
-    fn verify_tls12_signature(
-      &self,
-      message: &[u8],
-      cert: &pki_types::CertificateDer<'_>,
-      dss: &rustls::DigitallySignedStruct,
-    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
-      Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
-    }
-
-    fn verify_tls13_signature(
-      &self,
-      message: &[u8],
-      cert: &pki_types::CertificateDer<'_>,
-      dss: &rustls::DigitallySignedStruct,
-    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
-      Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
-    }
-
-    // fn verify_server_cert(
-    //   &self,
-    //   _end_entity: &tls_client2::Certificate,
-    //   _intermediates: &[tls_client2::Certificate],
-    //   _server_name: &tls_client2::ServerName,
-    //   _scts: &mut (dyn Iterator<Item = &[u8]> + Send),
-    //   _ocsp_response: &[u8],
-    //   _now: std::time::SystemTime,
-    // ) -> Result<tls_core::verify::ServerCertVerified, tls_core::Error> {
-    //   Ok(tls_core::verify::ServerCertVerified::assertion())
-    // }
-    // fn verify_server_cert(
-    //   &self,
-    //   _end_entity: &CertificateDer<'_>,
-    //   _intermediates: &[CertificateDer<'_>],
-    //   server_name: &rustls_pki_types::ServerName<'_>,
-    //   _ocsp_response: &[u8],
-    //   _now: rustls_pki_types::UnixTime,
-    // ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
-    //   if server_name.to_str() != self.verify_hostname {
-    //     return Err(rustls::Error::InvalidCertificate(rustls::CertificateError::NotValidForName));
-    //   }
-
-    //   // TODO what else do we need to check here?
-
-    //   Ok(rustls::client::danger::ServerCertVerified::assertion())
-    // }
-
-    // fn verify_tls12_signature(
-    //   &self,
-    //   _message: &[u8],
-    //   _cert: &CertificateDer<'_>,
-    //   _dss: &rustls::DigitallySignedStruct,
-    // ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
-    //   Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
-    // }
-
-    // fn verify_tls13_signature(
-    //   &self,
-    //   _message: &[u8],
-    //   _cert: &CertificateDer<'_>,
-    //   _dss: &rustls::DigitallySignedStruct,
-    // ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
-    //   Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
-
-    // TODO
-    // verify_tls13_signature_with_raw_key(
-    //     message,
-    //     &rustls_pki_types::SubjectPublicKeyInfoDer::from(cert.as_ref()),
-    //     dss,
-    //     &self.supported_algs,
-    // )
-    // }
-
-    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
-      self.supported_algs.supported_schemes()
-    }
-
-    // TODO do we need this?!
-    // fn requires_raw_public_keys(&self) -> bool {
-    //     true
-    // }
-  }
-}
-
 /// we want to be able to specify somewhere in here what cipher suite to use.
 /// Perhapse the config object should have this information.
 pub(crate) async fn proxy(
@@ -324,13 +211,18 @@ pub(crate) async fn proxy(
     tls_client2::ServerName::try_from(config.target_host()?.as_str()).unwrap(),
   )?;
 
-  // TODO for easier testing add feature flag to allow invalid certs
-  let client_notary_config = rustls::ClientConfig::builder()
-    .dangerous()
-    .with_custom_certificate_verifier(skipper::SkipServerVerification::new())
-    .with_no_client_auth();
-  // .with_root_certificates(crate::tls::rustls_default_root_store())
-  // .with_no_client_auth();
+  let client_notary_config = if cfg!(feature = "unsafe_skip_cert_verification") {
+    // if feature `unsafe_skip_cert_verification` is active, build a TLS client
+    // which does not verify the certificate
+    rustls::ClientConfig::builder()
+      .dangerous()
+      .with_custom_certificate_verifier(crate::tls::unsafe_tls::SkipServerVerification::new())
+      .with_no_client_auth()
+  } else {
+    rustls::ClientConfig::builder()
+      .with_root_certificates(crate::tls::rustls_default_root_store())
+      .with_no_client_auth()
+  };
 
   let notary_connector =
     tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));

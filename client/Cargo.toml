@@ -13,6 +13,9 @@ tracing  =[]
 # used for local development
 notary_ca_cert=[]
 
+# used to disable cert verification, useful for development
+unsafe_skip_cert_verification=[]
+
 # Shared dependencies for all targets
 [dependencies]
 # TLS
