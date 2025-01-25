@@ -3,7 +3,7 @@
 //! - Plaintext authentication: ChaCha encryption
 //! - HTTP verification: HTTP parsing and locking
 //! - JSON extraction: JSON value extraction
-use proofs::program::data::{R1CSType, SetupData, WitnessGeneratorType};
+use proofs::program::data::{R1CSType, UninitializedSetup, WitnessGeneratorType};
 
 // -------------------------------------- 1024B circuits -------------------------------------- //
 pub const MAX_ROM_LENGTH: usize = 5;
@@ -72,11 +72,11 @@ const JSON_EXTRACTION_512B_R1CS: &[u8] = include_bytes!(
   "../../proofs/web_proof_circuits/circom-artifacts-512b-v0.8.0/json_extraction_512b.r1cs"
 );
 
-/// construct [`SetupData`] with all the required inputs for 1024B inputs
-pub fn construct_setup_data() -> SetupData {
+/// construct [`UninitializedSetup`] with all the required inputs for 1024B inputs
+pub fn construct_setup_data() -> UninitializedSetup {
   #[cfg(not(target_arch = "wasm32"))]
   {
-    SetupData {
+    UninitializedSetup {
       r1cs_types:              vec![
         R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
         R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
@@ -93,7 +93,7 @@ pub fn construct_setup_data() -> SetupData {
 
   #[cfg(target_arch = "wasm32")]
   {
-    SetupData {
+    UninitializedSetup {
       r1cs_types:              vec![
         R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
         R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),

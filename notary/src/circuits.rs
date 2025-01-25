@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
 use proofs::{
   program::data::{
-    CircuitData, NotExpanded, Offline, Online, ProgramData, R1CSType, SetupData,
+    CircuitData, NotExpanded, Offline, Online, ProgramData, R1CSType, UninitializedSetup,
     WitnessGeneratorType,
   },
   E1, F, G1, G2, S1, S2,
@@ -49,8 +49,8 @@ const JSON_EXTRACTION_512B_R1CS: &[u8] = include_bytes!(
   "../../proofs/web_proof_circuits/circom-artifacts-512b-v0.8.0/json_extraction_512b.r1cs"
 );
 
-pub fn construct_setup_data_512() -> SetupData {
-  SetupData {
+pub fn construct_setup_data_512() -> UninitializedSetup {
+  UninitializedSetup {
     r1cs_types:              vec![
       R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
       R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
@@ -61,8 +61,8 @@ pub fn construct_setup_data_512() -> SetupData {
   }
 }
 
-pub fn construct_setup_data_1024() -> SetupData {
-  SetupData {
+pub fn construct_setup_data_1024() -> UninitializedSetup {
+  UninitializedSetup {
     r1cs_types:              vec![
       R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
       R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
@@ -73,7 +73,7 @@ pub fn construct_setup_data_1024() -> SetupData {
   }
 }
 
-pub fn construct_setup_data(plaintext_length: usize) -> SetupData {
+pub fn construct_setup_data(plaintext_length: usize) -> UninitializedSetup {
   let circuit_size = if plaintext_length <= 512 {
     512
   } else if plaintext_length <= 1024 {

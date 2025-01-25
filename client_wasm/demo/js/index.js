@@ -6,6 +6,19 @@ import { witness } from "./witness";
 
 const numConcurrency = navigator.hardwareConcurrency;
 
+
+// Monitoring for WASM memory usage
+function checkWasmMemory(wasmMemory) {
+  const memoryMB = wasmMemory.buffer.byteLength / (1024 * 1024);
+  console.log(`${new Date().toISOString()}: WASM Memory Usage: ${memoryMB.toFixed(2)} MB`);
+}
+
+function startMemoryMonitoring(instance) {
+  checkWasmMemory(instance);
+  setInterval(() => {
+      checkWasmMemory(instance);
+  }, 5000);
+}
 // Create a WebAssembly.Memory object
 const shared_memory = new WebAssembly.Memory({
   initial: 16384, // 256 pages = 16MB
@@ -16,6 +29,8 @@ const shared_memory = new WebAssembly.Memory({
 await init(undefined, shared_memory);
 setup_tracing("debug,tlsn_extension_rs=debug");
 await initThreadPool(numConcurrency);
+console.log("initialized thread pool", numConcurrency);
+startMemoryMonitoring(shared_memory);
 
 var startTime, endTime, startPreWitgenTime;
 

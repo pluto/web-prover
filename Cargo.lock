@@ -1339,6 +1339,7 @@ dependencies = [
  "caratls",
  "chrono",
  "clap",
+ "client-side-prover",
  "console_error_panic_hook",
  "elliptic-curve",
  "futures",

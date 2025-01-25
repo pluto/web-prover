@@ -4,13 +4,18 @@ use caratls::client::TeeTlsConnector;
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
+use proofs::program::{self, manifest::{EncryptionInput, Manifest}};
 use tls_client2::origo::OrigoConnection;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
+use proofs::{F, G1, G2};
+use std::collections::HashMap;
+use proofs::program::data::{ProgramData, Offline, NotExpanded};
+use crate::circuits::construct_setup_data;
 
 use crate::{
   config::{self, NotaryMode},
-  errors::ClientErrors,
+  errors::ClientErrors, OrigoProof,
 };
 
 /// we want to be able to specify somewhere in here what cipher suite to use.
@@ -123,4 +128,55 @@ pub(crate) async fn proxy(
 
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
   Ok(origo_conn)
+}
+
+pub(crate) async fn generate_proof(
+  manifest: Manifest, 
+  proving_params: Vec<u8>, 
+  request_inputs: EncryptionInput, 
+  response_inputs: EncryptionInput
+) -> Result<OrigoProof, ClientErrors> {
+  let setup_data = construct_setup_data();
+  let program_data = ProgramData::<Offline, NotExpanded> {
+    public_params: proving_params,
+    vk_digest_primary: F::<G1>::from(0), // These need to be right. 
+    vk_digest_secondary: F::<G2>::from(0),
+    setup_data,
+    rom: vec![],
+    rom_data: HashMap::new(),
+    initial_nivc_input: vec![],
+    inputs: (vec![], HashMap::new()),
+    witnesses: vec![],
+  }
+  .into_online()?;
+
+  let vk_digest_primary = program_data.vk_digest_primary;
+  let vk_digest_secondary = program_data.vk_digest_secondary;
+
+  let params_ref = program_data.public_params.clone();
+  let setup_ref = program_data.setup_data.clone();
+  let (request_proof, response_proof) = futures::future::try_join(
+    tokio::task::spawn_blocking(move || crate::proof::construct_request_program_data_and_proof(
+      manifest.request.clone(),
+      request_inputs,
+      (vk_digest_primary, vk_digest_secondary),
+      params_ref,
+      setup_ref,
+      vec![vec![]]
+    )),
+    tokio::task::spawn_blocking(move || crate::proof::construct_response_program_data_and_proof(
+      manifest.response,
+      response_inputs,
+      (vk_digest_primary, vk_digest_secondary),
+      program_data.public_params.clone(),
+      program_data.setup_data.clone(),
+      vec![vec![]]
+    )),
+  )
+  .await?;
+
+  return Ok(OrigoProof{
+    request: request_proof?,
+    response: response_proof?,
+  })
 }

@@ -4,12 +4,13 @@ use client_side_prover::{
   supernova::{NonUniformCircuit, RecursiveSNARK, StepCircuit},
   traits::{snark::default_ck_hint, Dual},
 };
-use data::Expanded;
+use data::{Expanded, InitializedSetup};
 use proof::FoldingProof;
 #[cfg(feature = "timing")] use tracing::trace;
 use utils::into_input_json;
 
 use super::*;
+use std::sync::Arc;
 
 pub mod data;
 pub mod manifest;
@@ -88,14 +89,15 @@ impl StepCircuit<F<G1>> for RomCircuit {
 
 // TODO: This is like a one-time use setup that overlaps some with `ProgramData::into_online()`.
 // Worth checking out how to make this simpler, clearer, more efficient.
-pub fn setup(setup_data: &SetupData) -> PublicParams<E1> {
+pub fn setup(setup_data: &UninitializedSetup) -> PublicParams<E1> {
   // Optionally time the setup stage for the program
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
 
   // TODO: I don't think we want to have to call `initialize_circuit_list` more than once on setup
   // ever and it seems like it may get used more frequently.
-  let circuits = initialize_circuit_list(setup_data).unwrap(); // TODO, change the type signature of trait to use arbitrary error types.
+  let initilized_setup = initialize_setup_data(setup_data).unwrap();
+  let circuits = initialize_circuit_list(&initilized_setup); // TODO, change the type signature of trait to use arbitrary error types.
   let memory = Memory { circuits, rom: vec![0; setup_data.max_rom_length] }; // Note, `rom` here is not used in setup, only `circuits`
   let public_params = PublicParams::setup(&memory, &*default_ck_hint(), &*default_ck_hint());
 
@@ -108,7 +110,7 @@ pub fn setup(setup_data: &SetupData) -> PublicParams<E1> {
 pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNARK<E1>, ProofError> {
   info!("Starting SuperNova program...");
 
-  // Resize the rom to be the `max_rom_length` committed to in the `SetupData`
+  // Resize the rom to be the `max_rom_length` committed to in the `S::SetupData`
   let (z0_primary, resized_rom) = program_data.extend_public_inputs(None)?;
   let z0_secondary = vec![F::<G2>::ZERO];
 
@@ -117,7 +119,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
 
   // TODO (Colin): We are basically creating a `R1CS` for each circuit here, then also creating
   // `R1CSWithArity` for the circuits in the `PublicParams`. Surely we don't need both?
-  let circuits = initialize_circuit_list(&program_data.setup_data)?; // TODO: AwK?
+  let circuits = initialize_circuit_list(&program_data.setup_data); // TODO: AwK?
 
   let mut memory = Memory { rom: resized_rom.clone(), circuits };
 
@@ -162,7 +164,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
       RecursiveSNARK::new(
         public_params,
         &memory,
-        &circuit_primary,
+        &circuit_primary,  
         &circuit_secondary,
         &z0_primary,
         &z0_secondary,
@@ -248,24 +250,39 @@ pub fn compress_proof(
   Ok(proof)
 }
 
-// TODO: May want to rethink this slightly as we also store the R1CS data inside the PP. Avoid
-// doubling up if possible (maybe need to use refs)
-pub fn initialize_circuit_list(setup_data: &SetupData) -> Result<Vec<RomCircuit>, ProofError> {
-  let mut circuits = vec![];
-  for (circuit_index, (r1cs_type, witness_generator_type)) in
-    setup_data.r1cs_types.iter().zip(setup_data.witness_generator_types.iter()).enumerate()
-  {
-    let circuit = circom::CircomCircuit { r1cs: R1CS::try_from(r1cs_type)?, witness: None };
-    let rom_circuit = RomCircuit {
-      circuit,
-      circuit_index,
-      rom_size: setup_data.max_rom_length,
-      nivc_io: None,
-      private_input: None,
-      witness_generator_type: witness_generator_type.clone(),
-    };
+pub fn initialize_setup_data(setup_data: &UninitializedSetup) -> Result<InitializedSetup, ProofError> {
+  let (r1cs, witness_generator_types) = setup_data.r1cs_types.iter()
+    .zip(setup_data.witness_generator_types.iter())
+    .enumerate()
+    .map(|(_, (r1cs_type, generator))| {
+        let r1cs = R1CS::try_from(r1cs_type)?;
+        Ok::<(Arc<circom::r1cs::R1CS>, data::WitnessGeneratorType), ProofError>((Arc::new(r1cs), generator.clone()))
+    })
+    .collect::<Result<Vec<_>, _>>()?
+    .into_iter()
+    .unzip();
 
-    circuits.push(rom_circuit);
-  }
-  Ok(circuits)
+  return Ok(InitializedSetup{
+    r1cs, 
+    witness_generator_types,
+    max_rom_length: setup_data.max_rom_length
+  })
+}
+
+pub fn initialize_circuit_list(setup_data: &InitializedSetup) -> Vec<RomCircuit> {
+  setup_data.r1cs.iter()
+    .zip(setup_data.witness_generator_types.iter())
+    .enumerate()
+    .map(|(i, (r1cs, generator))| {
+        let circuit = circom::CircomCircuit { r1cs: r1cs.clone(), witness: None };
+        RomCircuit {
+          circuit,
+          circuit_index: i,
+          rom_size: setup_data.max_rom_length,
+          nivc_io: None,
+          private_input: None,
+          witness_generator_type: generator.clone(),
+        }
+    })
+    .collect::<Vec<_>>()
 }

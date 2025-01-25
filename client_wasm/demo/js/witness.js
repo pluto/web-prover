@@ -8,8 +8,6 @@ const getWitnessGenerator = async function (circuit) {
   return wasm;
 }
 
-
-
 async function generateWitness(input, wasm) {
   const witStart = +Date.now();
   let wtns = { type: "mem" };
