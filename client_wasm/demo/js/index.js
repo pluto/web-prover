@@ -6,6 +6,19 @@ import { witness } from "./witness";
 
 const numConcurrency = navigator.hardwareConcurrency;
 
+
+// Monitoring for WASM memory usage
+function checkWasmMemory(wasmMemory) {
+  const memoryMB = wasmMemory.buffer.byteLength / (1024 * 1024);
+  console.log(`${new Date().toISOString()}: WASM Memory Usage: ${memoryMB.toFixed(2)} MB`);
+}
+
+function startMemoryMonitoring(instance) {
+  checkWasmMemory(instance);
+  setInterval(() => {
+      checkWasmMemory(instance);
+  }, 5000);
+}
 // Create a WebAssembly.Memory object
 const shared_memory = new WebAssembly.Memory({
   initial: 16384, // 256 pages = 16MB
@@ -16,14 +29,13 @@ const shared_memory = new WebAssembly.Memory({
 await init(undefined, shared_memory);
 setup_tracing("debug,tlsn_extension_rs=debug");
 await initThreadPool(numConcurrency);
+console.log("initialized thread pool", numConcurrency);
+startMemoryMonitoring(shared_memory);
 
 var startTime, endTime, startPreWitgenTime;
 
 function start() {
   startTime = performance.now();
-}
-function startPreWitgen() {
-  startPreWitgenTime = performance.now();
 }
 
 function end() {
@@ -46,80 +58,14 @@ const getByteParams = async function (setupFile) {
   return pp;
 }
 
-export function numToBitsNumerical(num, bitCount = 32) {
-  const bits = []
-  for (let i = 2 ** (bitCount - 1); i >= 1; i /= 2) {
-    const bit = num >= i ? 1 : 0
-    bits.push(bit)
-    num -= bit * i
-  }
-
-  return bits
-}
-
-
 start();
 
-let proverConfig = {
-  mode: "Origo",
-  notary_host: "localhost",
-  notary_port: 7443,
-  target_method: "GET",
-  target_url: "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json",
-  target_headers: {},
-  target_body: "",
-  max_sent_data: 10000,
-  max_recv_data: 10000,
-  proving: {
-    witnesses: [],
-    manifest: {
-      "manifestVersion": "1",
-      "id": "reddit-user-karma",
-      "title": "Total Reddit Karma",
-      "description": "Generate a proof that you have a certain amount of karma",
-      "prepareUrl": "https://www.reddit.com/login/",
-      "request": {
-        "method": "GET",
-        "version": "HTTP/1.1",
-        "url": "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json",
-        "headers": {
-          "accept-encoding": "identity"
-        },
-        "body": {
-          "userId": "<% userId %>"
-        },
-        "vars": {
-          "userId": {
-            "regex": "[a-z]{,20}+"
-          },
-          "token": {
-            "type": "base64",
-            "length": 32
-          }
-        }
-      },
-      "response": {
-        "status": "200",
-        "version": "HTTP/1.1",
-        "message": "OK",
-        "headers": {
-            "Content-Type": "text/plain"
-        },
-        "body": {
-            "json": [
-                "hello"
-            ],
-            "contains": "this_string_exists_in_body"
-        }
-      }
-    },
-  }
-};
+import proverConfig from "../../../fixture/client.origo_tcp_local.json";
 
 const proofWorker = new Worker(new URL("./proof.js", import.meta.url), { type: "module" });
 console.log("sending message to worker");
 var proving_params = {
-  aux_params: await getByteParams("circom-artifacts-512b-v0.7.3/serialized_setup_512b_rom_length_5.bin"),
+  aux_params: await getByteParams("circom-artifacts-1024b-v0.8.0/serialized_setup_1024b_rom_length_5.bin"),
 };
 proofWorker.postMessage({ proverConfig, proving_params, shared_memory });
 console.log("message sent to worker");
@@ -132,54 +78,7 @@ proofWorker.onmessage = (event) => {
     console.log("proof generated!", event.data);
   }
 }
-// TODO: Call this in a web worker so the main thread doesn't hang.
-// Config for local development
-// const proof = await prover({
-//   mode: "Origo",
-//   notary_host: "localhost",
-//   notary_port: 7443,
-//   target_method: "GET",
-//   target_url: "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json",
-//   target_headers: {},
-//   target_body: "",
-//   max_sent_data: 10000,
-//   max_recv_data: 10000,
-//   proving: {
-//     r1cs: r1cs,
-//     witnesses: witnesses,
-//     params: pp,
-//   }
-// });
 
-// const proof = await prover({
-//   mode: "TLSN",
-//   notary_host: "localhost",
-//   notary_port: 7443,
-//   target_method: "GET",
-//   target_url:
-//     "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json", // "https://localhost:8085/health",
-//   target_headers: {},
-//   target_body: "",
-//   websocket_proxy_url: "wss://localhost:7443/v1/tlsnotary/websocket_proxy",
-//   max_sent_data: 10000,
-//   max_recv_data: 10000,
-// });
-
-// Config using notary.pluto.dev
-// const proof = await prover({
-//   mode: "TLSN",
-//   notary_host: "notary.pluto.dev",
-//   notary_port: 443,
-//   target_method: "GET",
-//   target_url: "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json",
-//   target_headers: {},
-//   target_body: "",
-//   websocket_proxy_url: "wss://notary.pluto.dev/v1/tlsnotary/websocket_proxy",
-//   max_sent_data: 10000,
-//   max_recv_data: 10000,
-// });
-
-// console.log(proof);
 end();
 
 // ./fixture/cets/notary.pub

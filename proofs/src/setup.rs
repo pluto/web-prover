@@ -7,7 +7,7 @@ use client_side_prover::{
 };
 
 use crate::{
-  errors::ProofError, program, program::data::R1CSType, AuxParams, ProverKey, SetupData,
+  errors::ProofError, program, program::data::R1CSType, AuxParams, ProverKey, UninitializedSetup,
   WitnessGeneratorType, E1, S1, S2,
 };
 
@@ -84,7 +84,7 @@ impl ProvingParams {
 /// # Returns
 /// * `Result<Vec<u8>, ProofError>` - Bytes ready to be written to disk
 pub fn setup(r1cs_files: &[R1CSType], rom_length: usize) -> Vec<u8> {
-  let setup_data = SetupData {
+  let setup_data = UninitializedSetup {
     r1cs_types:              r1cs_files.to_vec(),
     witness_generator_types: vec![WitnessGeneratorType::Browser; r1cs_files.len()],
     max_rom_length:          rom_length,

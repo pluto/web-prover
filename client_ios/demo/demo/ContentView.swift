@@ -156,7 +156,7 @@ struct ContentView: View {
                                         "version": "HTTP/1.1",
                                         "message": "OK",
                                         "headers": {
-                                            "Content-Type": "text/plain"
+                                            "Content-Type": "text/plain; charset=utf-8"
                                         },
                                         "body": {
                                             "json": [

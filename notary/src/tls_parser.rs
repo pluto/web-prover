@@ -34,6 +34,7 @@ const TRIMMED_BYTES: usize = 17;
 // TODO: Relocate and consolidate with circuits.rs
 pub const CIRCUIT_SIZE_SMALL: usize = 512;
 pub const CIRCUIT_SIZE_MAX: usize = 1024;
+pub const MAX_STACK_HEIGHT: usize = 10;
 
 #[derive(Debug, Copy, Clone)]
 pub enum Direction {
@@ -300,7 +301,7 @@ impl ParsedTranscript {
   ///
   /// To skip redundant verification in the future, we could accept a possible target hash
   /// from the client and check if it is in the set of valid hashes.
-  pub fn get_ciphertext_hashes(&self) -> (Vec<F<G1>>, Vec<F<G1>>) {
+  pub fn get_ciphertext_hashes(&self) -> (Vec<F<G1>>, Vec<F<G1>>, Vec<Vec<u8>>, Vec<Vec<u8>>) {
     // State machine for extracting request response
     // Transcript Structure:
     // - Encrypted 1: server sends back verify data
@@ -401,18 +402,7 @@ impl ParsedTranscript {
     let request_hashes = ParsedTranscript::get_permutations(&request_messages);
     let response_hashes = ParsedTranscript::get_permutations(&response_messages);
 
-    debug!(
-      "request_hashes={:?}, hex={:?}",
-      request_hashes,
-      request_hashes.clone().into_iter().map(|f| hex::encode(f.to_bytes())).collect::<Vec<_>>()
-    );
-    debug!(
-      "response_hashes={:?}, hex={:?}",
-      response_hashes,
-      response_hashes.clone().into_iter().map(|f| hex::encode(f.to_bytes())).collect::<Vec<_>>()
-    );
-
-    (request_hashes, response_hashes)
+    (request_hashes, response_hashes, request_messages, response_messages)
   }
 }
 

@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
 use proofs::{
   program::data::{
-    CircuitData, NotExpanded, Offline, Online, ProgramData, R1CSType, SetupData,
+    CircuitData, NotExpanded, Offline, Online, ProgramData, R1CSType, UninitializedSetup,
     WitnessGeneratorType,
   },
   E1, F, G1, G2, S1, S2,
@@ -16,42 +16,41 @@ use proofs::{
 use tracing::debug;
 
 pub const MAX_ROM_LENGTH: usize = 5;
-pub const PROVING_PARAMS_512: &str =
-  "proofs/web_proof_circuits/circom-artifacts-512b-v0.7.3/serialized_setup_512b_rom_length_5.bin";
+
 pub const PROVING_PARAMS_1024: &str =
-  "proofs/web_proof_circuits/circom-artifacts-1024b-v0.7.3/serialized_setup_1024b_rom_length_5.bin";
+  "proofs/web_proof_circuits/circom-artifacts-1024b-v0.8.0/serialized_setup_1024b_rom_length_5.bin";
 
 // -------------------------------------- 1024B circuits -------------------------------------- //
 // Circuit 0
 const PLAINTEXT_AUTHENTICATION_R1CS: &[u8] = include_bytes!(
-  "../../proofs/web_proof_circuits/circom-artifacts-1024b-v0.7.3/plaintext_authentication_1024b.\
+  "../../proofs/web_proof_circuits/circom-artifacts-1024b-v0.8.0/plaintext_authentication_1024b.\
    r1cs"
 );
 // Circuit 1
 const HTTP_VERIFICATION_R1CS: &[u8] = include_bytes!(
-  "../../proofs/web_proof_circuits/circom-artifacts-1024b-v0.7.3/http_verification_1024b.r1cs"
+  "../../proofs/web_proof_circuits/circom-artifacts-1024b-v0.8.0/http_verification_1024b.r1cs"
 );
 // Circuit 2
 const JSON_EXTRACTION_R1CS: &[u8] = include_bytes!(
-  "../../proofs/web_proof_circuits/circom-artifacts-1024b-v0.7.3/json_extraction_1024b.r1cs"
+  "../../proofs/web_proof_circuits/circom-artifacts-1024b-v0.8.0/json_extraction_1024b.r1cs"
 );
 
 // -------------------------------------- 512B circuits -------------------------------------- //
 // Circuit 0
 const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] = include_bytes!(
-  "../../proofs/web_proof_circuits/circom-artifacts-512b-v0.7.3/plaintext_authentication_512b.r1cs"
+  "../../proofs/web_proof_circuits/circom-artifacts-512b-v0.8.0/plaintext_authentication_512b.r1cs"
 );
 // Circuit 1
 const HTTP_VERIFICATION_512B_R1CS: &[u8] = include_bytes!(
-  "../../proofs/web_proof_circuits/circom-artifacts-512b-v0.7.3/http_verification_512b.r1cs"
+  "../../proofs/web_proof_circuits/circom-artifacts-512b-v0.8.0/http_verification_512b.r1cs"
 );
 // Circuit 2
 const JSON_EXTRACTION_512B_R1CS: &[u8] = include_bytes!(
-  "../../proofs/web_proof_circuits/circom-artifacts-512b-v0.7.3/json_extraction_512b.r1cs"
+  "../../proofs/web_proof_circuits/circom-artifacts-512b-v0.8.0/json_extraction_512b.r1cs"
 );
 
-pub fn construct_setup_data_512() -> SetupData {
-  SetupData {
+pub fn construct_setup_data_512() -> UninitializedSetup {
+  UninitializedSetup {
     r1cs_types:              vec![
       R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
       R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
@@ -62,8 +61,8 @@ pub fn construct_setup_data_512() -> SetupData {
   }
 }
 
-pub fn construct_setup_data_1024() -> SetupData {
-  SetupData {
+pub fn construct_setup_data_1024() -> UninitializedSetup {
+  UninitializedSetup {
     r1cs_types:              vec![
       R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
       R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
@@ -74,7 +73,7 @@ pub fn construct_setup_data_1024() -> SetupData {
   }
 }
 
-pub fn construct_setup_data(plaintext_length: usize) -> SetupData {
+pub fn construct_setup_data(plaintext_length: usize) -> UninitializedSetup {
   let circuit_size = if plaintext_length <= 512 {
     512
   } else if plaintext_length <= 1024 {
@@ -95,22 +94,37 @@ pub struct Verifier {
   pub verifier_key: VerifierKey<E1, S1, S2>,
 }
 
+// TODO: add another initialization endpoint when the rom is not static
 pub fn get_initialized_verifiers() -> HashMap<String, Verifier> {
-  // TODO: Update to support response verification.
   let decryption_label = String::from("PLAINTEXT_AUTHENTICATION");
   let http_label = String::from("HTTP_VERIFICATION");
+  let json_label = String::from("JSON_EXTRACTION");
 
-  let rom_data = HashMap::from([
+  let request_rom_data = HashMap::from([
     (decryption_label.clone(), CircuitData { opcode: 0 }),
     (http_label.clone(), CircuitData { opcode: 1 }),
   ]);
-  let rom = vec![decryption_label.clone(), http_label.clone()];
+  let response_rom_data = HashMap::from([
+    ("PLAINTEXT_AUTHENTICATION_0".to_string(), CircuitData { opcode: 0 }),
+    ("PLAINTEXT_AUTHENTICATION_1".to_string(), CircuitData { opcode: 0 }),
+    (http_label.clone(), CircuitData { opcode: 1 }),
+    (json_label.clone(), CircuitData { opcode: 2 }),
+  ]);
+  let request_rom = vec![decryption_label.clone(), http_label.clone()];
+  let response_rom = vec![
+    "PLAINTEXT_AUTHENTICATION_0".to_string(),
+    "PLAINTEXT_AUTHENTICATION_1".to_string(),
+    http_label.clone(),
+    json_label.clone(),
+  ];
 
-  let params_1024 = (PROVING_PARAMS_1024, 1024, rom_data.clone(), rom.clone());
-  let params_512 = (PROVING_PARAMS_512, 512, rom_data.clone(), rom.clone());
+  let request_params_1024 =
+    ("request", PROVING_PARAMS_1024, 1024, request_rom_data, request_rom.clone());
+  let response_params_1024 =
+    ("response", PROVING_PARAMS_1024, 1024, response_rom_data, response_rom.clone());
 
   let mut verifiers = HashMap::new();
-  for (path, circuit_size, rom_data, rom) in [params_1024, params_512] {
+  for (label, path, circuit_size, rom_data, rom) in [request_params_1024, response_params_1024] {
     let bytes = std::fs::read(path).unwrap();
     let setup_data = construct_setup_data(circuit_size);
     let program_data = ProgramData::<Offline, NotExpanded> {
@@ -137,7 +151,8 @@ pub fn get_initialized_verifiers() -> HashMap<String, Verifier> {
       hex::encode(pk.pk_primary.vk_digest.to_bytes()),
       pk.pk_secondary.vk_digest,
     );
-    let verifier_digest = hex::encode(program_data.vk_digest_primary.to_bytes());
+    let verifier_digest =
+      format!("{}_{}", label, hex::encode(program_data.vk_digest_primary.to_bytes()));
     let _ = verifiers.insert(verifier_digest, Verifier { program_data, verifier_key });
   }
 

@@ -1,11 +1,31 @@
 // logic common to wasm32 and native
+use proofs::program::manifest::TLSEncryption;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
-#[derive(Serialize)]
+use crate::{
+  config::{self},
+  errors::ClientErrors,
+  tls::decrypt_tls_ciphertext,
+  OrigoProof,
+};
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SignBody {
   pub handshake_server_iv:  String,
   pub handshake_server_key: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VerifyBody {
+  pub session_id:  String,
+  pub origo_proof: OrigoProof,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VerifyReply {
+  pub valid: bool,
+  // TODO: need a signature
 }
 
 pub async fn sign(
@@ -42,20 +62,6 @@ pub async fn sign(
   Ok(sign_response)
 }
 
-#[derive(Serialize, Debug, Clone)]
-pub struct VerifyBody {
-  pub session_id:              String,
-  pub request_verifier_digest: String,
-  pub request_proof:           Vec<u8>,
-  pub response_proof:          Vec<u8>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct VerifyReply {
-  pub valid: bool,
-  // TODO: need a signature
-}
-
 pub async fn verify(
   config: crate::config::Config,
   verify_body: VerifyBody,
@@ -84,4 +90,45 @@ pub async fn verify(
   debug!("\n{:?}\n\n", verify_response.clone());
 
   Ok(verify_response)
+}
+
+pub(crate) async fn proxy_and_sign_and_generate_proof(
+  config: config::Config,
+  proving_params: Option<Vec<u8>>,
+) -> Result<OrigoProof, ClientErrors> {
+  let session_id = config.session_id.clone();
+
+  #[cfg(not(target_arch = "wasm32"))]
+  let mut origo_conn = crate::origo_native::proxy(config.clone(), session_id.clone()).await?;
+  #[cfg(target_arch = "wasm32")]
+  let mut origo_conn = crate::origo_wasm32::proxy(config.clone(), session_id.clone()).await?;
+
+  let sb = SignBody {
+    handshake_server_iv:  hex::encode(
+      origo_conn.secret_map.get("Handshake:server_iv").unwrap().clone().to_vec(),
+    ),
+    handshake_server_key: hex::encode(
+      origo_conn.secret_map.get("Handshake:server_key").unwrap().clone().to_vec(),
+    ),
+  };
+
+  let _sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb).await;
+
+  debug!("generating program data!");
+  let witness = origo_conn.to_witness_data();
+
+  // decrypt TLS ciphertext for request and response and create NIVC inputs
+  let TLSEncryption { request: request_inputs, response: response_inputs } =
+    decrypt_tls_ciphertext(&witness)?;
+
+  // generate NIVC proofs for request and response
+  let manifest = config.proving.manifest.unwrap();
+
+  #[cfg(not(target_arch = "wasm32"))]
+  let proof = crate::origo_native::generate_proof(manifest, proving_params.unwrap(), request_inputs, response_inputs).await?;
+  #[cfg(target_arch = "wasm32")]
+  let proof = crate::origo_wasm32::generate_proof(manifest, proving_params.unwrap(), request_inputs, response_inputs).await?;
+
+  // TODO(Sambhav): handle request and response into one proof
+  Ok(proof)
 }

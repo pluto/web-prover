@@ -12,6 +12,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use ff::PrimeField;
 use r1cs::R1CS;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use super::*;
 
@@ -39,14 +40,14 @@ pub struct CircuitJson {
 
 #[derive(Clone)]
 pub struct CircomCircuit {
-  pub r1cs:    R1CS,
+  pub r1cs:    Arc<R1CS>,
   pub witness: Option<Vec<F<G1>>>,
 }
 
 // NOTE (Colin): This is added so we can cache only the active circuits we are using.
 #[allow(clippy::derivable_impls)]
 impl Default for CircomCircuit {
-  fn default() -> Self { Self { r1cs: R1CS::default(), witness: None } }
+  fn default() -> Self { Self { r1cs: Arc::new(R1CS::default()), witness: None } }
 }
 
 impl CircomCircuit {

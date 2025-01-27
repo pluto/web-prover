@@ -28,25 +28,24 @@
 
 use std::collections::HashMap;
 
+use halo2curves::bn256::Fr;
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tls_client2::CipherSuiteKey;
 use tracing::debug;
 
-use super::{
-  witness::{compress_tree_hash, json_tree_hasher, json_value_digest, polynomial_digest},
-  ProofError,
-};
 use crate::{
   program::{
     data::{CircuitData, FoldInput},
     F, G1,
   },
   witness::{
-    compute_http_header_witness, compute_http_witness, data_hasher, request_initial_digest,
+    compress_tree_hash, compute_http_header_witness, compute_http_witness, data_hasher,
+    json_tree_hasher, json_value_digest, polynomial_digest, poseidon, request_initial_digest,
     response_initial_digest, ByteOrPad,
   },
+  ProofError,
 };
 
 /// HTTP
@@ -120,6 +119,7 @@ pub struct Manifest {
 
 // TODO(Sambhav): can we remove usage of vec here?
 /// encryption input for AES/CHACHA required to generate witness for the circuits
+#[derive(Clone)]
 pub struct EncryptionInput {
   /// 128-bit key
   pub key:        CipherSuiteKey,
@@ -128,9 +128,11 @@ pub struct EncryptionInput {
   /// 128-bit AAD
   pub aad:        Vec<u8>,
   /// plaintext to be encrypted
-  pub plaintext:  Vec<u8>,
+  pub plaintext:  Vec<Vec<u8>>,
   /// ciphertext associated with plaintext
-  pub ciphertext: Vec<u8>,
+  pub ciphertext: Vec<Vec<u8>>,
+  /// nonce sequence number
+  pub seq:        u64,
 }
 
 /// TLS encryption input for request and response proving
@@ -142,9 +144,9 @@ pub struct TLSEncryption {
 /// encryption circuit input for AES/CHACHA
 struct EncryptionCircuitInput {
   /// padded plaintext
-  plaintext:  Vec<ByteOrPad>,
+  plaintext:  Vec<Vec<ByteOrPad>>,
   /// padded ciphertext
-  ciphertext: Vec<ByteOrPad>,
+  ciphertext: Vec<Vec<ByteOrPad>>,
 }
 
 /// convert bytes to u32
@@ -195,18 +197,17 @@ pub fn make_nonce(iv: [u8; 12], seq: u64) -> [u8; 12] {
 fn pad_plaintext_authentication_inputs(inputs: &EncryptionInput) -> EncryptionCircuitInput {
   match inputs.key {
     CipherSuiteKey::CHACHA20POLY1305(_) => {
-      let plaintext = ByteOrPad::from_bytes_with_padding(
-        &inputs.plaintext,
-        CIRCUIT_SIZE - inputs.plaintext.len(),
-      );
-      let ciphertext = ByteOrPad::from_bytes_with_padding(
-        &inputs.ciphertext,
-        CIRCUIT_SIZE - inputs.plaintext.len(),
-      );
+      let mut plaintext_packets = vec![];
+      let mut ciphertext_packets = vec![];
+      for (plaintext, ciphertext) in inputs.plaintext.iter().zip(inputs.ciphertext.iter()) {
+        assert_eq!(plaintext.len(), ciphertext.len());
+        plaintext_packets
+          .push(ByteOrPad::from_bytes_with_padding(&plaintext, CIRCUIT_SIZE - plaintext.len()));
+        ciphertext_packets
+          .push(ByteOrPad::from_bytes_with_padding(&ciphertext, CIRCUIT_SIZE - plaintext.len()));
+      }
 
-      assert_eq!(plaintext.len(), ciphertext.len());
-
-      EncryptionCircuitInput { plaintext, ciphertext }
+      EncryptionCircuitInput { plaintext: plaintext_packets, ciphertext: ciphertext_packets }
     },
     _ => {
       unimplemented!("Only CHACHA20POLY1305 is supported for now");
@@ -226,13 +227,21 @@ fn pad_plaintext_authentication_inputs(inputs: &EncryptionInput) -> EncryptionCi
 fn build_plaintext_authentication_circuit_inputs(
   inputs: &EncryptionInput,
   padded_plaintext: &[ByteOrPad],
+  ciphertext_digest: F<G1>,
   private_inputs: &mut Vec<HashMap<String, Value>>,
   _fold_inputs: &mut HashMap<String, FoldInput>,
-) {
+  plaintext_circuit_counter: usize,
+) -> F<G1> {
   // handle different cipher suite, currently AES-GCM-128 & ChaCha20-Poly1305
   match inputs.key {
     CipherSuiteKey::CHACHA20POLY1305(key) => {
-      let nonce = make_nonce(inputs.iv, 0);
+      let nonce = make_nonce(inputs.iv, inputs.seq + plaintext_circuit_counter as u64);
+
+      let plaintext_index_counter = if plaintext_circuit_counter == 0 {
+        0
+      } else {
+        inputs.plaintext[..plaintext_circuit_counter].iter().map(|x| x.len()).sum::<usize>()
+      };
 
       // CHACHA rom opcode with private inputs
       private_inputs.push(HashMap::from([
@@ -240,7 +249,25 @@ fn build_plaintext_authentication_circuit_inputs(
         (String::from("nonce"), json!(to_chacha_input(&nonce))),
         (String::from("counter"), json!(to_chacha_input(&[1]))),
         (String::from("plaintext"), json!(&padded_plaintext)),
+        (String::from("plaintext_index_counter"), json!(plaintext_index_counter)),
+        (
+          String::from("ciphertext_digest"),
+          json!(BigInt::from_bytes_le(num_bigint::Sign::Plus, &ciphertext_digest.to_bytes())
+            .to_str_radix(10)),
+        ),
       ]));
+
+      let plaintext_digest = polynomial_digest(
+        &ByteOrPad::as_bytes(padded_plaintext),
+        ciphertext_digest,
+        plaintext_index_counter as u64,
+      );
+
+      let packet_ciphertext_digest = data_hasher(&ByteOrPad::from_bytes_with_padding(
+        &inputs.ciphertext[plaintext_circuit_counter],
+        CIRCUIT_SIZE,
+      ));
+      plaintext_digest - packet_ciphertext_digest
     },
     _ => {
       unimplemented!("Only CHACHA20POLY1305 is supported for now");
@@ -264,25 +291,36 @@ fn build_http_verification_circuit_inputs(
   headers: &HashMap<String, String>,
   private_inputs: &mut Vec<HashMap<String, Value>>,
   _fold_inputs: &mut HashMap<String, FoldInput>,
-) -> Vec<ByteOrPad> {
+) -> (F<G1>, Vec<ByteOrPad>) {
+  let plaintext_digest = polynomial_digest(&ByteOrPad::as_bytes(inputs), ciphertext_digest, 0);
+
   // compute hashes http start line and headers signals
   let mut main_digests = vec!["0".to_string(); MAX_HTTP_HEADERS + 1];
   let http_start_line_digest = polynomial_digest(
     &ByteOrPad::as_bytes(&compute_http_witness(inputs, super::witness::HttpMaskType::StartLine)),
     ciphertext_digest,
+    0,
   );
+
+  let http_start_line_digest_hashed = poseidon::<1>(&[http_start_line_digest]);
+
+  let mut header_digests_hashed = vec![];
   main_digests[0] =
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &http_start_line_digest.to_bytes())
       .to_str_radix(10);
 
   for header_name in headers.keys() {
     let (index, masked_header) = compute_http_header_witness(inputs, header_name.as_bytes());
-    let header_digest = polynomial_digest(&ByteOrPad::as_bytes(&masked_header), ciphertext_digest);
+    let header_digest =
+      polynomial_digest(&ByteOrPad::as_bytes(&masked_header), ciphertext_digest, 0);
+    header_digests_hashed.push(poseidon::<1>(&[header_digest]));
+
     main_digests[index + 1] =
       BigInt::from_bytes_le(num_bigint::Sign::Plus, &header_digest.to_bytes()).to_str_radix(10);
   }
 
   // initialise rom data and rom
+  assert_eq!(inputs.len(), CIRCUIT_SIZE);
   private_inputs.push(HashMap::from([
     (String::from(DATA_SIGNAL_NAME), json!(&inputs)),
     (
@@ -293,7 +331,19 @@ fn build_http_verification_circuit_inputs(
     (String::from("main_digests"), json!(main_digests)),
   ]));
 
-  compute_http_witness(inputs, crate::witness::HttpMaskType::Body)
+  let mut padded_http_body = compute_http_witness(inputs, crate::witness::HttpMaskType::Body);
+  padded_http_body.resize(CIRCUIT_SIZE, ByteOrPad::Pad);
+
+  let http_body_digest =
+    polynomial_digest(&ByteOrPad::as_bytes(&padded_http_body), ciphertext_digest, 0);
+  let http_body_digest_hashed = poseidon::<1>(&[http_body_digest]);
+
+  let http_step_out = http_body_digest_hashed
+    - http_start_line_digest_hashed
+    - header_digests_hashed.iter().sum::<F<G1>>()
+    - plaintext_digest;
+
+  (http_step_out, padded_http_body)
 }
 
 /// Build JSON extraction circuit inputs
@@ -320,9 +370,12 @@ fn build_json_extraction_circuit_inputs(
     ciphertext_digest,
     json_tree_hasher(ciphertext_digest, keys, MAX_STACK_HEIGHT),
   );
+  let sequence_digest_hashed = poseidon::<1>(&[sequence_digest]);
+  let data_digest_hashed =
+    poseidon::<1>(&[polynomial_digest(&ByteOrPad::as_bytes(&inputs), ciphertext_digest, 0)]);
 
   let value = json_value_digest(&inputs, keys)?;
-  let value_digest = polynomial_digest(&value, sequence_digest);
+  let value_digest = polynomial_digest(&value, ciphertext_digest, 0);
 
   // extend inputs to correct circuit size and pad
   let mut padded_inputs = inputs.clone();
@@ -350,7 +403,7 @@ fn build_json_extraction_circuit_inputs(
     ),
   ]));
 
-  Ok(value_digest)
+  Ok(sequence_digest_hashed + data_digest_hashed)
 }
 
 /// NIVC ROM containing circuit data and rom
@@ -382,29 +435,52 @@ impl Request {
 
     let mut private_inputs = vec![];
     let mut fold_inputs: HashMap<String, FoldInput> = HashMap::new();
+    let mut public_inputs = vec![];
 
+    let combined_plaintext: Vec<u8> = inputs.plaintext.iter().flatten().cloned().collect();
+    let combined_plaintext = ByteOrPad::from_bytes_with_padding(
+      &combined_plaintext,
+      CIRCUIT_SIZE - combined_plaintext.len(),
+    );
     let EncryptionCircuitInput { plaintext, ciphertext } =
       pad_plaintext_authentication_inputs(inputs);
 
-    let ciphertext_digest = data_hasher(&ciphertext);
-    let (ciphertext_digest, init_nivc_input) = request_initial_digest(self, ciphertext_digest);
+    let (ciphertext_digest, init_nivc_input) = request_initial_digest(self, &ciphertext);
+    public_inputs.push(init_nivc_input);
 
-    build_plaintext_authentication_circuit_inputs(
-      inputs,
-      &plaintext,
-      &mut private_inputs,
-      &mut fold_inputs,
+    let mut plaintext_step_outs = Fr::zero();
+    for (i, pt) in plaintext.iter().enumerate() {
+      let plaintext_step_out = build_plaintext_authentication_circuit_inputs(
+        &inputs,
+        &pt,
+        ciphertext_digest,
+        &mut private_inputs,
+        &mut fold_inputs,
+        i,
+      );
+      plaintext_step_outs += plaintext_step_out;
+      let plaintext_step_out = init_nivc_input + plaintext_step_outs;
+      // debug!("plaintext_step_out: {:?}", field_element_to_base10_string(plaintext_step_out));
+      public_inputs.push(plaintext_step_out);
+    }
+
+    assert_eq!(
+      plaintext_step_outs,
+      -ciphertext_digest
+        + polynomial_digest(&ByteOrPad::as_bytes(&combined_plaintext), ciphertext_digest, 0)
     );
 
-    build_http_verification_circuit_inputs(
-      &plaintext,
+    let (http_step_out, _http_body) = build_http_verification_circuit_inputs(
+      &combined_plaintext,
       ciphertext_digest,
       &self.headers,
       &mut private_inputs,
       &mut fold_inputs,
     );
+    let http_step_out = public_inputs.last().unwrap() + http_step_out;
+    public_inputs.push(http_step_out);
 
-    NivcCircuitInputs { private_inputs, fold_inputs, initial_nivc_input: vec![init_nivc_input] }
+    NivcCircuitInputs { private_inputs, fold_inputs, initial_nivc_input: public_inputs }
   }
 
   /// builds ROM for [`Manifest`] request.
@@ -431,45 +507,75 @@ impl Response {
   /// - plaintext authentication
   /// - http verification
   /// - json extraction
-  pub fn build_inputs(&self, inputs: EncryptionInput) -> Result<NivcCircuitInputs, ProofError> {
+  pub fn build_inputs(&self, inputs: &EncryptionInput) -> Result<NivcCircuitInputs, ProofError> {
     assert_eq!(inputs.plaintext.len(), inputs.ciphertext.len());
 
     let mut private_inputs = vec![];
     let mut fold_inputs: HashMap<String, FoldInput> = HashMap::new();
+    let mut public_inputs = vec![];
+
+    let combined_plaintext = inputs.plaintext.iter().flatten().cloned().collect::<Vec<u8>>();
+    let combined_plaintext = ByteOrPad::from_bytes_with_padding(
+      &combined_plaintext,
+      CIRCUIT_SIZE - combined_plaintext.len(),
+    );
 
     let EncryptionCircuitInput { plaintext, ciphertext } =
       pad_plaintext_authentication_inputs(&inputs);
 
-    let ciphertext_digest = data_hasher(&ciphertext);
-
     let (ciphertext_digest, init_nivc_input) =
-      response_initial_digest(self, ciphertext_digest, MAX_STACK_HEIGHT);
+      response_initial_digest(self, &ciphertext, MAX_STACK_HEIGHT);
+    // debug!("ciphertext_digest: {:?}", field_element_to_base10_string(ciphertext_digest));
+    // debug!("init_nivc_input: {:?}", field_element_to_base10_string(init_nivc_input));
 
-    build_plaintext_authentication_circuit_inputs(
-      &inputs,
-      &plaintext,
-      &mut private_inputs,
-      &mut fold_inputs,
+    public_inputs.push(init_nivc_input);
+    let mut plaintext_step_outs = Fr::zero();
+
+    for (i, pt) in plaintext.iter().enumerate() {
+      let plaintext_step_out = build_plaintext_authentication_circuit_inputs(
+        &inputs,
+        &pt,
+        ciphertext_digest,
+        &mut private_inputs,
+        &mut fold_inputs,
+        i,
+      );
+      plaintext_step_outs += plaintext_step_out;
+      let plaintext_step_out = init_nivc_input + plaintext_step_outs;
+      // debug!("plaintext_step_out: {:?}", field_element_to_base10_string(plaintext_step_out));
+      public_inputs.push(plaintext_step_out);
+    }
+
+    assert_eq!(
+      plaintext_step_outs,
+      -ciphertext_digest
+        + polynomial_digest(&ByteOrPad::as_bytes(&combined_plaintext), ciphertext_digest, 0)
     );
 
-    let http_body = build_http_verification_circuit_inputs(
-      &plaintext,
+    let (http_step_out, http_body) = build_http_verification_circuit_inputs(
+      &combined_plaintext,
       ciphertext_digest,
       &self.headers,
       &mut private_inputs,
       &mut fold_inputs,
     );
+    // unwrap is secure, as we are sure that there is at least one element in the vector
+    let http_step_out = public_inputs.last().unwrap() + http_step_out;
+    // debug!("http_step_out: {:?}", field_element_to_base10_string(http_step_out));
+    public_inputs.push(http_step_out);
 
     // json keys
-    let _ = build_json_extraction_circuit_inputs(
+    let json_step_out_check = build_json_extraction_circuit_inputs(
       http_body,
       ciphertext_digest,
       &self.body.json,
       &mut private_inputs,
       &mut fold_inputs,
     )?;
+    // debug!("json_step_out_check: {:?}", field_element_to_base10_string(json_step_out_check));
+    assert_eq!(http_step_out - json_step_out_check, F::<G1>::zero());
 
-    Ok(NivcCircuitInputs { fold_inputs, private_inputs, initial_nivc_input: vec![init_nivc_input] })
+    Ok(NivcCircuitInputs { fold_inputs, private_inputs, initial_nivc_input: public_inputs })
   }
 
   /// Builds ROM for [`Manifest`] response.
@@ -481,18 +587,23 @@ impl Response {
   ///
   /// # Returns
   /// - [`NIVCRom`] containing circuit data and rom
-  pub fn build_rom(&self) -> NIVCRom {
-    let rom_data = HashMap::from([
-      (String::from("PLAINTEXT_AUTHENTICATION"), CircuitData { opcode: 0 }),
-      (String::from("HTTP_VERIFICATION"), CircuitData { opcode: 1 }),
-      (String::from("JSON_EXTRACTION"), CircuitData { opcode: 2 }),
-    ]);
+  pub fn build_rom(&self, response_packets: usize) -> NIVCRom {
+    let plaintext_authentication_label = String::from("PLAINTEXT_AUTHENTICATION");
+    // plaintext_authentication_label is duplicated `response_packets` times
+    let mut rom_data = HashMap::new();
+    (0..response_packets).for_each(|i| {
+      rom_data
+        .insert(format!("{}_{}", plaintext_authentication_label, i), CircuitData { opcode: 0 });
+    });
+    rom_data.insert(String::from("HTTP_VERIFICATION"), CircuitData { opcode: 1 });
+    rom_data.insert(String::from("JSON_EXTRACTION"), CircuitData { opcode: 2 });
 
-    let rom = vec![
-      String::from("PLAINTEXT_AUTHENTICATION"),
-      String::from("HTTP_VERIFICATION"),
-      String::from("JSON_EXTRACTION"),
-    ];
+    let mut rom = vec![];
+    (0..response_packets).for_each(|i| {
+      rom.push(format!("{}_{}", plaintext_authentication_label, i));
+    });
+    rom.push(String::from("HTTP_VERIFICATION"));
+    rom.push(String::from("JSON_EXTRACTION"));
 
     NIVCRom { circuit_data: rom_data, rom }
   }
@@ -501,10 +612,10 @@ impl Response {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::tests::{
+    mock_manifest, CHACHA20_CIPHERTEXT, CHACHA20_KEY, CHACHA20_NONCE, HTTP_RESPONSE_PLAINTEXT,
+  };
 
-  const AEAD_IV: (&str, [u8; 12]) = ("iv", [49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49]);
-  const AEAD_AAD: (&str, [u8; 16]) = ("aad", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-  const CHACHA_KEY: (&str, [u8; 32]) = ("key", [0u8; 32]);
   const TEST_MANIFEST_REQUEST: &[u8] = &[
     71, 69, 84, 32, 104, 116, 116, 112, 115, 58, 47, 47, 103, 105, 115, 116, 46, 103, 105, 116,
     104, 117, 98, 117, 115, 101, 114, 99, 111, 110, 116, 101, 110, 116, 46, 99, 111, 109, 47, 109,
@@ -519,23 +630,7 @@ mod tests {
     111, 110, 110, 101, 99, 116, 105, 111, 110, 58, 32, 99, 108, 111, 115, 101, 13, 10, 97, 99, 99,
     101, 112, 116, 58, 32, 42, 47, 42, 0, 0,
   ];
-  const TEST_MANIFEST_RESPONSE: &[u8] = &[
-    72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101,
-    110, 116, 45, 116, 121, 112, 101, 58, 32, 97, 112, 112, 108, 105, 99, 97, 116, 105, 111, 110,
-    47, 106, 115, 111, 110, 59, 32, 99, 104, 97, 114, 115, 101, 116, 61, 117, 116, 102, 45, 56, 13,
-    10, 99, 111, 110, 116, 101, 110, 116, 45, 101, 110, 99, 111, 100, 105, 110, 103, 58, 32, 103,
-    122, 105, 112, 13, 10, 84, 114, 97, 110, 115, 102, 101, 114, 45, 69, 110, 99, 111, 100, 105,
-    110, 103, 58, 32, 99, 104, 117, 110, 107, 101, 100, 13, 10, 13, 10, 123, 13, 10, 32, 32, 32,
-    34, 100, 97, 116, 97, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32, 32, 32, 34, 105, 116, 101,
-    109, 115, 34, 58, 32, 91, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 123, 13, 10, 32,
-    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 100, 97, 116, 97, 34, 58, 32, 34,
-    65, 114, 116, 105, 115, 116, 34, 44, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-    32, 32, 32, 34, 112, 114, 111, 102, 105, 108, 101, 34, 58, 32, 123, 13, 10, 32, 32, 32, 32, 32,
-    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 110, 97, 109, 101, 34, 58, 32, 34, 84, 97, 121,
-    108, 111, 114, 32, 83, 119, 105, 102, 116, 34, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
-    32, 32, 32, 32, 32, 125, 13, 10, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 125, 13, 10, 32,
-    32, 32, 32, 32, 32, 32, 93, 13, 10, 32, 32, 32, 125, 13, 10, 125,
-  ];
+
   const TEST_MANIFEST: &str = r#"
   {
       "manifestVersion": "1",
@@ -605,11 +700,12 @@ mod tests {
 
     let NivcCircuitInputs { fold_inputs, private_inputs, .. } =
       manifest.request.build_inputs(&EncryptionInput {
-        key:        tls_client2::CipherSuiteKey::CHACHA20POLY1305(CHACHA_KEY.1),
-        iv:         AEAD_IV.1,
-        aad:        AEAD_AAD.1.to_vec(),
-        plaintext:  TEST_MANIFEST_REQUEST.to_vec(),
-        ciphertext: TEST_MANIFEST_REQUEST.to_vec(),
+        key:        tls_client2::CipherSuiteKey::CHACHA20POLY1305(CHACHA20_KEY.1),
+        iv:         CHACHA20_NONCE.1,
+        aad:        [0; 12].to_vec(),
+        plaintext:  vec![TEST_MANIFEST_REQUEST.to_vec()],
+        ciphertext: vec![TEST_MANIFEST_REQUEST.to_vec()],
+        seq:        0,
       });
     let NIVCRom { circuit_data: rom_data, rom } = manifest.request.build_rom();
 
@@ -627,6 +723,8 @@ mod tests {
     assert!(private_inputs[plaintext_authentication_len].contains_key("nonce"));
     assert!(private_inputs[plaintext_authentication_len].contains_key("key"));
     assert!(private_inputs[plaintext_authentication_len].contains_key("plaintext"));
+    assert!(private_inputs[plaintext_authentication_len].contains_key("ciphertext_digest"));
+    assert!(private_inputs[plaintext_authentication_len].contains_key("plaintext_index_counter"));
 
     // assert http verification inputs
     let http_instruction_len = 1;
@@ -635,24 +733,25 @@ mod tests {
     assert!(private_inputs[http_instruction_len].contains_key("ciphertext_digest"));
     assert!(private_inputs[http_instruction_len].contains_key("data"));
 
-    assert!(!fold_inputs.contains_key(&String::from("PLAINTEXT_AUTHENTICATION")));
+    assert!(fold_inputs.is_empty());
   }
 
   #[test]
   fn generate_rom_from_response() {
-    let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
+    let manifest: Manifest = mock_manifest();
 
     let NivcCircuitInputs { fold_inputs, private_inputs, .. } = manifest
       .response
-      .build_inputs(EncryptionInput {
-        key:        tls_client2::CipherSuiteKey::CHACHA20POLY1305(CHACHA_KEY.1),
-        iv:         AEAD_IV.1,
-        aad:        AEAD_AAD.1.to_vec(),
-        plaintext:  TEST_MANIFEST_RESPONSE.to_vec(),
-        ciphertext: TEST_MANIFEST_RESPONSE.to_vec(),
+      .build_inputs(&EncryptionInput {
+        key:        tls_client2::CipherSuiteKey::CHACHA20POLY1305(CHACHA20_KEY.1),
+        iv:         CHACHA20_NONCE.1,
+        aad:        [0; 12].to_vec(),
+        plaintext:  vec![HTTP_RESPONSE_PLAINTEXT.1.to_vec()],
+        ciphertext: vec![CHACHA20_CIPHERTEXT.1.to_vec()],
+        seq:        1,
       })
       .unwrap();
-    let NIVCRom { circuit_data: rom_data, rom } = manifest.response.build_rom();
+    let NIVCRom { circuit_data: rom_data, rom } = manifest.response.build_rom(1);
 
     // plaintext_authentication + http verification + json extraction
     assert_eq!(rom_data.len(), 3);
@@ -660,7 +759,7 @@ mod tests {
 
     // assert plaintext authentication inputs
     let plaintext_authentication_len = 0;
-    assert_eq!(rom[plaintext_authentication_len], String::from("PLAINTEXT_AUTHENTICATION"));
+    assert_eq!(rom[plaintext_authentication_len], String::from("PLAINTEXT_AUTHENTICATION_0"));
     assert!(private_inputs[plaintext_authentication_len].contains_key("counter"));
     assert!(private_inputs[plaintext_authentication_len].contains_key("nonce"));
     assert!(private_inputs[plaintext_authentication_len].contains_key("key"));

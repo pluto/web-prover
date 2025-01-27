@@ -2,12 +2,12 @@
 # Second generate the graph bin files using circom-witnesscalc
 # Finally run test using these files
 
-CIRCUIT_VERSIONS = circom-artifacts-512b-v0.7.3 circom-artifacts-1024b-v0.7.3
+CIRCUIT_VERSIONS = circom-artifacts-512b-v0.8.0 circom-artifacts-1024b-v0.8.0
 
 web-prover-circuits:
 	for version in $(CIRCUIT_VERSIONS); do \
 		if [ ! -d "web_proof_circuits/$$version" ] || [ -z "$$(ls -A web_proof_circuits/$$version)" ]; then \
-			curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/download/v0.7.3/$$version.zip; \
+			curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/download/v0.8.0/$$version.zip; \
 			mkdir -p web_proof_circuits/$$version/; \
 			unzip -o circuits.zip -d web_proof_circuits/$$version/; \
 			rm circuits.zip; \

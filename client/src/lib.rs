@@ -9,20 +9,22 @@ pub mod origo;
 pub mod circuits;
 pub mod config;
 pub mod errors;
+mod proof;
 mod tls;
+
 pub mod tls_client_async2;
 use proofs::{errors::ProofError, proof::FoldingProof};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::errors::ClientErrors;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct OrigoProof {
-  request:  FoldingProof<Vec<u8>, String>,
-  response: Option<FoldingProof<Vec<u8>, String>>,
+  pub request:  FoldingProof<Vec<u8>, String>,
+  pub response: FoldingProof<Vec<u8>, String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -82,21 +84,12 @@ pub async fn prover_inner_origo(
   proving_params: Option<Vec<u8>>,
 ) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id.clone();
-  #[cfg(target_arch = "wasm32")]
-  let proof =
-    origo_wasm32::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
 
-  #[cfg(not(target_arch = "wasm32"))]
-  let proof =
-    origo_native::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
+  let proof = origo::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
 
-  let verify_response = origo::verify(config, origo::VerifyBody {
-    request_proof: proof.request.proof.clone(),
-    response_proof: Vec::new(),
-    session_id,
-    request_verifier_digest: proof.request.verifier_digest.clone(),
-  })
-  .await?;
+  debug!("sending proof to proxy for verification");
+  let verify_response =
+    origo::verify(config, origo::VerifyBody { session_id, origo_proof: proof.clone() }).await?;
 
   if !verify_response.valid {
     Err(ProofError::VerifyFailed().into())
