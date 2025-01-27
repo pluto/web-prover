@@ -1380,7 +1380,6 @@ dependencies = [
  "uuid",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-bindgen-rayon",
  "wasm-bindgen-test",
  "web-sys",
  "web-time 1.1.0",
