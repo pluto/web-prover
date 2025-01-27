@@ -6,14 +6,17 @@ use client_side_prover::supernova::RecursiveSNARK;
 use program::manifest::JsonKey;
 use serde_json::json;
 use witness::{compress_tree_hash, json_tree_hasher, polynomial_digest};
+use std::sync::Arc;
+
 
 use super::*;
 use crate::{
   program::{
-    data::{CircuitData, NotExpanded},
+    data::{CircuitData, UninitializedSetup, NotExpanded},
     manifest::{
       make_nonce, to_chacha_input, EncryptionInput, Manifest, Request, Response, ResponseBody,
     },
+    initialize_setup_data
   },
   witness::{compute_http_witness, ByteOrPad},
 };
@@ -157,7 +160,7 @@ fn test_end_to_end_proofs_res() {
   //    }
   // }
 
-  let setup_data = SetupData {
+  let setup_data = UninitializedSetup {
     r1cs_types:              vec![
       R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
       R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
@@ -302,11 +305,12 @@ fn test_end_to_end_proofs_res() {
   let (pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
   let vk_digest_primary = pk.pk_primary.vk_digest;
   let vk_digest_secondary = pk.pk_secondary.vk_digest;
+  let initialized_setup = initialize_setup_data(&setup_data).unwrap();
   let program_data = ProgramData::<Online, NotExpanded> {
-    public_params,
+    public_params: Arc::new(public_params),
     vk_digest_primary,
     vk_digest_secondary,
-    setup_data,
+    setup_data: Arc::new(initialized_setup),
     rom_data: rom_data.clone(),
     rom: rom.clone(),
     initial_nivc_input: vec![init_nivc_input],
@@ -337,7 +341,7 @@ fn test_end_to_end_proofs_res() {
 #[test]
 #[tracing_test::traced_test]
 fn test_end_to_end_proofs_req() {
-  let setup_data = SetupData {
+  let setup_data = UninitializedSetup {
     r1cs_types:              vec![
       R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
       R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
@@ -467,11 +471,12 @@ fn test_end_to_end_proofs_req() {
   let (pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
   let vk_digest_primary = pk.pk_primary.vk_digest;
   let vk_digest_secondary = pk.pk_secondary.vk_digest;
+  let initialized_setup = initialize_setup_data(&setup_data).unwrap();
   let program_data = ProgramData::<Online, NotExpanded> {
-    public_params,
+    public_params: Arc::new(public_params),
     vk_digest_primary,
     vk_digest_secondary,
-    setup_data,
+    setup_data: Arc::new(initialized_setup),
     rom_data: rom_data.clone(),
     rom: rom.clone(),
     initial_nivc_input: vec![init_nivc_input],

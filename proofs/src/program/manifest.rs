@@ -433,12 +433,6 @@ impl Request {
   pub fn build_inputs(&self, inputs: &EncryptionInput) -> NivcCircuitInputs {
     assert_eq!(inputs.plaintext.len(), inputs.ciphertext.len());
 
-    debug!("plaintext: {:?}", inputs.plaintext);
-    debug!("ciphertext: {:?}", inputs.ciphertext);
-    debug!("key: {:?}", inputs.key.as_ref());
-    debug!("iv: {:?}", inputs.iv);
-    debug!("aad: {:?}", inputs.aad);
-
     let mut private_inputs = vec![];
     let mut fold_inputs: HashMap<String, FoldInput> = HashMap::new();
     let mut public_inputs = vec![];
@@ -515,12 +509,6 @@ impl Response {
   /// - json extraction
   pub fn build_inputs(&self, inputs: &EncryptionInput) -> Result<NivcCircuitInputs, ProofError> {
     assert_eq!(inputs.plaintext.len(), inputs.ciphertext.len());
-
-    debug!("plaintext: {:?}", inputs.plaintext);
-    debug!("ciphertext: {:?}", inputs.ciphertext);
-    debug!("key: {:?}", inputs.key.as_ref());
-    debug!("iv: {:?}", inputs.iv);
-    debug!("aad: {:?}", inputs.aad);
 
     let mut private_inputs = vec![];
     let mut fold_inputs: HashMap<String, FoldInput> = HashMap::new();

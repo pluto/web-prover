@@ -7,7 +7,7 @@ use std::{
   sync::Arc,
   task::{Context, Poll},
 };
-
+use proofs::{G2, program::data::{ProgramData, Offline, NotExpanded}, program::manifest::{Manifest, EncryptionInput, NIVCRom, NivcCircuitInputs}};
 use caratls::client::TeeTlsConnector;
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::StatusCode;
@@ -19,7 +19,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
-use crate::{config, config::NotaryMode, errors, tls_client_async2::bind_client};
+use crate::{config, circuits::construct_setup_data, config::NotaryMode, errors, tls_client_async2::bind_client, errors::ClientErrors, OrigoProof};
 
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Debug)]
@@ -104,23 +104,20 @@ pub(crate) async fn proxy(
   let client_tls_conn = unsafe { FuturesIo::new(client_tls_conn) };
 
   let (tls_sender, _tls_receiver) = oneshot::channel();
-  let handled_tls_fut = async {
+  spawn_local(async {
     let result = tls_fut.await;
-    // Triggered when the server shuts the connection.
     let _ = tls_sender.send(result);
-  };
-  spawn_local(handled_tls_fut);
+  });
 
   let (mut request_sender, connection) =
     hyper::client::conn::http1::handshake(client_tls_conn).await?;
 
   let (connection_sender, connection_receiver) = oneshot::channel();
   let connection_fut = connection.without_shutdown();
-  let handled_connection_fut = async {
+  spawn_local(async {
     let result = connection_fut.await;
     let _ = connection_sender.send(result);
-  };
-  spawn_local(handled_connection_fut);
+  });
 
   let response = request_sender.send_request(config.to_request()?).await?;
 
@@ -134,10 +131,24 @@ pub(crate) async fn proxy(
 }
 
 pub async fn build_witness_data_from_wasm(
-  private_inputs: Vec<HashMap<String, Value>>,
-  rom_opcodes: Vec<u64>,
+  inputs: NivcCircuitInputs,
+  rom: NIVCRom,
 ) -> Result<Vec<Vec<F<G1>>>, errors::ClientErrors> {
-  let js_witness_input = serde_wasm_bindgen::to_value(&private_inputs).unwrap();
+  debug!("generating witness in wasm");
+  let rom_opcodes: Vec<u64> =
+      rom.rom.iter().map(|c| rom.circuit_data.get(c).unwrap().opcode).collect::<Vec<_>>();
+
+  let mut wasm_private_inputs = inputs.private_inputs.clone();
+  let initial_nivc_inputs = inputs.initial_nivc_input
+    .iter()
+    .map(|&x| proofs::witness::field_element_to_base10_string(x))
+    .collect::<Vec<String>>();
+
+  for (input, initial_input) in wasm_private_inputs.iter_mut().zip(initial_nivc_inputs.iter()) {
+    input.insert("step_in".to_string(), serde_json::json!(initial_input));
+  }
+
+  let js_witness_input = serde_wasm_bindgen::to_value(&wasm_private_inputs).unwrap();
   let js_witness_rom = serde_wasm_bindgen::to_value(&rom_opcodes).unwrap();
 
   let js_witnesses_output = create_witness(js_witness_input, js_witness_rom).await.unwrap();
@@ -149,6 +160,79 @@ pub async fn build_witness_data_from_wasm(
   }
 
   Ok(witnesses)
+}
+
+pub(crate) async fn generate_proof(
+  manifest: Manifest, 
+  proving_params: Vec<u8>, 
+  request_inputs: EncryptionInput, 
+  response_inputs: EncryptionInput
+) -> Result<OrigoProof, ClientErrors> {
+  // Prepare request witness  
+  let request_nivc = manifest.request.build_inputs(&request_inputs);
+  let request_witness = build_witness_data_from_wasm(request_nivc, manifest.request.build_rom()).await?;
+  
+  // Prepare response witness
+  let response_nivc = manifest.response.build_inputs(&response_inputs)?;
+  let response_witness = build_witness_data_from_wasm(response_nivc, manifest.response.build_rom(response_inputs.plaintext.len())).await?;
+
+  let setup_data = construct_setup_data();
+  let program_data = ProgramData::<Offline, NotExpanded> {
+    public_params: proving_params,
+    vk_digest_primary: F::<G1>::from(0),
+    vk_digest_secondary: F::<G2>::from(0),
+    setup_data,
+    rom: vec![],
+    rom_data: HashMap::new(),
+    initial_nivc_input: vec![],
+    inputs: (vec![], HashMap::new()),
+    witnesses: vec![],
+  }
+  .into_online()?;
+  let vk_digest_primary = program_data.vk_digest_primary;
+  let vk_digest_secondary = program_data.vk_digest_secondary;
+
+  let (request_tx, request_rx) = oneshot::channel();
+  let (response_tx, response_rx) = oneshot::channel();
+  let params_ref = program_data.public_params.clone();
+  let setup_ref = program_data.setup_data.clone();
+
+  // Deliberately run these concurrently instead of in parallel (i.e. using rayon::spawn)
+  // due to excessive memory consumption of these prove threads, running in parallel
+  // is slower. 
+  spawn_local(async move {
+    let result = crate::proof::construct_request_program_data_and_proof(
+      manifest.request.clone(),
+      request_inputs,
+      (vk_digest_primary, vk_digest_secondary),
+      params_ref,
+      setup_ref,
+      request_witness
+    );
+    let _ = request_tx.send(result);
+  });
+
+  spawn_local(async move {
+    let result = crate::proof::construct_response_program_data_and_proof(
+      manifest.response.clone(),
+      response_inputs,
+      (vk_digest_primary, vk_digest_secondary),
+      program_data.public_params,
+      program_data.setup_data,
+      response_witness
+    );
+    let _ = response_tx.send(result);
+  });
+ 
+  let (request_proof, response_proof) = futures::future::try_join(
+    request_rx,
+    response_rx,
+  ).await?;
+
+  return Ok(OrigoProof{
+    request: request_proof?,
+    response: response_proof?,
+  })
 }
 
 use pin_project_lite::pin_project;

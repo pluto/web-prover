@@ -123,23 +123,12 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
 
   // generate NIVC proofs for request and response
   let manifest = config.proving.manifest.unwrap();
-  // Clone parameters needed for both proofs
-  let proving_params_clone = proving_params.clone();
 
-  let (request_proof, response_proof) = futures::future::try_join(
-    crate::proof::construct_request_program_data_and_proof(
-      &manifest.request,
-      request_inputs,
-      proving_params_clone,
-    ),
-    crate::proof::construct_response_program_data_and_proof(
-      &manifest.response,
-      response_inputs,
-      proving_params,
-    ),
-  )
-  .await?;
+  #[cfg(not(target_arch = "wasm32"))]
+  let proof = crate::origo_native::generate_proof(manifest, proving_params.unwrap(), request_inputs, response_inputs).await?;
+  #[cfg(target_arch = "wasm32")]
+  let proof = crate::origo_wasm32::generate_proof(manifest, proving_params.unwrap(), request_inputs, response_inputs).await?;
 
   // TODO(Sambhav): handle request and response into one proof
-  Ok(OrigoProof { request: request_proof, response: response_proof })
+  Ok(proof)
 }

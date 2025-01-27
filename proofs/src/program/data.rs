@@ -1,6 +1,8 @@
 use std::{
   fs::{self, File},
   io::Write,
+  sync::Arc,
+  default
 };
 
 use client_side_prover::{fast_serde::FastSerde, supernova::get_circuit_shapes};
@@ -62,18 +64,45 @@ pub enum WitnessGeneratorType {
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
 }
 
+/// Uninitialized Circuit Setup data, in this configuration the R1CS objects have not
+/// been initialized and require a bulky initialize process. 
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct UninitializedSetup {
+  /// vector of all circuits' r1cs
+  pub r1cs_types:              Vec<R1CSType>,
+  /// vector of all circuits' witness generator
+  pub witness_generator_types: Vec<WitnessGeneratorType>,
+  /// NIVC max ROM length
+  pub max_rom_length:          usize,
+}
+
+/// Initialized Circuit Setup data, in this configuration the R1CS objects have been
+/// fully loaded for proving. 
+#[derive(Clone, Debug)]
+pub struct InitializedSetup {
+  /// vector of all circuits' r1cs
+  pub r1cs:              Vec<Arc<R1CS>>,
+  /// vector of all circuits' witness generator
+  pub witness_generator_types: Vec<WitnessGeneratorType>,
+  /// NIVC max ROM length
+  pub max_rom_length:          usize,
+}
+
 // Note, the below are typestates that prevent misuse of our current API.
 pub trait SetupStatus {
   type PublicParams;
+  type SetupData; 
 }
 
 pub struct Online;
 impl SetupStatus for Online {
-  type PublicParams = PublicParams<E1>;
+  type PublicParams = Arc<PublicParams<E1>>;
+  type SetupData = Arc<InitializedSetup>;
 }
 pub struct Offline;
 impl SetupStatus for Offline {
   type PublicParams = Vec<u8>;
+  type SetupData = UninitializedSetup;
 }
 
 pub trait WitnessStatus {
@@ -94,21 +123,10 @@ impl WitnessStatus for NotExpanded {
   type PrivateInputs = (Vec<HashMap<String, Value>>, HashMap<String, FoldInput>);
 }
 
-/// Circuit setup data containing r1cs and witness generators along with max NIVC ROM length
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SetupData {
-  /// vector of all circuits' r1cs
-  pub r1cs_types:              Vec<R1CSType>,
-  /// vector of all circuits' witness generator
-  pub witness_generator_types: Vec<WitnessGeneratorType>,
-  /// NIVC max ROM length
-  pub max_rom_length:          usize,
-}
-
 /// Auxillary circuit data required to execute the ROM
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CircuitData {
-  /// circuit instruction opcode in [`SetupData`]
+  /// circuit instruction opcode in [`S::SetupData`]
   pub opcode: u64,
 }
 
@@ -118,7 +136,7 @@ pub struct ProgramData<S: SetupStatus, W: WitnessStatus> {
   // TODO: Refactor this onto the PublicParams object and share the ProvingParams abstraction
   pub vk_digest_primary:   <E1 as Engine>::Scalar,
   pub vk_digest_secondary: <Dual<E1> as Engine>::Scalar,
-  pub setup_data:          SetupData,
+  pub setup_data:          S::SetupData,
   pub rom_data:            HashMap<String, CircuitData>,
   pub rom:                 Vec<String>,
   pub initial_nivc_input:  Vec<F<G1>>,
@@ -258,27 +276,31 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
   ///
   /// # Example
   pub fn into_online(self) -> Result<ProgramData<Online, W>, ProofError> {
-    debug!("loading proving params, proving_param_bytes={:?}", self.public_params.len());
+    debug!("init proving params, proving_param_bytes={:?}", self.public_params.len());
     let proving_params = ProvingParams::from_bytes(&self.public_params).unwrap();
-    debug!("done loading proving params");
 
-    // TODO: get the circuit shapes needed
-    info!("circuit list");
-    let circuits = initialize_circuit_list(&self.setup_data)?;
-    let memory = Memory { circuits, rom: vec![0; self.setup_data.max_rom_length] }; // Note, `rom` here is not used in setup, only `circuits`
-    info!("circuit shapes");
-    let circuit_shapes = get_circuit_shapes(&memory);
+    info!("init setup");
+    let initialized_setup = initialize_setup_data(&self.setup_data).unwrap();
 
-    info!("public params from parts");
+    let circuits = initialize_circuit_list(&initialized_setup);
+    let memory = Memory { circuits, rom: vec![0; self.setup_data.max_rom_length] };
+
+    // TODO: This converts the r1cs memory into sparse matrices, which doubles
+    // the memory usage. Can we re-used these sparse matrices in our constraint
+    // system? 
+    info!("init circuit shapes");
+    let circuit_shapes = get_circuit_shapes(&memory); 
+
+    info!("init public params from parts");
     let public_params =
       PublicParams::<E1>::from_parts_unchecked(circuit_shapes, proving_params.aux_params);
-    let Self { setup_data, rom, initial_nivc_input, inputs, witnesses, rom_data, .. } = self;
+    let Self { rom, initial_nivc_input, inputs, witnesses, rom_data, .. } = self;
 
     Ok(ProgramData {
-      public_params,
+      public_params: Arc::new(public_params),
       vk_digest_primary: proving_params.vk_digest_primary,
       vk_digest_secondary: proving_params.vk_digest_secondary,
-      setup_data,
+      setup_data: Arc::new(initialized_setup),
       rom,
       initial_nivc_input,
       inputs,
@@ -320,7 +342,8 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   /// * `W: WitnessStatus` - The witness status type parameter carried over from the original
   ///   program data
   pub fn into_offline(self, path: PathBuf) -> Result<ProgramData<Offline, W>, ProofError> {
-    let (_, aux_params) = self.public_params.into_parts();
+    let exclusive = Arc::try_unwrap(self.public_params).unwrap();
+    let (_, aux_params) = exclusive.into_parts();
     let vk_digest_primary = self.vk_digest_primary;
     let vk_digest_secondary = self.vk_digest_secondary;
     let proving_param_bytes =
@@ -334,12 +357,13 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
     debug!("bytes_path={:?}", bytes_path);
     File::create(&bytes_path)?.write_all(&proving_param_bytes).unwrap();
 
-    let Self { setup_data, rom_data, rom, initial_nivc_input, inputs, witnesses, .. } = self;
+    let Self { rom_data, rom, initial_nivc_input, inputs, witnesses, .. } = self;
     Ok(ProgramData {
       public_params: proving_param_bytes,
       vk_digest_primary,
       vk_digest_secondary,
-      setup_data,
+      // TODO: This approach is odd, refactor with #375
+      setup_data: Default::default(),
       rom_data,
       rom,
       initial_nivc_input,
@@ -467,18 +491,19 @@ mod tests {
     // Rest of the function remains same
     let rom: Vec<String> = vec!["add".to_string(), "mul".to_string()];
 
-    let setup_data = SetupData {
+    let setup_data = UninitializedSetup {
       max_rom_length:          4,
       r1cs_types:              vec![r1cs],
       witness_generator_types: vec![WitnessGeneratorType::Raw(vec![])],
     };
+    let initilized_setup = initialize_setup_data(&setup_data).unwrap();
 
     let public_params = program::setup(&setup_data);
     let (prover_key, _vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
 
     ProgramData {
-      public_params,
-      setup_data,
+      public_params: Arc::new(public_params),
+      setup_data: Arc::new(initilized_setup),
       vk_digest_primary: prover_key.pk_primary.vk_digest,
       vk_digest_secondary: prover_key.pk_secondary.vk_digest,
       rom_data,
@@ -543,7 +568,7 @@ mod tests {
   #[test]
   #[tracing_test::traced_test]
   fn test_expand_private_inputs() {
-    let setup_data = SetupData {
+    let setup_data = UninitializedSetup {
       r1cs_types:              vec![R1CSType::Raw(vec![])],
       witness_generator_types: vec![WitnessGeneratorType::Raw(vec![])],
       max_rom_length:          3,
