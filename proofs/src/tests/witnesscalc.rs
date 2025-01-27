@@ -120,16 +120,16 @@ fn test_run() {
 #[tracing_test::traced_test]
 fn test_run_serialized_verify() {
   let setup_data = get_setup_data();
-  let (program_data, recursive_snark) = run_entry(setup_data).unwrap();
+  let (program_data, recursive_snark) = run_entry(setup_data.clone()).unwrap();
 
   // Pseudo-offline the `PublicParams` and regenerate it
-  let program_data =
+  let mut program_data =
     program_data.into_offline(PathBuf::from_str(TEST_OFFLINE_PATH).unwrap()).unwrap();
+  program_data.setup_data = setup_data.clone();
   let program_data = program_data.into_online().unwrap();
 
   // Create the compressed proof with the offlined `PublicParams`
   let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
-
   let serialized_compressed_proof = proof.serialize();
   let proof = serialized_compressed_proof.deserialize();
 
