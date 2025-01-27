@@ -17,6 +17,13 @@ The repository is laid out as follows:
 
 Documentation is evolving throughout the repository as the pipeline becomes more stable.
 
+## Cranelift Compile
+We make use of the [Cranelift compiler](https://github.com/rust-lang/rustc_codegen_cranelift?tab=readme-ov-file) to reduce dev buildtimes. This is configured as our dev profile. To make sure this works, you need to add it to your toolchian.
+
+```
+rustup component add rustc-codegen-cranelift-preview --toolchain nightly
+```
+
 ## Usage
 
 ```
