@@ -104,23 +104,20 @@ pub(crate) async fn proxy(
   let client_tls_conn = unsafe { FuturesIo::new(client_tls_conn) };
 
   let (tls_sender, _tls_receiver) = oneshot::channel();
-  let handled_tls_fut = async {
+  spawn_local(async {
     let result = tls_fut.await;
-    // Triggered when the server shuts the connection.
     let _ = tls_sender.send(result);
-  };
-  spawn_local(handled_tls_fut);
+  });
 
   let (mut request_sender, connection) =
     hyper::client::conn::http1::handshake(client_tls_conn).await?;
 
   let (connection_sender, connection_receiver) = oneshot::channel();
   let connection_fut = connection.without_shutdown();
-  let handled_connection_fut = async {
+  spawn_local(async {
     let result = connection_fut.await;
     let _ = connection_sender.send(result);
-  };
-  spawn_local(handled_connection_fut);
+  });
 
   let response = request_sender.send_request(config.to_request()?).await?;
 
@@ -199,26 +196,30 @@ pub(crate) async fn generate_proof(
   let (response_tx, response_rx) = oneshot::channel();
   let params_ref = program_data.public_params.clone();
   let setup_ref = program_data.setup_data.clone();
-  rayon::spawn(move || {
+
+  // Deliberately run these concurrently instead of in parallel (i.e. using rayon::spawn)
+  // due to excessive memory consumption of these prove threads, running in parallel
+  // is slower. 
+  spawn_local(async move {
     let result = crate::proof::construct_request_program_data_and_proof(
-        manifest.request.clone(),
-        request_inputs,
-        (vk_digest_primary, vk_digest_secondary),
-        params_ref,
-        setup_ref,
-        request_witness
+      manifest.request.clone(),
+      request_inputs,
+      (vk_digest_primary, vk_digest_secondary),
+      params_ref,
+      setup_ref,
+      request_witness
     );
     let _ = request_tx.send(result);
   });
 
-  rayon::spawn(move || {
+  spawn_local(async move {
     let result = crate::proof::construct_response_program_data_and_proof(
-        manifest.response.clone(),
-        response_inputs,
-        (vk_digest_primary, vk_digest_secondary),
-        program_data.public_params,
-        program_data.setup_data,
-        response_witness
+      manifest.response.clone(),
+      response_inputs,
+      (vk_digest_primary, vk_digest_secondary),
+      program_data.public_params,
+      program_data.setup_data,
+      response_witness
     );
     let _ = response_tx.send(result);
   });

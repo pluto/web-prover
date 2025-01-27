@@ -157,7 +157,7 @@ pub(crate) async fn generate_proof(
   let setup_ref = program_data.setup_data.clone();
   let (request_proof, response_proof) = futures::future::try_join(
     tokio::task::spawn_blocking(move || crate::proof::construct_request_program_data_and_proof(
-      manifest.request.clone(),
+      manifest.request,
       request_inputs,
       (vk_digest_primary, vk_digest_secondary),
       params_ref,

@@ -1,11 +1,12 @@
 use std::{
   fs::{self, File},
   io::Write,
+  sync::Arc,
+  default
 };
 
 use client_side_prover::{fast_serde::FastSerde, supernova::get_circuit_shapes};
 use serde_json::json;
-use std::sync::Arc;
 
 use super::*;
 use crate::setup::ProvingParams;
@@ -65,7 +66,7 @@ pub enum WitnessGeneratorType {
 
 /// Uninitialized Circuit Setup data, in this configuration the R1CS objects have not
 /// been initialized and require a bulky initialize process. 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct UninitializedSetup {
   /// vector of all circuits' r1cs
   pub r1cs_types:              Vec<R1CSType>,
@@ -362,11 +363,7 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
       vk_digest_primary,
       vk_digest_secondary,
       // TODO: This approach is odd, refactor with #375
-      setup_data: UninitializedSetup {
-        r1cs_types: Vec::new(), 
-        witness_generator_types: Vec::new(), 
-        max_rom_length: 0
-      },
+      setup_data: Default::default(),
       rom_data,
       rom,
       initial_nivc_input,
