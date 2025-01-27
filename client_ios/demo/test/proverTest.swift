@@ -147,23 +147,37 @@ func fetchData(from urlString: String, completion: @escaping (Data?, Error?) -> 
 class CustomURLSessionDelegate: NSObject, URLSessionDelegate {
     func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         guard let serverTrust = challenge.protectionSpace.serverTrust else {
+            print("Server trust error: Unable to get server trust from protection space")
             completionHandler(.cancelAuthenticationChallenge, nil)
             return
         }
 
-        guard let certificatePath = Bundle.main.path(forResource: "ca-cert", ofType: "cer"),
-              let certificateData = try? Data(contentsOf: URL(fileURLWithPath: certificatePath)) else {
-            print("Failed to load root CA certificate")
+        // Split the certificate loading into two separate guards for better error handling
+        guard let certificatePath = Bundle.main.path(forResource: "ca-cert", ofType: "cer") else {
+            print("Certificate path error: Could not find ca-cert.cer in bundle")
+            print("Bundle path searched: \(Bundle.main.bundlePath)")
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+
+        let certificateData: Data
+        do {
+            certificateData = try Data(contentsOf: URL(fileURLWithPath: certificatePath))
+        } catch {
+            print("Certificate data error: \(error.localizedDescription)")
+            print("Certificate path attempted: \(certificatePath)")
             completionHandler(.cancelAuthenticationChallenge, nil)
             return
         }
 
         guard let rootCertificate = SecCertificateCreateWithData(nil, certificateData as CFData) else {
-            print("Failed to create SecCertificate")
+            print("SecCertificate error: Failed to create certificate from data")
+            print("Certificate data size: \(certificateData.count) bytes")
             completionHandler(.cancelAuthenticationChallenge, nil)
             return
         }
 
+        // The rest remains unchanged
         SecTrustSetAnchorCertificates(serverTrust, [rootCertificate] as CFArray)
 
         // Set a more lenient policy
@@ -179,6 +193,7 @@ class CustomURLSessionDelegate: NSObject, URLSessionDelegate {
             completionHandler(.useCredential, credential)
         } else {
             print("Trust evaluation failed")
+            print("Trust result: \(result)")
             completionHandler(.cancelAuthenticationChallenge, nil)
         }
     }
