@@ -8,11 +8,11 @@
 
 /* Begin PBXBuildFile section */
 		25670E3F2CB58C510033872F /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2597756E2CAB48FA006D6FB1 /* Network.framework */; };
-		25E689D82CBDB1EB00D63F7A /* ca-cert.cer in Resources */ = {isa = PBXBuildFile; fileRef = 25E689D12CBDB1EB00D63F7A /* ca-cert.cer */; };
 		25E689D92CBDB1EB00D63F7A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 25E689D32CBDB1EB00D63F7A /* Assets.xcassets */; };
 		25E689DA2CBDB1EB00D63F7A /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 25E689D52CBDB1EB00D63F7A /* Preview Assets.xcassets */; };
 		25E689DB2CBDB1EB00D63F7A /* demoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25E689D62CBDB1EB00D63F7A /* demoApp.swift */; };
 		25E689DC2CBDB1EB00D63F7A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25E689D72CBDB1EB00D63F7A /* ContentView.swift */; };
+		5B44E6CE2D47DAF3004248FC /* libclient_ios.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 25D9316A2CBDC27E00DF32C2 /* libclient_ios.xcframework */; };
 		5B7AF3CE2D42D3E1003A9BD4 /* libclient_ios.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 25D9316A2CBDC27E00DF32C2 /* libclient_ios.xcframework */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5B7AF3D02D42D48D003A9BD4 /* libclient_ios.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 25D9316A2CBDC27E00DF32C2 /* libclient_ios.xcframework */; };
 		5BEA2C6E2D4462070000FD7C /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5BEA2C5D2D44608E0000FD7C /* XCTest.framework */; platformFilter = ios; };
@@ -37,7 +37,6 @@
 		2597752B2CAB3E40006D6FB1 /* demo-app-clip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = "demo-app-clip.app"; path = "/Users/shufflebottomhogwood/Code/web-prover/client_ios/demo/build/Debug-iphoneos/demo-app-clip.app"; sourceTree = "<absolute>"; };
 		2597756E2CAB48FA006D6FB1 /* Network.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Network.framework; path = System/Library/Frameworks/Network.framework; sourceTree = SDKROOT; };
 		25D9316A2CBDC27E00DF32C2 /* libclient_ios.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = libclient_ios.xcframework; path = "../../target/aarch64-apple-ios-sim/release/libclient_ios.xcframework"; sourceTree = "<group>"; };
-		25E689D12CBDB1EB00D63F7A /* ca-cert.cer */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ca-cert.cer"; sourceTree = "<group>"; };
 		25E689D22CBDB1EB00D63F7A /* demo.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = demo.entitlements; sourceTree = "<group>"; };
 		25E689D32CBDB1EB00D63F7A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		25E689D52CBDB1EB00D63F7A /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
@@ -47,9 +46,30 @@
 		5BEA2C652D4461950000FD7C /* test.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = test.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5B44E6CF2D47E2A9004248FC /* Exceptions for "test" folder in "demo" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"ca-cert.cer",
+			);
+			target = 259774F92CAB3DC6006D6FB1 /* demo */;
+		};
+		5B44E6D02D47E2A9004248FC /* Exceptions for "test" folder in "test" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"ca-cert.cer",
+			);
+			target = 5BEA2C642D4461950000FD7C /* test */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5BEA2C662D4461950000FD7C /* test */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5B44E6CF2D47E2A9004248FC /* Exceptions for "test" folder in "demo" target */,
+				5B44E6D02D47E2A9004248FC /* Exceptions for "test" folder in "test" target */,
+			);
 			path = test;
 			sourceTree = "<group>";
 		};
@@ -69,6 +89,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5B44E6CE2D47DAF3004248FC /* libclient_ios.xcframework in Frameworks */,
 				5BEA2C6E2D4462070000FD7C /* XCTest.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -109,7 +130,6 @@
 		25E689D02CBDB1EB00D63F7A /* demo */ = {
 			isa = PBXGroup;
 			children = (
-				25E689D12CBDB1EB00D63F7A /* ca-cert.cer */,
 				25E689D22CBDB1EB00D63F7A /* demo.entitlements */,
 				25E689D32CBDB1EB00D63F7A /* Assets.xcassets */,
 				25E689D42CBDB1EB00D63F7A /* Preview Content */,
@@ -222,7 +242,6 @@
 			files = (
 				25E689D92CBDB1EB00D63F7A /* Assets.xcassets in Resources */,
 				25E689DA2CBDB1EB00D63F7A /* Preview Assets.xcassets in Resources */,
-				25E689D82CBDB1EB00D63F7A /* ca-cert.cer in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -452,15 +471,19 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pluto.test;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 2;
 			};
 			name = Debug;
 		};
@@ -475,14 +498,18 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pluto.test;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 2;
 			};
 			name = Release;
 		};
