@@ -6,9 +6,9 @@ concurrency:
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   setup:
@@ -62,19 +62,35 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt install unzip -y
 
+      - name: Cache Chrome
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/cache@v4
+        with:
+          path: chrome-linux64
+          key: chrome-linux64-132.0.6834.110
+
+      - name: Download Chrome
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          wget -q "https://storage.googleapis.com/chrome-for-testing-public/132.0.6834.110/linux64/chrome-linux64.zip"
+          unzip chrome-linux64.zip
+          rm chrome-linux64.zip
+
       - name: Restore circuit artifacts
         uses: actions/cache@v3
         with:
           path: proofs/web_proof_circuits
           key: ${{ needs.setup.outputs.cache-key }}
 
-      # TODO run automated tests?
-      #      wasm-pack test --firefox
-      #      docs: https://rustwasm.github.io/docs/wasm-pack/tutorials/npm-browser-packages/testing-your-project.html
-
       - name: compile wasm
         run: |
           make wasm
+
+      - name: Run WASM tests
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          export PATH=$PATH:$PWD/chrome-linux64
+          RUST_LOG=wasm_bindgen_test_runner wasm-pack test --chrome --headless
 
       - run: "tar czf pkg.tar.gz ./pkg/*"
         if: matrix.os == 'ubuntu-latest'
