@@ -24,7 +24,7 @@ use futures::{
 use tls_client2::ClientConnection;
 use tracing::warn;
 #[cfg(feature = "tracing")]
-use tracing::{debug, debug_span, error, trace, Instrument};
+use tracing::{debug, debug_span, error, trace, warn, Instrument};
 
 const RX_TLS_BUF_SIZE: usize = 1 << 13; // 8 KiB
 const RX_BUF_SIZE: usize = 1 << 13; // 8 KiB
