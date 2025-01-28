@@ -40,7 +40,7 @@ console_error_panic_hook={ version="0.1.7" }
 wasm-bindgen-test       ="0.3.50"
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt=["--enable-mutable-globals", "--enable-bulk-memory", "--no-check-features"]
+wasm-opt=["--enable-mutable-globals", "--enable-bulk-memory"]
 
 [package.metadata.wasm-pack.profile.dev.wasm-bindgen]
 dwarf-debug-info=true
