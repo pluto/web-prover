@@ -15,7 +15,7 @@ serde-wasm-bindgen  ="0.6.1"
 serde_json          ={ workspace=true }
 tracing             ={ workspace=true }
 wasm-bindgen        ="=0.2.93"
-wasm-bindgen-rayon  ={ version="=1.2.1" }
+wasm-bindgen-rayon  ={ workspace=true }
 wasm-bindgen-futures="=0.4.43"
 tracing-subscriber  ={ workspace=true, features=["time"] }
 tracing-web         ="0.1.2"
@@ -37,7 +37,7 @@ tlsn-core={ workspace=true }
 console_error_panic_hook={ version="0.1.7" }
 
 [dev-dependencies]
-wasm-bindgen-test="0.3.34"
+wasm-bindgen-test       ="0.3.34"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt=["-Oz", "--enable-threads", "--enable-mutable-globals", "--enable-bulk-memory"]

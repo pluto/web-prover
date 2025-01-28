@@ -6,12 +6,11 @@
 # See https://github.com/pluto/web-prover/pull/201#issuecomment-2392115215
 #
 [build]
-[target.wasm32-unknown-unknown]
 rustflags=[
   "-C",
   "target-feature=+atomics,+bulk-memory,+mutable-globals",
   "-C",
+  "opt-level=z",
+  "-C",
   "link-args=--shared-memory --max-memory=4294967296",
-  "-Z",
-  "threads=8",
 ]
