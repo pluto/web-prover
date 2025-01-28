@@ -64,13 +64,14 @@ jobs:
 
       - name: Cache Chrome
         if: matrix.os == 'ubuntu-latest'
+        id: chrome-cache
         uses: actions/cache@v4
         with:
           path: chrome-linux64
           key: chrome-linux64-132.0.6834.110
 
-      - name: Download Chrome
-        if: matrix.os == 'ubuntu-latest'
+      - name: Download Chrome (if not cached)
+        if: matrix.os == 'ubuntu-latest' && steps.chrome-cache.outputs.cache-hit != 'true'
         run: |
           wget -q "https://storage.googleapis.com/chrome-for-testing-public/132.0.6834.110/linux64/chrome-linux64.zip"
           unzip chrome-linux64.zip
@@ -91,7 +92,7 @@ jobs:
         run: |
           export PATH=$PATH:$PWD/chrome-linux64
           cd client_wasm
-          RUST_LOG=wasm_bindgen_test_runner ~/.cargo/bin/wasm-pack test --chrome --headless
+          RUST_LOG=wasm_bindgen_test_runner rustup run nightly-2024-10-28 ~/.cargo/bin/wasm-pack test --chrome --headless
 
       - run: "tar czf pkg.tar.gz ./pkg/*"
         if: matrix.os == 'ubuntu-latest'
