@@ -48,7 +48,7 @@ struct SharedState {
   origo_signing_key:  Secp256k1SigningKey,
   tlsn_max_sent_data: usize,
   tlsn_max_recv_data: usize,
-  origo_sessions:     Arc<Mutex<HashMap<String, tls_parser::UnparsedTranscript>>>,
+  origo_sessions:     Arc<Mutex<HashMap<String, tls_parser::Transcript<tls_parser::Raw>>>>,
   verifier_sessions:  Arc<Mutex<HashMap<String, origo::VerifierInputs>>>,
   verifiers:          HashMap<String, Verifier>,
   manifest:           Manifest,

@@ -27,9 +27,7 @@ use ws_stream_tungstenite::WsStream;
 use crate::{
   axum_websocket::WebSocket,
   errors::{NotaryServerError, ProxyError},
-  tls_parser::{
-    Direction, UnparsedMessage, UnparsedTranscript, CIRCUIT_SIZE_MAX, MAX_STACK_HEIGHT,
-  },
+  tls_parser::{Direction, Transcript, UnparsedMessage, CIRCUIT_SIZE_MAX, MAX_STACK_HEIGHT},
   tlsn::ProtocolUpgrade,
   SharedState,
 };
@@ -65,7 +63,9 @@ pub async fn sign(
 ) -> Result<Json<SignReply>, ProxyError> {
   let transcript = state.origo_sessions.lock().unwrap().get(&query.session_id).cloned().unwrap();
 
-  let r = transcript.parse_transcript(payload.handshake_server_key, payload.handshake_server_iv);
+  let r = transcript
+    .into_flattened()?
+    .into_parsed(payload.handshake_server_key, payload.handshake_server_iv);
   let parsed_transcript = match r {
     Ok(p) => p,
     Err(e) => {
@@ -385,9 +385,11 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   pin_mut!(client_to_server, server_to_client);
   let _ = select(client_to_server, server_to_client).await.factor_first().0;
 
-  state.origo_sessions.lock().unwrap().insert(session_id.to_string(), UnparsedTranscript {
-    messages: messages.lock().unwrap().to_vec(),
-  });
+  state
+    .origo_sessions
+    .lock()
+    .unwrap()
+    .insert(session_id.to_string(), Transcript { payload: messages.lock().unwrap().to_vec() });
 
   Ok(())
 }
