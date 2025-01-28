@@ -92,7 +92,8 @@ jobs:
         run: |
           export PATH=$PATH:$PWD/chrome-linux64
           cd client_wasm
-          RUST_LOG=wasm_bindgen_test_runner rustup run nightly-2024-10-28 ~/.cargo/bin/wasm-pack test --chrome --headless
+          export RUST_LOG=wasm_bindgen_test_runner
+          rustup run nightly-2024-10-28 ~/.cargo/bin/wasm-pack test --chrome --headless -- -Z build-std=panic_abort,std
 
       - run: "tar czf pkg.tar.gz ./pkg/*"
         if: matrix.os == 'ubuntu-latest'
