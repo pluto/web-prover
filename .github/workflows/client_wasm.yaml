@@ -73,6 +73,7 @@ jobs:
       - name: Download Chrome (if not cached)
         if: matrix.os == 'ubuntu-latest' && steps.chrome-cache.outputs.cache-hit != 'true'
         run: |
+          # https://googlechromelabs.github.io/chrome-for-testing/#stable
           wget -q "https://storage.googleapis.com/chrome-for-testing-public/132.0.6834.110/linux64/chrome-linux64.zip"
           unzip chrome-linux64.zip
           rm chrome-linux64.zip
