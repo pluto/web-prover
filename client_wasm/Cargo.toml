@@ -42,5 +42,8 @@ wasm-bindgen-test       ="0.3.50"
 [package.metadata.wasm-pack.profile.release]
 wasm-opt=["-Oz", "--enable-threads", "--enable-mutable-globals", "--enable-bulk-memory"]
 
+[package.metadata.wasm-pack.profile.debug]
+wasm-opt=["-Oz", "--enable-threads", "--enable-mutable-globals", "--enable-bulk-memory"]
+
 [package.metadata.wasm-pack.profile.dev.wasm-bindgen]
 dwarf-debug-info=true
