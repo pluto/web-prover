@@ -95,8 +95,8 @@ struct ContentView: View {
                let localMethod = "GET"
                let localUrl = "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json"
 
-               let circuit = "aes_gctr_nivc_512b.r1cs"
-               let r1cs_url = "https://localhost:8090/build/target_512b/\(circuit)"
+               let circuit = "plaintext_authentication_512b.r1cs"
+               let r1cs_url = "https://localhost:8090/build/circom-artifacts-512b-v0.7.3/\(circuit)"
 
                // TODO: Live app should fetch these in parallel
                fetchData(from: r1cs_url) { (r1cs_data, error) in

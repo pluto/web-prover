@@ -24,3 +24,4 @@ client_ios/demo/demo.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChec
 
 # artifacts zipfile
 *.zip
+client_ios/demo/build/*
