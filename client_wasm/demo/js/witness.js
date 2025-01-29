@@ -1,12 +1,28 @@
 import { WitnessOutput } from "../pkg/client_wasm";
-const _snarkjs = import("snarkjs");
-const snarkjs = await _snarkjs;
+let snarkjs;
+try {
+  const _snarkjs = await import("snarkjs");
+  snarkjs = _snarkjs;
+  console.log("snarkjs loaded successfully");
+} catch (error) {
+  console.error("Failed to load snarkjs:", error);
+  throw error;
+}
 
 const getWitnessGenerator = async function (circuit) {
-  const wasmUrl = new URL(`${circuit}.wasm`, `https://localhost:8090/build/circom-artifacts-1024b-v0.8.0/`).toString();
+  // Use self.location for workers, fallback to window.location for main thread
+  const origin =
+    typeof self !== "undefined" && self.location
+      ? self.location.origin
+      : window.location.origin;
+
+  const wasmUrl = new URL(
+    `build/circom-artifacts-1024b-v0.8.0/${circuit}.wasm`,
+    origin,
+  ).toString();
   const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
   return wasm;
-}
+};
 
 async function generateWitness(input, wasm) {
   const witStart = +Date.now();
@@ -17,7 +33,11 @@ async function generateWitness(input, wasm) {
   return wtns;
 }
 
-const circuits_label = ["plaintext_authentication_1024b", "http_verification_1024b", "json_extraction_1024b"];
+const circuits_label = [
+  "plaintext_authentication_1024b",
+  "http_verification_1024b",
+  "json_extraction_1024b",
+];
 
 export const generateWitnessBytes = async function (inputs, rom) {
   // load all circuits
@@ -50,12 +70,19 @@ export const witness = {
     let witnesses_typed = new WitnessOutput(witnesses);
     console.log("witness", witnesses_typed);
     return witnesses_typed;
-  }
+  },
 };
 
-
-if (typeof window !== 'undefined') {
-  window.witness = witness;  // For main thread
-} else if (typeof self !== 'undefined') {
-  self.witness = witness;    // For worker thread
+// Modify the environment check to properly handle worker context
+if (
+  typeof self !== "undefined" &&
+  self.constructor.name === "DedicatedWorkerGlobalScope"
+) {
+  console.log("Running in worker thread");
+  self.witness = witness;
+} else if (typeof window !== "undefined") {
+  console.log("Running in main thread");
+  window.witness = witness;
+} else {
+  console.error("Neither window nor worker context defined!");
 }
