@@ -1,6 +1,5 @@
 use client::{
-  config::{self, NotaryMode},
-  prover_inner,
+  circuits, config::{self, NotaryMode}, prover_inner
 };
 use wasm_bindgen_test::*;
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
