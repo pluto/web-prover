@@ -84,9 +84,9 @@ jobs:
           path: proofs/web_proof_circuits
           key: ${{ needs.setup.outputs.cache-key }}
 
-      - name: compile wasm
-        run: |
-          make wasm
+      # - name: compile wasm
+      #   run: |
+      #     make wasm
 
       - name: Run WASM tests
         if: matrix.os == 'ubuntu-latest'
