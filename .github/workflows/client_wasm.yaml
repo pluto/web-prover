@@ -6,9 +6,9 @@ concurrency:
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ['main']
   pull_request:
-    branches: [ "main" ]
+    branches: ['main']
 
 jobs:
   setup:
@@ -33,20 +33,21 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      # Install the generic nightly toolchain
-      - run: rustup toolchain install nightly-2024-10-28 --profile minimal --no-self-update
-
-      # Add the `rust-src` component and wasm target for WebAssembly builds
-      - run: |
-          rustup component add rust-src --toolchain nightly-2024-10-28
-          rustup target add wasm32-unknown-unknown --toolchain nightly-2024-10-28
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2024-10-28
+          components: rust-src
+          targets: wasm32-unknown-unknown
 
       # Add platform-specific targets
-      - run: rustup target add x86_64-unknown-linux-gnu --toolchain nightly-2024-10-28
+      - name: Add Linux target
         if: matrix.os == 'ubuntu-latest'
+        run: rustup target add x86_64-unknown-linux-gnu --toolchain nightly-2024-10-28
 
-      - run: rustup target add aarch64-apple-darwin --toolchain nightly-2024-10-28
+      - name: Add macOS target
         if: matrix.os == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin --toolchain nightly-2024-10-28
 
       - run: sudo apt install -y protobuf-compiler
         if: matrix.os == 'ubuntu-latest'
@@ -76,12 +77,45 @@ jobs:
         run: |
           make wasm
 
-      - run: "tar czf pkg.tar.gz ./pkg/*"
+      # Add Node.js setup for Playwright
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Install npm dependencies and Playwright
+      - name: Install dependencies
+        working-directory: client_wasm/demo
+        run: |
+          npm install
+          npx playwright install --with-deps
+
+      # Start notary in background
+      - name: Start notary
+        run: |
+          RUST_LOG=DEBUG cargo +nightly-2024-10-28 run --release -p notary -- --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json &
+          echo "Waiting for notary to start..."
+          sleep 30
+
+      # Run Playwright tests
+      - name: Run Playwright tests
+        working-directory: client_wasm/demo
+        run: npm test
+
+      # Upload test results on failure
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-${{ matrix.os }}
+          path: client_wasm/demo/playwright-report/
+          retention-days: 30
+
+      # Continue with existing artifact upload steps
+      - run: 'tar czf pkg.tar.gz ./pkg/*'
         if: matrix.os == 'ubuntu-latest'
-        working-directory: "client_wasm"
+        working-directory: 'client_wasm'
 
       - uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-latest'
         with:
-          name: "wasm.tar.gz"
-          path: "client_wasm/pkg.tar.gz"
+          name: 'wasm.tar.gz'
+          path: 'client_wasm/pkg.tar.gz'
