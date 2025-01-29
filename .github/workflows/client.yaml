@@ -28,6 +28,11 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2024-10-28
+      
+      - name: Install wasm Rust components
+        run: |
+          rustup component add rust-src --toolchain nightly-2024-10-28
+          rustup target add wasm32-unknown-unknown --toolchain nightly-2024-10-28
 
       - name: Install LLVM and Clang to support 'ring' crate and protobuf
         run: |
