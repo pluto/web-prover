@@ -1,0 +1,7 @@
+{
+	"goog:chromeOptions": {
+		"args": [
+			"--allow-insecure-localhost"
+		]
+	}
+}

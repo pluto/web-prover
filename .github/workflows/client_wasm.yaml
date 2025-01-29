@@ -91,6 +91,8 @@ jobs:
       - name: Run WASM tests
         if: matrix.os == 'ubuntu-latest'
         run: |
+          RUST_LOG=DEBUG cargo +nightly-2024-10-28 run --release -p notary -- --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json &
+          sleep 30
           export PATH=$PATH:$PWD/chrome-linux64
           cd client_wasm
           export RUST_LOG=wasm_bindgen_test_runner
