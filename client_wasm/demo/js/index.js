@@ -1,22 +1,20 @@
-import init, {
-  setup_tracing,
-  initThreadPool,
-} from "../pkg/client_wasm.js";
+import init, { setup_tracing, initThreadPool } from "../pkg/client_wasm.js";
 import { witness } from "./witness";
 
 const numConcurrency = navigator.hardwareConcurrency;
 
-
 // Monitoring for WASM memory usage
 function checkWasmMemory(wasmMemory) {
   const memoryMB = wasmMemory.buffer.byteLength / (1024 * 1024);
-  console.log(`${new Date().toISOString()}: WASM Memory Usage: ${memoryMB.toFixed(2)} MB`);
+  console.log(
+    `${new Date().toISOString()}: WASM Memory Usage: ${memoryMB.toFixed(2)} MB`,
+  );
 }
 
 function startMemoryMonitoring(instance) {
   checkWasmMemory(instance);
   setInterval(() => {
-      checkWasmMemory(instance);
+    checkWasmMemory(instance);
   }, 5000);
 }
 // Create a WebAssembly.Memory object
@@ -30,6 +28,10 @@ await init(undefined, shared_memory);
 setup_tracing("debug,tlsn_extension_rs=debug");
 await initThreadPool(numConcurrency);
 console.log("initialized thread pool", numConcurrency);
+console.log(`Thread pool initialized with ${numConcurrency} threads`);
+if (navigator.hardwareConcurrency) {
+  console.log(`Hardware concurrency: ${navigator.hardwareConcurrency}`);
+}
 startMemoryMonitoring(shared_memory);
 
 var startTime, endTime, startPreWitgenTime;
@@ -50,24 +52,34 @@ function end() {
   console.log(Math.round(timeDiffWitgen) + " seconds (including witness)");
 }
 
-
 const getByteParams = async function (setupFile) {
-  const ppUrl = new URL(`${setupFile}`, "https://localhost:8090/build/").toString();
+  const ppUrl = new URL(
+    `build/${setupFile}`,
+    window.location.origin,
+  ).toString();
   const pp = await fetch(ppUrl).then((r) => r.arrayBuffer());
   console.log("byte_params", pp);
   return pp;
-}
+};
 
 start();
 
 import proverConfig from "../../../fixture/client.origo_tcp_local.json";
 
-const proofWorker = new Worker(new URL("./proof.js", import.meta.url), { type: "module" });
+const proofWorker = new Worker(new URL("./proof.js", import.meta.url), {
+  type: "module",
+});
 console.log("sending message to worker");
 var proving_params = {
-  aux_params: await getByteParams("circom-artifacts-1024b-v0.8.0/serialized_setup_1024b_rom_length_5.bin"),
+  aux_params: await getByteParams(
+    "circom-artifacts-1024b-v0.8.0/serialized_setup_1024b_rom_length_5.bin",
+  ),
 };
-proofWorker.postMessage({ proverConfig, proving_params, shared_memory });
+proofWorker.postMessage({
+  proverConfig,
+  proving_params,
+  shared_memory,
+});
 console.log("message sent to worker");
 proofWorker.onmessage = (event) => {
   if (event.data.error) {
@@ -77,7 +89,7 @@ proofWorker.onmessage = (event) => {
   } else {
     console.log("proof generated!", event.data);
   }
-}
+};
 
 end();
 
