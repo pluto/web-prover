@@ -5,13 +5,13 @@ on:
     outputs:
       version:
         description: "web-prover-circuits version"
-        value: ${{ jobs.set_version.outputs.version }}
+        value: ${{ jobs.build.outputs.version }}
       cache-key:
         description: "Github CI cache key for web-prover-circuits version"
-        value: web-prover-circuits-v${{ jobs.set_version.outputs.version }}
+        value: web-prover-circuits-v${{ jobs.build.outputs.version }}
 
 jobs:
-  set_version:
+  build:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.set-version.outputs.version }}
@@ -25,23 +25,13 @@ jobs:
           echo "version=$version" >> $GITHUB_OUTPUT
           echo "::notice title=WEB_PROVER_CIRCUITS_VERSION::v$version"
 
-  build:
-    runs-on: ubuntu-latest
-    needs: set_version
-    concurrency:
-      group: web-prover-circuits-v${{ needs.set_version.outputs.version }}
-      cancel-in-progress: false
-    steps:
       - name: Check cache
         id: cached-circuits
         uses: actions/cache@v4
         with:
           path: proofs/web_proof_circuits
-          key: web-prover-circuits-v${{ needs.set_version.outputs.version }}
+          key: web-prover-circuits-v${{ steps.set_version.outputs.version }}
           lookup-only: true # don't download, but still save if cache miss
-
-      - uses: actions/checkout@v4
-        if: steps.cached-circuits.outputs.cache-hit != 'true'
 
       - name: make web-prover-circuits
         if: steps.cached-circuits.outputs.cache-hit != 'true'
