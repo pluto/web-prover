@@ -2,6 +2,7 @@ name: Build Client Native
 
 on:
   workflow_call:
+    inputs:
       web-prover-circuits-cache-key:
         required: true
         type: string

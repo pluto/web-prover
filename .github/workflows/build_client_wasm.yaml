@@ -2,9 +2,10 @@ name: Build Client WASM
 
 on:
   workflow_call:
-    web-prover-circuits-cache-key:
-      required: true
-      type: string
+    inputs:
+      web-prover-circuits-cache-key:
+        required: true
+        type: string
 
 jobs:
   build:
