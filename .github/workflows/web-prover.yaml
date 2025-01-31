@@ -60,9 +60,12 @@ jobs:
 
   deploy_notary_staging:
     needs:
+      - web-prover-circuits
       - build_notary
       - test_client_wasm_origo
       - test_client_native_origo
       - test_client_native_tlsn
       - test_proofs
     uses: ./.github/workflows/deploy_notary_staging.yaml
+    with:
+      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
