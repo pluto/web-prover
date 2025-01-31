@@ -42,24 +42,17 @@ const circuits_label = [
 ];
 
 export const generateWitnessBytes = async function (inputs, rom) {
-  // load all circuits
-  var circuits = [];
-  for (let i = 0; i < circuits_label.length; i++) {
-    circuits[i] = await getWitnessGenerator(circuits_label[i]);
-  }
+  // TODO (sambhav): this loads for each witness call, should be moved to a global scope
+  let circuit = await getWitnessGenerator(circuits_label[rom]);
 
-  let witnesses = [];
+  let circuitInputs = {};
+  inputs.forEach((value, key, map) => {
+    circuitInputs[key] = value;
+  });
 
-  for (let i = 0; i < inputs.length; i++) {
-    let jsonInputs = {};
-    inputs[i].forEach((value, key, map) => {
-      jsonInputs[key] = value;
-    });
-    // load respective circuit from rom
-    let wtns = await generateWitness(jsonInputs, circuits[rom[i]]);
-    witnesses.push(wtns.data);
-  }
-  return witnesses;
+  let wtns = await generateWitness(circuitInputs, circuit);
+
+  return wtns.data;
 };
 
 // this is exposed via FFI to the rust code

@@ -34,7 +34,7 @@ fn get_setup_data() -> UninitializedSetup {
   }
 }
 
-fn run_entry(
+async fn run_entry(
   setup_data: UninitializedSetup,
 ) -> Result<(ProgramData<Online, Expanded>, RecursiveSNARK<E1>), ProofError> {
   let mut external_input0: HashMap<String, Value> = HashMap::new();
@@ -78,18 +78,17 @@ fn run_entry(
     vk_digest_secondary: F::<G2>::ZERO,
     initial_nivc_input: vec![F::<G1>::from(1), F::<G1>::from(2)],
     inputs: (private_inputs, HashMap::new()),
-    witnesses: vec![],
   }
   .into_expanded()?;
-  let recursive_snark = program::run(&program_data).unwrap();
+  let recursive_snark = program::run(&program_data).await.unwrap();
   Ok((program_data, recursive_snark))
 }
 
-#[test]
+#[tokio::test]
 #[tracing_test::traced_test]
-fn test_run() {
+async fn test_run() {
   let setup_data = get_setup_data();
-  let (_, proof) = run_entry(setup_data).unwrap();
+  let (_, proof) = run_entry(setup_data).await.unwrap();
   // [1,2] + [5,7]
   // --> [6,9]
   // --> [36,9]
@@ -115,11 +114,11 @@ fn test_run() {
   assert_eq!(&final_mem.to_vec(), proof.zi_primary());
 }
 
-#[test]
+#[tokio::test]
 #[tracing_test::traced_test]
-fn test_run_serialized_verify() {
+async fn test_run_serialized_verify() {
   let setup_data = get_setup_data();
-  let (program_data, recursive_snark) = run_entry(setup_data.clone()).unwrap();
+  let (program_data, recursive_snark) = run_entry(setup_data.clone()).await.unwrap();
 
   // Pseudo-offline the `PublicParams` and regenerate it
   let mut program_data =

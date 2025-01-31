@@ -1,10 +1,8 @@
 use std::io::Cursor;
 
+use k256::elliptic_curve::Field;
 use nom::{bytes::streaming::take, IResult};
-use proofs::{
-  witness::{data_hasher, ByteOrPad},
-  F, G1,
-};
+use proofs::{F, G1};
 use tls_client2::{
   hash_hs::HandshakeHashBuffer,
   internal::msgs::hsjoiner::HandshakeJoiner,
@@ -27,6 +25,7 @@ use tls_parser::{
   TlsMessageHandshake, TlsServerHelloContents,
 };
 use tracing::{debug, error, info, trace};
+use web_proof_circuits_witness_generator::{data_hasher, ByteOrPad};
 
 use crate::errors::ProxyError;
 
@@ -324,7 +323,12 @@ impl Transcript<Parsed> {
       vec![CIRCUIT_SIZE_SMALL, CIRCUIT_SIZE_MAX]
         .into_iter()
         .filter(|&size| bytes.len() <= size)
-        .map(|size| data_hasher(&ByteOrPad::from_bytes_with_padding(&bytes, size - bytes.len())))
+        .map(|size| {
+          data_hasher(
+            &ByteOrPad::from_bytes_with_padding(&bytes, size - bytes.len()),
+            F::<G1>::ZERO,
+          )
+        })
         .collect()
     }
 

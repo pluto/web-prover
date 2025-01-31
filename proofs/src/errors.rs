@@ -58,4 +58,11 @@ pub enum ProofError {
 
   #[error("json key not found: {0}")]
   JsonKeyError(String),
+
+  #[error(transparent)]
+  WitnessGenerator(#[from] web_proof_circuits_witness_generator::WitnessGeneratorError),
+
+  #[cfg(target_arch = "wasm32")]
+  #[error("transparent")]
+  SerdeWasmBindgen(#[from] serde_wasm_bindgen::Error),
 }

@@ -2,6 +2,30 @@ use fs::OpenOptions;
 
 use super::*;
 
+#[allow(unused_variables)]
+pub async fn generate_witness_from_browser_type(
+  circom_input: CircomInput,
+  opcode: u64,
+) -> Result<Vec<F<G1>>, ProofError> {
+  #[cfg(target_arch = "wasm32")]
+  {
+    let js_witness_input = serde_wasm_bindgen::to_value(&circom_input).map_err(ProofError::from)?;
+
+    let js_witness =
+      crate::circom::wasm_witness::create_witness(js_witness_input, opcode).await.unwrap();
+
+    let js_computed_witnesses: Vec<u8> = js_witness.data.to_vec();
+    let witnesses =
+      load_witness_from_bin_reader(BufReader::new(Cursor::new(js_computed_witnesses)))?;
+
+    return Ok(witnesses);
+  }
+  #[cfg(not(target_arch = "wasm32"))]
+  Err(ProofError::Other(String::from(
+    "Browser type witness generation cannot be generated in process",
+  )))
+}
+
 pub fn generate_witness_from_generator_type(
   input_json: &str,
   witness_generator_type: &WitnessGeneratorType,

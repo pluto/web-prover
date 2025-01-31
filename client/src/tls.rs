@@ -1,6 +1,5 @@
 // TODO many root_stores ... this could use some cleanup where possible
 use proofs::program::manifest::{EncryptionInput, TLSEncryption};
-use reqwest::Client;
 use tls_client2::{origo::WitnessData, CipherSuite, CipherSuiteKey, Decrypter, ProtocolVersion};
 use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
 use tracing::debug;
@@ -58,6 +57,7 @@ pub fn tls_client2_default_root_store() -> tls_client2::RootCertStore {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn rustls_default_root_store() -> rustls::RootCertStore {
+  #[allow(unused_mut)]
   let mut root_store = rustls::RootCertStore { roots: webpki_roots::TLS_SERVER_ROOTS.into() };
 
   #[cfg(feature = "notary_ca_cert")]

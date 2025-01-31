@@ -1,9 +1,18 @@
 // logic common to wasm32 and native
-use proofs::program::manifest::TLSEncryption;
+use std::collections::HashMap;
+
+use proofs::{
+  program::{
+    data::{NotExpanded, Offline, ProgramData},
+    manifest::{EncryptionInput, Manifest, TLSEncryption},
+  },
+  F, G1, G2,
+};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::{
+  circuits::construct_setup_data,
   config::{self},
   errors::ClientErrors,
   tls::decrypt_tls_ciphertext,
@@ -124,23 +133,42 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
   // generate NIVC proofs for request and response
   let manifest = config.proving.manifest.unwrap();
 
-  #[cfg(not(target_arch = "wasm32"))]
-  let proof = crate::origo_native::generate_proof(
-    manifest,
-    proving_params.unwrap(),
-    request_inputs,
-    response_inputs,
-  )
-  .await?;
-  #[cfg(target_arch = "wasm32")]
-  let proof = crate::origo_wasm32::generate_proof(
-    manifest,
-    proving_params.unwrap(),
-    request_inputs,
-    response_inputs,
-  )
-  .await?;
+  let proof =
+    generate_proof(manifest, proving_params.unwrap(), request_inputs, response_inputs).await?;
 
-  // TODO(Sambhav): handle request and response into one proof
   Ok(proof)
+}
+
+pub(crate) async fn generate_proof(
+  manifest: Manifest,
+  proving_params: Vec<u8>,
+  request_inputs: EncryptionInput,
+  response_inputs: EncryptionInput,
+) -> Result<OrigoProof, ClientErrors> {
+  let setup_data = construct_setup_data();
+  let program_data = ProgramData::<Offline, NotExpanded> {
+    public_params: proving_params,
+    vk_digest_primary: F::<G1>::from(0), // These need to be right.
+    vk_digest_secondary: F::<G2>::from(0),
+    setup_data,
+    rom: vec![],
+    rom_data: HashMap::new(),
+    initial_nivc_input: vec![],
+    inputs: (vec![], HashMap::new()),
+  }
+  .into_online()?;
+
+  let vk_digest_primary = program_data.vk_digest_primary;
+  let vk_digest_secondary = program_data.vk_digest_secondary;
+  crate::proof::construct_program_data_and_proof(
+    manifest,
+    request_inputs,
+    response_inputs,
+    (vk_digest_primary, vk_digest_secondary),
+    program_data.public_params,
+    program_data.setup_data,
+  )
+  .await
+
+  // return Ok(OrigoProof(proof));
 }

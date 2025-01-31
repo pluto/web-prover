@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use super::*;
 
 pub mod r1cs;
+#[cfg(target_arch = "wasm32")] pub mod wasm_witness;
 pub mod witness;
 
 #[derive(Debug, Serialize, Deserialize)]
