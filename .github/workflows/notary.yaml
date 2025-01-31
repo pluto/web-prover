@@ -1,8 +1,8 @@
 name: notary
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: true
 
 on:
   push:
@@ -11,11 +11,7 @@ on:
     branches: ["main"]
 
 jobs:
-  setup:
-    uses: ./.github/workflows/download-circuits.yaml
-
   build:
-    needs: setup
     strategy:
       fail-fast: false
       matrix:
@@ -30,10 +26,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: ./.github/workflows/web-prover-circuits.yaml
 
-      - run: rustup toolchain install nightly-2024-10-28
-      - run: sudo apt install -y protobuf-compiler
+      - uses: ./.github/workflows/rust-base-ubuntu.yaml
         if: matrix.os == 'ubuntu-latest'
 
       - name: Install LLVM and Clang to support 'ring' crate and protobuf
@@ -42,12 +37,6 @@ jobs:
           brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
           echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
           brew install protobuf
-
-      - name: Restore circuit artifacts
-        uses: actions/cache@v3
-        with:
-          path: proofs/web_proof_circuits
-          key: ${{ needs.setup.outputs.cache-key }}
 
       - run: cargo +nightly-2024-10-28 build -p notary --release
 

@@ -12,7 +12,7 @@ on:
 
 jobs:
   setup:
-    uses: ./.github/workflows/download-circuits.yaml
+    uses: ./.github/workflows/web-prover-circuits.yaml
 
   version-check:
     needs: setup

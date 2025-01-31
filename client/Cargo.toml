@@ -2,7 +2,7 @@
 name   ="client"
 version="0.2.0"
 edition="2021"
-build  ="../build.rs"
+build  ="build.rs"
 publish=false
 
 [features]
@@ -13,19 +13,22 @@ tracing  =[]
 # used for local development
 notary_ca_cert=[]
 
+[build-dependencies]
+cargo_metadata="0.19.1"
+
 # Shared dependencies for all targets
 [dependencies]
 # TLS
-tls-client ={ workspace=true }
-tls-client2={ workspace=true }
-tls-core   ={ workspace=true }
+tls-client        ={ workspace=true }
+tls-client2       ={ workspace=true }
+tls-core          ={ workspace=true }
 client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="8e7eb839e901dcee416179116bb0f9c4f7ae683c" }
 
 # TLSN
 tlsn-prover={ workspace=true }
 tlsn-core  ={ workspace=true }
 
-caratls = {workspace = true}
+caratls={ workspace=true }
 
 bytes ="1"
 proofs={ workspace=true }
@@ -72,7 +75,7 @@ hyper-util={ workspace=true }
 # Async
 tokio-rustls={ version="0.26", default-features=false, features=["logging", "tls12"] }
 tokio       ={ workspace=true, features=["rt", "rt-multi-thread", "macros", "net", "io-std", "fs"] }
-rustls      ={ version="0.23", default-features=false, features = ["ring"]}
+rustls      ={ version="0.23", default-features=false, features=["ring"] }
 # TLSN
 async-tungstenite    ={ version="0.25.1", features=["async-std-runtime", "async-tls"] }
 ws_stream_tungstenite={ version="0.13.0", features=["tokio_io"] }
@@ -83,7 +86,9 @@ reqwest              ={ version="0.12", features=["json", "rustls-tls"] }
 # Web
 hyper-util={ version="0.1", features=["http1"] }
 ## Use the patched ws_stream_wasm to fix the issue https://github.com/najamelan/ws_stream_wasm/issues/12#issuecomment-1711902958
-ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wasm", rev="2ed12aad9f0236e5321f577672f309920b2aef51", features = ["tokio_io"]}
+ws_stream_wasm={ version="0.7.4", git="https://github.com/tlsnotary/ws_stream_wasm", rev="2ed12aad9f0236e5321f577672f309920b2aef51", features=[
+  "tokio_io",
+] }
 # Serde
 serde-wasm-bindgen="0.6.5"
 reqwest           ={ version="0.12", features=["json"] }

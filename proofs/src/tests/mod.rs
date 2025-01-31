@@ -2,21 +2,21 @@
 
 // TODO: (Colin): I'm noticing this module could use some TLC. There's a lot of lint here!
 
+use std::sync::Arc;
+
 use client_side_prover::supernova::RecursiveSNARK;
 use program::manifest::JsonKey;
 use serde_json::json;
 use witness::{compress_tree_hash, json_tree_hasher, polynomial_digest};
-use std::sync::Arc;
-
 
 use super::*;
 use crate::{
   program::{
-    data::{CircuitData, UninitializedSetup, NotExpanded},
+    data::{CircuitData, NotExpanded, UninitializedSetup},
+    initialize_setup_data,
     manifest::{
       make_nonce, to_chacha_input, EncryptionInput, Manifest, Request, Response, ResponseBody,
     },
-    initialize_setup_data
   },
   witness::{compute_http_witness, ByteOrPad},
 };
@@ -29,28 +29,40 @@ const MAX_STACK_HEIGHT: usize = 10;
 const MAX_HTTP_HEADERS: usize = 25;
 
 // Circuit 0
-const PLAINTEXT_AUTHENTICATION_R1CS: &[u8] = include_bytes!(
-  "../../web_proof_circuits/circom-artifacts-1024b-v0.8.0/plaintext_authentication_1024b.r1cs"
-);
-const PLAINTEXT_AUTHENTICATION_GRAPH: &[u8] = include_bytes!(
-  "../../web_proof_circuits/circom-artifacts-1024b-v0.8.0/plaintext_authentication_1024b.bin"
-);
+const PLAINTEXT_AUTHENTICATION_R1CS: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-1024b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/plaintext_authentication_1024b.r1cs"
+));
+const PLAINTEXT_AUTHENTICATION_GRAPH: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-1024b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/plaintext_authentication_1024b.bin"
+));
 
 // Circuit 1
-const HTTP_VERIFICATION_R1CS: &[u8] = include_bytes!(
-  "../../web_proof_circuits/circom-artifacts-1024b-v0.8.0/http_verification_1024b.r1cs"
-);
-const HTTP_VERIFICATION_GRAPH: &[u8] = include_bytes!(
-  "../../web_proof_circuits/circom-artifacts-1024b-v0.8.0/http_verification_1024b.bin"
-);
+const HTTP_VERIFICATION_R1CS: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-1024b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/http_verification_1024b.r1cs"
+));
+const HTTP_VERIFICATION_GRAPH: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-1024b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/http_verification_1024b.bin"
+));
 
 // Circuit 2
-const JSON_EXTRACTION_R1CS: &[u8] = include_bytes!(
-  "../../web_proof_circuits/circom-artifacts-1024b-v0.8.0/json_extraction_1024b.r1cs"
-);
-const JSON_EXTRACTION_GRAPH: &[u8] = include_bytes!(
-  "../../web_proof_circuits/circom-artifacts-1024b-v0.8.0/json_extraction_1024b.bin"
-);
+const JSON_EXTRACTION_R1CS: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-1024b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/json_extraction_1024b.r1cs"
+));
+const JSON_EXTRACTION_GRAPH: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-1024b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/json_extraction_1024b.bin"
+));
 
 // HTTP/1.1 200 OK
 // content-type: application/json; charset=utf-8

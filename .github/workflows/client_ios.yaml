@@ -1,9 +1,5 @@
 name: client_ios
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 on:
   push:
     branches: [ "main" ]
@@ -12,7 +8,7 @@ on:
 
 jobs:
   setup:
-    uses: ./.github/workflows/download-circuits.yaml
+    uses: ./.github/workflows/web-prover-circuits.yaml
   build:
     needs: setup
     name: client_ios

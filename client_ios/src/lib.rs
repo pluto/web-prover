@@ -14,6 +14,12 @@ struct Output {
 
 #[no_mangle]
 #[allow(clippy::missing_safety_doc)]
+pub unsafe extern "C" fn get_web_prover_circuits_version() -> *const c_char {
+  CString::new(client::get_web_prover_circuits_version()).unwrap().into_raw()
+}
+
+#[no_mangle]
+#[allow(clippy::missing_safety_doc)]
 pub unsafe extern "C" fn setup_tracing() {
   let collector =
     tracing_subscriber::fmt().with_ansi(false).with_max_level(tracing::Level::TRACE).finish();

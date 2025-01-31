@@ -2,12 +2,13 @@
 # Second generate the graph bin files using circom-witnesscalc
 # Finally run test using these files
 
-CIRCUIT_VERSIONS = circom-artifacts-512b-v0.8.0 circom-artifacts-1024b-v0.8.0
+VERSION = $(shell sed -n 's/^web_prover_circuits_version *= *"\(.*\)"/\1/p' ../Cargo.toml)
+CIRCUIT_VERSIONS = circom-artifacts-512b-v$(VERSION) circom-artifacts-1024b-v$(VERSION)
 
 web-prover-circuits:
 	for version in $(CIRCUIT_VERSIONS); do \
 		if [ ! -d "web_proof_circuits/$$version" ] || [ -z "$$(ls -A web_proof_circuits/$$version)" ]; then \
-			curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/download/v0.8.0/$$version.zip; \
+			curl -L -o circuits.zip https://github.com/pluto/web-prover-circuits/releases/download/v$(VERSION)/$$version.zip; \
 			mkdir -p web_proof_circuits/$$version/; \
 			unzip -o circuits.zip -d web_proof_circuits/$$version/; \
 			rm circuits.zip; \
@@ -26,5 +27,5 @@ test-circuits:
 	build-circuit examples/circuit_data/square_zeroth.circom examples/circuit_data/square_zeroth.bin -l node_modules
 	build-circuit examples/circuit_data/swap_memory.circom examples/circuit_data/swap_memory.bin -l node_modules
 
-proof: web-prover-circuits-1024
+proof: web-prover-circuits
 	cargo test --release --features timing -- tests::test_end_to_end_proofs --exact --show-output

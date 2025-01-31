@@ -311,7 +311,7 @@ async fn listen(
     match ServerConfig::builder().with_no_client_auth().with_single_cert(certs, key) {
       Ok(config) => {
         let mut config = config;
-        config.alpn_protocols = vec![b"http/1.1".to_vec()];
+        config.alpn_protocols = vec![b"http/1.0".to_vec()];
         config
       },
       Err(e) => {

@@ -1,0 +1,15 @@
+on:
+  workflow_call:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "hello"
+
+      - uses: Swatinem/rust-cache@v2 # TODO does not work!
+
+      - run: rustup toolchain install nightly-2024-10-28
+
+      - run: sudo apt install -y protobuf-compiler
+        if: matrix.os == 'ubuntu-latest'
