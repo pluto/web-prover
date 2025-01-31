@@ -7,8 +7,10 @@ on:
         required: true
         type: string
     secrets:
-      cloudflare-api-token:
-        required: true
+      inherit
+
+      # cloudflare-api-token:
+      # required: true
 
 jobs:
   deploy:
@@ -96,7 +98,7 @@ jobs:
           OUT=`curl -s --request POST \
             --url https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records \
             --header 'Content-Type: application/json' \
-            --header "Authorization: Bearer ${{ inputs.cloudflare-api-token }}" \
+            --header "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
             --data "{ \
               \"comment\": \"Staging Notary $GIT_SHORT_HASH\", \
               \"name\": \"$GIT_SHORT_HASH.notary\", \

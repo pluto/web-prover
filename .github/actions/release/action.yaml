@@ -67,8 +67,8 @@ runs:
         echo "RELEASE_TEMP_DIR=$RELEASE_TEMP_DIR" >> $GITHUB_ENV
         cd $RELEASE_TEMP_DIR
 
-        echo "Release of `${{ inputs.release_name }}`" > release_notes.md
-        echo "Version: `v${{ steps.extract-version.outputs.version }}`" >> release_notes.md
+        echo "Release of ${{ inputs.release_name }}" > release_notes.md
+        echo "Version: v${{ steps.extract-version.outputs.version }}" >> release_notes.md
         echo "Commit: ${{ github.sha }}" >> release_notes.md
 
     - name: Upload Release
