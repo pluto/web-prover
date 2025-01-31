@@ -26,7 +26,17 @@ jobs:
     needs: ["web-prover-circuits"]
     uses: ./.github/workflows/build_client_wasm.yaml
 
-  # test_wasm:
+  test_client_wasm_origo:
+    needs: ["build_client_wasm", "build_notary"]
+    uses: ./.github/workflows/test_client_wasm_origo.yaml
+
+  test_client_native_origo:
+    needs: ["build_client_native", "build_notary"]
+    uses: ./.github/workflows/test_client_native_origo.yaml
+
+  test_client_native_tlsn:
+    needs: ["build_client_native", "build_notary"]
+    uses: ./.github/workflows/test_client_native_tlsn.yaml
 
   # test_proofs:
 
