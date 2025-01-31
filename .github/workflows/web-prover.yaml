@@ -1,0 +1,33 @@
+name: web-prover
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  web-prover-circuits:
+    uses: ./.github/workflows/web-prover-circuits.yaml
+
+  build_notary:
+    needs: ["web-prover-circuits"]
+    uses: ./.github/workflows/build_notary.yaml
+
+  build_client_native:
+    needs: ["web-prover-circuits"]
+    uses: ./.github/workflows/build_client_native.yaml
+
+  build_client_ios:
+    needs: ["web-prover-circuits"]
+    uses: ./.github/workflows/build_client_ios.yaml
+
+  build_client_wasm:
+    needs: ["web-prover-circuits"]
+    uses: ./.github/workflows/build_client_wasm.yaml
+
+  # test_wasm:
+
+  # test_proofs:
+
+  # deploy:

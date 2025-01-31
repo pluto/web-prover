@@ -1,0 +1,14 @@
+name: Build Client iOS
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hello
+        shell: bash
+        run: |
+          echo "hello"
+
