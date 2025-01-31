@@ -9,6 +9,7 @@ on:
 
 jobs:
   build:
+    name: build client wasm
     runs-on: ubuntu-latest
     env:
       CARGO_TERM_COLOR: always
@@ -30,4 +31,11 @@ jobs:
 
       - run: make wasm
 
-      # TODO upload wasm artifact
+      - run: "tar czf pkg.tar.gz ./pkg/*"
+        working-directory: "client_wasm"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: "client.wasm.tar.gz"
+          path: "client_wasm/pkg.tar.gz"
+          retention-days: 7
