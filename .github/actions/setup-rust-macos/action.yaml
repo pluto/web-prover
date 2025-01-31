@@ -2,7 +2,7 @@ name: "Setup Rust Environment (MacOS)"
 description: ""
 inputs:
   rust-cache-key:
-    description: "Additional Rust Cache Key"
+    description: "Additional Rust Cache Key (should not include OS)"
     required: true
 
 runs:

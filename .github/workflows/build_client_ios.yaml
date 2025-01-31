@@ -18,7 +18,7 @@ jobs:
 
       - uses: ./.github/actions/setup-rust-macos
         with:
-          rust-cache-key: ios
+          rust-cache-key: client_ios
 
       - name: Fetch web-prover-circuits cache
         uses: actions/cache/restore@v4

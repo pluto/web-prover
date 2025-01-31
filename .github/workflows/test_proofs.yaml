@@ -18,7 +18,7 @@ jobs:
 
       - uses: ./.github/actions/setup-rust-ubuntu
         with:
-          rust-cache-key: native
+          rust-cache-key: test_proofs
 
       - name: Fetch web-prover-circuits cache
         uses: actions/cache/restore@v4

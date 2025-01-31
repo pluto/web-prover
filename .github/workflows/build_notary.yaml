@@ -24,11 +24,11 @@ jobs:
       - uses: ./.github/actions/setup-rust-ubuntu
         if: matrix.os == 'ubuntu-latest'
         with:
-          rust-cache-key: native
+          rust-cache-key: client_notary
       - uses: ./.github/actions/setup-rust-macos
         if: matrix.os == 'macos-latest'
         with:
-          rust-cache-key: native
+          rust-cache-key: client_notary
 
       - name: Fetch web-prover-circuits cache
         uses: actions/cache/restore@v4

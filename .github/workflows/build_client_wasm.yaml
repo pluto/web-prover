@@ -18,7 +18,7 @@ jobs:
 
       - uses: ./.github/actions/setup-rust-ubuntu
         with:
-          rust-cache-key: wasm
+          rust-cache-key: client_wasm
 
       - name: Install WASM Rust components
         run: |
