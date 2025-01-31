@@ -90,4 +90,5 @@ jobs:
     uses: ./.github/workflows/deploy_notary_staging.yaml
     with:
       web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
+    secrets:
       cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}

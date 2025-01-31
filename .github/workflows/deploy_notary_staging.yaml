@@ -6,9 +6,9 @@ on:
       web-prover-circuits-cache-key:
         required: true
         type: string
+    secrets:
       cloudflare-api-token:
         required: true
-        type: string
 
 jobs:
   deploy:
