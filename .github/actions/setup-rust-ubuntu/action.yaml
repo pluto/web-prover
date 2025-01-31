@@ -22,12 +22,6 @@ runs:
         sudo chmod +x /usr/local/bin/protoc
         echo "PROTOC=/usr/local/bin/protoc" >> $GITHUB_ENV
 
-    - name: Install cbindgen
-      shell: bash
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y cbindgen
-
     - name: Cache Rust dependencies
       uses: actions/cache@v4
       with:
@@ -40,7 +34,9 @@ runs:
           rust-${{ runner.os }}-${{ inputs.rust-cache-key }}
 
     - shell: bash
-      run: rustup toolchain install nightly-2024-10-28
+      run: |
+        rustup toolchain install nightly-2024-10-28
+        cargo install cbindgen
 
     - name: Verify installations
       shell: bash

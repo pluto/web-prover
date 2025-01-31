@@ -29,11 +29,11 @@ runs:
     #     path: /opt/homebrew/opt/llvm@18
     #     key: ${{ runner.os }}-llvm18
 
-    - name: Install LLVM and build deps
+    - name: Install LLVM
       # if: steps.llvm-cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        brew install llvm@18 cbindgen # https://formulae.brew.sh/formula/llvm#default
+        brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
         echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
 
     - name: Cache Rust dependencies
@@ -48,7 +48,9 @@ runs:
           rust-${{ runner.os }}-${{ inputs.rust-cache-key }}
 
     - shell: bash
-      run: rustup toolchain install nightly-2024-10-28
+      run: |
+        rustup toolchain install nightly-2024-10-28
+        cargo install cbindgen
 
     - name: Verify installations
       shell: bash
