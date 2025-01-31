@@ -41,16 +41,22 @@ jobs:
       web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
   test_client_wasm_origo:
-    needs: ["build_client_wasm", "build_notary"]
+    needs: ["web-prover-circuits", "build_client_wasm", "build_notary"]
     uses: ./.github/workflows/test_client_wasm_origo.yaml
+    with:
+      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
   test_client_native_origo:
-    needs: ["build_client_native", "build_notary"]
+    needs: ["web-prover-circuits", "build_client_native", "build_notary"]
     uses: ./.github/workflows/test_client_native_origo.yaml
+    with:
+      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
   test_client_native_tlsn:
-    needs: ["build_client_native", "build_notary"]
+    needs: ["web-prover-circuits", "build_client_native", "build_notary"]
     uses: ./.github/workflows/test_client_native_tlsn.yaml
+    with:
+      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
   test_proofs:
     needs: ["web-prover-circuits"]
