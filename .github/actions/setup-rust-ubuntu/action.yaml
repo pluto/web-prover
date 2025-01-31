@@ -8,11 +8,13 @@ runs:
       shell: bash
       run: |
         cd ${{ runner.temp }}
+        mkdir protobuf
+        cd protobuf
         VERSION=29.3
-        wget https://github.com/protocolbuffers/protobuf/releases/download/v${VERSION}/protoc-${VERSION}-linux-x86_64.zip
+        wget -q "https://github.com/protocolbuffers/protobuf/releases/download/v${VERSION}/protoc-${VERSION}-linux-x86_64.zip"
         unzip protoc-${VERSION}-linux-x86_64.zip
-        sudo mv protoc-${VERSION}-linux-x86_64/include/google /usr/local/include/
-        sudo mv protoc-${VERSION}-linux-x86_64/bin/protoc /usr/local/bin/
+        sudo mv include/google /usr/local/include/
+        sudo mv bin/protoc /usr/local/bin/
         sudo chmod +x /usr/local/bin/protoc
         echo "PROTOC=/usr/local/bin/protoc" >> $GITHUB_ENV
 
