@@ -72,7 +72,7 @@ jobs:
     needs:
       - build_notary
       - build_client_wasm
-      - build_client_ios
+      # - build_client_ios
       # - test_client_wasm_origo
       # - test_client_native_origo
       # - test_client_native_tlsn
@@ -90,3 +90,4 @@ jobs:
     uses: ./.github/workflows/deploy_notary_staging.yaml
     with:
       web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
+      cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}

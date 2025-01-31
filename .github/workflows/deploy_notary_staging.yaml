@@ -6,6 +6,9 @@ on:
       web-prover-circuits-cache-key:
         required: true
         type: string
+      cloudflare-api-token:
+        required: true
+        type: string
 
 jobs:
   deploy:
@@ -93,7 +96,7 @@ jobs:
           OUT=`curl -s --request POST \
             --url https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records \
             --header 'Content-Type: application/json' \
-            --header "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            --header "Authorization: Bearer ${{ inputs.cloudflare-api-token }}" \
             --data "{ \
               \"comment\": \"Staging Notary $GIT_SHORT_HASH\", \
               \"name\": \"$GIT_SHORT_HASH.notary\", \
