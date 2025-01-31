@@ -46,3 +46,4 @@ jobs:
           name: "client.wasm"
           path: "client_wasm/pkg/*"
           retention-days: 7
+          if-no-files-found: "error"

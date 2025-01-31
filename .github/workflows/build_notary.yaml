@@ -44,3 +44,4 @@ jobs:
           name: "notary.linux.amd64"
           path: "target/release/notary"
           retention-days: 7
+          if-no-files-found: "error"

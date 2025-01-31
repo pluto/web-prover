@@ -41,3 +41,8 @@ jobs:
           ls -la /target/PlutoProver.xcframework
           ls -la /client_wasm
           ls -la /client_wasm/pkg
+
+      - uses: ./.github/actions/release
+        with:
+          cargo_toml_path: notary/Cargo.toml
+          release_name: "notary"

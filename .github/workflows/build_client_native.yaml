@@ -46,3 +46,4 @@ jobs:
           name: "client.linux.amd64"
           path: "target/release/client"
           retention-days: 7
+          if-no-files-found: "error"
