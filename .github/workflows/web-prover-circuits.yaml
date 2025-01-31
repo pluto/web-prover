@@ -21,9 +21,9 @@ jobs:
       - name: Extract web_prover_circuits_version
         id: set-version
         run: |
-          VERSION=$(sed -n 's/^web_prover_circuits_version *= *"\(.*\)"/\1/p' Cargo.toml)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "::notice title=WEB_PROVER_CIRCUITS_VERSION::v$(VERSION)"
+          version=$(sed -n 's/^web_prover_circuits_version *= *"\(.*\)"/\1/p' Cargo.toml)
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "::notice title=WEB_PROVER_CIRCUITS_VERSION::v$version"
 
   build:
     runs-on: ubuntu-latest
