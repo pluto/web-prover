@@ -27,7 +27,7 @@ jobs:
 
       - uses: ./.github/actions/setup-rust-ubuntu
         if: matrix.os == 'ubuntu-latest'
-      - uses: ./.github/actions/setup-rust-mac
+      - uses: ./.github/actions/setup-rust-macos
         if: matrix.os == 'macos-latest'
 
       - name: Fetch web-prover-circuits cache

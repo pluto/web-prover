@@ -11,10 +11,11 @@ on:
     branches: ["main"]
 
 jobs:
-  setup:
+  web-prover-circuits:
     uses: ./.github/workflows/web-prover-circuits.yaml
+
   test:
-    needs: setup
+    needs: web-prover-circuits
     name: client on macos-latest
     runs-on: macos-latest
     steps:
@@ -22,12 +23,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: Swatinem/rust-cache@v2
+      # - uses: Swatinem/rust-cache@v2
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2024-10-28
+      # - name: Install Rust
+      #   uses: dtolnay/rust-toolchain@master
+      #   with:
+      #     toolchain: nightly-2024-10-28
       
       - name: Install wasm Rust components
         run: |

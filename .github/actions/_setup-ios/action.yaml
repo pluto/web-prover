@@ -1,0 +1,54 @@
+name: 'Setup iOS Build Environment'
+description: 'Sets up iOS build environment with Rust, LLVM, and required dependencies'
+inputs:
+  rust-version:
+    description: 'Rust version to install'
+    required: false
+    default: 'nightly'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Cache dependencies
+      id: cache-deps
+      uses: actions/cache@v3
+      with:
+        path: |
+          /opt/homebrew/opt/llvm@18
+          /opt/homebrew/opt/protobuf
+        key: ${{ runner.os }}-ios-deps-${{ hashFiles('/opt/homebrew/opt/llvm@18/**', '/opt/homebrew/opt/protobuf/**') }}
+
+    - name: Install dependencies
+      if: steps.cache-deps.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        brew install llvm@18
+        brew install protobuf
+
+    - name: Set environment paths
+      shell: bash
+      run: |
+        echo "/opt/homebrew/opt/llvm@18/bin" >> $GITHUB_PATH
+        echo "/opt/homebrew/opt/protobuf/bin" >> $GITHUB_PATH
+        echo "PROTOC=/opt/homebrew/opt/protobuf/bin/protoc" >> $GITHUB_ENV
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ inputs.rust-version }}
+        components: rust-src
+        targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
+    - name: Verify installations
+      shell: bash
+      run: |
+        echo "Verifying LLVM installation..."
+        clang --version
+        
+        echo "Verifying protoc installation..."
+        which protoc
+        protoc --version
+        
+        echo "Verifying Rust installation..."
+        rustc --version
+        rustup show
