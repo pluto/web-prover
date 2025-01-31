@@ -19,11 +19,9 @@ jobs:
           name: "client.linux.amd64"
           path: "target/release"
 
-      - run: ls -la target/release
-
       - run: |
-          RUST_LOG=DEBUG target/release/notary.linux.amd64 --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json &
+          RUST_LOG=DEBUG ./target/release/notary --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json &
           sleep 10
 
           export NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer
-          target/release/client.linux.amd64 --config ./fixture/client.origo_tcp_local.json
+          ./target/release/client --config ./fixture/client.origo_tcp_local.json

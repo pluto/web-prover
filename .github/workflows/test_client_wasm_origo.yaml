@@ -27,7 +27,7 @@ jobs:
           npx playwright install --with-deps
 
       - run: |
-          RUST_LOG=DEBUG target/release/notary.linux.amd64 --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json &
+          RUST_LOG=DEBUG ./target/release/notary --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json &
           sleep 10
 
           cd client_wasm/demo
