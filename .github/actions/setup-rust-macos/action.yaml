@@ -32,6 +32,18 @@ runs:
         brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
         echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
 
+    - name: Cache Rust dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          rust-${{ runner.os }}-
+
     - name: Verify installations
       shell: bash
       run: |

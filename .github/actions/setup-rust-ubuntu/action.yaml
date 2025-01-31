@@ -21,6 +21,18 @@ runs:
     - shell: bash
       run: rustup toolchain install nightly-2024-10-28
 
+    - name: Cache Rust dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          rust-${{ runner.os }}-
+
     - name: Verify installations
       shell: bash
       run: |
