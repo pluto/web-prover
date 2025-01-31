@@ -12,7 +12,7 @@ jobs:
 
   lint:
     needs: ["web-prover-circuits"]
-    uses: ./github/workflows/lint.yaml
+    uses: ./.github/workflows/lint.yaml
     with:
       web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
