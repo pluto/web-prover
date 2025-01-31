@@ -22,15 +22,15 @@ runs:
         sudo chmod +x /usr/local/bin/protoc
         echo "PROTOC=/usr/local/bin/protoc" >> $GITHUB_ENV
 
-    - name: Cache LLVM installation
-      id: llvm-cache
-      uses: actions/cache@v4
-      with:
-        path: /opt/homebrew/opt/llvm@18
-        key: ${{ runner.os }}-llvm18
+    # - name: Cache LLVM installation
+    #   id: llvm-cache
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: /opt/homebrew/opt/llvm@18
+    #     key: ${{ runner.os }}-llvm18
 
-    - name: Install LLVM
-      if: steps.llvm-cache.outputs.cache-hit != 'true'
+    - name: Install LLVM and build deps
+      # if: steps.llvm-cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         brew install llvm@18 cbindgen # https://formulae.brew.sh/formula/llvm#default
