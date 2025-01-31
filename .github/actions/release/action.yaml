@@ -63,11 +63,12 @@ runs:
       if: steps.check-release.outputs.exists != 'true'
       shell: bash
       run: |
-        mkdir -p releases/${{ inputs.release_name }}
-        cd releases/${{ inputs.release_name }}
+        RELEASE_TEMP_DIR=$(mktemp -d "$RUNNER_TEMP/releases.XXXXXX")
+        echo "RELEASE_TEMP_DIR=$RELEASE_TEMP_DIR" >> $GITHUB_ENV
+        cd $RELEASE_TEMP_DIR
 
-        echo "Automated release of ${{ inputs.release_name }}" > release_notes.md
-        echo "Version: v${{ steps.extract-version.outputs.version }}" >> release_notes.md
+        echo "Release of `${{ inputs.release_name }}`" > release_notes.md
+        echo "Version: `v${{ steps.extract-version.outputs.version }}`" >> release_notes.md
         echo "Commit: ${{ github.sha }}" >> release_notes.md
 
     - name: Upload Release
@@ -78,6 +79,6 @@ runs:
       with:
         files: ${{ inputs.asset_files }}
         tag_name: ${{ inputs.release_name }}-v${{ steps.extract-version.outputs.version }}
-        body_path: releases/${{ inputs.release_name }}/release_notes.md
+        body_path: ${{ env.RELEASE_TEMP_DIR }}/release_notes.md
         fail_on_unmatched_files: true
         preserve_order: true

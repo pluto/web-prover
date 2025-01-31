@@ -42,12 +42,40 @@ jobs:
           ls -la client_wasm
           ls -la client_wasm/pkg
 
+      - name: Prepare client_wasm
+        shell: bash
+        run: |
+          mkdir -p releases/client_wasm
+          cd releases/client_wasm
+          tar -czf  releases/client_wasm/client_wasm.tar.gz client_wasm/pkg
+          sha256sum * > sha256sum.txt
+
+      - name: Release client_wasm
+        uses: ./.github/actions/release
+        with:
+          cargo_toml_path: client_wasm/Cargo.toml
+          release_name: "client.wasm"
+          asset_files: |
+            releases/client_wasm/client_wasm.tar.gz
+            releases/client_wasm/sha256sum.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare notary
+        shell: bash
+        run: |
+          mkdir -p releases/notary
+          cd releases/notary
+          tar -czf releases/notary/notary.linux.amd64.tar.gz target/release/notary
+          sha256sum * > sha256sum.txt
+
       - name: Release notary
         uses: ./.github/actions/release
         with:
           cargo_toml_path: notary/Cargo.toml
           release_name: "notary"
           asset_files: |
-            target/release/notary
+            releases/notary/notary.linux.amd64.tar.gz
+            releases/notary/sha256sum.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
