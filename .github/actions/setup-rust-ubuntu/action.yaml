@@ -4,10 +4,31 @@ description: ""
 runs:
   using: "composite"
   steps:
+    - name: Install protoc
+      shell: bash
+      run: |
+        cd ${{ runner.temp }}
+        VERSION=29.3
+        wget https://github.com/protocolbuffers/protobuf/releases/download/v${VERSION}/protoc-${VERSION}-linux-x86_64.zip
+        unzip protoc-${VERSION}-linux-x86_64.zip
+        sudo mv protoc-${VERSION}-linux-x86_64/include/google /usr/local/include/
+        sudo mv protoc-${VERSION}-linux-x86_64/bin/protoc /usr/local/bin/
+        sudo chmod +x /usr/local/bin/protoc
+        echo "PROTOC=/usr/local/bin/protoc" >> $GITHUB_ENV
+
     - shell: bash
       run: rustup toolchain install nightly-2024-10-28
 
-    - shell: bash
-      run: sudo apt install -y protobuf-compiler
+    - name: Verify installations
+      shell: bash
+      run: |
+        echo "Verifying LLVM installation..."
+        clang --version
 
-    # TODO cache action
+        echo "Verifying protoc installation..."
+        which protoc
+        protoc --version
+
+        echo "Verifying Rust installation..."
+        rustc --version
+        rustup show

@@ -27,9 +27,8 @@ jobs:
 
       - uses: ./.github/actions/setup-rust-ubuntu
         if: matrix.os == 'ubuntu-latest'
-
-      # - uses: ./.github/actions/setup-rust-mac
-      #   if: matrix.os == 'macos-latest'
+      - uses: ./.github/actions/setup-rust-mac
+        if: matrix.os == 'macos-latest'
 
       - run: cargo +nightly-2024-10-28 build -p notary --release
 
@@ -148,4 +147,4 @@ jobs:
             exit 1
           fi
 
-          echo "##[notice]https://$GIT_SHORT_HASH.notary.pluto.dev/health"
+          echo "::notice title=Notary_URL::https://$GIT_SHORT_HASH.notary.pluto.dev/health"

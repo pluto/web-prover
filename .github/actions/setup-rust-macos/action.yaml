@@ -4,14 +4,42 @@ description: ""
 runs:
   using: "composite"
   steps:
-    - name: fdf
+    - name: Install protoc
       shell: bash
-      run: echo "hello"
+      run: |
+        cd ${{ runner.temp }}
+        VERSION=29.3
+        wget https://github.com/protocolbuffers/protobuf/releases/download/v${VERSION}/protoc-${VERSION}-osx-aarch_64.zip
+        unzip protoc-${VERSION}-osx-aarch_64.zip
+        sudo mv protoc-${VERSION}-osx-aarch_64/include/google /usr/local/include/
+        sudo mv protoc-${VERSION}-osx-aarch_64/bin/protoc /usr/local/bin/
+        sudo chmod +x /usr/local/bin/protoc
+        echo "PROTOC=/usr/local/bin/protoc" >> $GITHUB_ENV
 
-    - name: Install LLVM and Clang to support 'ring' crate and protobuf
-      if: inputs.os == 'macos-latest'
+    - name: Cache LLVM installation
+      id: llvm-cache
+      uses: actions/cache@v4
+      with:
+        path: /opt/homebrew/opt/llvm@18
+        key: ${{ runner.os }}-llvm18
+
+    - name: Install LLVM
+      if: steps.llvm-cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
         echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
-        brew install protobuf
+
+    - name: Verify installations
+      shell: bash
+      run: |
+        echo "Verifying LLVM installation..."
+        clang --version
+
+        echo "Verifying protoc installation..."
+        which protoc
+        protoc --version
+
+        echo "Verifying Rust installation..."
+        rustc --version
+        rustup show
