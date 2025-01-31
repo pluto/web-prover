@@ -21,7 +21,7 @@ runs:
         sudo mv bin/protoc /usr/local/bin/
         sudo chmod +x /usr/local/bin/protoc
         echo "PROTOC=/usr/local/bin/protoc" >> $GITHUB_ENV
-
+    
     - name: Cache LLVM installation
       id: llvm-cache
       uses: actions/cache@v4
