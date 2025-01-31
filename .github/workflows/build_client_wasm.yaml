@@ -33,11 +33,8 @@ jobs:
 
       - run: make wasm
 
-      - run: "tar czf pkg.tar.gz ./pkg/*"
-        working-directory: "client_wasm"
-
       - uses: actions/upload-artifact@v4
         with:
-          name: "client.wasm.tar.gz"
-          path: "client_wasm/pkg.tar.gz"
+          name: "client.wasm"
+          path: "client_wasm/pkg/*"
           retention-days: 7

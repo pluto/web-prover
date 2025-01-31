@@ -1,0 +1,48 @@
+name: Lint
+
+on:
+  workflow_call:
+    inputs:
+      web-prover-circuits-cache-key:
+        required: true
+        type: string
+
+jobs:
+  clippy:
+    continue-on-error: true
+    needs: web-prover-circuits
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        crate:
+          - notary
+          - proofs
+          - client
+          - client_ios
+          # TODO - client_wasm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-rust-ubuntu
+
+      - name: Fetch web-prover-circuits cache
+        uses: actions/cache/restore@v4
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ inputs.web-prover-circuits-cache-key }}
+
+      - run: cargo clippy -p ${{ matrix.crate }}
+
+  fmt:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-rust-ubuntu
+
+      - run: rustup component add rustfmt
+
+      - run: cargo fmt --all -- --check

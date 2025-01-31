@@ -7,8 +7,28 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Hello
-        shell: bash
-        run: |
-          echo "hello"
+      - uses: actions/checkout@v4
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: "notary.linux.amd64"
+          path: "target/release"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # TODO: cache node_modules?
+
+      - name: Install dependencies
+        working-directory: client_wasm/demo
+        run: |
+          npm install
+          npx playwright install --with-deps
+
+      - run: |
+          RUST_LOG=DEBUG target/release/notary.linux.amd64 --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json &
+          sleep 10
+
+          cd client_wasm/demo
+          npm test

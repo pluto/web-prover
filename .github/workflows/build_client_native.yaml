@@ -40,14 +40,9 @@ jobs:
           export NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer 
           cargo +nightly-2024-10-28 build -p client --release
 
-      - if: matrix.os == 'ubuntu-latest'
-        run: |
-          cp target/release/client target/release/client.linux.amd64
-          tar czf target/release/client.linux.amd64.tar.gz target/release/client.linux.amd64
-
       - uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-latest'
         with:
-          name: "client.linux.amd64.tar.gz"
-          path: "target/release/client.linux.amd64.tar.gz"
+          name: "client.linux.amd64"
+          path: "target/release/client"
           retention-days: 7

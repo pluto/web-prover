@@ -7,8 +7,23 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Hello
-        shell: bash
-        run: |
-          echo "hello"
+      - uses: actions/checkout@v4
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: "notary.linux.amd64"
+          path: "target/release"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: "client.linux.amd64"
+          path: "target/release"
+
+      - run: ls -la target/release
+
+      - run: |
+          RUST_LOG=DEBUG target/release/notary.linux.amd64 --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json &
+          sleep 10
+
+          export NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer
+          target/release/client.linux.amd64 --config ./fixture/client.tlsn_tcp_local.json
