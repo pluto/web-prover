@@ -1,0 +1,52 @@
+name: client_ios
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  setup:
+    uses: ./.github/workflows/web-prover-circuits.yaml
+  build:
+    needs: setup
+    name: client_ios
+    runs-on: macos-latest
+
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install Rust toolchain and target
+        run: |
+          rustup toolchain install nightly-2024-10-28 --profile minimal --no-self-update
+          rustup component add rust-src --toolchain nightly-2024-10-28
+
+      # TODO: do we need llvm for this?
+      - name: Install LLVM and Clang to support 'ring' crate and protobuf for witnesscalc
+        run: |
+          brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
+          echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
+          brew install protobuf
+
+      - name: Restore circuit artifacts
+        uses: actions/cache@v3
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ needs.setup.outputs.cache-key }}
+
+      - name: Compile iOS
+        run: |
+          make ios
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: "PlutoProver.xcframework"
+          path: "target/PlutoProver.xcframework"

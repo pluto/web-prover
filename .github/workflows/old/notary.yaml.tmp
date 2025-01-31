@@ -1,0 +1,156 @@
+name: notary
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  web-prover-circuits:
+    uses: ./.github/workflows/web-prover-circuits.yaml
+
+  build:
+    name: notary on ${{ matrix.os }}
+    needs: web-prover-circuits
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-rust-ubuntu
+        if: matrix.os == 'ubuntu-latest'
+      - uses: ./.github/actions/setup-rust-macos
+        if: matrix.os == 'macos-latest'
+
+      - name: Fetch web-prover-circuits cache
+        uses: actions/cache/restore@v4
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ needs.web-prover-circuits.outputs.cache-key }}
+
+      - run: cargo +nightly-2024-10-28 build -p notary --release
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          name: "notary.linux.amd64"
+          path: "target/release/notary"
+          retention-days: 7
+
+  deploy:
+    # TODO run only on main branch?
+    runs-on: ubuntu-latest
+    needs: ["web-prover-circuits", "build"]
+    permissions:
+      contents: "read"
+      id-token: "write"
+
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download notary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: "notary.linux.amd64"
+          path: .github/workflows/staging-deploy
+
+      - name: Restore circuit artifacts
+        uses: actions/cache@v3
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ needs.web-prover-circuits.outputs.cache-key }}
+
+      - uses: "google-github-actions/auth@v2"
+        with:
+          project_id: "web-prover-staging-65d502"
+          workload_identity_provider: "projects/683425918315/locations/global/workloadIdentityPools/github/providers/web-prover-deploy-test"
+
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v2"
+        with:
+          version: ">= 506.0.0"
+
+      - name: "Prepare assets to be uploaded"
+        run: |
+          GIT_SHORT_HASH=$(git rev-parse --short HEAD) # is there a better way?
+          mv fixture .github/workflows/staging-deploy/
+          mkdir .github/workflows/staging-deploy/proofs
+          mv proofs/web_proof_circuits .github/workflows/staging-deploy/proofs/
+          echo -e "\nacme_domain=\"${GIT_SHORT_HASH}.notary.pluto.dev\"\n" >> .github/workflows/staging-deploy/notary-config.toml
+
+      - name: Upload assets
+        uses: "google-github-actions/upload-cloud-storage@v2"
+        with:
+          path: ".github/workflows/staging-deploy"
+          destination: "web-prover-staging-7ff608/${{ github.sha }}"
+          parent: false
+
+      - name: Boot Notary instance
+        run: |
+          INSTANCE=notary-${{ github.sha }}
+          PROJECT=web-prover-staging-65d502
+          MACHINE=e2-highmem-2
+          ASSET_BUCKET=web-prover-staging-7ff608
+
+          echo "Delete $INSTANCE if it exists ... (ignore errors)"
+          gcloud compute instances delete "$INSTANCE" --zone=us-central1-b --quiet --verbosity=info || true
+
+          OUT=`gcloud compute instances create $INSTANCE \
+            --project=$PROJECT \
+            --zone=us-central1-b \
+            --machine-type=$MACHINE \
+            --network-interface=network-tier=PREMIUM,stack-type=IPV4_ONLY,subnet=default \
+            --metadata="enable-osconfig=TRUE,git-hash=${{ github.sha }},asset-bucket-name=$ASSET_BUCKET" \
+            --metadata-from-file startup-script=.github/workflows/staging-deploy/startup-script.sh \
+            --maintenance-policy=MIGRATE \
+            --provisioning-model=STANDARD \
+            --service-account=683425918315-compute@developer.gserviceaccount.com \
+            --scopes=https://www.googleapis.com/auth/cloud-platform \
+            --tags=notary \
+            --create-disk=auto-delete=yes,boot=yes,device-name=$INSTANCE,image=projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-v20241219,mode=rw,size=10,type=pd-balanced \
+            --no-shielded-secure-boot \
+            --shielded-vtpm \
+            --shielded-integrity-monitoring \
+            --labels=goog-ops-agent-policy=v2-x86-template-1-4-0,goog-ec-src=vm_add-gcloud \
+            --reservation-affinity=any \
+            --format=json`
+
+          EXTERNAL_IP=$(echo $OUT | jq -r '.[0].networkInterfaces[0].accessConfigs[0].natIP')
+          echo $EXTERNAL_IP
+
+          GIT_SHORT_HASH=$(git rev-parse --short HEAD) # is there a better way?
+
+          ZONE_ID=1d20e7dd6bf74aa550038d25bd4ac8b8
+          OUT=`curl -s --request POST \
+            --url https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records \
+            --header 'Content-Type: application/json' \
+            --header "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            --data "{ \
+              \"comment\": \"Staging Notary $GIT_SHORT_HASH\", \
+              \"name\": \"$GIT_SHORT_HASH.notary\", \
+              \"proxied\": false, \
+              \"settings\": {}, \
+              \"tags\": [], \
+              \"ttl\": 3600, \
+              \"content\": \"$EXTERNAL_IP\", \
+              \"type\": \"A\" \
+            }"`
+
+          echo $OUT
+          if [ "$(echo $OUT | jq -r .success)" != "true" ]; then
+            echo "Error: Cloudflare API call failed."
+            exit 1
+          fi
+
+          echo "::notice title=Notary_URL::https://$GIT_SHORT_HASH.notary.pluto.dev/health"
