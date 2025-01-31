@@ -20,7 +20,10 @@ jobs:
 
       - name: Extract web_prover_circuits_version
         id: set-version
-        run: echo "version=$(sed -n 's/^web_prover_circuits_version *= *"\(.*\)"/\1/p') Cargo.toml) >> $GITHUB_OUTPUT"
+        run: |
+          VERSION=$(sed -n 's/^web_prover_circuits_version *= *"\(.*\)"/\1/p' Cargo.toml)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "::notice title=WEB_PROVER_CIRCUITS_VERSION::v$(VERSION)"
 
   build:
     runs-on: ubuntu-latest
@@ -35,6 +38,7 @@ jobs:
         with:
           path: proofs/web_proof_circuits
           key: web-prover-circuits-v${{ needs.set_version.outputs.version }}
+          lookup-only: true # don't download, but still save if cache miss
 
       - uses: actions/checkout@v4
         if: steps.cached-circuits.outputs.cache-hit != 'true'
