@@ -18,6 +18,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - run: |
+          echo $HOME
+
       - name: Extract web_prover_circuits_version from Cargo.toml
         id: set-version
         run: |
