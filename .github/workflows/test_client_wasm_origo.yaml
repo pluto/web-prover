@@ -19,12 +19,19 @@ jobs:
           path: proofs/web_proof_circuits
           key: ${{ inputs.web-prover-circuits-cache-key }}
 
-      - uses: actions/download-artifact@v4
+      - name: Download notary
+        uses: actions/download-artifact@v4
         with:
           name: "notary.linux.amd64"
           path: "target/release"
 
       - run: chmod +x target/release/notary
+
+      - name: Download client.wasm
+        uses: actions/download-artifact@v4
+        with:
+          name: "client.wasm"
+          path: "client_wasm/pkg/"
 
       - uses: actions/setup-node@v4
         with:

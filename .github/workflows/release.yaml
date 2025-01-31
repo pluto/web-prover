@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  workflow_call:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download notary
+        uses: actions/download-artifact@v4
+        with:
+          name: "notary.linux.amd64"
+          path: "target/release"
+
+      - name: Download client
+        uses: actions/download-artifact@v4
+        with:
+          name: "client.linux.amd64"
+          path: "target/release"
+
+      - name: Download client.wasm
+        uses: actions/download-artifact@v4
+        with:
+          name: "client.wasm"
+          path: "client_wasm/pkg/"
+
+      - name: Download client.ios
+        uses: actions/download-artifact@v4
+        with:
+          name: "PlutoProver.xcframework"
+          path: "target/PlutoProver.xcframework"
+
+      # TODO
+      - shell: bash
+        run: |
+          ls -la /target
+          ls -la /target/PlutoProver.xcframework
+          ls -la /client_wasm
+          ls -la /client_wasm/pkg

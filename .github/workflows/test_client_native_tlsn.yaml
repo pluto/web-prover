@@ -19,14 +19,16 @@ jobs:
           path: proofs/web_proof_circuits
           key: ${{ inputs.web-prover-circuits-cache-key }}
 
-      - uses: actions/download-artifact@v4
+      - name: Download notary
+        uses: actions/download-artifact@v4
         with:
           name: "notary.linux.amd64"
           path: "target/release"
 
       - run: chmod +x target/release/notary
 
-      - uses: actions/download-artifact@v4
+      - name: Download client
+        uses: actions/download-artifact@v4
         with:
           name: "client.linux.amd64"
           path: "target/release"
