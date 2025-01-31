@@ -37,12 +37,14 @@ jobs:
       # TODO
       - shell: bash
         run: |
-          ls -la /target
-          ls -la /target/PlutoProver.xcframework
-          ls -la /client_wasm
-          ls -la /client_wasm/pkg
+          ls -la target
+          ls -la target/PlutoProver.xcframework
+          ls -la client_wasm
+          ls -la client_wasm/pkg
 
       - uses: ./.github/actions/release
         with:
           cargo_toml_path: notary/Cargo.toml
           release_name: "notary"
+          asset_files: |
+            target/release/notary

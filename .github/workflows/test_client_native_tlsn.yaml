@@ -36,7 +36,8 @@ jobs:
       - run: chmod +x target/release/client
 
       - run: |
-          RUST_LOG=DEBUG ./target/release/notary --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json &
+          export RUST_LOG=DEBUG 
+          ./target/release/notary --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json &
           sleep 10
 
           export NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer

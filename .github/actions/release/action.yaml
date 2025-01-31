@@ -7,6 +7,9 @@ inputs:
   release_name:
     description: "Unique name for the release"
     required: true
+  asset_files:
+    description: "Newline-delimited globs of paths to assets to upload for release"
+    required: true
 
 outputs:
   version:
@@ -63,15 +66,21 @@ runs:
       if: steps.check-release.outputs.exists != 'true'
       shell: bash
       run: |
-        echo "Automated release of compiled Circom circuits" > release_notes.md
+        mkdir releases/${{ inputs.release_name }}
+        cd releases/${{ inputs.release_name }}
+
+        echo "Automated release of ${{ inputs.release_name }}" > release_notes.md
+        echo "Version: v${{ steps.extract-version.outputs.version }}" >> release_notes.md
         echo "Commit: ${{ github.sha }}" >> release_notes.md
 
-    # - name: Upload Release Assets
-    #  if: steps.check-release.outputs.exists != 'true'
-    #   uses: softprops/action-gh-release@v2
-    #   with:
-    #     files: artifacts/circom-artifacts-*-v${{ env.VERSION }}.zip
-    #     tag_name: v${{ env.VERSION }}
-    #     body_path: release_notes.md
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload Release
+      if: steps.check-release.outputs.exists != 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ${{ inputs.asset_files }}
+        tag_name: ${{ inputs.release_name }}-v${{ steps.extract-version.outputs.version }}
+        body_path: releases/${{ inputs.release_name }}/release_notes.md
+        fail_on_unmatched_files: true
+        preserve_order: true
