@@ -53,6 +53,7 @@ jobs:
           path: ".github/workflows/staging-deploy"
           destination: "web-prover-staging-7ff608/${{ github.sha }}"
           parent: false
+          process_gcloudignore: false
 
       - name: Boot Notary instance
         run: |
