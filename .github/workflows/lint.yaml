@@ -25,6 +25,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-rust-ubuntu
+        with:
+          rust-cache-key: clippy
 
       - name: Fetch web-prover-circuits cache
         uses: actions/cache/restore@v4
@@ -41,6 +43,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-rust-ubuntu
+        with:
+          rust-cache-key: fmt
 
       - run: rustup component add rustfmt
 
