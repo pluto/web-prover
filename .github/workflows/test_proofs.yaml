@@ -1,0 +1,29 @@
+name: Test proofs
+
+on:
+  workflow_call:
+    inputs:
+      web-prover-circuits-cache-key:
+        required: true
+        type: string
+
+jobs:
+  test:
+    name: test proofs
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-rust-ubuntu
+        with:
+          rust-cache-key: native
+
+      - name: Fetch web-prover-circuits cache
+        uses: actions/cache/restore@v4
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ inputs.web-prover-circuits-cache-key }}
+
+      - run: cargo test --package proofs --release

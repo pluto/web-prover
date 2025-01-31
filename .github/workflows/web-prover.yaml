@@ -52,6 +52,17 @@ jobs:
     needs: ["build_client_native", "build_notary"]
     uses: ./.github/workflows/test_client_native_tlsn.yaml
 
-  # TODO test_proofs:
+  test_proofs:
+    needs: ["web-prover-circuits"]
+    uses: ./.github/workflows/test_proofs.yaml
+    with:
+      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
-  # TODO deploy:
+  deploy_notary_staging:
+    needs:
+      - build_notary
+      - test_client_wasm_origo
+      - test_client_native_origo
+      - test_client_native_tlsn
+      - test_proofs
+    uses: ./.github/workflows/deploy_notary_staging.yaml
