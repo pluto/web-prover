@@ -21,7 +21,7 @@ runs:
         sudo mv bin/protoc /usr/local/bin/
         sudo chmod +x /usr/local/bin/protoc
         echo "PROTOC=/usr/local/bin/protoc" >> $GITHUB_ENV
-    
+
     - name: Cache LLVM installation
       id: llvm-cache
       uses: actions/cache@v4
@@ -33,7 +33,7 @@ runs:
       if: steps.llvm-cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
+        brew install llvm@18 cbindgen # https://formulae.brew.sh/formula/llvm#default
         echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
 
     - name: Cache Rust dependencies
@@ -55,6 +55,9 @@ runs:
       run: |
         echo "Verifying LLVM installation..."
         clang --version
+
+        echo "Verifying cbindgen installation..."
+        cbindgen --version
 
         echo "Verifying protoc installation..."
         which protoc

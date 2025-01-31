@@ -20,13 +20,43 @@ jobs:
         with:
           rust-cache-key: client_ios
 
+      - name: Install WASM Rust components
+        run: |
+          rustup target add aarch64-apple-ios-sim --toolchain nightly-2024-10-28
+          rustup target add aarch64-apple-ios --toolchain nightly-2024-10-28
+
       - name: Fetch web-prover-circuits cache
         uses: actions/cache/restore@v4
         with:
           path: proofs/web_proof_circuits
           key: ${{ inputs.web-prover-circuits-cache-key }}
 
-      - run: make ios
+      - name: Build iOS lib
+        run: |
+          export NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" 
+          export RUSTFLAGS="-C panic=unwind" 
+
+          rm -rf target/{sim,device}
+          rm -f target/PlutoProver.xcframework
+          mkdir -p target/{sim,device}/headers
+
+          cargo +nightly-2024-10-28 build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
+          cbindgen --lang c --crate client_ios --output target/sim/headers/Prover.h
+          mv target/aarch64-apple-ios-sim/release/libclient_ios.a target/sim/libProver.a
+
+          cargo +nightly-2024-10-28  build -p client_ios --release --target aarch64-apple-ios # builds target/aarch64-apple-ios/release/libclient_ios.a
+          cbindgen --lang c --crate client_ios --output target/device/headers/Prover.h
+          mv target/aarch64-apple-ios/release/libclient_ios.a target/device/libProver.a
+
+          xcodebuild -create-xcframework \
+            -library "target/sim/libProver.a" \
+            -headers target/sim/headers \
+            -library "target/device/libProver.a" \
+            -headers target/device/headers \
+            -output target/PlutoProver.xcframework
+
+          rm -rf target/{sim,device}
+          rm -f target/PlutoProver.xcframework
 
       - uses: actions/upload-artifact@v4
         with:

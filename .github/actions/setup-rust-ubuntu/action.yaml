@@ -22,6 +22,12 @@ runs:
         sudo chmod +x /usr/local/bin/protoc
         echo "PROTOC=/usr/local/bin/protoc" >> $GITHUB_ENV
 
+    - name: Install cbindgen
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cbindgen
+
     - name: Cache Rust dependencies
       uses: actions/cache@v4
       with:
@@ -41,6 +47,9 @@ runs:
       run: |
         echo "Verifying LLVM installation..."
         clang --version
+
+        echo "Verifying cbindgen installation..."
+        cbindgen --version
 
         echo "Verifying protoc installation..."
         which protoc
