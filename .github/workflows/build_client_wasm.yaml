@@ -2,13 +2,31 @@ name: Build Client WASM
 
 on:
   workflow_call:
+    web-prover-circuits-cache-key:
+      required: true
+      type: string
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
     steps:
-      - name: Hello
-        shell: bash
-        run: |
-          echo "hello"
+      - uses: actions/checkout@v4
 
+      - uses: ./.github/actions/setup-rust-ubuntu
+
+      - name: Install WASM Rust components
+        run: |
+          rustup component add rust-src --toolchain nightly-2024-10-28
+          rustup target add wasm32-unknown-unknown --toolchain nightly-2024-10-28
+
+      - name: Fetch web-prover-circuits cache
+        uses: actions/cache/restore@v4
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ inputs.web-prover-circuits-cache-key }}
+
+      - run: make wasm
+
+      # TODO upload wasm artifact

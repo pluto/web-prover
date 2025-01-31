@@ -2,13 +2,42 @@ name: Build Client Native
 
 on:
   workflow_call:
+      web-prover-circuits-cache-key:
+        required: true
+        type: string
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Hello
-        shell: bash
-        run: |
-          echo "hello"
+    name: client native on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      CARGO_TERM_COLOR: always
 
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-rust-ubuntu
+        if: matrix.os == 'ubuntu-latest'
+      - uses: ./.github/actions/setup-rust-macos
+        if: matrix.os == 'macos-latest'
+
+      - name: Fetch web-prover-circuits cache
+        uses: actions/cache/restore@v4
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ inputs.web-prover-circuits-cache-key }}
+
+      - run: |
+          NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer 
+          cargo +nightly-2024-10-28 build -p client --release
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          name: "client.linux.amd64"
+          path: "target/release/client"
+          retention-days: 7

@@ -2,13 +2,29 @@ name: Build Client iOS
 
 on:
   workflow_call:
+    web-prover-circuits-cache-key:
+      required: true
+      type: string
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
+    env:
+      CARGO_TERM_COLOR: always
     steps:
-      - name: Hello
-        shell: bash
-        run: |
-          echo "hello"
+      - uses: actions/checkout@v4
 
+      - uses: ./.github/actions/setup-rust-macos
+
+      - name: Fetch web-prover-circuits cache
+        uses: actions/cache/restore@v4
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ inputs.web-prover-circuits-cache-key }}
+
+      - run: make ios
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: "PlutoProver.xcframework"
+          path: "target/PlutoProver.xcframework"

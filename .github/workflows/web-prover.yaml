@@ -19,14 +19,20 @@ jobs:
   build_client_native:
     needs: ["web-prover-circuits"]
     uses: ./.github/workflows/build_client_native.yaml
+    with:
+      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
   build_client_ios:
     needs: ["web-prover-circuits"]
     uses: ./.github/workflows/build_client_ios.yaml
+    with:
+      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
   build_client_wasm:
     needs: ["web-prover-circuits"]
     uses: ./.github/workflows/build_client_wasm.yaml
+    with:
+      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
   test_client_wasm_origo:
     needs: ["build_client_wasm", "build_notary"]
