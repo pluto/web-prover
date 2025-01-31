@@ -16,11 +16,11 @@ jobs:
           name: "notary.linux.amd64"
           path: "target/release"
 
-      - name: Download client
-        uses: actions/download-artifact@v4
-        with:
-          name: "client.linux.amd64"
-          path: "target/release"
+      # - name: Download client
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: "client.linux.amd64"
+      #     path: "target/release"
 
       - name: Download client.wasm
         uses: actions/download-artifact@v4
