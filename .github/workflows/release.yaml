@@ -38,7 +38,7 @@ jobs:
       - shell: bash
         run: |
           ls -la target
-          ls -la target/PlutoProver.xcframework
+          # ls -la target/PlutoProver.xcframework
           ls -la client_wasm
           ls -la client_wasm/pkg
 
