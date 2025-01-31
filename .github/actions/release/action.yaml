@@ -63,7 +63,7 @@ runs:
       if: steps.check-release.outputs.exists != 'true'
       shell: bash
       run: |
-        mkdir releases/${{ inputs.release_name }}
+        mkdir -p releases/${{ inputs.release_name }}
         cd releases/${{ inputs.release_name }}
 
         echo "Automated release of ${{ inputs.release_name }}" > release_notes.md

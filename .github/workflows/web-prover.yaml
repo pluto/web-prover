@@ -69,6 +69,7 @@ jobs:
       web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
   release:
+    # TODO if: github.ref == 'refs/heads/main'
     needs:
       - build_notary
       - build_client_wasm
@@ -80,6 +81,7 @@ jobs:
     uses: ./.github/workflows/release.yaml
 
   deploy_notary_staging:
+    # TODO if: github.ref == 'refs/heads/main'
     needs:
       - web-prover-circuits
       - build_notary
