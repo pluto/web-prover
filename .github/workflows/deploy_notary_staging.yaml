@@ -6,8 +6,8 @@ on:
       web-prover-circuits-cache-key:
         required: true
         type: string
-    secrets:
-      inherit
+    # secrets:
+    #   inherit
 
       # cloudflare-api-token:
       # required: true
