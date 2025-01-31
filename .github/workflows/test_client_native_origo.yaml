@@ -14,10 +14,14 @@ jobs:
           name: "notary.linux.amd64"
           path: "target/release"
 
+      - run: chmod +x target/release/notary
+
       - uses: actions/download-artifact@v4
         with:
           name: "client.linux.amd64"
           path: "target/release"
+
+      - run: chmod +x target/release/client
 
       - run: |
           RUST_LOG=DEBUG ./target/release/notary --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json &
