@@ -16,7 +16,6 @@ jobs:
 
   clippy:
     needs: web-prover-circuits
-    name: clippy
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -32,27 +31,20 @@ jobs:
 
       - uses: ./.github/actions/setup-rust-ubuntu
 
-      # - name: Set up Rust
-      #   uses: actions-rs/toolchain@v1
-      #   with:
-      #     toolchain: nightly
-      #     profile: minimal
-      #     components: clippy
-      #     override: true
+      - name: Fetch web-prover-circuits cache
+        uses: actions/cache/restore@v4
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
       - run: cargo clippy -p ${{ matrix.crate }}
 
   fmt:
-    name: fmt project
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        toolchain:
-          - nightly
     steps:
       - uses: actions/checkout@v4
 
-      - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+      - uses: ./.github/actions/setup-rust-ubuntu
 
       - run: rustup component add rustfmt
 
