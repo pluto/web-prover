@@ -10,43 +10,52 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download notary
-        uses: actions/download-artifact@v4
-        with:
-          name: "notary.linux.amd64"
-          path: "target/release"
-
+      # TODO release the native client?
       # - name: Download client
       #   uses: actions/download-artifact@v4
       #   with:
       #     name: "client.linux.amd64"
       #     path: "target/release"
 
+      # client_os ...
+      - name: Download client.ios
+        uses: actions/download-artifact@v4
+        with:
+          name: "PlutoProver.xcframework"
+          path: "target/PlutoProver.xcframework"
+
+      - name: Prepare client_ios
+        shell: bash
+        run: |
+          mkdir -p releases/client_ios
+          tar -czf  releases/client_ios/client_ios.tar.gz target/PlutoProver.xcframework 
+
+          cd releases/client_ios
+          sha256sum * > sha256sum.txt
+
+      - name: Release client_ios
+        uses: ./.github/actions/release
+        with:
+          cargo_toml_path: client_ios/Cargo.toml
+          release_name: "client.ios"
+          asset_files: |
+            releases/client_ios/client_ios.tar.gz
+            releases/client_ios/sha256sum.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # client_wasm ...
       - name: Download client.wasm
         uses: actions/download-artifact@v4
         with:
           name: "client.wasm"
           path: "client_wasm/pkg/"
 
-      # - name: Download client.ios
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: "PlutoProver.xcframework"
-      #     path: "target/PlutoProver.xcframework"
-
-      # TODO
-      - shell: bash
-        run: |
-          ls -la target
-          # ls -la target/PlutoProver.xcframework
-          ls -la client_wasm
-          ls -la client_wasm/pkg
-
       - name: Prepare client_wasm
         shell: bash
         run: |
           mkdir -p releases/client_wasm
-          tar -czf  releases/client_wasm/client_wasm.tar.gz client_wasm/pkg
+          tar -czf  releases/client_wasm/client_wasm.tar.gz client_wasm/pkg/*
 
           cd releases/client_wasm
           sha256sum * > sha256sum.txt
@@ -61,6 +70,13 @@ jobs:
             releases/client_wasm/sha256sum.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # notary ...
+      - name: Download notary
+        uses: actions/download-artifact@v4
+        with:
+          name: "notary.linux.amd64"
+          path: "target/release"
 
       - name: Prepare notary
         shell: bash

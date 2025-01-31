@@ -93,5 +93,3 @@ jobs:
     with:
       web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
     secrets: inherit
-    # secrets:
-    # cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
