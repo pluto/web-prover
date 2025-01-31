@@ -42,10 +42,16 @@ runs:
         path: |
           /Users/runner/.cargo
           /Users/runner/.rustup
+        key: rust-${{ runner.os }}-${{ inputs.rust-cache-key }}
+
+    - name: Cache Rust target dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
           target
-        key: rust-${{ runner.os }}-${{ inputs.rust-cache-key }}-${{ hashFiles('**/Cargo.lock') }}
+        key: rust-${{ runner.os }}-${{ inputs.rust-cache-key }}-target-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
-          rust-${{ runner.os }}-${{ inputs.rust-cache-key }}
+          rust-${{ runner.os }}-${{ inputs.rust-cache-key }}-target
 
     - shell: bash
       run: |

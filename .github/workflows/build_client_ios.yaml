@@ -37,7 +37,7 @@ jobs:
           export RUSTFLAGS="-C panic=unwind" 
 
           rm -rf target/{sim,device}
-          rm -f target/PlutoProver.xcframework
+          rm -rf target/PlutoProver.xcframework
           mkdir -p target/{sim,device}/headers
 
           cargo +nightly-2024-10-28 build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
@@ -56,7 +56,7 @@ jobs:
             -output target/PlutoProver.xcframework
 
           rm -rf target/{sim,device}
-          rm -f target/PlutoProver.xcframework
+          rm -rf target/PlutoProver.xcframework
 
       - uses: actions/upload-artifact@v4
         with:
