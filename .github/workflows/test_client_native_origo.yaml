@@ -7,8 +7,22 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Hello
-        shell: bash
-        run: |
-          echo "hello"
+      - uses: actions/checkout@v4
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: "notary.linux.amd64.tar.gz"
+          path: "target/release/notary.linux.amd64.tar.gz"
+
+      - run: tar -xzf notary.linux.amd64.tar.gz
+        working-directory: target/release
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: "client.linux.amd64.tar.gz"
+          path: "target/release/client.linux.amd64.tar.gz"
+
+      - run: tar -xzf client.linux.amd64.tar.gz
+        working-directory: target/release
+
+      - run: ls -la target/release

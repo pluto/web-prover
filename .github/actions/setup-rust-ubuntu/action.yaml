@@ -1,5 +1,9 @@
 name: "Setup Rust Environment (Ubuntu)"
 description: ""
+inputs:
+  rust-cache-key:
+    description: "Additional Rust Cache Key"
+    required: true
 
 runs:
   using: "composite"
@@ -29,9 +33,9 @@ runs:
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+        key: rust-${{ runner.os }}-${{ inputs.rust-cache-key }}-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
-          rust-${{ runner.os }}-
+          rust-${{ runner.os }}-${{ inputs.rust-cache-key }}
 
     - name: Verify installations
       shell: bash

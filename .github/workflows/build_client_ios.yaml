@@ -17,6 +17,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-rust-macos
+        with:
+          rust-cache-key: ios
 
       - name: Fetch web-prover-circuits cache
         uses: actions/cache/restore@v4

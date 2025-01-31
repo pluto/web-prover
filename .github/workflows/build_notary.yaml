@@ -23,8 +23,12 @@ jobs:
 
       - uses: ./.github/actions/setup-rust-ubuntu
         if: matrix.os == 'ubuntu-latest'
+        with:
+          rust-cache-key: native
       - uses: ./.github/actions/setup-rust-macos
         if: matrix.os == 'macos-latest'
+        with:
+          rust-cache-key: native
 
       - name: Fetch web-prover-circuits cache
         uses: actions/cache/restore@v4
@@ -34,9 +38,14 @@ jobs:
 
       - run: cargo +nightly-2024-10-28 build -p notary --release
 
+      - if: matrix.os == 'ubuntu-latest'
+        run: |
+          cp target/release/notary target/release/notary.linux.amd64
+          tar czf target/release/notary.linux.amd64.tar.gz target/release/notary.linux.amd64
+
       - uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-latest'
         with:
-          name: "notary.linux.amd64"
-          path: "target/release/notary"
+          name: "notary.linux.amd64.tar.gz"
+          path: "target/release/notary.linux.amd64.tar.gz"
           retention-days: 7

@@ -46,6 +46,6 @@ jobs:
     needs: ["build_client_native", "build_notary"]
     uses: ./.github/workflows/test_client_native_tlsn.yaml
 
-  # test_proofs:
+  # TODO test_proofs:
 
-  # deploy:
+  # TODO deploy:
