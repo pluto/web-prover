@@ -1,4 +1,6 @@
 import { WitnessOutput } from "../pkg/client_wasm";
+import { WEB_PROVER_VERSION } from "./config";
+
 let snarkjs;
 try {
   const _snarkjs = await import("snarkjs");
@@ -17,7 +19,7 @@ const getWitnessGenerator = async function (circuit) {
       : window.location.origin;
 
   const wasmUrl = new URL(
-    `build/circom-artifacts-1024b-v0.8.0/${circuit}.wasm`,
+    `build/circom-artifacts-1024b-v${WEB_PROVER_VERSION}/${circuit}.wasm`,
     origin,
   ).toString();
   const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());

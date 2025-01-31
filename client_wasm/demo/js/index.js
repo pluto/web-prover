@@ -1,5 +1,6 @@
 import init, { setup_tracing, initThreadPool } from "../pkg/client_wasm.js";
 import { witness } from "./witness";
+import { WEB_PROVER_VERSION } from "./config";
 
 const numConcurrency = navigator.hardwareConcurrency;
 
@@ -70,9 +71,10 @@ const proofWorker = new Worker(new URL("./proof.js", import.meta.url), {
   type: "module",
 });
 console.log("sending message to worker");
+
 var proving_params = {
   aux_params: await getByteParams(
-    "circom-artifacts-1024b-v0.8.0/serialized_setup_1024b_rom_length_5.bin",
+    `circom-artifacts-1024b-v${WEB_PROVER_VERSION}/serialized_setup_1024b_rom_length_5.bin`,
   ),
 };
 proofWorker.postMessage({
