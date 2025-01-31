@@ -46,8 +46,9 @@ jobs:
         shell: bash
         run: |
           mkdir -p releases/client_wasm
-          cd releases/client_wasm
           tar -czf  releases/client_wasm/client_wasm.tar.gz client_wasm/pkg
+
+          cd releases/client_wasm
           sha256sum * > sha256sum.txt
 
       - name: Release client_wasm
@@ -65,8 +66,9 @@ jobs:
         shell: bash
         run: |
           mkdir -p releases/notary
-          cd releases/notary
           tar -czf releases/notary/notary.linux.amd64.tar.gz target/release/notary
+
+          cd releases/notary
           sha256sum * > sha256sum.txt
 
       - name: Release notary
