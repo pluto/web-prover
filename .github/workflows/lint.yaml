@@ -10,7 +10,6 @@ on:
 jobs:
   clippy:
     continue-on-error: true
-    needs: web-prover-circuits
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
