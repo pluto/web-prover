@@ -1,9 +1,5 @@
 name: notary
 
-# concurrency:
-#   group: ${{ github.workflow }}-${{ github.ref }}
-#   cancel-in-progress: true
-
 on:
   push:
     branches: ["main"]
@@ -11,13 +7,16 @@ on:
     branches: ["main"]
 
 jobs:
+  web-prover-circuits:
+    uses: ./.github/workflows/web-prover-circuits.yaml
+
   build:
+    name: notary on ${{ matrix.os }}
+    needs: web-prover-circuits
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-
-    name: notary on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
     env:
@@ -26,17 +25,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/workflows/web-prover-circuits.yaml
+      - uses: ./.github/actions/setup-rust-ubuntu
+        if: matrix.os == "ubuntu-latest"
 
-      - uses: ./.github/workflows/rust-base-ubuntu.yaml
-        if: matrix.os == 'ubuntu-latest'
-
-      - name: Install LLVM and Clang to support 'ring' crate and protobuf
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
-          echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
-          brew install protobuf
+      # - uses: ./.github/actions/setup-rust-mac
+      #   if: matrix.os == "macos-latest"
 
       - run: cargo +nightly-2024-10-28 build -p notary --release
 
@@ -48,8 +41,9 @@ jobs:
           retention-days: 7
 
   deploy:
+    # TODO run only on main branch?
     runs-on: ubuntu-latest
-    needs: ["build"]
+    needs: ["web-prover-circuits", "build"]
     permissions:
       contents: "read"
       id-token: "write"
@@ -70,7 +64,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: proofs/web_proof_circuits
-          key: ${{ needs.setup.outputs.cache-key }}
+          key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
       - uses: "google-github-actions/auth@v2"
         with:

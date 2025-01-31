@@ -1,0 +1,17 @@
+name: "Setup Rust Environment (MacOS)"
+description: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: fdf
+      shell: bash
+      run: echo "hello"
+
+    - name: Install LLVM and Clang to support 'ring' crate and protobuf
+      if: inputs.os == 'macos-latest'
+      shell: bash
+      run: |
+        brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
+        echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
+        brew install protobuf

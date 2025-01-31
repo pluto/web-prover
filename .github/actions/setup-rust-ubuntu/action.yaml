@@ -1,0 +1,13 @@
+name: "Setup Rust Environment (Ubuntu)"
+description: ""
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      run: rustup toolchain install nightly-2024-10-28
+
+    - shell: bash
+      run: sudo apt install -y protobuf-compiler
+
+    # TODO cache action
