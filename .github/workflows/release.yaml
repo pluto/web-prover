@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p releases/client_ios
-          tar -czf  releases/client_ios/client_ios.xcframework.tar.gz -C target target/PlutoProver.xcframework
+          tar -czf  releases/client_ios/client_ios.xcframework.tar.gz -C target PlutoProver.xcframework
 
           cd releases/client_ios
           sha256sum * > sha256sum.txt
