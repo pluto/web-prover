@@ -27,7 +27,7 @@ NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" cargo run --release -p cli
 cargo run --release --bin mock_server
 ```
 
-## WASM Demo
+## WASM Test Harness
 
 ```
 cargo run --release -p notary -- --config ./fixture/notary-config.toml --manifest ./fixture/notary.origo_tcp_local.json
@@ -36,7 +36,7 @@ make wasm-demo
 open https://localhost:8090
 ```
 
-## Native Client Demo
+## Native Client Test Harness
 
 ```
 cargo run --release -p notary -- --config ./fixture/notary-config.toml --manifest ./fixture/notary.origo_tcp_local.json
