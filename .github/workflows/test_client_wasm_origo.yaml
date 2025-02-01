@@ -33,13 +33,6 @@ jobs:
           name: "client.wasm"
           path: "client_wasm/pkg"
 
-      # TODO
-      - name: Log client_wasm/pkg
-        run: ls -la client_wasm/pkg
-
-      - name: Log client_wasm/demo/pkg
-        run: ls -la client_wasm/demo/pkg
-
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
