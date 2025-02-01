@@ -22,13 +22,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: "PlutoProver.xcframework"
-          path: "target"
+          path: "target/PlutoProver.xcframework"
 
       - name: Prepare client_ios
         shell: bash
         run: |
           mkdir -p releases/client_ios
-          tar -czf  releases/client_ios/client_ios.xcframework.tar.gz target/PlutoProver.xcframework 
+          tar -czf  releases/client_ios/client_ios.xcframework.tar.gz target/PlutoProver.xcframework/*
 
           cd releases/client_ios
           sha256sum * > sha256sum.txt
