@@ -341,7 +341,6 @@ fn build_http_verification_circuit_inputs<const CIRCUIT_SIZE: usize>(
   polynomial_input: F<G1>,
   headers_digest: &[F<G1>],
   private_inputs: &mut Vec<HashMap<String, Value>>,
-  _fold_inputs: &mut HashMap<String, FoldInput>,
 ) -> Result<(F<G1>, Vec<u8>), ProofError> {
   // pad request plaintext and ciphertext to circuit size
   let plaintext = plaintext_chunks.iter().flatten().cloned().collect::<Vec<u8>>();
@@ -406,7 +405,6 @@ fn build_json_extraction_circuit_inputs<const CIRCUIT_SIZE: usize>(
   polynomial_input: F<G1>,
   keys: &[JsonKey],
   private_inputs: &mut Vec<HashMap<String, Value>>,
-  _fold_inputs: &mut HashMap<String, FoldInput>,
 ) -> Result<F<G1>, ProofError> {
   let raw_response_json_machine =
     RawJsonMachine::<MAX_STACK_HEIGHT>::from_chosen_sequence_and_input(polynomial_input, keys)?;
@@ -583,7 +581,6 @@ impl Manifest {
       ciphertext_digest,
       &headers_digest,
       &mut private_inputs,
-      &mut fold_inputs,
     )?;
     // debug!("private_inputs: {:?}", private_inputs.len());
 
@@ -600,7 +597,6 @@ impl Manifest {
       ciphertext_digest,
       &headers_digest,
       &mut private_inputs,
-      &mut fold_inputs,
     )?;
 
     let _ = build_json_extraction_circuit_inputs::<CIRCUIT_SIZE>(
@@ -608,7 +604,6 @@ impl Manifest {
       ciphertext_digest,
       &self.response.body.json,
       &mut private_inputs,
-      &mut fold_inputs,
     )?;
 
     Ok(NivcCircuitInputs { private_inputs, fold_inputs, initial_nivc_input })
@@ -733,7 +728,7 @@ mod tests {
     response_inputs: EncryptionInput,
   ) {
     let NivcCircuitInputs { fold_inputs, private_inputs, .. } =
-      manifest.build_inputs::<CIRCUIT_SIZE>(&request_inputs, &response_inputs).unwrap();
+      manifest.build_inputs::<CIRCUIT_SIZE>(&request_inputs, &response_inputs).unwrap().unwrap();
     let NIVCRom { circuit_data: rom_data, rom } =
       manifest.build_rom::<CIRCUIT_SIZE>(&request_inputs, &response_inputs);
 

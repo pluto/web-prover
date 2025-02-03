@@ -68,4 +68,8 @@ pub enum ProofError {
   #[cfg(target_arch = "wasm32")]
   #[error("transparent")]
   SerdeWasmBindgen(#[from] serde_wasm_bindgen::Error),
+
+  // TODO: Add concrete cases?
+  #[error("Invalid circuit inputs")]
+  InvalidCircuitInputs,
 }
