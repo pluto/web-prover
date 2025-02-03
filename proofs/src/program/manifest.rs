@@ -139,6 +139,51 @@ pub struct Response {
   pub body:    ResponseBody,
 }
 
+impl Response {
+  pub fn validate(&self) -> Result<(), ProofError> {
+    // TODO: What are legal statuses?
+    if self.status != "200" {
+      return Err(ProofError::InvalidManifest);
+    }
+
+    // TODO: What HTTP versions are supported?
+    if self.version != "HTTP/1.1" {
+      return Err(ProofError::InvalidManifest);
+    }
+
+    // TODO: What is the max supported message length?
+    if self.message.len() > 1024 {
+      return Err(ProofError::InvalidManifest);
+    }
+    // TODO: Not covered by serde's #default annotation. Is '""' a valid message?
+    if self.message.len() == 0 {
+      return Err(ProofError::InvalidManifest);
+    }
+
+    if self.headers.len() > MAX_HTTP_HEADERS {
+      return Err(ProofError::InvalidManifest);
+    }
+    // We always expect at least one header, "Content-Type"
+    if self.headers.len() == 0 {
+      return Err(ProofError::InvalidManifest);
+    }
+    if self.headers.get("Content-Type").is_none() {
+      return Err(ProofError::InvalidManifest);
+    }
+
+    // TODO: Is this the only supported Content-Type?
+    if self.headers.get("Content-Type").unwrap() != "application/json" {
+      return Err(ProofError::InvalidManifest);
+    }
+    // When Content-Type is application/json, we expect at least one JSON item
+    if self.body.json.is_empty() {
+      return Err(ProofError::InvalidManifest);
+    }
+
+    Ok(())
+  }
+}
+
 /// HTTP Request items required for circuits
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Request {
@@ -151,6 +196,54 @@ pub struct Request {
   pub version: String,
   /// Request headers to lock
   pub headers: HashMap<String, String>,
+  // TODO: Should we support `vars` here
+}
+
+impl Request {
+  pub fn validate(&self) -> Result<(), ProofError> {
+    // TODO: What HTTP methods are supported?
+    if self.method != "GET" && self.method != "POST" {
+      return Err(ProofError::InvalidManifest);
+    }
+
+    // Not a valid URL
+    if url::Url::parse(&self.url).is_err() {
+      return Err(ProofError::InvalidManifest);
+    }
+
+    // TODO: What HTTP versions are supported?
+    if self.version != "HTTP/1.1" {
+      return Err(ProofError::InvalidManifest);
+    }
+
+    // TODO: What are the legal request headers?
+
+    // TODO: Validate request header templates against `vars`
+
+    Ok(())
+  }
+}
+
+/// Default HTTP version
+fn default_version() -> String { "HTTP/1.1".to_string() }
+/// Default HTTP message
+fn default_message() -> String { "OK".to_string() }
+
+/// Manifest containing [`Request`] and [`Response`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Manifest {
+  /// HTTP request lock items
+  pub request:  Request,
+  /// HTTP response lock items
+  pub response: Response,
+}
+
+impl Manifest {
+  pub fn validate(&self) -> Result<(), ProofError> {
+    self.request.validate()?;
+    self.response.validate()?;
+    Ok(())
+  }
 }
 
 // TODO(Sambhav): can we remove usage of vec here?

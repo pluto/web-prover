@@ -72,4 +72,8 @@ pub enum ProofError {
   // TODO: Add concrete cases?
   #[error("Invalid circuit inputs")]
   InvalidCircuitInputs,
+
+  // TODO: Add concrete cases?
+  #[error("Invalid manifest")]
+  InvalidManifest,
 }

@@ -4635,6 +4635,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tracing-test",
+ "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-proof-circuits-witness-generator",

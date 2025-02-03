@@ -21,6 +21,7 @@ client-side-prover                  ={ git="https://github.com/pluto/client-side
 ff                                  ={ version="0.13", default-features=false, features=["derive"] }
 bellpepper-core                     ="0.4"
 halo2curves                         ="0.6.1"
+url                                 ="2.5"
 web-proof-circuits-witness-generator={ git="https://github.com/pluto/web-prover-circuits" }
 # web-proof-circuits-witness-generator={ path="../../web-prover-circuits/witness-generator" }
 
@@ -41,7 +42,7 @@ wasm-bindgen-futures="0.4.37"
 
 [dev-dependencies]
 tracing-test="0.2.5"
-tempdir = "0.3.7"
+tempdir     ="0.3.7"
 
 [build-dependencies]
 cargo_metadata="0.19.1"
