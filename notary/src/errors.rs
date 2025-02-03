@@ -4,7 +4,7 @@ use axum::{
 };
 use eyre::Report;
 use thiserror::Error;
-use tlsn_verifier::tls::{VerifierConfigBuilderError, VerifierError};
+use tlsn_verifier::{VerifierConfigBuilderError, VerifierError};
 
 #[derive(Debug, Error)]
 pub enum ProxyError {

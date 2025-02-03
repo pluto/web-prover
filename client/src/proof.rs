@@ -3,7 +3,7 @@ use std::sync::Arc;
 use client_side_prover::supernova::PublicParams;
 use proofs::{
   program::{
-    data::{InitializedSetup, NotExpanded, Offline, Online, ProgramData},
+    data::{InitializedSetup, NotExpanded, Online, ProgramData},
     manifest::{
       EncryptionInput, NIVCRom, NivcCircuitInputs, Request as ManifestRequest,
       Response as ManifestResponse,
@@ -14,7 +14,7 @@ use proofs::{
 };
 use tracing::debug;
 
-use crate::{circuits::*, ClientErrors};
+use crate::ClientErrors;
 
 /// creates NIVC proof from TLS transcript and [`Manifest`] config
 ///

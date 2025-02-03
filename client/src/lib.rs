@@ -15,8 +15,9 @@ mod tls;
 pub mod tls_client_async2;
 use proofs::{errors::ProofError, proof::FoldingProof};
 use serde::{Deserialize, Serialize};
-pub use tlsn_core::proof::TlsProof;
-use tlsn_prover::tls::ProverConfig;
+use tlsn_common::config::ProtocolConfig;
+pub use tlsn_core::attestation::Attestation;
+use tlsn_prover::ProverConfig;
 use tracing::{debug, info};
 
 use crate::errors::ClientErrors;
@@ -29,7 +30,7 @@ pub struct OrigoProof {
 
 #[derive(Debug, Serialize)]
 pub enum Proof {
-  TLSN(Box<TlsProof>),
+  TLSN(Box<Attestation>),
   Origo(OrigoProof),
   TEE(), // TODO
 }
@@ -51,8 +52,6 @@ pub async fn prover_inner(
 }
 
 pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
-  let root_store = crate::tls::tls_client_default_root_store();
-
   let max_sent_data = config
     .max_sent_data
     .ok_or_else(|| ClientErrors::Other("max_sent_data is missing".to_string()))?;
@@ -61,13 +60,14 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, erro
     .ok_or_else(|| ClientErrors::Other("max_recv_data is missing".to_string()))?;
 
   let prover_config = ProverConfig::builder()
-    .id(config.session_id.clone())
-    .root_cert_store(root_store)
-    .server_dns(config.target_host()?)
-    .max_sent_data(max_sent_data)
-    .max_recv_data(max_recv_data)
-    .build()
-    .map_err(|e| ClientErrors::Other(e.to_string()))?;
+    .server_name(config.target_host()?.as_str())
+    .protocol_config(
+      ProtocolConfig::builder()
+        .max_sent_data(max_sent_data)
+        .max_recv_data(max_recv_data)
+        .build()?,
+    )
+    .build()?;
 
   #[cfg(target_arch = "wasm32")]
   let prover = tlsn_wasm32::setup_connection(&mut config, prover_config).await?;

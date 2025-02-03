@@ -25,6 +25,8 @@ cargo_metadata="0.19.1"
 tls-client        ={ workspace=true }
 tls-client2       ={ workspace=true }
 tls-core          ={ workspace=true }
+tlsn-common       ={ workspace=true }
+tlsn-formats      ={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.7" }
 client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="8e7eb839e901dcee416179116bb0f9c4f7ae683c" }
 
 # TLSN
@@ -42,17 +44,18 @@ serde-wasm-bindgen="0.6.5"
 webpki-roots="0.26.1"
 pki-types   ={ package="rustls-pki-types", version="1.7" }
 # Serde
-serde.workspace     =true
-serde_json.workspace=true
+serde     ={ workspace=true }
+serde_json={ workspace=true }
+spansy    ={ git="https://github.com/tlsnotary/tlsn-utils", rev="e7b2db6" }
 # Web
 hex           ="0.4"
 url           ="2.5"
 hyper         ={ workspace=true, features=["client", "http1"] }
 http-body-util={ workspace=true }
 # Logging and errors
-tracing.workspace           =true
-tracing-subscriber.workspace=true
-thiserror                   ={ workspace=true }
+tracing           ={ workspace=true }
+tracing-subscriber={ workspace=true }
+thiserror         ={ workspace=true }
 # Async
 futures={ workspace=true }
 # Other

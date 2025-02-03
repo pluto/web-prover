@@ -1,6 +1,5 @@
 // TODO many root_stores ... this could use some cleanup where possible
 use proofs::program::manifest::{EncryptionInput, TLSEncryption};
-use reqwest::Client;
 use tls_client2::{origo::WitnessData, CipherSuite, CipherSuiteKey, Decrypter, ProtocolVersion};
 use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
 use tracing::debug;
