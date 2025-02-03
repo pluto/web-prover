@@ -12,6 +12,20 @@ pub enum ClientErrors {
   RustTls(#[from] rustls::Error),
 
   #[error(transparent)]
+  SpansyError(#[from] spansy::ParseError),
+
+  #[error(transparent)]
+  HttpCommitError(#[from] tlsn_formats::http::HttpCommitError),
+
+  #[error(transparent)]
+  TranscriptCommitConfigBuilderError(
+    #[from] tlsn_core::transcript::TranscriptCommitConfigBuilderError,
+  ),
+
+  #[error(transparent)]
+  ProtocolConfigBuilder(#[from] tlsn_common::config::ProtocolConfigBuilderError),
+
+  #[error(transparent)]
   FromUtf8(#[from] std::string::FromUtf8Error),
 
   #[error(transparent)]
@@ -54,11 +68,16 @@ pub enum ClientErrors {
   UrlParse(#[from] url::ParseError),
 
   #[error(transparent)]
-  ProverConfigBuilder(#[from] tlsn_prover::tls::ProverConfigBuilderError),
+  ProverError(#[from] tlsn_prover::ProverError),
 
   #[error(transparent)]
-  Prover(#[from] tlsn_prover::tls::ProverError),
+  ProverConfigBuilder(#[from] tlsn_prover::ProverConfigBuilderError),
 
+  #[error(transparent)]
+  TranscriptProofBuilderError(#[from] tlsn_core::transcript::TranscriptProofBuilderError),
+
+  #[error(transparent)]
+  PresentationBuilderError(#[from] tlsn_core::presentation::PresentationBuilderError),
   #[error(transparent)]
   InvalidHeaderName(#[from] hyper::header::InvalidHeaderName),
 
@@ -67,12 +86,6 @@ pub enum ClientErrors {
 
   #[error(transparent)]
   Base64Decode(#[from] base64::DecodeError),
-
-  #[error(transparent)]
-  HttpProver(#[from] tlsn_prover::http::HttpProverError),
-
-  #[error(transparent)]
-  SubstringsProofBuilder(#[from] tlsn_core::proof::SubstringsProofBuilderError),
 
   #[error(transparent)]
   ProofError(#[from] proofs::errors::ProofError),
