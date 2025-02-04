@@ -1,8 +1,7 @@
-use std::str::FromStr;
+use std::{str::FromStr, sync::Arc};
 
 use program::data::Expanded;
 use serde_json::json;
-use std::sync::Arc;
 
 use super::*;
 use crate::program::data::{R1CSType, UninitializedSetup, WitnessGeneratorType};

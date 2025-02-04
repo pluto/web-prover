@@ -125,11 +125,22 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
   let manifest = config.proving.manifest.unwrap();
 
   #[cfg(not(target_arch = "wasm32"))]
-  let proof = crate::origo_native::generate_proof(manifest, proving_params.unwrap(), request_inputs, response_inputs).await?;
+  let proof = crate::origo_native::generate_proof(
+    manifest,
+    proving_params.unwrap(),
+    request_inputs,
+    response_inputs,
+  )
+  .await?;
   #[cfg(target_arch = "wasm32")]
-  let proof = crate::origo_wasm32::generate_proof(manifest, proving_params.unwrap(), request_inputs, response_inputs).await?;
+  let proof = crate::origo_wasm32::generate_proof(
+    manifest,
+    proving_params.unwrap(),
+    request_inputs,
+    response_inputs,
+  )
+  .await?;
 
   // TODO(Sambhav): handle request and response into one proof
   Ok(proof)
 }
-

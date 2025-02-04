@@ -1,8 +1,8 @@
 use std::{
+  default,
   fs::{self, File},
   io::Write,
   sync::Arc,
-  default
 };
 
 use client_side_prover::{fast_serde::FastSerde, supernova::get_circuit_shapes};
@@ -65,7 +65,7 @@ pub enum WitnessGeneratorType {
 }
 
 /// Uninitialized Circuit Setup data, in this configuration the R1CS objects have not
-/// been initialized and require a bulky initialize process. 
+/// been initialized and require a bulky initialize process.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct UninitializedSetup {
   /// vector of all circuits' r1cs
@@ -77,11 +77,11 @@ pub struct UninitializedSetup {
 }
 
 /// Initialized Circuit Setup data, in this configuration the R1CS objects have been
-/// fully loaded for proving. 
+/// fully loaded for proving.
 #[derive(Clone, Debug)]
 pub struct InitializedSetup {
   /// vector of all circuits' r1cs
-  pub r1cs:              Vec<Arc<R1CS>>,
+  pub r1cs:                    Vec<Arc<R1CS>>,
   /// vector of all circuits' witness generator
   pub witness_generator_types: Vec<WitnessGeneratorType>,
   /// NIVC max ROM length
@@ -91,7 +91,7 @@ pub struct InitializedSetup {
 // Note, the below are typestates that prevent misuse of our current API.
 pub trait SetupStatus {
   type PublicParams;
-  type SetupData; 
+  type SetupData;
 }
 
 pub struct Online;
@@ -287,9 +287,9 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
 
     // TODO: This converts the r1cs memory into sparse matrices, which doubles
     // the memory usage. Can we re-used these sparse matrices in our constraint
-    // system? 
+    // system?
     info!("init circuit shapes");
-    let circuit_shapes = get_circuit_shapes(&memory); 
+    let circuit_shapes = get_circuit_shapes(&memory);
 
     info!("init public params from parts");
     let public_params =

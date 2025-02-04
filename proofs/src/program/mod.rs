@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
 use client_side_prover::{
@@ -10,7 +12,6 @@ use proof::FoldingProof;
 use utils::into_input_json;
 
 use super::*;
-use std::sync::Arc;
 
 pub mod data;
 pub mod manifest;
@@ -164,7 +165,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
       RecursiveSNARK::new(
         public_params,
         &memory,
-        &circuit_primary,  
+        &circuit_primary,
         &circuit_secondary,
         &z0_primary,
         &z0_secondary,
@@ -250,39 +251,48 @@ pub fn compress_proof(
   Ok(proof)
 }
 
-pub fn initialize_setup_data(setup_data: &UninitializedSetup) -> Result<InitializedSetup, ProofError> {
-  let (r1cs, witness_generator_types) = setup_data.r1cs_types.iter()
+pub fn initialize_setup_data(
+  setup_data: &UninitializedSetup,
+) -> Result<InitializedSetup, ProofError> {
+  let (r1cs, witness_generator_types) = setup_data
+    .r1cs_types
+    .iter()
     .zip(setup_data.witness_generator_types.iter())
     .enumerate()
     .map(|(_, (r1cs_type, generator))| {
-        let r1cs = R1CS::try_from(r1cs_type)?;
-        Ok::<(Arc<circom::r1cs::R1CS>, data::WitnessGeneratorType), ProofError>((Arc::new(r1cs), generator.clone()))
+      let r1cs = R1CS::try_from(r1cs_type)?;
+      Ok::<(Arc<circom::r1cs::R1CS>, data::WitnessGeneratorType), ProofError>((
+        Arc::new(r1cs),
+        generator.clone(),
+      ))
     })
     .collect::<Result<Vec<_>, _>>()?
     .into_iter()
     .unzip();
 
-  return Ok(InitializedSetup{
-    r1cs, 
+  return Ok(InitializedSetup {
+    r1cs,
     witness_generator_types,
-    max_rom_length: setup_data.max_rom_length
-  })
+    max_rom_length: setup_data.max_rom_length,
+  });
 }
 
 pub fn initialize_circuit_list(setup_data: &InitializedSetup) -> Vec<RomCircuit> {
-  setup_data.r1cs.iter()
+  setup_data
+    .r1cs
+    .iter()
     .zip(setup_data.witness_generator_types.iter())
     .enumerate()
     .map(|(i, (r1cs, generator))| {
-        let circuit = circom::CircomCircuit { r1cs: r1cs.clone(), witness: None };
-        RomCircuit {
-          circuit,
-          circuit_index: i,
-          rom_size: setup_data.max_rom_length,
-          nivc_io: None,
-          private_input: None,
-          witness_generator_type: generator.clone(),
-        }
+      let circuit = circom::CircomCircuit { r1cs: r1cs.clone(), witness: None };
+      RomCircuit {
+        circuit,
+        circuit_index: i,
+        rom_size: setup_data.max_rom_length,
+        nivc_io: None,
+        private_input: None,
+        witness_generator_type: generator.clone(),
+      }
     })
     .collect::<Vec<_>>()
 }

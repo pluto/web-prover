@@ -52,9 +52,7 @@ impl TryFrom<&R1CSType> for R1CS {
   fn try_from(value: &R1CSType) -> Result<Self, Self::Error> {
     match value {
       R1CSType::File { path } => R1CS::try_from(path),
-      R1CSType::Raw(bytes) => {
-        R1CS::try_from(&bytes[..])
-      },
+      R1CSType::Raw(bytes) => R1CS::try_from(&bytes[..]),
     }
   }
 }
