@@ -36,17 +36,16 @@ jobs:
 
       - run: cargo clippy -p ${{ matrix.crate }}
 
-  # TODO: disable for now, merge PR #405 and then worry about this
-  # fmt:
-  #   continue-on-error: true
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
+  fmt:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-  #     - uses: ./.github/actions/setup-rust-ubuntu
-  #       with:
-  #         rust-cache-key: fmt
+      - uses: ./.github/actions/setup-rust-ubuntu
+        with:
+          rust-cache-key: fmt
 
-  #     - run: rustup component add rustfmt
+      - run: rustup component add rustfmt
 
-  #     - run: cargo fmt --all -- --check
+      - run: cargo fmt --all -- --check
