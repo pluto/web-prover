@@ -67,7 +67,7 @@ async fn run_entry(
   rom.push(String::from("SWAP_MEMORY"));
   private_inputs.push(HashMap::new());
   let public_params = program::setup(&setup_data);
-  let initialized_setup = initialize_setup_data(&setup_data).unwrap();
+  let initialized_setup = initialize_setup_data(&setup_data)?;
 
   let program_data = ProgramData::<Online, NotExpanded> {
     public_params: Arc::new(public_params),
@@ -80,7 +80,7 @@ async fn run_entry(
     inputs: (private_inputs, HashMap::new()),
   }
   .into_expanded()?;
-  let recursive_snark = program::run(&program_data).await.unwrap();
+  let recursive_snark = program::run(&program_data, &vec![]).await?;
   Ok((program_data, recursive_snark))
 }
 

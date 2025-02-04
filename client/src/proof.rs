@@ -3,7 +3,7 @@ use std::sync::Arc;
 use client_side_prover::supernova::PublicParams;
 use proofs::{
   program::{
-    data::{InitializedSetup, NotExpanded, Online, ProgramData},
+    data::{InitializedSetup, NotExpanded, Online, ProgramData, Witnesses},
     manifest::{EncryptionInput, Manifest, NIVCRom, NivcCircuitInputs},
   },
   E1, F, G1, G2,
@@ -38,6 +38,7 @@ pub async fn construct_program_data_and_proof(
   vks: (F<G1>, F<G2>),
   proving_params: Arc<PublicParams<E1>>,
   setup_data: Arc<InitializedSetup>,
+  witnesses: &Witnesses,
 ) -> Result<OrigoProof, ClientErrors> {
   let NivcCircuitInputs { private_inputs, fold_inputs, initial_nivc_input } =
     manifest.build_inputs(&request_inputs, &response_inputs)?;
@@ -58,6 +59,6 @@ pub async fn construct_program_data_and_proof(
   .into_expanded()?;
 
   debug!("starting recursive proving");
-  let proof = program_data.generate_proof().await?;
+  let proof = program_data.generate_proof(&witnesses).await?;
   Ok(OrigoProof { proof, rom: NIVCRom { circuit_data, rom } })
 }

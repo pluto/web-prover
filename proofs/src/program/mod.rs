@@ -12,6 +12,7 @@ use proof::FoldingProof;
 use utils::into_input_json;
 
 use super::*;
+use crate::program::data::Witnesses;
 
 pub mod data;
 pub mod manifest;
@@ -112,6 +113,7 @@ use crate::{
 };
 pub async fn run(
   program_data: &ProgramData<Online, Expanded>,
+  _witnesses: &Witnesses,
 ) -> Result<RecursiveSNARK<E1>, ProofError> {
   info!("Starting SuperNova program...");
 
@@ -145,7 +147,7 @@ pub async fn run(
     memory.circuits[op_code as usize].circuit.witness =
       if wit_type == WitnessGeneratorType::Browser {
         // When running in browser, the witness is passed as input.
-        // Some(program_data.witnesses[idx].clone())
+        // Some(witnesses[idx].clone())
         let arity = memory.circuits[op_code as usize].circuit.arity();
         let nivc_io =
           &memory.circuits[op_code as usize].nivc_io.as_ref().ok_or_else(|| {

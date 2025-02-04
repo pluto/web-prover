@@ -129,6 +129,10 @@ pub struct CircuitData {
   pub opcode: u64,
 }
 
+// TODO: Helper for the purpose of refactoring, remove later?
+pub type Witnesses = Vec<Vec<F<G1>>>;
+
+/// Represents the proof program
 #[derive(Debug)]
 pub struct ProgramData<S: SetupStatus, W: WitnessStatus> {
   // SetupParams
@@ -140,14 +144,13 @@ pub struct ProgramData<S: SetupStatus, W: WitnessStatus> {
   pub rom_data:            HashMap<String, CircuitData>,
 
   // ProofParams
-  pub rom:                 Vec<String>,
+  pub rom: Vec<String>,
 
   // InstanceParams
-  pub initial_nivc_input:  Vec<F<G1>>, // in the PR: nivc_input
-  pub inputs:              W::PrivateInputs, // in the PR: private_inputs
-  // missing from PR: public_inputs
-
-  pub witnesses:           Vec<Vec<F<G1>>>, // TODO: Ideally remove this
+  pub initial_nivc_input: Vec<F<G1>>, // in the PR: nivc_input
+  pub inputs:             W::PrivateInputs, /* in the PR: private_inputs
+                                       *
+                                       *  missing from PR: public_inputs */
 }
 
 impl<S: SetupStatus> ProgramData<S, NotExpanded> {
@@ -191,7 +194,7 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
   /// The resulting expanded form contains individual private inputs for each ROM position, with
   /// fold inputs properly distributed according to circuit usage.
   pub fn into_expanded(self) -> Result<ProgramData<S, Expanded>, ProofError> {
-    assert!(self.inputs.0.len() == self.rom.len());
+    assert_eq!(self.inputs.0.len(), self.rom.len());
 
     let mut instruction_usage: HashMap<String, Vec<usize>> = HashMap::new();
     for (index, circuit) in self.rom.iter().enumerate() {
@@ -216,7 +219,7 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
       }
     }
 
-    assert!(private_inputs.len() == self.rom.len());
+    assert_eq!(private_inputs.len(), self.rom.len());
 
     let Self {
       public_params,
@@ -358,7 +361,7 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
 
     let bytes_path = path.with_extension("bytes");
     debug!("bytes_path={:?}", bytes_path);
-    File::create(&bytes_path)?.write_all(&proving_param_bytes).unwrap();
+    File::create(&bytes_path)?.write_all(&proving_param_bytes)?;
 
     let Self { rom_data, rom, initial_nivc_input, inputs, .. } = self;
     Ok(ProgramData {
@@ -433,9 +436,12 @@ impl ProgramData<Online, Expanded> {
   /// - run NIVC recursive proving
   /// - run CompressedSNARK to compress proof
   /// - serialize proof
-  pub async fn generate_proof(self) -> Result<FoldingProof<Vec<u8>, String>, ProofError> {
+  pub async fn generate_proof(
+    self,
+    witnesses: &Witnesses,
+  ) -> Result<FoldingProof<Vec<u8>, String>, ProofError> {
     debug!("starting recursive proving");
-    let program_output = program::run(&self).await?;
+    let program_output = program::run(&self, &witnesses).await?;
 
     debug!("starting proof compression");
     let compressed_snark_proof = program::compress_proof_no_setup(

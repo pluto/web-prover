@@ -10,7 +10,7 @@ use proofs::{
 };
 use serde::{Deserialize, Serialize};
 use tracing::debug;
-
+use proofs::program::data::Witnesses;
 use crate::{
   circuits::construct_setup_data,
   config::{self},
@@ -134,7 +134,7 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
   let manifest = config.proving.manifest.unwrap();
 
   let proof =
-    generate_proof(manifest, proving_params.unwrap(), request_inputs, response_inputs).await?;
+    generate_proof(manifest, proving_params.unwrap(), request_inputs, response_inputs, &vec![]).await?;
 
   Ok(proof)
 }
@@ -144,6 +144,7 @@ pub(crate) async fn generate_proof(
   proving_params: Vec<u8>,
   request_inputs: EncryptionInput,
   response_inputs: EncryptionInput,
+  witnesses: &Witnesses,
 ) -> Result<OrigoProof, ClientErrors> {
   let setup_data = construct_setup_data();
   let program_data = ProgramData::<Offline, NotExpanded> {
@@ -167,6 +168,7 @@ pub(crate) async fn generate_proof(
     (vk_digest_primary, vk_digest_secondary),
     program_data.public_params,
     program_data.setup_data,
+    witnesses,
   )
   .await
 

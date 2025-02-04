@@ -434,7 +434,7 @@ async fn test_end_to_end_proofs_simple() {
   .into_expanded()
   .unwrap();
 
-  let recursive_snark = program::run(&program_data).await.unwrap();
+  let recursive_snark = program::run(&program_data, &vec![]).await.unwrap();
 
   let proof = program::compress_proof_no_setup(
     &recursive_snark,
@@ -514,7 +514,7 @@ async fn test_end_to_end_proofs_complex() {
   .into_expanded()
   .unwrap();
 
-  let recursive_snark = program::run(&program_data).await.unwrap();
+  let recursive_snark = program::run(&program_data, &vec![]).await.unwrap();
 
   let proof = program::compress_proof_no_setup(
     &recursive_snark,
