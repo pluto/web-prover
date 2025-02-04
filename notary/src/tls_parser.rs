@@ -34,8 +34,9 @@ const TRIMMED_BYTES: usize = 17;
 // TODO: Relocate and consolidate with circuits.rs
 pub const CIRCUIT_SIZE_SMALL: usize = 512;
 pub const CIRCUIT_SIZE_MAX: usize = 1024;
+pub const MAX_STACK_HEIGHT: usize = 10;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Direction {
   Sent,
   Received,
@@ -48,7 +49,7 @@ pub enum WrappedPayload {
 }
 
 #[derive(Debug)]
-struct ParsedMessage {
+pub struct ParsedMessage {
   direction: Direction,
   seq:       u64,
   payload:   WrappedPayload,
@@ -60,16 +61,70 @@ pub struct UnparsedMessage {
   pub payload:   Vec<u8>,
 }
 
-pub struct ParsedTranscript {
-  messages: Vec<ParsedMessage>,
+/// State transitions for Transcripts
+///
+/// 1. Raw: Raw network data, only structure is direction
+/// 2. Flattened: Organize the network data into parseable objects.
+/// 3. Parsed: TLS Parsed into structured decryptable-objects
+pub trait TranscriptState {
+  type MessageFormat;
+}
+#[derive(Debug, Clone)]
+pub struct Raw;
+impl TranscriptState for Raw {
+  type MessageFormat = Vec<UnparsedMessage>;
 }
 
 #[derive(Debug, Clone)]
-pub struct UnparsedTranscript {
-  pub messages: Vec<UnparsedMessage>,
+pub struct Flattened;
+impl TranscriptState for Flattened {
+  type MessageFormat = Vec<UnparsedMessage>;
+}
+#[derive(Debug, Clone)]
+pub struct Parsed;
+impl TranscriptState for Parsed {
+  type MessageFormat = Vec<ParsedMessage>;
 }
 
-impl UnparsedTranscript {
+#[derive(Debug, Clone)]
+pub struct Transcript<T: TranscriptState> {
+  pub payload: T::MessageFormat,
+}
+
+impl Transcript<Raw> {
+  /// Flatten neighboring transcript messages in the same direction
+  pub fn into_flattened(&self) -> Result<Transcript<Flattened>, ProxyError> {
+    let (mut processed, current) = self.payload.iter().fold(
+      (Vec::new(), Vec::<UnparsedMessage>::new()),
+      |(mut processed, mut current), msg| {
+        if current.is_empty() || current[0].direction == msg.direction {
+          current.push(msg.clone());
+        } else if current[0].direction != msg.direction {
+          processed.push(UnparsedMessage {
+            payload:   current.iter().flat_map(|m| m.payload.clone()).collect(),
+            direction: current[0].direction,
+          });
+
+          current.clear();
+          current.push(msg.clone());
+        }
+        (processed, current)
+      },
+    );
+
+    // Handle last group
+    if !current.is_empty() {
+      processed.push(UnparsedMessage {
+        payload:   current.iter().flat_map(|m| m.payload.clone()).collect(),
+        direction: current[0].direction,
+      });
+    }
+
+    Ok(Transcript { payload: processed })
+  }
+}
+
+impl Transcript<Flattened> {
   /// Transform raw data into more structured TLS data by
   /// processing with handhsake keys.
   ///
@@ -78,12 +133,12 @@ impl UnparsedTranscript {
   /// * `handshake_server_iv` -  Encryption IV for decrypting TLS1.3 messages
   ///
   /// # Returns
-  /// * `Result<Vec<Message>, ProxyError>` - Vector of parsed TLS messages or error
-  pub fn parse_transcript(
+  /// * `Result<Transcript<Parsed>, ProxyError>` - Vector of parsed TLS messages or error
+  pub fn into_parsed(
     &self,
     handshake_server_key: String,
     handshake_server_iv: String,
-  ) -> Result<ParsedTranscript, ProxyError> {
+  ) -> Result<Transcript<Parsed>, ProxyError> {
     let server_hs_key = hex::decode(handshake_server_key).unwrap();
     let server_hs_iv = hex::decode(handshake_server_iv).unwrap();
     info!("key_as_string: {:?}, length: {}", server_hs_key, server_hs_key.len());
@@ -93,7 +148,7 @@ impl UnparsedTranscript {
     let mut seq = 0u64;
     let mut cipher_suite_key: Option<CipherSuiteKey> = None;
 
-    for m in &self.messages {
+    for m in &self.payload {
       let mut cursor = Cursor::new(m.payload.clone());
       while cursor.position() < m.payload.len() as u64 {
         let current_bytes = &cursor.get_ref()[cursor.position() as usize..];
@@ -172,11 +227,11 @@ impl UnparsedTranscript {
       return Err(ProxyError::TlsHandshakeExtract(String::from("empty transcript messages")));
     }
 
-    Ok(ParsedTranscript { messages: parsed_messages })
+    Ok(Transcript { payload: parsed_messages })
   }
 }
 
-impl ParsedTranscript {
+impl Transcript<Parsed> {
   pub fn verify_certificate_sig(&self) -> Result<(), ProxyError> {
     // TODO: get hash algorithm from cipher suite in a better way
     let handshake_hash_buffer = HandshakeHashBuffer::new();
@@ -184,7 +239,7 @@ impl ParsedTranscript {
       handshake_hash_buffer.start_hash(&tls_client2::tls_core::suites::HashAlgorithm::SHA256);
     let mut server_certificate: Certificate = Certificate(vec![]);
 
-    let decrypted_messages = self.messages.iter().flat_map(|m| match m.payload {
+    let decrypted_messages = self.payload.iter().flat_map(|m| match m.payload {
       WrappedPayload::Decrypted(ref m) => Some(m),
       WrappedPayload::Encrypted(_) => None,
     });
@@ -300,7 +355,7 @@ impl ParsedTranscript {
   ///
   /// To skip redundant verification in the future, we could accept a possible target hash
   /// from the client and check if it is in the set of valid hashes.
-  pub fn get_ciphertext_hashes(&self) -> (Vec<F<G1>>, Vec<F<G1>>) {
+  pub fn get_ciphertext_hashes(&self) -> (Vec<F<G1>>, Vec<F<G1>>, Vec<Vec<u8>>, Vec<Vec<u8>>) {
     // State machine for extracting request response
     // Transcript Structure:
     // - Encrypted 1: server sends back verify data
@@ -364,7 +419,7 @@ impl ParsedTranscript {
     let mut request_messages: Vec<Vec<u8>> = Vec::new();
     let mut response_messages: Vec<Vec<u8>> = Vec::new();
     let mut current_state = State::SeekingRequest;
-    for (m_idx, m) in self.messages.iter().enumerate() {
+    for (m_idx, m) in self.payload.iter().enumerate() {
       match &m.payload {
         WrappedPayload::Encrypted(e) => {
           info!(
@@ -380,7 +435,7 @@ impl ParsedTranscript {
             e.payload.0.clone(),
             current_state,
             m_idx,
-            self.messages.len() - 1,
+            self.payload.len() - 1,
             &mut request_messages,
             &mut response_messages,
           );
@@ -398,13 +453,10 @@ impl ParsedTranscript {
       };
     }
 
-    let request_hashes = ParsedTranscript::get_permutations(&request_messages);
-    let response_hashes = ParsedTranscript::get_permutations(&response_messages);
+    let request_hashes = Transcript::<Parsed>::get_permutations(&request_messages);
+    let response_hashes = Transcript::<Parsed>::get_permutations(&response_messages);
 
-    debug!("request_hashes={:?}", request_hashes);
-    debug!("response_hashes={:?}", response_hashes);
-
-    (request_hashes, response_hashes)
+    (request_hashes, response_hashes, request_messages, response_messages)
   }
 }
 
@@ -688,5 +740,33 @@ fn set_key(key: Vec<u8>, cipher_suite: CipherSuite) -> Result<CipherSuiteKey, Pr
       debug!("Unsupported cipher suite: {:?}", cipher_suite);
       Err(ProxyError::TlsHandshakeExtract(format!("Unsupported cipher suite: {:?}", cipher_suite)))
     },
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_transcript_flattening() {
+    let raw = Transcript {
+      payload: vec![
+        UnparsedMessage { direction: Direction::Sent, payload: vec![1] },
+        UnparsedMessage { direction: Direction::Sent, payload: vec![2] },
+        UnparsedMessage { direction: Direction::Received, payload: vec![3] },
+        UnparsedMessage { direction: Direction::Received, payload: vec![4] },
+        UnparsedMessage { direction: Direction::Sent, payload: vec![5] },
+      ],
+    };
+
+    // Flatten the transcript
+    let flattened = raw.into_flattened().unwrap();
+    assert_eq!(flattened.payload.len(), 3);
+    assert_eq!(flattened.payload[0].direction, Direction::Sent);
+    assert_eq!(flattened.payload[0].payload, vec![1, 2]);
+    assert_eq!(flattened.payload[1].direction, Direction::Received);
+    assert_eq!(flattened.payload[1].payload, vec![3, 4]);
+    assert_eq!(flattened.payload[2].direction, Direction::Sent);
+    assert_eq!(flattened.payload[2].payload, vec![5]);
   }
 }

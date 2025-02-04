@@ -6,9 +6,14 @@ use axum::{
   response::Response,
   Json,
 };
+use client::origo::{SignBody, VerifyBody, VerifyReply};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
-use proofs::{proof::FoldingProof, witness::request_initial_digest, F, G1, G2};
+use proofs::{
+  proof::FoldingProof,
+  witness::{request_initial_digest, response_initial_digest, ByteOrPad},
+  F, G1, G2,
+};
 use rs_merkle::{Hasher, MerkleTree};
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -22,7 +27,7 @@ use ws_stream_tungstenite::WsStream;
 use crate::{
   axum_websocket::WebSocket,
   errors::{NotaryServerError, ProxyError},
-  tls_parser::{Direction, UnparsedMessage, UnparsedTranscript},
+  tls_parser::{Direction, Transcript, UnparsedMessage, CIRCUIT_SIZE_MAX, MAX_STACK_HEIGHT},
   tlsn::ProtocolUpgrade,
   SharedState,
 };
@@ -43,32 +48,12 @@ pub struct SignReply {
   signer:      String,
 }
 
-#[derive(Deserialize, Debug, Clone)]
-pub struct SignBody {
-  handshake_server_iv:  String,
-  handshake_server_key: String,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct VerifyBody {
-  session_id:              String,
-  request_verifier_digest: String,
-  // TODO: Also implement response verifier digest.
-  request_proof:           Vec<u8>,
-  #[allow(unused)]
-  response_proof:          Vec<u8>,
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub struct VerifyReply {
-  valid: bool,
-  // TODO: need a signature
-}
-
 #[derive(Serialize, Debug, Clone)]
 pub struct VerifierInputs {
-  request_hashes:  Vec<F<G1>>,
-  response_hashes: Vec<F<G1>>,
+  request_hashes:    Vec<F<G1>>,
+  response_hashes:   Vec<F<G1>>,
+  request_messages:  Vec<Vec<u8>>,
+  response_messages: Vec<Vec<u8>>,
 }
 
 pub async fn sign(
@@ -78,7 +63,9 @@ pub async fn sign(
 ) -> Result<Json<SignReply>, ProxyError> {
   let transcript = state.origo_sessions.lock().unwrap().get(&query.session_id).cloned().unwrap();
 
-  let r = transcript.parse_transcript(payload.handshake_server_key, payload.handshake_server_iv);
+  let r = transcript
+    .into_flattened()?
+    .into_parsed(payload.handshake_server_key, payload.handshake_server_iv);
   let parsed_transcript = match r {
     Ok(p) => p,
     Err(e) => {
@@ -97,15 +84,17 @@ pub async fn sign(
   }
 
   // Determine possible request hash and response hash
-  let (request_hashes, response_hashes) = parsed_transcript.get_ciphertext_hashes();
+  let (request_hashes, response_hashes, request_messages, response_messages) =
+    parsed_transcript.get_ciphertext_hashes();
 
   // Log a verifier session for public inputs
   debug!("inserting with session_id={:?}", query.session_id);
-  state
-    .verifier_sessions
-    .lock()
-    .unwrap()
-    .insert(query.session_id.clone(), VerifierInputs { request_hashes, response_hashes });
+  state.verifier_sessions.lock().unwrap().insert(query.session_id.clone(), VerifierInputs {
+    request_hashes,
+    response_hashes,
+    request_messages,
+    response_messages,
+  });
 
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
@@ -213,28 +202,53 @@ pub async fn verify(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<VerifyBody>,
 ) -> Result<Json<VerifyReply>, ProxyError> {
-  let proof = FoldingProof {
-    proof:           payload.request_proof,
-    verifier_digest: payload.request_verifier_digest.clone(),
+  let request_proof = FoldingProof {
+    proof:           payload.origo_proof.request.proof.clone(),
+    verifier_digest: payload.origo_proof.request.verifier_digest.clone(),
+  }
+  .deserialize();
+  let response_proof = FoldingProof {
+    proof:           payload.origo_proof.response.proof.clone(),
+    verifier_digest: payload.origo_proof.response.verifier_digest.clone(),
   }
   .deserialize();
 
-  // TODO (tracy): Right now this only verifies the request, we need to accept
-  // digest for req/resp and set intersect with verifier_inputs.
-
-  debug!("request_verifier_digest: {:?}", payload.request_verifier_digest.clone());
+  debug!("request_verifier_digest: {:?}", request_proof.verifier_digest.clone());
+  debug!("response_verifier_digest: {:?}", response_proof.verifier_digest.clone());
   debug!("verifiers.keys()={:?}", state.verifiers.keys());
 
   // Form verifier inputs
   let verifier_inputs =
     state.verifier_sessions.lock().unwrap().get(&payload.session_id).cloned().unwrap();
-  let ciphertext_digest = verifier_inputs.request_hashes.first().cloned().unwrap();
-  let (_, nivc_input) = request_initial_digest(&state.manifest.request, ciphertext_digest);
-  let verifier = state.verifiers.get(&payload.request_verifier_digest).unwrap();
+
+  // DEBUG: Use this digest to pin the proving behavior. You must also override
+  // `client/src/tls.rs#decrypt_tls_ciphertext`
+  //
+  // let ciphertext_digest = F::<G1>::from_bytes(&hex::decode(
+  //   "66ab857c95c11767913c36e9341dbe4d46915616a67a5f47379e06848411b32b"
+  // ).unwrap().try_into().unwrap()).unwrap();
+
+  let mut request_ciphertext_packets = vec![];
+  let mut response_ciphertext_packets = vec![];
+  for message in verifier_inputs.request_messages.iter() {
+    request_ciphertext_packets
+      .push(ByteOrPad::from_bytes_with_padding(&message, CIRCUIT_SIZE_MAX - message.len()));
+  }
+  for message in verifier_inputs.response_messages.iter() {
+    response_ciphertext_packets
+      .push(ByteOrPad::from_bytes_with_padding(&message, CIRCUIT_SIZE_MAX - message.len()));
+  }
+
+  // request verification
+  debug!("request_messages {:?}", verifier_inputs.request_messages);
+  let (_, nivc_input) =
+    request_initial_digest(&state.manifest.request, &request_ciphertext_packets);
+  let verifier_label = format!("{}_{}", "request", payload.origo_proof.request.verifier_digest);
+  let verifier = state.verifiers.get(&verifier_label).unwrap();
   let (z0_primary, _) = verifier.program_data.extend_public_inputs(Some(vec![nivc_input])).unwrap();
   let z0_secondary = vec![F::<G2>::from(0)];
 
-  let valid = match proof.proof.verify(
+  let request_valid = match request_proof.proof.verify(
     &verifier.program_data.public_params,
     &verifier.verifier_key,
     &z0_primary,
@@ -242,12 +256,36 @@ pub async fn verify(
   ) {
     Ok(_) => true,
     Err(e) => {
-      error!("Error verifying proof: {:?}", e);
+      error!("Error verifying request proof: {:?}", e);
       false
     },
   };
 
-  Ok(Json(VerifyReply { valid }))
+  // response verification
+  debug!("response_messages {:?}", verifier_inputs.response_messages);
+  let (_, nivc_input) = response_initial_digest(
+    &state.manifest.response,
+    &response_ciphertext_packets,
+    MAX_STACK_HEIGHT,
+  );
+  let verifier_label = format!("{}_{}", "response", payload.origo_proof.response.verifier_digest);
+  let verifier = state.verifiers.get(&verifier_label).unwrap();
+  let (z0_primary, _) = verifier.program_data.extend_public_inputs(Some(vec![nivc_input])).unwrap();
+
+  let response_valid = match response_proof.proof.verify(
+    &verifier.program_data.public_params,
+    &verifier.verifier_key,
+    &z0_primary,
+    &z0_secondary,
+  ) {
+    Ok(_) => true,
+    Err(e) => {
+      error!("Error verifying response proof: {:?}", e);
+      false
+    },
+  };
+
+  Ok(Json(VerifyReply { valid: response_valid && request_valid }))
 }
 
 pub async fn websocket_notarize(
@@ -347,9 +385,11 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   pin_mut!(client_to_server, server_to_client);
   let _ = select(client_to_server, server_to_client).await.factor_first().0;
 
-  state.origo_sessions.lock().unwrap().insert(session_id.to_string(), UnparsedTranscript {
-    messages: messages.lock().unwrap().to_vec(),
-  });
+  state
+    .origo_sessions
+    .lock()
+    .unwrap()
+    .insert(session_id.to_string(), Transcript { payload: messages.lock().unwrap().to_vec() });
 
   Ok(())
 }

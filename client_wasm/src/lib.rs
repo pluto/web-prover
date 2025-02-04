@@ -12,6 +12,9 @@ use tracing_web::{performance_layer, MakeWebConsoleWriter};
 use wasm_bindgen::prelude::*;
 pub use wasm_bindgen_rayon::init_thread_pool;
 
+#[wasm_bindgen]
+pub fn get_web_prover_circuits_version() -> String { client::get_web_prover_circuits_version() }
+
 /// ProvingParamsWasm interface is for efficiently moving data between
 /// the javascript and wasm runtime. Using wasm_bindgen creates a
 /// mirrored representation in javascript.

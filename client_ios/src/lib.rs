@@ -3,15 +3,19 @@ use std::{
   time::Instant,
 };
 
-use client::circuits::PROVING_PARAMS_BYTES_1024;
-use client::config::Config;
+use client::{circuits::PROVING_PARAMS_BYTES_1024, config::Config};
 use tracing::debug;
-
 
 #[derive(serde::Serialize)]
 struct Output {
   proof: Option<String>,
   error: Option<String>,
+}
+
+#[no_mangle]
+#[allow(clippy::missing_safety_doc)]
+pub unsafe extern "C" fn get_web_prover_circuits_version() -> *const c_char {
+  CString::new(client::get_web_prover_circuits_version()).unwrap().into_raw()
 }
 
 #[no_mangle]

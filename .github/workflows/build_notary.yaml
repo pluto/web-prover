@@ -1,0 +1,47 @@
+name: Build Notary
+
+on:
+  workflow_call:
+    inputs:
+      web-prover-circuits-cache-key:
+        required: true
+        type: string
+
+jobs:
+  build:
+    name: notary on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-rust-ubuntu
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          rust-cache-key: client_notary
+      - uses: ./.github/actions/setup-rust-macos
+        if: matrix.os == 'macos-latest'
+        with:
+          rust-cache-key: client_notary
+
+      - name: Fetch web-prover-circuits cache
+        uses: actions/cache/restore@v4
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ inputs.web-prover-circuits-cache-key }}
+
+      - run: cargo +nightly-2024-10-28 build -p notary --release
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          name: "notary.linux.amd64"
+          path: "target/release/notary"
+          retention-days: 7
+          if-no-files-found: "error"

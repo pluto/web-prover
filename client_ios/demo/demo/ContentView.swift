@@ -6,7 +6,12 @@
 //
 
 import SwiftUI
-import Prover
+
+@_silgen_name("prover")
+func c_prover(_ config: UnsafePointer<Int8>?) -> UnsafePointer<Int8>?
+
+@_silgen_name("setup_tracing")
+func c_setup_tracing()
 
 class CustomURLSessionDelegate: NSObject, URLSessionDelegate {
     func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
@@ -79,7 +84,7 @@ struct ContentView: View {
 
        VStack {
            Button("Call Setup Tracing") {
-               Prover.setup_tracing()
+               c_setup_tracing()
            }
            .padding()
            .background(Color.blue)
@@ -156,7 +161,7 @@ struct ContentView: View {
                                         "version": "HTTP/1.1",
                                         "message": "OK",
                                         "headers": {
-                                            "Content-Type": "text/plain"
+                                            "Content-Type": "text/plain; charset=utf-8"
                                         },
                                         "body": {
                                             "json": [
@@ -172,7 +177,7 @@ struct ContentView: View {
 
                        // NOTE: Witness generation happen in the library for ios
                        jsonString.withCString { (cString) in
-                           Prover.prover(cString)
+                           c_prover(cString)
                        }
                        let timeElapsed = CFAbsoluteTimeGetCurrent() - start
                        print("Time elapsed: \(timeElapsed) seconds")

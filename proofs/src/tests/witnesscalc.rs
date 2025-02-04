@@ -2,9 +2,10 @@ use std::str::FromStr;
 
 use program::data::Expanded;
 use serde_json::json;
+use std::sync::Arc;
 
 use super::*;
-use crate::program::data::{R1CSType, SetupData, WitnessGeneratorType};
+use crate::program::data::{R1CSType, UninitializedSetup, WitnessGeneratorType};
 
 const ADD_EXTERNAL_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/add_external.r1cs");
 const SQUARE_ZEROTH_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/square_zeroth.r1cs");
@@ -18,8 +19,8 @@ const MAX_ROM_LENGTH: usize = 10;
 
 const TEST_OFFLINE_PATH: &str = "src/tests/test_run_serialized_verify.bytes";
 
-fn get_setup_data() -> SetupData {
-  SetupData {
+fn get_setup_data() -> UninitializedSetup {
+  UninitializedSetup {
     r1cs_types:              vec![
       R1CSType::Raw(ADD_EXTERNAL_R1CS.to_vec()),
       R1CSType::Raw(SQUARE_ZEROTH_R1CS.to_vec()),
@@ -35,7 +36,7 @@ fn get_setup_data() -> SetupData {
 }
 
 fn run_entry(
-  setup_data: SetupData,
+  setup_data: UninitializedSetup,
 ) -> Result<(ProgramData<Online, Expanded>, RecursiveSNARK<E1>), ProofError> {
   let mut external_input0: HashMap<String, Value> = HashMap::new();
   external_input0.insert("external".to_string(), json!(EXTERNAL_INPUTS[0]));
@@ -67,9 +68,11 @@ fn run_entry(
   rom.push(String::from("SWAP_MEMORY"));
   private_inputs.push(HashMap::new());
   let public_params = program::setup(&setup_data);
+  let initialized_setup = initialize_setup_data(&setup_data).unwrap();
+
   let program_data = ProgramData::<Online, NotExpanded> {
-    public_params,
-    setup_data,
+    public_params: Arc::new(public_params),
+    setup_data: Arc::new(initialized_setup),
     rom_data,
     rom,
     vk_digest_primary: F::<G1>::ZERO,
@@ -117,16 +120,16 @@ fn test_run() {
 #[tracing_test::traced_test]
 fn test_run_serialized_verify() {
   let setup_data = get_setup_data();
-  let (program_data, recursive_snark) = run_entry(setup_data).unwrap();
+  let (program_data, recursive_snark) = run_entry(setup_data.clone()).unwrap();
 
   // Pseudo-offline the `PublicParams` and regenerate it
-  let program_data =
+  let mut program_data =
     program_data.into_offline(PathBuf::from_str(TEST_OFFLINE_PATH).unwrap()).unwrap();
+  program_data.setup_data = setup_data.clone();
   let program_data = program_data.into_online().unwrap();
 
   // Create the compressed proof with the offlined `PublicParams`
   let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
-
   let serialized_compressed_proof = proof.serialize();
   let proof = serialized_compressed_proof.deserialize();
 

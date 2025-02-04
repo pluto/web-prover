@@ -1,0 +1,76 @@
+name: "Setup Rust Environment (MacOS)"
+description: ""
+inputs:
+  rust-cache-key:
+    description: "Additional Rust Cache Key (should not include OS)"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install protoc
+      shell: bash
+      run: |
+        cd ${{ runner.temp }}
+        mkdir protobuf
+        cd protobuf
+        VERSION=29.3
+        wget -q "https://github.com/protocolbuffers/protobuf/releases/download/v${VERSION}/protoc-${VERSION}-osx-aarch_64.zip"
+        unzip protoc-${VERSION}-osx-aarch_64.zip
+        sudo mv include/google /usr/local/include/
+        sudo mv bin/protoc /usr/local/bin/
+        sudo chmod +x /usr/local/bin/protoc
+        echo "PROTOC=/usr/local/bin/protoc" >> $GITHUB_ENV
+
+    # - name: Cache LLVM installation
+    #   id: llvm-cache
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: /opt/homebrew/opt/llvm@18
+    #     key: ${{ runner.os }}-llvm18
+
+    - name: Install LLVM
+      # if: steps.llvm-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
+        echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
+
+    - name: Cache Rust dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          /Users/runner/.cargo
+          /Users/runner/.rustup
+        key: rust-${{ runner.os }}-${{ inputs.rust-cache-key }}
+
+    - name: Cache Rust target dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          target
+        key: rust-${{ runner.os }}-${{ inputs.rust-cache-key }}-target-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          rust-${{ runner.os }}-${{ inputs.rust-cache-key }}-target
+
+    - shell: bash
+      run: |
+        rustup toolchain install nightly-2024-10-28
+        cargo install cbindgen
+
+    - name: Verify installations
+      shell: bash
+      run: |
+        echo "Verifying LLVM installation..."
+        clang --version
+
+        echo "Verifying cbindgen installation..."
+        cbindgen --version
+
+        echo "Verifying protoc installation..."
+        which protoc
+        protoc --version
+
+        echo "Verifying Rust installation..."
+        rustc --version
+        rustup show

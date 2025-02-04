@@ -1,8 +1,8 @@
 [package]
 name   ="client"
-version="0.2.0"
+version="0.1.0"
 edition="2021"
-build  ="../build.rs"
+build  ="build.rs"
 publish=false
 
 [features]
@@ -16,12 +16,16 @@ notary_ca_cert=[]
 # used to disable cert verification, useful for development
 unsafe_skip_cert_verification=[]
 
+[build-dependencies]
+cargo_metadata="0.19.1"
+
 # Shared dependencies for all targets
 [dependencies]
 # TLS
-tls-client ={ workspace=true }
-tls-client2={ workspace=true }
-tls-core   ={ workspace=true }
+tls-client        ={ workspace=true }
+tls-client2       ={ workspace=true }
+tls-core          ={ workspace=true }
+client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="8e7eb839e901dcee416179116bb0f9c4f7ae683c" }
 
 # TLSN
 tlsn-prover={ workspace=true }
@@ -58,11 +62,11 @@ tokio-util={ version="0.7", features=[
 ] } # compat is used to work with AsyncRead and AsyncWrite from other crates
 chrono="0.4"
 p256={ version="0.13", features=["pem", "ecdsa"] }
+rayon={ workspace=true }
 
 uuid={ version="1.10.0", default-features=false, features=["v4"] }
 
-rayon={ workspace=true }
-clap ={ workspace=true }
+clap={ workspace=true }
 
 ####################################################################################################
 # Target-specific configuration

@@ -14,13 +14,13 @@
 		257802412CBDB190006657CA /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2578023C2CBDB18F006657CA /* ContentView.swift */; };
 		259775502CAB3E41006D6FB1 /* demo-app-clip.app in Embed App Clips */ = {isa = PBXBuildFile; fileRef = 2597752B2CAB3E40006D6FB1 /* demo-app-clip.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		259775702CAB49F5006D6FB1 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2597756E2CAB48FA006D6FB1 /* Network.framework */; };
-		25D9316B2CBDC27E00DF32C2 /* libclient_ios.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 25D9316A2CBDC27E00DF32C2 /* libclient_ios.xcframework */; };
-		25D9316C2CBDC28500DF32C2 /* libclient_ios.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 25D9316A2CBDC27E00DF32C2 /* libclient_ios.xcframework */; };
 		25E689D82CBDB1EB00D63F7A /* ca-cert.cer in Resources */ = {isa = PBXBuildFile; fileRef = 25E689D12CBDB1EB00D63F7A /* ca-cert.cer */; };
 		25E689D92CBDB1EB00D63F7A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 25E689D32CBDB1EB00D63F7A /* Assets.xcassets */; };
 		25E689DA2CBDB1EB00D63F7A /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 25E689D52CBDB1EB00D63F7A /* Preview Assets.xcassets */; };
 		25E689DB2CBDB1EB00D63F7A /* demoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25E689D62CBDB1EB00D63F7A /* demoApp.swift */; };
 		25E689DC2CBDB1EB00D63F7A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25E689D72CBDB1EB00D63F7A /* ContentView.swift */; };
+		E0A2B0132D482FBD001D2206 /* PlutoProver.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = E0A2B0122D482FBD001D2206 /* PlutoProver.xcframework */; };
+		E0A2B0162D482FC9001D2206 /* PlutoProver.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = E0A2B0122D482FBD001D2206 /* PlutoProver.xcframework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,7 +48,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		250F3F712CB9F7C1001F7BD0 /* libclient_ios.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = libclient_ios.xcframework; path = "../../zk/web-prover/target/aarch64-apple-ios-sim/release/libclient_ios.xcframework"; sourceTree = "<group>"; };
 		257802372CBDB18F006657CA /* demo-app-clip.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = "demo-app-clip.entitlements"; sourceTree = "<group>"; };
 		257802382CBDB18F006657CA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2578023A2CBDB18F006657CA /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
@@ -58,13 +57,13 @@
 		259774FA2CAB3DC6006D6FB1 /* demo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = demo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2597752B2CAB3E40006D6FB1 /* demo-app-clip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "demo-app-clip.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		2597756E2CAB48FA006D6FB1 /* Network.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Network.framework; path = System/Library/Frameworks/Network.framework; sourceTree = SDKROOT; };
-		25D9316A2CBDC27E00DF32C2 /* libclient_ios.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = libclient_ios.xcframework; path = "../../target/aarch64-apple-ios-sim/release/libclient_ios.xcframework"; sourceTree = "<group>"; };
 		25E689D12CBDB1EB00D63F7A /* ca-cert.cer */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ca-cert.cer"; sourceTree = "<group>"; };
 		25E689D22CBDB1EB00D63F7A /* demo.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = demo.entitlements; sourceTree = "<group>"; };
 		25E689D32CBDB1EB00D63F7A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		25E689D52CBDB1EB00D63F7A /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		25E689D62CBDB1EB00D63F7A /* demoApp.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = demoApp.swift; sourceTree = "<group>"; };
 		25E689D72CBDB1EB00D63F7A /* ContentView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		E0A2B0122D482FBD001D2206 /* PlutoProver.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = PlutoProver.xcframework; path = ../../target/PlutoProver.xcframework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,8 +71,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E0A2B0132D482FBD001D2206 /* PlutoProver.xcframework in Frameworks */,
 				25670E3F2CB58C510033872F /* Network.framework in Frameworks */,
-				25D9316B2CBDC27E00DF32C2 /* libclient_ios.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -81,8 +80,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E0A2B0162D482FC9001D2206 /* PlutoProver.xcframework in Frameworks */,
 				259775702CAB49F5006D6FB1 /* Network.framework in Frameworks */,
-				25D9316C2CBDC28500DF32C2 /* libclient_ios.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -132,8 +131,7 @@
 		2597756D2CAB48FA006D6FB1 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				250F3F712CB9F7C1001F7BD0 /* libclient_ios.xcframework */,
-				25D9316A2CBDC27E00DF32C2 /* libclient_ios.xcframework */,
+				E0A2B0122D482FBD001D2206 /* PlutoProver.xcframework */,
 				2597756E2CAB48FA006D6FB1 /* Network.framework */,
 			);
 			name = Frameworks;

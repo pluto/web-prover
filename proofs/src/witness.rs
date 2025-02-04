@@ -58,7 +58,7 @@ impl From<&ByteOrPad> for halo2curves::bn256::Fr {
 }
 
 /// Converts a field element to a base10 string.
-fn field_element_to_base10_string(fe: F<G1>) -> String {
+pub fn field_element_to_base10_string(fe: F<G1>) -> String {
   BigInt::from_bytes_le(num_bigint::Sign::Plus, &fe.to_bytes()).to_str_radix(10)
 }
 
@@ -266,8 +266,8 @@ pub fn data_hasher(preimage: &[ByteOrPad]) -> F<G1> {
   hash_val
 }
 
-pub fn polynomial_digest(bytes: &[u8], polynomial_input: F<G1>) -> F<G1> {
-  let mut monomial = F::<G1>::ONE;
+pub fn polynomial_digest(bytes: &[u8], polynomial_input: F<G1>, counter: u64) -> F<G1> {
+  let mut monomial = polynomial_input.pow(&[counter]);
   let mut accumulated = F::<G1>::ZERO;
   for byte in bytes {
     accumulated += F::<G1>::from(u64::from(*byte)) * monomial;
@@ -357,45 +357,83 @@ pub fn json_value_digest(plaintext: &[ByteOrPad], keys: &[JsonKey]) -> Result<Ve
 
 pub fn request_initial_digest(
   manifest_request: &Request,
-  ciphertext_digest: F<G1>,
+  ciphertext: &[Vec<ByteOrPad>],
 ) -> (F<G1>, F<G1>) {
+  // First create a digest of the ciphertext itself
+  let ciphertext_digest = ciphertext.iter().map(|c| data_hasher(c)).sum::<F<G1>>();
+  debug!(
+    "WITNESS (request): ct_digest={:?}, hex(ct_digest)={:?}",
+    ciphertext_digest,
+    hex::encode(ciphertext_digest.to_bytes())
+  );
+
   // TODO: This assumes the start line format here as well.
   // Then digest the start line using the ciphertext_digest as a random input
   let start_line_bytes =
     format!("{} {} {}", &manifest_request.method, &manifest_request.url, &manifest_request.version);
-  let start_line_digest = polynomial_digest(start_line_bytes.as_bytes(), ciphertext_digest);
+  let start_line_digest = polynomial_digest(start_line_bytes.as_bytes(), ciphertext_digest, 0);
+  debug!(
+    "WITNESS (request): start_line_digest={:?}, hex={:?}",
+    start_line_digest,
+    hex::encode(start_line_digest.to_bytes())
+  );
 
   // Digest all the headers
   let header_bytes = headers_to_bytes(&manifest_request.headers);
-  let headers_digest = header_bytes.map(|bytes| polynomial_digest(&bytes, ciphertext_digest));
+  let headers_digest =
+    header_bytes.map(|bytes| polynomial_digest(&bytes, ciphertext_digest, 0)).collect::<Vec<_>>();
+  debug!(
+    "WITNESS (request): headers_digest={:?}, hex={:?}",
+    headers_digest,
+    headers_digest.clone().into_iter().map(|f| hex::encode(f.to_bytes()))
+  );
 
   // Put all the digests into a vec
   let mut all_digests = vec![];
   all_digests.push(start_line_digest);
   headers_digest.into_iter().for_each(|d| all_digests.push(d));
+  let hashed_digests = all_digests.clone().into_iter().map(|d| poseidon::<1>(&[d]));
+  debug!(
+    "WITNESS (request): hashed_digests={:?}, hex={:?}",
+    hashed_digests,
+    hashed_digests.clone().into_iter().map(|f| hex::encode(f.to_bytes()))
+  );
+
+  for digest in all_digests.clone() {
+    debug!("Digest: {}", field_element_to_base10_string(digest));
+  }
 
   // Iterate through the material and sum up poseidon hashes of each as to not mix polynomials
   let manifest_digest =
     ciphertext_digest + all_digests.into_iter().map(|d| poseidon::<1>(&[d])).sum::<F<G1>>();
+  debug!(
+    "WITNESS (request) PREP: z0_primary (init_nivc)={:?}, hex={:?}",
+    manifest_digest,
+    hex::encode(manifest_digest.to_bytes())
+  );
   (ciphertext_digest, manifest_digest)
 }
 
+// TODO (Sambhav): move this to manifest.rs
 pub fn response_initial_digest(
   manifest_response: &Response,
-  ciphertext_digest: F<G1>,
+  ciphertext: &[Vec<ByteOrPad>],
   max_stack_height: usize,
 ) -> (F<G1>, F<G1>) {
+  // First create a digest of the ciphertext itself
+  let ciphertext_digest = ciphertext.iter().map(|c| data_hasher(c)).sum::<F<G1>>();
+
   // TODO: This assumes the start line format here as well.
   // Then digest the start line using the ciphertext_digest as a random input
   let start_line_bytes = format!(
     "{} {} {}",
     &manifest_response.version, &manifest_response.status, &manifest_response.message
   );
-  let start_line_digest = polynomial_digest(start_line_bytes.as_bytes(), ciphertext_digest);
+  let start_line_digest = polynomial_digest(start_line_bytes.as_bytes(), ciphertext_digest, 0);
 
   // Digest all the headers
   let header_bytes = headers_to_bytes(&manifest_response.headers);
-  let headers_digest = header_bytes.map(|bytes| polynomial_digest(&bytes, ciphertext_digest));
+  let headers_digest = header_bytes.map(|bytes| polynomial_digest(&bytes, ciphertext_digest, 0));
 
   // Digest the JSON sequence
   let json_tree_hash =
@@ -660,9 +698,9 @@ mod tests {
   fn test_initial_digest() {
     let test_ciphertext_padded =
       TEST_CIPHERTEXT.iter().map(|x| ByteOrPad::Byte(*x)).collect::<Vec<ByteOrPad>>();
-    let ciphertext_digest = data_hasher(&test_ciphertext_padded);
+
     let (ct_digest, manifest_digest) =
-      response_initial_digest(&mock_manifest().response, ciphertext_digest, 5);
+      response_initial_digest(&mock_manifest().response, &[test_ciphertext_padded.clone()], 5);
     println!("\nManifest Digest (decimal):");
     println!("  {}", BigUint::from_bytes_le(&manifest_digest.to_bytes()));
 
@@ -675,7 +713,7 @@ mod tests {
     );
 
     let (ct_digest, _manifest_digest) =
-      request_initial_digest(&mock_manifest().request, ciphertext_digest);
+      request_initial_digest(&mock_manifest().request, &[test_ciphertext_padded]);
     assert_eq!(
       BigUint::from_bytes_le(&ct_digest.to_bytes()),
       BigUint::from_str(

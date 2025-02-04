@@ -4,6 +4,10 @@ members=["client", "client_ios", "client_wasm", "notary", "proofs"]
 # members =["client", "client_ios"] # config for ios rust analyzer
 resolver="2"
 
+[workspace.metadata]
+# https://github.com/pluto/web-prover-circuits/releases
+web_prover_circuits_version="0.8.0"
+
 [workspace.dependencies]
 # Local re-exporting
 client={ path="client" }

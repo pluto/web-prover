@@ -1,0 +1,65 @@
+name: Test Client WASM with Origo
+
+on:
+  workflow_call:
+    inputs:
+      web-prover-circuits-cache-key:
+        required: true
+        type: string
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch web-prover-circuits cache
+        uses: actions/cache/restore@v4
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ inputs.web-prover-circuits-cache-key }}
+
+      - name: Download notary
+        uses: actions/download-artifact@v4
+        with:
+          name: "notary.linux.amd64"
+          path: "target/release"
+
+      - run: chmod +x target/release/notary
+
+      - name: Download client.wasm
+        uses: actions/download-artifact@v4
+        with:
+          name: "client.wasm"
+          path: "client_wasm/pkg"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "client_wasm/demo/package-lock.json"
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            client_wasm/demo/node_modules
+          key: client-wasm-node-modules-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: client-wasm-node-modules-${{ runner.os }}
+
+      - name: Install dependencies
+        working-directory: client_wasm/demo
+        run: |
+          npm install
+          npx playwright install --with-deps
+
+      - run: |
+          export RUST_LOG=DEBUG
+          ./target/release/notary --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json &
+          sleep 10
+
+          # symlink proofs/web_proof_circuits
+          (cd client_wasm/demo/static && rm -rf build && ln -s ../../../proofs/web_proof_circuits build)
+
+          cd client_wasm/demo
+          npm test

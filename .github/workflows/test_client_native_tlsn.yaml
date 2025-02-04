@@ -1,0 +1,44 @@
+name: Test Client Native with TLSN
+
+on:
+  workflow_call:
+    inputs:
+      web-prover-circuits-cache-key:
+        required: true
+        type: string
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch web-prover-circuits cache
+        uses: actions/cache/restore@v4
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ inputs.web-prover-circuits-cache-key }}
+
+      - name: Download notary
+        uses: actions/download-artifact@v4
+        with:
+          name: "notary.linux.amd64"
+          path: "target/release"
+
+      - run: chmod +x target/release/notary
+
+      - name: Download client
+        uses: actions/download-artifact@v4
+        with:
+          name: "client.linux.amd64"
+          path: "target/release"
+
+      - run: chmod +x target/release/client
+
+      - run: |
+          export RUST_LOG=DEBUG 
+          ./target/release/notary --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json &
+          sleep 10
+
+          export NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer
+          ./target/release/client --config ./fixture/client.tlsn_tcp_local.json

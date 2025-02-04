@@ -735,9 +735,9 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "aws-lc-rs"
-version = "1.12.2"
+version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c2b7ddaa2c56a367ad27a094ad8ef4faacf8a617c2575acb2ba88949df999ca"
+checksum = "f409eb70b561706bf8abba8ca9c112729c481595893fd06a2dd9af8ed8441148"
 dependencies = [
  "aws-lc-sys",
  "paste",
@@ -746,9 +746,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-sys"
-version = "0.25.0"
+version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71b2ddd3ada61a305e1d8bb6c005d1eaa7d14d903681edfc400406d523a9b491"
+checksum = "923ded50f602b3007e5e63e3f094c479d9c8a9b42d7f4034e4afe456aa48bfd2"
 dependencies = [
  "bindgen 0.69.5",
  "cc",
@@ -1135,69 +1135,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "caratls_ekm_client"
-version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=2f4631af7400eafec7a533b72d1d460fa5a66db3#2f4631af7400eafec7a533b72d1d460fa5a66db3"
-dependencies = [
- "caratls_ekm_types",
- "rustls 0.23.19",
- "rustls-pki-types",
- "serde",
- "serde_cbor",
- "thiserror 2.0.6",
- "tokio",
- "tokio-rustls",
-]
-
-[[package]]
-name = "caratls_ekm_google_confidential_space_client"
-version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=2f4631af7400eafec7a533b72d1d460fa5a66db3#2f4631af7400eafec7a533b72d1d460fa5a66db3"
-dependencies = [
- "caratls_ekm_client",
- "caratls_ekm_google_confidential_space_types",
- "hex",
- "jsonwebtoken",
- "reqwest",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "caratls_ekm_google_confidential_space_server"
-version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=2f4631af7400eafec7a533b72d1d460fa5a66db3#2f4631af7400eafec7a533b72d1d460fa5a66db3"
-dependencies = [
- "caratls_ekm_google_confidential_space_types",
- "caratls_ekm_server",
- "hex",
- "http-body-util",
- "hyper",
- "hyper-util",
- "jsonwebtoken",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "caratls_ekm_google_confidential_space_types"
-version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=2f4631af7400eafec7a533b72d1d460fa5a66db3#2f4631af7400eafec7a533b72d1d460fa5a66db3"
+name = "camino"
+version = "1.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b96ec4966b5813e2c0507c1f86115c8c5abaadc3980879c3424042a02fd1ad3"
 dependencies = [
  "serde",
 ]
 
 [[package]]
-name = "caratls_ekm_server"
+name = "caratls"
 version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=2f4631af7400eafec7a533b72d1d460fa5a66db3#2f4631af7400eafec7a533b72d1d460fa5a66db3"
+source = "git+https://github.com/pluto/caratls.git?rev=e440cc71ece67fa3a53d7fd37d06d64d44840f01#e440cc71ece67fa3a53d7fd37d06d64d44840f01"
 dependencies = [
- "caratls_ekm_types",
  "rcgen",
  "rustls 0.23.19",
  "rustls-pki-types",
+ "serde",
  "serde_cbor",
  "thiserror 2.0.6",
  "tokio",
@@ -1205,11 +1159,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "caratls_ekm_types"
-version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=2f4631af7400eafec7a533b72d1d460fa5a66db3#2f4631af7400eafec7a533b72d1d460fa5a66db3"
+name = "cargo-platform"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e35af189006b9c0f00a064685c727031e3ed2d8020f7ba284d78cc2671bd36ea"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "cargo_metadata"
+version = "0.19.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8769706aad5d996120af43197bf46ef6ad0fda35216b4505f926a365a232d924"
+dependencies = [
+ "camino",
+ "cargo-platform",
+ "semver 1.0.23",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.6",
 ]
 
 [[package]]
@@ -1394,15 +1363,16 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
 name = "client"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
  "async-tungstenite 0.25.1",
  "base64 0.22.1",
  "bytes",
- "caratls_ekm_client",
- "caratls_ekm_google_confidential_space_client",
+ "caratls",
+ "cargo_metadata",
  "chrono",
  "clap",
+ "client-side-prover",
  "console_error_panic_hook",
  "elliptic-curve",
  "futures",
@@ -1495,8 +1465,9 @@ dependencies = [
 
 [[package]]
 name = "client_ios"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
+ "cargo_metadata",
  "client",
  "serde",
  "serde_json",
@@ -1509,6 +1480,7 @@ dependencies = [
 name = "client_wasm"
 version = "0.1.0"
 dependencies = [
+ "cargo_metadata",
  "client",
  "console_error_panic_hook",
  "js-sys",
@@ -3271,21 +3243,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jsonwebtoken"
-version = "9.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9ae10193d25051e74945f1ea2d0b42e03cc3b890f7e4cc5faa44997d808193f"
-dependencies = [
- "base64 0.21.7",
- "js-sys",
- "pem",
- "ring",
- "serde",
- "serde_json",
- "simple_asn1",
-]
-
-[[package]]
 name = "k256"
 version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3838,9 +3795,10 @@ dependencies = [
  "axum",
  "axum-core",
  "base64 0.21.7",
- "caratls_ekm_google_confidential_space_server",
- "caratls_ekm_server",
+ "caratls",
+ "cargo_metadata",
  "clap",
+ "client",
  "client-side-prover",
  "config",
  "eyre",
@@ -4568,6 +4526,7 @@ dependencies = [
  "bellpepper-core",
  "bincode",
  "byteorder",
+ "cargo_metadata",
  "circom_witnesscalc",
  "clap",
  "client-side-prover",
@@ -5401,6 +5360,9 @@ name = "semver"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61697e0a1c7e512e84a621326239844a24d8207b4669b41bc18b32ea5cbf988b"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "semver-parser"
@@ -5607,18 +5569,6 @@ checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
 dependencies = [
  "digest 0.10.7",
  "rand_core 0.6.4",
-]
-
-[[package]]
-name = "simple_asn1"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "297f631f50729c8c99b84667867963997ec0b50f32b2a7dbcab828ef0541e8bb"
-dependencies = [
- "num-bigint 0.4.6",
- "num-traits",
- "thiserror 2.0.6",
- "time",
 ]
 
 [[package]]

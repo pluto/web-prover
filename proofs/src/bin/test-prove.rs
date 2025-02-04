@@ -38,13 +38,4 @@ fn main() {
     "setting default subscriber
 failed",
   );
-
-  // // Read in the supernova program data
-  // let file = args.input_file;
-  // info!("Using file: {:?}", file);
-  // let read = std::fs::read(file).unwrap();
-  // let program_data: ProgramData = serde_json::from_slice(&read).unwrap();
-  // let circuit_list = program::initialize_circuit_list(&program_data);
-  // let setup_data = program::setup(circuit_list);
-  // program::run(&program_data);
 }
