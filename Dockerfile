@@ -1,3 +1,5 @@
+# Debug Dockerfile for building a TEE-Enabled Docker image
+
 FROM rust:1.82-bookworm AS rust-builder
 
 RUN apt-get update && apt-get install -y \
