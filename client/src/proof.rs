@@ -1,9 +1,12 @@
 use std::sync::Arc;
 
+use clap::ArgAction::Set;
 use client_side_prover::supernova::PublicParams;
 use proofs::{
   program::{
-    data::{InitializedSetup, NotExpanded, Online, ProgramData, Witnesses},
+    data::{
+      InitializedSetup, InstanceParams, NotExpanded, Online, ProofParams, SetupParams, Witnesses,
+    },
     manifest::{EncryptionInput, Manifest, NIVCRom, NivcCircuitInputs},
   },
   E1, F, G1, G2,
@@ -29,7 +32,7 @@ use crate::{ClientErrors, OrigoProof};
 /// - generates NIVC ROM from [`Manifest`] config for request and response
 /// - get circuit [`UninitializedSetup`] containing circuit R1CS and witness generator files
 ///   according to input sizes
-/// - create consolidate [`ProgramData`]
+/// - create consolidate [`InstanceParams`]
 /// - expand private inputs into fold inputs as per circuits
 pub async fn construct_program_data_and_proof(
   manifest: Manifest,
@@ -46,19 +49,21 @@ pub async fn construct_program_data_and_proof(
   let NIVCRom { circuit_data, rom } = manifest.build_rom(&request_inputs, &response_inputs);
 
   debug!("Generating `ProgramData`...");
-  let program_data = ProgramData::<Online, NotExpanded> {
+  let setup_params = SetupParams::<Online> {
     public_params: proving_params,
     vk_digest_primary: vks.0,
     vk_digest_secondary: vks.1,
     setup_data,
-    rom: rom.clone(),
     rom_data: circuit_data.clone(),
-    initial_nivc_input: initial_nivc_input.to_vec(),
-    inputs: (private_inputs, fold_inputs),
+  };
+  let proof_params = ProofParams { rom: rom.clone() };
+  let instance_params = InstanceParams::<NotExpanded> {
+    nivc_input:     vec![initial_nivc_input[0]],
+    private_inputs: (private_inputs, fold_inputs),
   }
-  .into_expanded()?;
+  .into_expanded(&proof_params)?;
 
   debug!("starting recursive proving");
-  let proof = program_data.generate_proof(&witnesses).await?;
+  let proof = setup_params.generate_proof(&proof_params, &instance_params, &witnesses).await?;
   Ok(OrigoProof { proof, rom: NIVCRom { circuit_data, rom } })
 }

@@ -3,14 +3,14 @@ use std::collections::HashMap;
 
 use proofs::{
   program::{
-    data::{NotExpanded, Offline, ProgramData},
+    data::{NotExpanded, Offline, SetupParams, Witnesses},
     manifest::{EncryptionInput, Manifest, TLSEncryption},
   },
   F, G1, G2,
 };
 use serde::{Deserialize, Serialize};
 use tracing::debug;
-use proofs::program::data::Witnesses;
+
 use crate::{
   circuits::construct_setup_data,
   config::{self},
@@ -134,7 +134,8 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
   let manifest = config.proving.manifest.unwrap();
 
   let proof =
-    generate_proof(manifest, proving_params.unwrap(), request_inputs, response_inputs, &vec![]).await?;
+    generate_proof(manifest, proving_params.unwrap(), request_inputs, response_inputs, &vec![])
+      .await?;
 
   Ok(proof)
 }
@@ -147,15 +148,12 @@ pub(crate) async fn generate_proof(
   witnesses: &Witnesses,
 ) -> Result<OrigoProof, ClientErrors> {
   let setup_data = construct_setup_data();
-  let program_data = ProgramData::<Offline, NotExpanded> {
+  let program_data = SetupParams::<Offline> {
     public_params: proving_params,
     vk_digest_primary: F::<G1>::from(0), // These need to be right.
     vk_digest_secondary: F::<G2>::from(0),
     setup_data,
-    rom: vec![],
     rom_data: HashMap::new(),
-    initial_nivc_input: vec![],
-    inputs: (vec![], HashMap::new()),
   }
   .into_online()?;
 
