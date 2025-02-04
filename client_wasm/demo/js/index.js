@@ -1,8 +1,9 @@
-import init, {setup_tracing, initThreadPool} from "../pkg/client_wasm.js";
+import init, { setup_tracing, initThreadPool } from "../pkg/client_wasm.js";
 import { witness } from "./witness"; // This is not unused, this is how we initialize window.witness
 import { WEB_PROVER_CIRCUITS_VERSION } from "./config";
 import teeConfig from "../../../fixture/client.tee_tcp_local.json";
 import origoConfig from "../../../fixture/client.origo_tcp_local.json";
+import tlsnConfig from "../../../fixture/client.tlsn_tcp_local.json";
 import { DEFAULT_MODE } from "../scripts/test.js";
 
 const numConcurrency = navigator.hardwareConcurrency;
@@ -72,7 +73,16 @@ const getBytes = async function (file) {
 start();
 
 const mode = window.MODE || DEFAULT_MODE; // Get the mode from window object
-const proverConfig = mode === 'origo' ? origoConfig : teeConfig;
+const proverConfig = {};
+if (mode === "tee") {
+  proverConfig.config = teeConfig;
+} else if (mode === "origo") {
+  proverConfig.config = origoConfig;
+} else if (mode === "tlsn") {
+  proverConfig.config = tlsnConfig;
+} else {
+  throw new Error(`Invalid mode: ${mode}`);
+}
 
 console.log(`Using ${mode} mode`);
 

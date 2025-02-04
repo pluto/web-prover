@@ -1,7 +1,7 @@
 use std::panic;
 
 use client::{config::Config, UninitializedSetup};
-use tlsn_core::proof::TlsProof;
+use tlsn_core::{presentation::Presentation, proof::TlsProof};
 use tracing::debug;
 use tracing_subscriber::{
   fmt::{format::Pretty, time::UtcTime},
@@ -79,11 +79,12 @@ pub async fn prover(
 pub async fn verify(proof: &str, notary_pubkey_str: &str) -> Result<String, JsValue> {
   panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-  let proof: TlsProof = serde_json::from_str(proof)
+  let proof: Presentation = serde_json::from_str(proof)
     .map_err(|e| JsValue::from_str(&format!("Could not deserialize proof: {:?}", e)))?;
 
-  let result = client::tlsn::verify(proof, notary_pubkey_str).await;
-  // .map_err(|e| JsValue::from_str(&format!("Could not verify proof: {:?}", e)))?;
+  let result = client::tlsn::verify(proof)
+    .await
+    .map_err(|e| JsValue::from_str(&format!("Could not verify proof: {:?}", e)))?;
 
   serde_json::to_string_pretty(&result)
     .map_err(|e| JsValue::from_str(&format!("Could not serialize result: {:?}", e)))

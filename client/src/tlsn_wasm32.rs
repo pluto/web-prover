@@ -1,5 +1,5 @@
 use futures::{channel::oneshot, AsyncWriteExt};
-use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
+use tlsn_prover::{state::Closed, Prover, ProverConfig};
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::*;
 

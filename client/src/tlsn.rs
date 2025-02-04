@@ -4,7 +4,6 @@ use std::time::Duration;
 
 use http_body_util::BodyExt;
 use hyper::{body::Bytes, Request};
-use p256::pkcs8::DecodePublicKey;
 use serde::{Deserialize, Serialize};
 pub use tlsn_core::attestation::Attestation;
 use tlsn_core::{
@@ -20,7 +19,7 @@ use tracing::debug;
 
 use crate::errors;
 
-pub async fn notarize(prover: Prover<Closed>) -> Result<Attestation, errors::ClientErrors> {
+pub async fn notarize(prover: Prover<Closed>) -> Result<Presentation, errors::ClientErrors> {
   let mut prover = prover.start_notarize();
   let transcript = HttpTranscript::parse(prover.transcript())?;
 
@@ -31,9 +30,10 @@ pub async fn notarize(prover: Prover<Closed>) -> Result<Attestation, errors::Cli
 
   // Request an attestation.
   let config = RequestConfig::default();
-  let (attestation, _secrets) = prover.finalize(&config).await?;
+  let (attestation, secrets) = prover.finalize(&config).await?;
 
-  Ok(attestation)
+  let presentation = present(attestation, secrets).await?;
+  Ok(presentation)
 }
 
 #[derive(Serialize, Deserialize)]

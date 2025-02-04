@@ -25,6 +25,7 @@ use proofs::{
 use serde::{Deserialize, Serialize};
 use tlsn_common::config::ProtocolConfig;
 pub use tlsn_core::attestation::Attestation;
+use tlsn_core::presentation::Presentation;
 use tlsn_prover::ProverConfig;
 use tracing::{debug, info};
 use web_prover_core::{
@@ -45,7 +46,7 @@ pub struct OrigoProof {
 
 #[derive(Debug, Serialize)]
 pub enum Proof {
-  TLSN(Box<Attestation>),
+  TLSN(Box<Presentation>),
   Origo(OrigoProof),
   TEE(TeeProof),
   Proxy(TeeProof),
@@ -101,6 +102,10 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, Clie
   };
 
   let p = tlsn::notarize(prover).await?;
+
+  // TODO(WJ 2025-02-04): We might want to return an presentation instead of an attestation here, no
+  // sure yet. The thought process here is that the verify api on TLSN takes a presentation, not
+  // an attestation.
   Ok(Proof::TLSN(Box::new(p)))
 }
 
