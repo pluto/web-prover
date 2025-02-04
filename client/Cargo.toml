@@ -13,6 +13,9 @@ tracing  =[]
 # used for local development
 notary_ca_cert=[]
 
+# used to disable cert verification, useful for development
+unsafe_skip_cert_verification=[]
+
 [build-dependencies]
 cargo_metadata="0.19.1"
 
@@ -28,7 +31,8 @@ client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="8e7
 tlsn-prover={ workspace=true }
 tlsn-core  ={ workspace=true }
 
-caratls={ workspace=true }
+caratls_ekm_client                          ={ workspace=true }
+caratls_ekm_google_confidential_space_client={ workspace=true }
 
 bytes ="1"
 proofs={ workspace=true }

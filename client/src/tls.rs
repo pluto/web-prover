@@ -241,3 +241,58 @@ fn parse_cipher_key(key: &[u8]) -> Result<CipherSuiteKey, ClientErrors> {
     len => Err(ClientErrors::TlsCrypto(format!("Unsupported key length: {}", len))),
   }
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) mod unsafe_tls {
+  use std::sync::Arc;
+
+  #[derive(Debug)]
+  pub struct SkipServerVerification {
+    supported_algs: rustls::crypto::WebPkiSupportedAlgorithms,
+  }
+
+  impl SkipServerVerification {
+    pub fn new() -> std::sync::Arc<Self> {
+      std::sync::Arc::new(Self {
+        supported_algs: Arc::new(rustls::crypto::CryptoProvider::get_default().unwrap())
+          .clone()
+          .signature_verification_algorithms,
+      })
+    }
+  }
+
+  impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
+    fn verify_server_cert(
+      &self,
+      _end_entity: &pki_types::CertificateDer<'_>,
+      _intermediates: &[pki_types::CertificateDer<'_>],
+      _server_name: &pki_types::ServerName<'_>,
+      _ocsp_response: &[u8],
+      _now: pki_types::UnixTime,
+    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
+      Ok(rustls::client::danger::ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+      &self,
+      _message: &[u8],
+      _cert: &pki_types::CertificateDer<'_>,
+      _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+      Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+      &self,
+      _message: &[u8],
+      _cert: &pki_types::CertificateDer<'_>,
+      _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+      Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+      self.supported_algs.supported_schemes()
+    }
+  }
+}

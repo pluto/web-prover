@@ -132,3 +132,4 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
   // TODO(Sambhav): handle request and response into one proof
   Ok(proof)
 }
+

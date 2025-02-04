@@ -30,7 +30,11 @@ tls-core          ={ git="https://github.com/pluto/tls-origo-legacy", package="t
 rayon             ="1.10.0"
 wasm-bindgen-rayon="=1.2.1"
 futures           ="0.3"
-caratls           ={ git="https://github.com/pluto/caratls.git", rev="e440cc71ece67fa3a53d7fd37d06d64d44840f01" }
+
+caratls_ekm_server                          ={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
+caratls_ekm_google_confidential_space_server={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
+caratls_ekm_client                          ={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
+caratls_ekm_google_confidential_space_client={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
 
 # CLI
 clap={ version="4.5.13", features=["derive"] }

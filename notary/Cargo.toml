@@ -50,7 +50,9 @@ alloy-primitives={ version="0.8.2", features=["k256"] }
 k256            ={ version="0.13.3", features=["ecdsa"] }
 
 tls-client2={ workspace=true }
-caratls    ={ workspace=true }
+
+caratls_ekm_server                          ={ workspace=true }
+caratls_ekm_google_confidential_space_server={ workspace=true }
 
 [dev-dependencies]
 tower="0.4.13"

@@ -8,7 +8,8 @@ use std::{
   task::{Context, Poll},
 };
 use proofs::{G2, program::data::{ProgramData, Offline, NotExpanded}, program::manifest::{Manifest, EncryptionInput, NIVCRom, NivcCircuitInputs}};
-use caratls::client::TeeTlsConnector;
+use caratls_ekm_client::TeeTlsConnector;
+use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::StatusCode;
 use proofs::{circom::witness::load_witness_from_bin_reader, F, G1};
@@ -94,7 +95,8 @@ pub(crate) async fn proxy(
 
   // Either bind client to TEE TLS connection or plain websocket connection
   let (mut client_tls_conn, tls_fut) = if config.mode == NotaryMode::TEE {
-    let tee_tls_connector = TeeTlsConnector::new("example.com"); // TODO example.com
+    let token_verifier = GoogleConfidentialSpaceTokenVerifier::new("audience").await; // TODO pass in as function input
+    let tee_tls_connector = TeeTlsConnector::new(token_verifier, "example.com"); // TODO example.com
     let tee_tls_stream = tee_tls_connector.connect(ws_stream.into_io()).await?;
     bind_client(tee_tls_stream.compat(), client)
   } else {
