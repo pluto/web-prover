@@ -71,6 +71,7 @@ const proofWorker = new Worker(new URL("./proof.js", import.meta.url), {
   type: "module",
 });
 console.log("sending message to worker");
+console.log(WEB_PROVER_CIRCUITS_VERSION)
 
 var proving_params = {
   aux_params: await getByteParams(
@@ -89,7 +90,11 @@ proofWorker.onmessage = (event) => {
   } else if (event.data.type === "log") {
     console.log(...event.data.data);
   } else {
-    console.log("proof generated!", event.data);
+    if ("type" in event.data && event.data.type == "proof") {
+      console.log("proof successfully generated: ", event.data);
+    } else {
+      console.error("Error from worker:", event.data)
+    }
   }
 };
 

@@ -29,6 +29,6 @@ test('should generate proof', async ({ page }) => {
   // Wait for the proof message (5 min)
   await page.waitForEvent('console', {
     timeout: 300000, // will fail test if timeout hits
-    predicate: (msg) => msg.text().startsWith('proof generated!')
+    predicate: (msg) => msg.text().startsWith('proof successfully generated:')
   });
 })
