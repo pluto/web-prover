@@ -7,8 +7,7 @@ use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
   program::{
-    self,
-    data::{InstanceParams, NotExpanded, Offline, ProofParams, SetupParams},
+    data::{Offline, SetupParams},
     manifest::{EncryptionInput, Manifest},
   },
   F, G1, G2,

@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use clap::ArgAction::Set;
 use client_side_prover::supernova::PublicParams;
 use proofs::{
   program::{

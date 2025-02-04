@@ -114,10 +114,10 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
 
   let sb = SignBody {
     handshake_server_iv:  hex::encode(
-      origo_conn.secret_map.get("Handshake:server_iv").unwrap().clone().to_vec(),
+      origo_conn.secret_map.get("Handshake:server_iv").unwrap().clone(),
     ),
     handshake_server_key: hex::encode(
-      origo_conn.secret_map.get("Handshake:server_key").unwrap().clone().to_vec(),
+      origo_conn.secret_map.get("Handshake:server_key").unwrap().clone(),
     ),
   };
 
