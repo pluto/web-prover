@@ -13,8 +13,7 @@ use serde::Deserialize;
 use tlsn_common::config::ProtocolConfigValidator;
 use tlsn_core::{attestation::AttestationConfig, signing::SignatureAlgId, CryptoProvider};
 use tlsn_verifier::{Verifier, VerifierConfig};
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
+use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{debug, error, info};
 use uuid::Uuid;
 use ws_stream_tungstenite::WsStream;
@@ -137,7 +136,7 @@ pub async fn websocket_notarize(
   max_recv_data: Option<usize>,
 ) {
   debug!("Upgraded to websocket connection");
-  let stream = WsStream::new(socket.into_inner()).compat();
+  let stream = WsStream::new(socket.into_inner());
   match notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data).await
   {
     Ok(_) => {
@@ -157,7 +156,14 @@ pub async fn tcp_notarize(
   max_recv_data: Option<usize>,
 ) {
   debug!("Upgraded to tcp connection");
-  match notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data).await
+  match notary_service(
+    stream.compat(),
+    &notary_signing_key,
+    &session_id,
+    max_sent_data,
+    max_recv_data,
+  )
+  .await
   {
     Ok(_) => {
       info!(?session_id, "Successful notarization using tcp!");
