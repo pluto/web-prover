@@ -131,15 +131,23 @@ pub struct CircuitData {
 
 #[derive(Debug)]
 pub struct ProgramData<S: SetupStatus, W: WitnessStatus> {
+  // SetupParams
   pub public_params:       S::PublicParams,
   // TODO: Refactor this onto the PublicParams object and share the ProvingParams abstraction
   pub vk_digest_primary:   <E1 as Engine>::Scalar,
   pub vk_digest_secondary: <Dual<E1> as Engine>::Scalar,
   pub setup_data:          S::SetupData,
   pub rom_data:            HashMap<String, CircuitData>,
+
+  // ProofParams
   pub rom:                 Vec<String>,
-  pub initial_nivc_input:  Vec<F<G1>>,
-  pub inputs:              W::PrivateInputs,
+
+  // InstanceParams
+  pub initial_nivc_input:  Vec<F<G1>>, // in the PR: nivc_input
+  pub inputs:              W::PrivateInputs, // in the PR: private_inputs
+  // missing from PR: public_inputs
+
+  pub witnesses:           Vec<Vec<F<G1>>>, // TODO: Ideally remove this
 }
 
 impl<S: SetupStatus> ProgramData<S, NotExpanded> {
