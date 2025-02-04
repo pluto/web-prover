@@ -105,10 +105,9 @@ pub fn construct_setup_data(plaintext_length: usize) -> UninitializedSetup {
 }
 
 pub struct Verifier {
-  pub setup_params:    SetupParams<Online>,
-  pub proof_params:    ProofParams,
-  pub instance_params: InstanceParams<NotExpanded>,
-  pub verifier_key:    VerifierKey<E1, S1, S2>,
+  pub setup_params: SetupParams<Online>,
+  pub proof_params: ProofParams,
+  pub verifier_key: VerifierKey<E1, S1, S2>,
 }
 
 pub fn initialize_verifier(rom_data: HashMap<String, CircuitData>, rom: Vec<String>) -> Verifier {
@@ -128,10 +127,6 @@ pub fn initialize_verifier(rom_data: HashMap<String, CircuitData>, rom: Vec<Stri
   .into_online()
   .unwrap();
   let proof_params = ProofParams { rom };
-  let instance_params = InstanceParams::<NotExpanded> {
-    nivc_input:     vec![F::<G1>::from(0); PUBLIC_IO_VARS],
-    private_inputs: (Vec::new(), HashMap::new()),
-  };
 
   let (pk, verifier_key) =
     CompressedSNARK::<E1, S1, S2>::setup(&setup_params.public_params).unwrap();
@@ -142,5 +137,5 @@ pub fn initialize_verifier(rom_data: HashMap<String, CircuitData>, rom: Vec<Stri
     pk.pk_secondary.vk_digest,
   );
 
-  Verifier { setup_params, proof_params, instance_params, verifier_key }
+  Verifier { setup_params, proof_params, verifier_key }
 }

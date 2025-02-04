@@ -122,18 +122,18 @@ async fn test_run_serialized_verify() {
   let setup_data = get_setup_data();
   let (instance_params, recursive_snark) = run_entry(setup_data.clone()).await.unwrap();
 
-  // Pseudo-offline the `PublicParams` and regenerate it
-  let mut program_data =
+  // Pseudo-offline the `SetupParams` and regenerate it
+  let mut setup_params =
     instance_params.into_offline(PathBuf::from_str(TEST_OFFLINE_PATH).unwrap()).unwrap();
-  program_data.setup_data = setup_data.clone();
-  let program_data = program_data.into_online().unwrap();
+  setup_params.setup_data = setup_data.clone();
+  let setup_params = setup_params.into_online().unwrap();
 
   // Create the compressed proof with the offlined `PublicParams`
-  let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
+  let proof = program::compress_proof(&recursive_snark, &setup_params.public_params).unwrap();
   let serialized_compressed_proof = proof.serialize();
   let proof = serialized_compressed_proof.deserialize();
 
-  // Extend the initial state input with the ROM (happens internally inside of `program::run`, so
+  // Extend the initial state input with the ROM (happens internally inside `program::run`, so
   // we do it out here just for the test)
   let mut z0_primary = vec![F::<G1>::ONE, F::<G1>::from(2)];
   z0_primary.push(F::<G1>::ZERO);
@@ -149,8 +149,8 @@ async fn test_run_serialized_verify() {
   z0_primary.extend_from_slice(&rom);
 
   // Check that it verifies with offlined `PublicParams` regenerated pkey vkey
-  let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
-  let res = proof.proof.verify(&program_data.public_params, &vk, &z0_primary, &[F::<G2>::ZERO]);
+  let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&setup_params.public_params).unwrap();
+  let res = proof.proof.verify(&setup_params.public_params, &vk, &z0_primary, &[F::<G2>::ZERO]);
   assert!(res.is_ok());
   std::fs::remove_file(PathBuf::from_str(TEST_OFFLINE_PATH).unwrap()).unwrap();
 }

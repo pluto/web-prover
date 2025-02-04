@@ -47,7 +47,7 @@ pub async fn construct_program_data_and_proof(
 
   let NIVCRom { circuit_data, rom } = manifest.build_rom(&request_inputs, &response_inputs);
 
-  debug!("Generating `ProgramData`...");
+  debug!("Generating response's parameters...");
   let setup_params = SetupParams::<Online> {
     public_params: proving_params,
     vk_digest_primary: vks.0,

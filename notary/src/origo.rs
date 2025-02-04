@@ -231,12 +231,7 @@ pub async fn verify(
     )?;
   let (z0_primary, _) = verifier
     .setup_params
-    .extend_public_inputs(
-      &verifier.proof_params.rom,
-      &verifier.instance_params.nivc_input,
-      Some(initial_nivc_input.to_vec()),
-    )
-    .unwrap();
+    .extend_public_inputs(&verifier.proof_params.rom, &initial_nivc_input.to_vec())?;
   let z0_secondary = vec![F::<G2>::from(0)];
 
   let valid = match proof.proof.verify(

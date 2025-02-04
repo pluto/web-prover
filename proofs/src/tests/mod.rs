@@ -449,9 +449,8 @@ async fn test_end_to_end_proofs_simple() {
 
   assert_eq!(*recursive_snark.zi_primary().first().unwrap(), *value_digest);
 
-  let (z0_primary, _) = setup_params
-    .extend_public_inputs(&proof_params.rom, &instance_params.nivc_input, None)
-    .unwrap();
+  let (z0_primary, _) =
+    setup_params.extend_public_inputs(&proof_params.rom, &instance_params.nivc_input).unwrap();
 
   let z0_secondary = vec![F::<G2>::ZERO];
   proof.proof.verify(&setup_params.public_params, &vk, &z0_primary, &z0_secondary).unwrap();
@@ -537,13 +536,8 @@ async fn test_end_to_end_proofs_complex() {
 
   assert_eq!(*recursive_snark.zi_primary().first().unwrap(), value_digest);
 
-  let (z0_primary, _) = setup_params
-    .extend_public_inputs(
-      &proof_params.rom,
-      &instance_params.nivc_input,
-      Some(vec![init_nivc_input]),
-    )
-    .unwrap();
+  let (z0_primary, _) =
+    setup_params.extend_public_inputs(&proof_params.rom, &vec![init_nivc_input]).unwrap();
 
   let z0_secondary = vec![F::<G2>::ZERO];
 

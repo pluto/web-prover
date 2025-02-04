@@ -121,7 +121,7 @@ pub async fn run(
 
   // Resize the rom to be the `max_rom_length` committed to in the `S::SetupData`
   let (z0_primary, resized_rom) =
-    setup_params.extend_public_inputs(&proof_params.rom, &instance_params.nivc_input, None)?;
+    setup_params.extend_public_inputs(&proof_params.rom, &instance_params.nivc_input)?;
   let z0_secondary = vec![F::<G2>::ZERO];
 
   let mut recursive_snark_option = None;
