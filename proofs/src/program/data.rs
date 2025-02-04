@@ -1,6 +1,6 @@
 use std::{
-  fs::{self, File},
-  io::Write,
+  fs::{self, File, OpenOptions},
+  io::{BufReader, Write},
   sync::Arc,
 };
 
@@ -39,7 +39,7 @@ impl FoldInput {
 }
 
 /// R1CS file type
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum R1CSType {
   /// file path
   #[serde(rename = "file")]
@@ -65,7 +65,7 @@ pub enum WitnessGeneratorType {
 
 /// Uninitialized Circuit Setup data, in this configuration the R1CS objects have not
 /// been initialized and require a bulky initialize process.
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct UninitializedSetup {
   /// vector of all circuits' r1cs
   pub r1cs_types:              Vec<R1CSType>,
@@ -75,9 +75,19 @@ pub struct UninitializedSetup {
   pub max_rom_length:          usize,
 }
 
+// TODO: What is the on disk format of these? Should I regenerate files in
+// ./proofs/web_proof_circuits with a new format? impl TryFrom<&PathBuf> for UninitializedSetup {
+//   type Error = ProofError;
+//
+//   fn try_from(file_path: &PathBuf) -> Result<Self, Self::Error> {
+//     let reader = BufReader::new(OpenOptions::new().read(true).open(file_path)?);
+//     bincode::deserialize_from(reader).map_err(Into::into)
+//   }
+// }
+
 /// Initialized Circuit Setup data, in this configuration the R1CS objects have been
 /// fully loaded for proving.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct InitializedSetup {
   /// vector of all circuits' r1cs
   pub r1cs:                    Vec<Arc<R1CS>>,
@@ -93,11 +103,14 @@ pub trait SetupStatus {
   type SetupData;
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Online;
 impl SetupStatus for Online {
   type PublicParams = Arc<PublicParams<E1>>;
   type SetupData = Arc<InitializedSetup>;
 }
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Offline;
 impl SetupStatus for Offline {
   type PublicParams = Vec<u8>;
@@ -123,7 +136,7 @@ impl WitnessStatus for NotExpanded {
 }
 
 /// Auxillary circuit data required to execute the ROM
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct CircuitData {
   /// circuit instruction opcode in [`S::SetupData`]
   pub opcode: u64,
@@ -136,6 +149,7 @@ pub type Rom = Vec<String>;
 pub type NivcInput = Vec<F<G1>>;
 
 /// Represents configuration and circuit data required for initializing the proving system.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct SetupParams<S: SetupStatus> {
   /// Public parameters of the proving system. Maps to the client-side prover parameters.
   pub public_params:       S::PublicParams,
@@ -484,14 +498,14 @@ mod tests {
       r1cs_types:              vec![r1cs],
       witness_generator_types: vec![WitnessGeneratorType::Raw(vec![])],
     };
-    let initilized_setup = initialize_setup_data(&setup_data).unwrap();
+    let initialized_setup = initialize_setup_data(&setup_data).unwrap();
 
     let public_params = program::setup(&setup_data);
     let (prover_key, _vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
 
     let setup_params = SetupParams {
       public_params: Arc::new(public_params),
-      setup_data: Arc::new(initilized_setup),
+      setup_data: Arc::new(initialized_setup),
       vk_digest_primary: prover_key.pk_primary.vk_digest,
       vk_digest_secondary: prover_key.pk_secondary.vk_digest,
       rom_data,
@@ -555,6 +569,7 @@ mod tests {
     assert!(mock_inputs.input.1.contains_key("CIRCUIT_3"));
   }
 
+  // TODO: This test is passing when un-ignored. Why was it ignored? Takes a long time on CI?
   #[ignore]
   #[test]
   #[tracing_test::traced_test]
@@ -572,4 +587,27 @@ mod tests {
     assert!(!instance_params.private_inputs[1].is_empty());
     assert!(!instance_params.private_inputs[2].is_empty());
   }
+
+  // TODO: Fails because of error: the foreign item type
+  // `client_side_prover::supernova::PublicParams<Bn256EngineKZG>` doesn't implement `PartialEq`
+  // #[ignore]
+  // #[test]
+  // fn test_online_to_offline_serialization_round_trip() {
+  //   let (setup_params_online, ..) = create_test_program_data();
+  //   let offline_path = PathBuf::from("mock/offline/path");
+  //   let setup_params_offline =
+  //     setup_params_online.clone().into_offline(offline_path.clone()).unwrap();
+  //
+  //   // Verify round-trip serialization for `Online`
+  //   let serialized_online = serde_json::to_string(&setup_params_online).unwrap();
+  //   let deserialized_online: SetupParams<Online> =
+  //     serde_json::from_str(&serialized_online).unwrap();
+  //   assert_eq!(setup_params_online, deserialized_online);
+  //
+  //   // Verify round-trip serialization for `Offline`
+  //   let serialized_offline = serde_json::to_string(&setup_params_offline).unwrap();
+  //   let deserialized_offline: SetupParams<Offline> =
+  //     serde_json::from_str(&serialized_offline).unwrap();
+  //   assert_eq!(setup_params_offline, deserialized_offline);
+  // }
 }

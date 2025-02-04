@@ -6,7 +6,7 @@ use super::*;
 
 pub type Constraint = (Vec<(usize, F<G1>)>, Vec<(usize, F<G1>)>, Vec<(usize, F<G1>)>);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct R1CS {
   pub num_private_inputs: usize,
   pub num_public_inputs:  usize,
