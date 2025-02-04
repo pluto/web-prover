@@ -1,5 +1,6 @@
 import init, { setup_tracing, initThreadPool } from "../pkg/client_wasm.js";
 import { witness } from "./witness";
+import { WEB_PROVER_CIRCUITS_VERSION } from "./config";
 
 const numConcurrency = navigator.hardwareConcurrency;
 
@@ -70,9 +71,11 @@ const proofWorker = new Worker(new URL("./proof.js", import.meta.url), {
   type: "module",
 });
 console.log("sending message to worker");
+console.log(WEB_PROVER_CIRCUITS_VERSION)
+
 var proving_params = {
   aux_params: await getByteParams(
-    "circom-artifacts-1024b-v0.8.0/serialized_setup_1024b_rom_length_5.bin",
+    `circom-artifacts-1024b-v${WEB_PROVER_CIRCUITS_VERSION}/serialized_setup_1024b_rom_length_5.bin`,
   ),
 };
 proofWorker.postMessage({
@@ -87,7 +90,11 @@ proofWorker.onmessage = (event) => {
   } else if (event.data.type === "log") {
     console.log(...event.data.data);
   } else {
-    console.log("proof generated!", event.data);
+    if ("type" in event.data && event.data.type == "proof") {
+      console.log("proof successfully generated: ", event.data);
+    } else {
+      console.error("Error from worker:", event.data)
+    }
   }
 };
 

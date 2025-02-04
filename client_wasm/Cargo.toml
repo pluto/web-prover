@@ -2,7 +2,7 @@
 name   ="client_wasm"
 version="0.1.0"
 edition="2021"
-build  ="../build.rs"
+build  ="build.rs"
 publish=false
 
 [lib]
@@ -37,7 +37,10 @@ tlsn-core={ workspace=true }
 console_error_panic_hook={ version="0.1.7" }
 
 [dev-dependencies]
-wasm-bindgen-test       ="0.3.34"
+wasm-bindgen-test="0.3.34"
+
+[build-dependencies]
+cargo_metadata="0.19.1"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt=["-Oz", "--enable-threads", "--enable-mutable-globals", "--enable-bulk-memory"]

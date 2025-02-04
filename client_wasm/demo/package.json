@@ -3,8 +3,9 @@
   "name": "wasm-demo",
   "version": "1.0.0",
   "scripts": {
+    "prestart": "node scripts/generate-config.js",
     "start": "webpack-dev-server --port 8090",
-    "test": "playwright test"
+    "test": "node scripts/generate-config.js && playwright test --browser=chromium"
   },
   "devDependencies": {
     "@wasm-tool/wasm-pack-plugin": "^1.7.0",

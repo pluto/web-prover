@@ -1,6 +1,6 @@
 # Web Prover
 
-The web-prover repository contains build pipelines for two types of Web Proofs: [TLSNotary proofs](https://tlsnotary.org/) and [Origo proofs](https://eprint.iacr.org/2024/447.pdf). Most of this work centers around the Origo proofs as we built it from the ground up, while the TLSNotary team has done most of the lifting for their work. 
+The web-prover repository contains build pipelines for two types of Web Proofs: [TLSNotary proofs](https://tlsnotary.org/) and [Origo proofs](https://eprint.iacr.org/2024/447.pdf). Most of this work centers around the Origo proofs as we built it from the ground up, while the TLSNotary team has done most of the lifting for their work.
 
 The Origo pipeline of the web-prover repository is to test and build a collection of circom generated artificts used for Web Proofs and compile them to two primary targets with a Nova folding backend to be used in a developer SDK. The two compilation targets we compile to are iOS mobile and Web Assembly and are referenced as the client.
 
@@ -103,3 +103,17 @@ rust-analyzer might not pick up on the llvm path, you can manually let it know v
   }
 }
 ```
+
+## Release
+
+1. Update the `version` field in the appropriate `Cargo.toml` file.
+2. Create a pull request with the version update.
+3. Merge the pull request.
+
+Once merged, the package will be automatically released. **Note:** Releases are immutable.
+
+The following crates are checked for version changes:
+
+- `notary/Cargo.toml`
+- `client_wasm/Cargo.toml`
+- `client_ios/Cargo.toml`

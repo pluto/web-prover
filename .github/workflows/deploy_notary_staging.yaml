@@ -1,72 +1,18 @@
-name: notary
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+name: Deploy Notary (Staging)
 
 on:
-  push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
+  workflow_call:
+    inputs:
+      web-prover-circuits-cache-key:
+        required: true
+        type: string
 
 jobs:
-  setup:
-    uses: ./.github/workflows/download-circuits.yaml
-
-  build:
-    needs: setup
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-
-    name: notary on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-
-    env:
-      CARGO_TERM_COLOR: always
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: Swatinem/rust-cache@v2
-
-      - run: rustup toolchain install nightly-2024-10-28
-      - run: sudo apt install -y protobuf-compiler
-        if: matrix.os == 'ubuntu-latest'
-
-      - name: Install LLVM and Clang to support 'ring' crate and protobuf
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install llvm@18 # https://formulae.brew.sh/formula/llvm#default
-          echo /opt/homebrew/opt/llvm@18/bin >> $GITHUB_PATH
-          brew install protobuf
-
-      - name: Restore circuit artifacts
-        uses: actions/cache@v3
-        with:
-          path: proofs/web_proof_circuits
-          key: ${{ needs.setup.outputs.cache-key }}
-
-      - run: cargo +nightly-2024-10-28 build -p notary --release
-
-      - uses: actions/upload-artifact@v4
-        if: matrix.os == 'ubuntu-latest'
-        with:
-          name: "notary.linux.amd64"
-          path: "target/release/notary"
-          retention-days: 7
-
   deploy:
     runs-on: ubuntu-latest
-    needs: ["setup", "build"]
     permissions:
       contents: "read"
       id-token: "write"
-
-    env:
-      CARGO_TERM_COLOR: always
 
     steps:
       - uses: actions/checkout@v4
@@ -77,11 +23,11 @@ jobs:
           name: "notary.linux.amd64"
           path: .github/workflows/staging-deploy
 
-      - name: Restore circuit artifacts
-        uses: actions/cache@v3
+      - name: Fetch web-prover-circuits cache
+        uses: actions/cache/restore@v4
         with:
           path: proofs/web_proof_circuits
-          key: ${{ needs.setup.outputs.cache-key }}
+          key: ${{ inputs.web-prover-circuits-cache-key }}
 
       - uses: "google-github-actions/auth@v2"
         with:
@@ -107,6 +53,7 @@ jobs:
           path: ".github/workflows/staging-deploy"
           destination: "web-prover-staging-7ff608/${{ github.sha }}"
           parent: false
+          process_gcloudignore: false
 
       - name: Boot Notary instance
         run: |
@@ -165,4 +112,4 @@ jobs:
             exit 1
           fi
 
-          echo "##[notice]https://$GIT_SHORT_HASH.notary.pluto.dev/health"
+          echo "::notice title=Notary_URL::https://$GIT_SHORT_HASH.notary.pluto.dev/health"

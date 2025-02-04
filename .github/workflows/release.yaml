@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  workflow_call:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # TODO release the native client?
+      # - name: Download client
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: "client.linux.amd64"
+      #     path: "target/release"
+
+      # client_os ...
+      - name: Download client.ios
+        uses: actions/download-artifact@v4
+        with:
+          name: "PlutoProver.xcframework"
+          path: "target/PlutoProver.xcframework"
+
+      - name: Prepare client_ios
+        shell: bash
+        run: |
+          mkdir -p releases/client_ios
+          tar -czf  releases/client_ios/client_ios.xcframework.tar.gz -C target PlutoProver.xcframework
+
+          cd releases/client_ios
+          sha256sum * > sha256sum.txt
+
+      - name: Release client_ios
+        uses: ./.github/actions/release
+        with:
+          cargo_toml_path: client_ios/Cargo.toml
+          release_name: "client.ios"
+          asset_files: |
+            releases/client_ios/client_ios.xcframework.tar.gz
+            releases/client_ios/sha256sum.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # client_wasm ...
+      - name: Download client.wasm
+        uses: actions/download-artifact@v4
+        with:
+          name: "client.wasm"
+          path: "client_wasm/pkg/"
+
+      - name: Prepare client_wasm
+        shell: bash
+        run: |
+          mkdir -p releases/client_wasm
+          tar -czf  releases/client_wasm/client_wasm.tar.gz client_wasm/pkg/*
+
+          cd releases/client_wasm
+          sha256sum * > sha256sum.txt
+
+      - name: Release client_wasm
+        uses: ./.github/actions/release
+        with:
+          cargo_toml_path: client_wasm/Cargo.toml
+          release_name: "client.wasm"
+          asset_files: |
+            releases/client_wasm/client_wasm.tar.gz
+            releases/client_wasm/sha256sum.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # notary ...
+      - name: Download notary
+        uses: actions/download-artifact@v4
+        with:
+          name: "notary.linux.amd64"
+          path: "target/release"
+
+      - name: Prepare notary
+        shell: bash
+        run: |
+          mkdir -p releases/notary
+          tar -czf releases/notary/notary.linux.amd64.tar.gz target/release/notary
+
+          cd releases/notary
+          sha256sum * > sha256sum.txt
+
+      - name: Release notary
+        uses: ./.github/actions/release
+        with:
+          cargo_toml_path: notary/Cargo.toml
+          release_name: "notary"
+          asset_files: |
+            releases/notary/notary.linux.amd64.tar.gz
+            releases/notary/sha256sum.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

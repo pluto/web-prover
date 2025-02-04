@@ -922,7 +922,7 @@ dependencies = [
  "bitflags",
  "cexpr",
  "clang-sys",
- "itertools 0.10.5",
+ "itertools 0.12.1",
  "lazy_static",
  "lazycell",
  "log",
@@ -1135,6 +1135,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "camino"
+version = "1.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b96ec4966b5813e2c0507c1f86115c8c5abaadc3980879c3424042a02fd1ad3"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "caratls"
 version = "0.1.0"
 source = "git+https://github.com/pluto/caratls.git?rev=e440cc71ece67fa3a53d7fd37d06d64d44840f01#e440cc71ece67fa3a53d7fd37d06d64d44840f01"
@@ -1147,6 +1156,29 @@ dependencies = [
  "thiserror 2.0.6",
  "tokio",
  "tokio-rustls",
+]
+
+[[package]]
+name = "cargo-platform"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e35af189006b9c0f00a064685c727031e3ed2d8020f7ba284d78cc2671bd36ea"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "cargo_metadata"
+version = "0.19.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8769706aad5d996120af43197bf46ef6ad0fda35216b4505f926a365a232d924"
+dependencies = [
+ "camino",
+ "cargo-platform",
+ "semver 1.0.23",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.6",
 ]
 
 [[package]]
@@ -1331,12 +1363,13 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
 name = "client"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
  "async-tungstenite 0.25.1",
  "base64 0.22.1",
  "bytes",
  "caratls",
+ "cargo_metadata",
  "chrono",
  "clap",
  "client-side-prover",
@@ -1432,8 +1465,9 @@ dependencies = [
 
 [[package]]
 name = "client_ios"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
+ "cargo_metadata",
  "client",
  "serde",
  "serde_json",
@@ -1446,6 +1480,7 @@ dependencies = [
 name = "client_wasm"
 version = "0.1.0"
 dependencies = [
+ "cargo_metadata",
  "client",
  "console_error_panic_hook",
  "js-sys",
@@ -3761,6 +3796,7 @@ dependencies = [
  "axum-core",
  "base64 0.21.7",
  "caratls",
+ "cargo_metadata",
  "clap",
  "client",
  "client-side-prover",
@@ -4490,6 +4526,7 @@ dependencies = [
  "bellpepper-core",
  "bincode",
  "byteorder",
+ "cargo_metadata",
  "circom_witnesscalc",
  "clap",
  "client-side-prover",
@@ -5323,6 +5360,9 @@ name = "semver"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61697e0a1c7e512e84a621326239844a24d8207b4669b41bc18b32ea5cbf988b"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "semver-parser"

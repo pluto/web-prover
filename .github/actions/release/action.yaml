@@ -1,0 +1,84 @@
+name: "Release crate"
+description: ""
+inputs:
+  cargo_toml_path:
+    description: "Path to Cargo.toml"
+    required: true
+  release_name:
+    description: "Unique name for the release"
+    required: true
+  asset_files:
+    description: "Newline-delimited globs of paths to assets to upload for release"
+    required: true
+
+outputs:
+  version:
+    description: "Extracted version from Cargo.toml"
+    value: ${{ steps.extract-version.outputs.version }}
+  exists:
+    description: "true if the release already exists"
+    value: ${{ steps.check-release.outputs.exists }}
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: echo "::add-mask::$GITHUB_TOKEN"
+
+    - name: "Extract version from Cargo.toml"
+      id: extract-version
+      shell: bash
+      run: |
+        VERSION=$(sed -n 's/^version *= *"\(.*\)"/\1/p' "${{ inputs.cargo_toml_path }}")
+
+        # Ensure version is found
+        if [[ -z "$VERSION" ]]; then
+          echo "Error: Could not extract version from ${{ inputs.cargo_toml_path }}"
+          exit 1
+        fi
+
+        echo "Extracted version: $VERSION"
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+    - name: "Check for existing release"
+      id: check-release
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+      run: |
+        RELEASE_TAG="${{ inputs.release_name }}-v${{ steps.extract-version.outputs.version }}"
+        echo "Checking for release: $RELEASE_TAG"
+
+        EXISTING_RELEASE=$(gh release list --json tagName --jq ".[] | select(.tagName == \"$RELEASE_TAG\")")
+
+        if [[ -n "$EXISTING_RELEASE" ]]; then
+          echo "Release $RELEASE_TAG already exists."
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "Release $RELEASE_TAG does not exist."
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Prepare Release Notes
+      if: steps.check-release.outputs.exists != 'true'
+      shell: bash
+      run: |
+        RELEASE_TEMP_DIR=$(mktemp -d "$RUNNER_TEMP/releases.XXXXXX")
+        echo "RELEASE_TEMP_DIR=$RELEASE_TEMP_DIR" >> $GITHUB_ENV
+        cd $RELEASE_TEMP_DIR
+
+        echo "Release of ${{ inputs.release_name }}" > release_notes.md
+        echo "Version: v${{ steps.extract-version.outputs.version }}" >> release_notes.md
+        echo "Commit: ${{ github.sha }}" >> release_notes.md
+
+    - name: Upload Release
+      if: steps.check-release.outputs.exists != 'true'
+      env:
+        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ${{ inputs.asset_files }}
+        tag_name: ${{ inputs.release_name }}-v${{ steps.extract-version.outputs.version }}
+        body_path: ${{ env.RELEASE_TEMP_DIR }}/release_notes.md
+        fail_on_unmatched_files: true
+        preserve_order: true

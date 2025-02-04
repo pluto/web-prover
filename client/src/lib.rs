@@ -34,6 +34,10 @@ pub enum Proof {
   TEE(), // TODO
 }
 
+pub fn get_web_prover_circuits_version() -> String {
+  env!("WEB_PROVER_CIRCUITS_VERSION").to_string()
+}
+
 pub async fn prover_inner(
   config: config::Config,
   proving_params: Option<Vec<u8>>,
