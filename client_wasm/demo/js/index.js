@@ -65,7 +65,7 @@ const getByteParams = async function (setupFile) {
 
 start();
 
-import proverConfig from "../../../fixture/client.origo_tcp_local.json";
+import proverConfig from "../../../fixture/client.tlsn_tcp_local.json";
 
 const proofWorker = new Worker(new URL("./proof.js", import.meta.url), {
   type: "module",
