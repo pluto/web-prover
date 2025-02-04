@@ -4608,7 +4608,6 @@ dependencies = [
  "byteorder",
  "cargo_metadata",
  "circom_witnesscalc",
- "clap",
  "client-side-prover",
  "ff",
  "halo2curves",
