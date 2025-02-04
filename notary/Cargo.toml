@@ -56,3 +56,6 @@ caratls_ekm_google_confidential_space_server={ workspace=true }
 
 [dev-dependencies]
 tower="0.4.13"
+
+[build-dependencies]
+cargo_metadata = "0.19.1"

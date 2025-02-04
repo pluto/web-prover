@@ -3876,6 +3876,7 @@ dependencies = [
  "base64 0.21.7",
  "caratls_ekm_google_confidential_space_server",
  "caratls_ekm_server",
+ "cargo_metadata",
  "clap",
  "client",
  "client-side-prover",
