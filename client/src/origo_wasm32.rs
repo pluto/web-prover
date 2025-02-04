@@ -7,12 +7,19 @@ use std::{
   sync::Arc,
   task::{Context, Poll},
 };
-use proofs::{G2, program::data::{ProgramData, Offline, NotExpanded}, program::manifest::{Manifest, EncryptionInput, NIVCRom, NivcCircuitInputs}};
+
 use caratls_ekm_client::TeeTlsConnector;
 use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::StatusCode;
-use proofs::{circom::witness::load_witness_from_bin_reader, F, G1};
+use proofs::{
+  circom::witness::load_witness_from_bin_reader,
+  program::{
+    data::{NotExpanded, Offline, ProgramData},
+    manifest::{EncryptionInput, Manifest, NIVCRom, NivcCircuitInputs},
+  },
+  F, G1, G2,
+};
 use serde_json::Value;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{debug, info};
@@ -20,7 +27,10 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
-use crate::{config, circuits::construct_setup_data, config::NotaryMode, errors, tls_client_async2::bind_client, errors::ClientErrors, OrigoProof};
+use crate::{
+  circuits::construct_setup_data, config, config::NotaryMode, errors, errors::ClientErrors,
+  tls_client_async2::bind_client, OrigoProof,
+};
 
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Debug)]
@@ -138,10 +148,11 @@ pub async fn build_witness_data_from_wasm(
 ) -> Result<Vec<Vec<F<G1>>>, errors::ClientErrors> {
   debug!("generating witness in wasm");
   let rom_opcodes: Vec<u64> =
-      rom.rom.iter().map(|c| rom.circuit_data.get(c).unwrap().opcode).collect::<Vec<_>>();
+    rom.rom.iter().map(|c| rom.circuit_data.get(c).unwrap().opcode).collect::<Vec<_>>();
 
   let mut wasm_private_inputs = inputs.private_inputs.clone();
-  let initial_nivc_inputs = inputs.initial_nivc_input
+  let initial_nivc_inputs = inputs
+    .initial_nivc_input
     .iter()
     .map(|&x| proofs::witness::field_element_to_base10_string(x))
     .collect::<Vec<String>>();
@@ -165,18 +176,23 @@ pub async fn build_witness_data_from_wasm(
 }
 
 pub(crate) async fn generate_proof(
-  manifest: Manifest, 
-  proving_params: Vec<u8>, 
-  request_inputs: EncryptionInput, 
-  response_inputs: EncryptionInput
+  manifest: Manifest,
+  proving_params: Vec<u8>,
+  request_inputs: EncryptionInput,
+  response_inputs: EncryptionInput,
 ) -> Result<OrigoProof, ClientErrors> {
-  // Prepare request witness  
+  // Prepare request witness
   let request_nivc = manifest.request.build_inputs(&request_inputs);
-  let request_witness = build_witness_data_from_wasm(request_nivc, manifest.request.build_rom()).await?;
-  
+  let request_witness =
+    build_witness_data_from_wasm(request_nivc, manifest.request.build_rom()).await?;
+
   // Prepare response witness
   let response_nivc = manifest.response.build_inputs(&response_inputs)?;
-  let response_witness = build_witness_data_from_wasm(response_nivc, manifest.response.build_rom(response_inputs.plaintext.len())).await?;
+  let response_witness = build_witness_data_from_wasm(
+    response_nivc,
+    manifest.response.build_rom(response_inputs.plaintext.len()),
+  )
+  .await?;
 
   let setup_data = construct_setup_data();
   let program_data = ProgramData::<Offline, NotExpanded> {
@@ -201,7 +217,7 @@ pub(crate) async fn generate_proof(
 
   // Deliberately run these concurrently instead of in parallel (i.e. using rayon::spawn)
   // due to excessive memory consumption of these prove threads, running in parallel
-  // is slower. 
+  // is slower.
   spawn_local(async move {
     let result = crate::proof::construct_request_program_data_and_proof(
       manifest.request.clone(),
@@ -209,7 +225,7 @@ pub(crate) async fn generate_proof(
       (vk_digest_primary, vk_digest_secondary),
       params_ref,
       setup_ref,
-      request_witness
+      request_witness,
     );
     let _ = request_tx.send(result);
   });
@@ -221,20 +237,14 @@ pub(crate) async fn generate_proof(
       (vk_digest_primary, vk_digest_secondary),
       program_data.public_params,
       program_data.setup_data,
-      response_witness
+      response_witness,
     );
     let _ = response_tx.send(result);
   });
- 
-  let (request_proof, response_proof) = futures::future::try_join(
-    request_rx,
-    response_rx,
-  ).await?;
 
-  return Ok(OrigoProof{
-    request: request_proof?,
-    response: response_proof?,
-  })
+  let (request_proof, response_proof) = futures::future::try_join(request_rx, response_rx).await?;
+
+  return Ok(OrigoProof { request: request_proof?, response: response_proof? });
 }
 
 use pin_project_lite::pin_project;

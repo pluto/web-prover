@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use client_side_prover::supernova::PublicParams;
 use proofs::{
   program::{
     data::{InitializedSetup, NotExpanded, Offline, Online, ProgramData},
@@ -7,12 +10,8 @@ use proofs::{
     },
   },
   proof::FoldingProof,
-  F, G1, G2,
+  E1, F, G1, G2,
 };
-use client_side_prover::supernova::PublicParams;
-use proofs::E1;
-use std::sync::Arc;
-
 use tracing::debug;
 
 use crate::{circuits::*, ClientErrors};
@@ -28,8 +27,8 @@ use crate::{circuits::*, ClientErrors};
 ///
 /// # Details
 /// - generates NIVC ROM from [`Manifest`] config for request and response
-/// - get circuit [`UninitializedSetup`] containing circuit R1CS and witness generator files according to
-///   input sizes
+/// - get circuit [`UninitializedSetup`] containing circuit R1CS and witness generator files
+///   according to input sizes
 /// - create consolidate [`ProgramData`]
 /// - expand private inputs into fold inputs as per circuits
 pub fn construct_request_program_data_and_proof(
@@ -67,8 +66,8 @@ pub fn construct_request_program_data_and_proof(
 /// response separately
 /// - decrypts TLS ciphertext in [`WitnessData`]
 /// - generates NIVC ROM from [`Manifest`] config for request and response
-/// - get circuit [`UninitializedSetup`] containing circuit R1CS and witness generator files according to
-///   input sizes
+/// - get circuit [`UninitializedSetup`] containing circuit R1CS and witness generator files
+///   according to input sizes
 /// - create consolidate [`ProgramData`]
 /// - expand private inputs into fold inputs as per circuits
 pub fn construct_response_program_data_and_proof(

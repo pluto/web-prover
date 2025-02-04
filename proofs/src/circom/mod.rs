@@ -5,6 +5,7 @@ use std::{
   io::{BufReader, Cursor, Read, Seek, SeekFrom},
   path::PathBuf,
   process::Command,
+  sync::Arc,
 };
 
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, LinearCombination, SynthesisError};
@@ -12,7 +13,6 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use ff::PrimeField;
 use r1cs::R1CS;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 use super::*;
 
