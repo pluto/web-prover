@@ -24,7 +24,7 @@ impl ByteOrPad {
   /// Converts a slice of bytes to a vector of `ByteOrPad` with padding.
   pub fn from_bytes_with_padding(bytes: &[u8], padding: usize) -> Vec<ByteOrPad> {
     let mut result = bytes.iter().map(|&b| ByteOrPad::Byte(b)).collect::<Vec<_>>();
-    result.extend(std::iter::repeat(ByteOrPad::Pad).take(padding));
+    result.extend(std::iter::repeat_n(ByteOrPad::Pad, padding));
     result
   }
 
