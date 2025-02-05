@@ -1,5 +1,6 @@
 use acvm::{
   acir::{
+    self,
     acir_field::GenericFieldElement,
     circuit::{brillig::BrilligBytecode, Circuit, Opcode, Program},
     native_types::{Witness, WitnessMap},
@@ -179,6 +180,13 @@ impl NoirProgram {
       }
     }
 
+    if let Some(wmap) = acir_witness_map {
+      for ret in &self.circuit().return_values.0 {
+        dbg!(&ret);
+        dbg!(wmap.get(ret));
+      }
+    }
+
     Ok(vec![]) // Return appropriate outputs if needed
   }
 }
@@ -239,7 +247,7 @@ mod tests {
 
   // TODO: Should probably have a check here, but I believe this is correct!
   #[test]
-  fn test_mock_noir_circuit() {
+  fn test_mock_noir_synthesize_empty() {
     // Circuit definition:
     // x_0 * w_0 + w_1 + 2 == 0
     let json_path = Path::new("./mock").join(format!("mock.json"));
@@ -258,7 +266,7 @@ mod tests {
   }
 
   #[test]
-  fn test_mock_noir_solve() {
+  fn test_mock_noir_synthesize_full() {
     // Circuit definition:
     // x_0 * w_0 + w_1 + 2 == 0
     let json_path = Path::new("./mock").join(format!("mock.json"));
@@ -273,5 +281,49 @@ mod tests {
     dbg!(&cs.constraints);
     dbg!(cs.num_aux());
     dbg!(cs.num_inputs());
+  }
+
+  // `fold.json` is:
+  // pub fn main(x0: Field, w: pub [Field;2]) -> pub [Field;2] {
+  //   [x0 * w[0] + w[1] + 1, (x0 + 3) * w[1] + w[0]]
+  // }
+
+  #[test]
+  fn test_fold_noir_synthesize_empty() {
+    // Circuit definition:
+    // x_0 * w_0 + w_1 + 2 == 0
+    let json_path = Path::new("./mock").join(format!("fold.json"));
+    let noir_json = std::fs::read(&json_path).unwrap();
+
+    let mut program = NoirProgram::new(&noir_json);
+
+    let mut cs = ShapeCS::<E1>::new();
+    program.vanilla_synthesize(&mut cs, &[]);
+
+    dbg!(&cs.constraints);
+    dbg!(cs.num_aux());
+    dbg!(cs.num_inputs());
+  }
+
+  #[test]
+  fn test_fold_noir_synthesize_full() {
+    // Circuit definition:
+    // x_0 * w_0 + w_1 + 2 == 0
+    let json_path = Path::new("./mock").join(format!("fold.json"));
+    let noir_json = std::fs::read(&json_path).unwrap();
+
+    let mut program = NoirProgram::new(&noir_json);
+    program.set_inputs(vec![F::<G1>::from(1), F::<G1>::from(1), F::<G1>::from(1)]);
+
+    // Check:
+    // 1 * 1 + 1 + 1 == 3
+    // (1 + 3) * 1 + 1 = 4
+
+    let mut cs = ShapeCS::<E1>::new();
+    program.vanilla_synthesize(&mut cs, &[]);
+
+    // dbg!(&cs.constraints);
+    // dbg!(cs.num_aux());
+    // dbg!(cs.num_inputs());
   }
 }
