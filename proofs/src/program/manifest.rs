@@ -33,7 +33,6 @@ use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tls_client2::CipherSuiteKey;
-use tracing::debug;
 
 use crate::{
   program::{
@@ -156,7 +155,7 @@ fn to_u32_array(input: &[u8]) -> Vec<u32> {
 
   // Create a new vector with padding
   let padded_input =
-    input.iter().chain(std::iter::repeat(&0).take(padding_needed)).cloned().collect::<Vec<u8>>();
+    input.iter().chain(std::iter::repeat(&0).take(padding_needed)).copied().collect::<Vec<u8>>();
 
   padded_input
     .chunks(4)
@@ -202,14 +201,14 @@ fn pad_plaintext_authentication_inputs(inputs: &EncryptionInput) -> EncryptionCi
       for (plaintext, ciphertext) in inputs.plaintext.iter().zip(inputs.ciphertext.iter()) {
         assert_eq!(plaintext.len(), ciphertext.len());
         plaintext_packets
-          .push(ByteOrPad::from_bytes_with_padding(&plaintext, CIRCUIT_SIZE - plaintext.len()));
+          .push(ByteOrPad::from_bytes_with_padding(plaintext, CIRCUIT_SIZE - plaintext.len()));
         ciphertext_packets
-          .push(ByteOrPad::from_bytes_with_padding(&ciphertext, CIRCUIT_SIZE - plaintext.len()));
+          .push(ByteOrPad::from_bytes_with_padding(ciphertext, CIRCUIT_SIZE - plaintext.len()));
       }
 
       EncryptionCircuitInput { plaintext: plaintext_packets, ciphertext: ciphertext_packets }
     },
-    _ => {
+    CipherSuiteKey::AES128GCM(_) => {
       unimplemented!("Only CHACHA20POLY1305 is supported for now");
     },
   }
@@ -240,7 +239,7 @@ fn build_plaintext_authentication_circuit_inputs(
       let plaintext_index_counter = if plaintext_circuit_counter == 0 {
         0
       } else {
-        inputs.plaintext[..plaintext_circuit_counter].iter().map(|x| x.len()).sum::<usize>()
+        inputs.plaintext[..plaintext_circuit_counter].iter().map(Vec::len).sum::<usize>()
       };
 
       // CHACHA rom opcode with private inputs
@@ -269,7 +268,7 @@ fn build_plaintext_authentication_circuit_inputs(
       ));
       plaintext_digest - packet_ciphertext_digest
     },
-    _ => {
+    CipherSuiteKey::AES128GCM(_) => {
       unimplemented!("Only CHACHA20POLY1305 is supported for now");
     },
   }
@@ -360,7 +359,7 @@ fn build_http_verification_circuit_inputs(
 /// # Notes
 /// Pads `inputs` to `CIRCUIT_SIZE` and computes the digest of the JSON key sequence.
 fn build_json_extraction_circuit_inputs(
-  inputs: Vec<ByteOrPad>,
+  inputs: &[ByteOrPad],
   ciphertext_digest: F<G1>,
   keys: &[JsonKey],
   private_inputs: &mut Vec<HashMap<String, Value>>,
@@ -372,13 +371,13 @@ fn build_json_extraction_circuit_inputs(
   );
   let sequence_digest_hashed = poseidon::<1>(&[sequence_digest]);
   let data_digest_hashed =
-    poseidon::<1>(&[polynomial_digest(&ByteOrPad::as_bytes(&inputs), ciphertext_digest, 0)]);
+    poseidon::<1>(&[polynomial_digest(&ByteOrPad::as_bytes(inputs), ciphertext_digest, 0)]);
 
-  let value = json_value_digest(&inputs, keys)?;
+  let value = json_value_digest(inputs, keys)?;
   let value_digest = polynomial_digest(&value, ciphertext_digest, 0);
 
   // extend inputs to correct circuit size and pad
-  let mut padded_inputs = inputs.clone();
+  let mut padded_inputs = inputs.to_vec();
   padded_inputs.resize(CIRCUIT_SIZE, ByteOrPad::Pad);
 
   // compute json value from keys
@@ -437,7 +436,7 @@ impl Request {
     let mut fold_inputs: HashMap<String, FoldInput> = HashMap::new();
     let mut public_inputs = vec![];
 
-    let combined_plaintext: Vec<u8> = inputs.plaintext.iter().flatten().cloned().collect();
+    let combined_plaintext: Vec<u8> = inputs.plaintext.iter().flatten().copied().collect();
     let combined_plaintext = ByteOrPad::from_bytes_with_padding(
       &combined_plaintext,
       CIRCUIT_SIZE - combined_plaintext.len(),
@@ -451,8 +450,8 @@ impl Request {
     let mut plaintext_step_outs = Fr::zero();
     for (i, pt) in plaintext.iter().enumerate() {
       let plaintext_step_out = build_plaintext_authentication_circuit_inputs(
-        &inputs,
-        &pt,
+        inputs,
+        pt,
         ciphertext_digest,
         &mut private_inputs,
         &mut fold_inputs,
@@ -514,14 +513,14 @@ impl Response {
     let mut fold_inputs: HashMap<String, FoldInput> = HashMap::new();
     let mut public_inputs = vec![];
 
-    let combined_plaintext = inputs.plaintext.iter().flatten().cloned().collect::<Vec<u8>>();
+    let combined_plaintext = inputs.plaintext.iter().flatten().copied().collect::<Vec<u8>>();
     let combined_plaintext = ByteOrPad::from_bytes_with_padding(
       &combined_plaintext,
       CIRCUIT_SIZE - combined_plaintext.len(),
     );
 
     let EncryptionCircuitInput { plaintext, ciphertext } =
-      pad_plaintext_authentication_inputs(&inputs);
+      pad_plaintext_authentication_inputs(inputs);
 
     let (ciphertext_digest, init_nivc_input) =
       response_initial_digest(self, &ciphertext, MAX_STACK_HEIGHT);
@@ -533,8 +532,8 @@ impl Response {
 
     for (i, pt) in plaintext.iter().enumerate() {
       let plaintext_step_out = build_plaintext_authentication_circuit_inputs(
-        &inputs,
-        &pt,
+        inputs,
+        pt,
         ciphertext_digest,
         &mut private_inputs,
         &mut fold_inputs,
@@ -566,7 +565,7 @@ impl Response {
 
     // json keys
     let json_step_out_check = build_json_extraction_circuit_inputs(
-      http_body,
+      &http_body,
       ciphertext_digest,
       &self.body.json,
       &mut private_inputs,
