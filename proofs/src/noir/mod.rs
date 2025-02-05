@@ -75,6 +75,7 @@ impl NoirProgram {
     for &witness in public_inputs {
       // TODO: In Circom, we hold the witness in the circuit struct as an option and match on
       // whether it is Some or not to get the value we put in here.
+      // TODO: could use alloc_empty_*
       let var = cs.alloc_input(|| format!("public_{}", witness.as_usize()), || Ok(F::<G1>::ONE));
       // witness_map.insert(witness, var);
     }
@@ -183,5 +184,48 @@ fn get_or_allocate_var<CS: ConstraintSystem<F<G1>>>(
     )?;
     witness_map.insert(witness, var.clone());
     Ok(var)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use std::path::Path;
+
+  use client_side_prover::bellpepper::shape_cs::ShapeCS;
+
+  use super::*;
+
+  #[test]
+  fn test_mock_noir_circuit() {
+    // Circuit definition:
+    // x_0 * w_0 + w_1 + 2 == 0
+    let json_path = Path::new("./mock").join(format!("mock.json"));
+    let noir_json = std::fs::read(&json_path).unwrap();
+    let program = NoirProgram::new(&noir_json);
+
+    let mut cs = ShapeCS::<E1>::new();
+
+    program.vanilla_synthesize(&mut cs, &[]);
+
+    dbg!(cs.num_constraints());
+
+    dbg!(&cs.constraints);
+    dbg!(cs.num_aux());
+    dbg!(cs.num_inputs());
+    // cs.finalize();
+
+    // cs.set_mode(SynthesisMode::Prove {
+    //     construct_matrices: true,
+    // });
+
+    // dbg!(cs.to_matrices());
+    // dbg!(cs.num_instance_variables());
+    // dbg!(cs.num_witness_variables());
+    // // NOTE, the 0th instance assignment is the constant term enabler.
+    // // This example is:
+    // // 2 * 3 + (-8) + 2 == 0
+    // cs.borrow_mut().unwrap().instance_assignment = vec![Fr::ONE, Fr::from(2)];
+    // cs.borrow_mut().unwrap().witness_assignment = vec![Fr::from(3), -Fr::from(8)];
+    // assert!(cs.is_satisfied().unwrap());
   }
 }
