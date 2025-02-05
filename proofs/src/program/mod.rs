@@ -258,8 +258,7 @@ pub fn initialize_setup_data(
     .r1cs_types
     .iter()
     .zip(setup_data.witness_generator_types.iter())
-    .enumerate()
-    .map(|(_, (r1cs_type, generator))| {
+    .map(|(r1cs_type, generator)| {
       let r1cs = R1CS::try_from(r1cs_type)?;
       Ok::<(Arc<circom::r1cs::R1CS>, data::WitnessGeneratorType), ProofError>((
         Arc::new(r1cs),
@@ -270,11 +269,11 @@ pub fn initialize_setup_data(
     .into_iter()
     .unzip();
 
-  return Ok(InitializedSetup {
+  Ok(InitializedSetup {
     r1cs,
     witness_generator_types,
     max_rom_length: setup_data.max_rom_length,
-  });
+  })
 }
 
 pub fn initialize_circuit_list(setup_data: &InitializedSetup) -> Vec<RomCircuit> {

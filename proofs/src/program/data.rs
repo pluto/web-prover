@@ -1,5 +1,4 @@
 use std::{
-  default,
   fs::{self, File},
   io::Write,
   sync::Arc,
