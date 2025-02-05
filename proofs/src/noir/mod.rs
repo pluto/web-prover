@@ -10,9 +10,10 @@ use acvm::{
 };
 use ark_bn254::Fr;
 use bellpepper_core::{
-  num::AllocatedNum, ConstraintSystem, LinearCombination, SynthesisError, Variable,
+  num::AllocatedNum, ConstraintSystem, Index, LinearCombination, SynthesisError, Variable,
 };
 use ff::PrimeField;
+use halo2curves::serde::SerdeObject;
 
 use super::*;
 
@@ -23,6 +24,7 @@ pub struct NoirProgram {
     deserialize_with = "Program::deserialize_program_base64"
   )]
   pub bytecode: Program<GenericFieldElement<Fr>>,
+  pub inputs:   Option<Vec<F<G1>>>,
 }
 
 impl NoirProgram {
@@ -54,7 +56,7 @@ impl NoirProgram {
 
     // write witness values for external_inputs
     self.circuit().private_parameters.iter().for_each(|witness| {
-      let idx = dbg!(witness.as_usize()) - dbg!(instance_variables.len());
+      let idx = witness.as_usize() - instance_variables.len();
 
       let f = GenericFieldElement::<Fr>::from_repr(witness_variables[idx]);
       acvm.overwrite_witness(*witness, f);
@@ -68,7 +70,35 @@ impl NoirProgram {
     cs: &mut CS,
     z: &[AllocatedNum<F<G1>>],
   ) -> Result<Vec<AllocatedNum<F<G1>>>, SynthesisError> {
-    let mut witness_map: HashMap<Witness, AllocatedNum<F<G1>>> = HashMap::new();
+    let mut witness_map: HashMap<Witness, Variable> = match &self.inputs {
+      Some(inputs) => {
+        let mut acvm = ACVM::new(
+          &StubbedBlackBoxSolver(false),
+          &self.circuit().opcodes,
+          WitnessMap::new(),
+          self.unconstrained_functions(),
+          &[],
+        );
+
+        // self.circuit().public_parameters.0.iter().for_each(|witness| {
+        //   let f = GenericFieldElement::<Fr>::fr(&inputs[witness.as_usize()].to_bytes());
+        //   acvm.overwrite_witness(*witness, f);
+        // });
+
+        // // write witness values for external_inputs
+        // self.circuit().private_parameters.iter().for_each(|witness| {
+        //   let idx = witness.as_usize() - instance_variables.len();
+
+        //   let f = GenericFieldElement::<Fr>::from_repr(witness_variables[idx]);
+        //   acvm.overwrite_witness(*witness, f);
+        // });
+        // let _status = acvm.solve();
+        // acvm.finalize()
+
+        HashMap::new()
+      },
+      None => HashMap::new(),
+    };
 
     // First, allocate all public inputs
     let public_inputs = &self.circuit().public_inputs().0;
@@ -76,8 +106,9 @@ impl NoirProgram {
       // TODO: In Circom, we hold the witness in the circuit struct as an option and match on
       // whether it is Some or not to get the value we put in here.
       // TODO: could use alloc_empty_*
-      let var = cs.alloc_input(|| format!("public_{}", witness.as_usize()), || Ok(F::<G1>::ONE));
-      // witness_map.insert(witness, var);
+      let var =
+        cs.alloc_input(|| format!("public_{}", witness.as_usize()), || Ok(F::<G1>::ONE)).unwrap();
+      witness_map.insert(witness, var);
     }
 
     // Then, allocate known private witnesses
@@ -85,81 +116,77 @@ impl NoirProgram {
     for &witness in private_params {
       // TODO: In Circom, we hold the witness in the circuit struct as an option and match on
       // whether it is Some or not to get the value we put in here.
-      let var = cs.alloc(|| format!("private_{}", witness.as_usize()), || Ok(F::<G1>::ONE));
-      // witness_map.insert(witness, var);
+      let var =
+        cs.alloc(|| format!("private_{}", witness.as_usize()), || Ok(F::<G1>::ONE)).unwrap();
+      witness_map.insert(witness, var);
     }
 
     // c_m0 q_L0 * q_R0 + c_m1 q_L * q_R1 + ... + c_a0 (q_La0 + q_Ra1) + ... + q_c == 0
     //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ mul        ^^^^^^^^^^^^^ add           ^^ const
 
+    // Process gates
     for (gate_idx, opcode) in self.circuit().opcodes.iter().enumerate() {
       if let Opcode::AssertZero(gate) = opcode {
-        let mut terms = LinearCombination::zero();
+        let mut left_terms = LinearCombination::zero();
+        let mut right_terms = LinearCombination::zero();
 
-        // Handle multiplication terms
-        for (mul_idx, mul_term) in gate.mul_terms.iter().enumerate() {
-          let mut arr = [0u8; 32];
-          arr.copy_from_slice(&mul_term.0.to_be_bytes()[..32]);
-          let coeff = F::<G1>::from_repr(arr).unwrap();
+        // Handle multiplication terms more efficiently
+        for mul_term in &gate.mul_terms {
+          let coeff = {
+            let bytes = mul_term.0.to_be_bytes();
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&bytes[..32]);
+            F::<G1>::from_repr(arr).unwrap()
+          };
 
           let left_var = get_or_allocate_var(
             &mut witness_map,
             mul_term.1,
-            || format!("mul_{}_left_{}", gate_idx, mul_idx),
+            || format!("mul_left_{}", gate_idx),
             cs,
           )?;
           let right_var = get_or_allocate_var(
             &mut witness_map,
             mul_term.2,
-            || format!("mul_{}_right_{}", gate_idx, mul_idx),
+            || format!("mul_right_{}", gate_idx),
             cs,
           )?;
 
-          // Create multiplication constraint
-          let mul_result = AllocatedNum::alloc(
-            cs.namespace(|| format!("mul_result_{}_{}", gate_idx, mul_idx)),
-            || Ok(F::<G1>::ONE), // Replace with actual computation when available
-          )?;
-
-          cs.enforce(
-            || format!("mul_constraint_{}_{}", gate_idx, mul_idx),
-            |lc| lc + left_var.get_variable(),
-            |lc| lc + right_var.get_variable(),
-            |lc| lc + mul_result.get_variable(),
-          );
-
-          terms = terms + (coeff, mul_result.get_variable());
+          // Directly combine into linear combination
+          left_terms = left_terms + (coeff, left_var);
+          right_terms = right_terms + (F::<G1>::one(), right_var);
         }
 
-        // Handle linear combinations (add terms)
-        for (add_idx, add_term) in gate.linear_combinations.iter().enumerate() {
-          let mut arr = [0u8; 32];
-          arr.copy_from_slice(&add_term.0.to_be_bytes()[..32]);
-          let coeff = F::<G1>::from_repr(arr).unwrap();
-
-          let var = get_or_allocate_var(
-            &mut witness_map,
-            add_term.1,
-            || format!("add_{}_{}", gate_idx, add_idx),
-            cs,
-          )?;
-          terms = terms + (coeff, var.get_variable());
+        // Handle linear combinations more efficiently
+        let mut final_terms = LinearCombination::zero();
+        for add_term in &gate.linear_combinations {
+          let coeff = {
+            let bytes = add_term.0.to_be_bytes();
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&bytes[..32]);
+            F::<G1>::from_repr(arr).unwrap()
+          };
+          let var =
+            get_or_allocate_var(&mut witness_map, add_term.1, || format!("add_{}", gate_idx), cs)?;
+          final_terms = final_terms + (coeff, var);
         }
 
-        // Add constant term if present
+        // Handle constant term
         if !gate.q_c.is_zero() {
+          let bytes = gate.q_c.to_be_bytes();
           let mut arr = [0u8; 32];
-          arr.copy_from_slice(&gate.q_c.to_be_bytes()[..32]);
-          let const_term = F::<G1>::from_repr(arr).unwrap();
-          terms = terms + (const_term, CS::one());
+          arr.copy_from_slice(&bytes[..32]);
+          let const_coeff = F::<G1>::from_repr(arr).unwrap();
+          // SUBTRACT HERE TO MOVE TO LHS: Az o Bz - Cz = 0
+          final_terms = final_terms - (const_coeff, Variable::new_unchecked(Index::Input(0)));
         }
 
-        // Enforce final constraint: terms = 0
+        // Enforce: left_terms * right_terms + final_terms = 0
         cs.enforce(
-          || format!("gate_constraint_{}", gate_idx),
-          |lc| terms.clone(),
-          |lc| lc + CS::one(),
-          |lc| lc,
+          || format!("gate_{}", gate_idx),
+          |lc| left_terms.clone(),
+          |lc| right_terms.clone(),
+          |lc| final_terms,
         );
       }
     }
@@ -170,11 +197,11 @@ impl NoirProgram {
 
 // Helper function to allocate variables in the constraint system
 fn get_or_allocate_var<CS: ConstraintSystem<F<G1>>>(
-  witness_map: &mut HashMap<Witness, AllocatedNum<F<G1>>>,
+  witness_map: &mut HashMap<Witness, Variable>,
   witness: Witness,
   ns: impl FnOnce() -> String,
   cs: &mut CS,
-) -> Result<AllocatedNum<F<G1>>, SynthesisError> {
+) -> Result<Variable, SynthesisError> {
   if let Some(var) = witness_map.get(&witness) {
     Ok(var.clone())
   } else {
@@ -182,9 +209,24 @@ fn get_or_allocate_var<CS: ConstraintSystem<F<G1>>>(
       cs.namespace(ns),
       || Ok(F::<G1>::ONE), // Replace with actual witness value
     )?;
-    witness_map.insert(witness, var.clone());
-    Ok(var)
+    witness_map.insert(witness, var.get_variable());
+    Ok(var.get_variable())
   }
+}
+
+fn convert_to_halo2_field(f: GenericFieldElement<Fr>) -> F<G1> {
+  let bytes = f.to_be_bytes();
+  let mut arr = [0u8; 32];
+  arr.copy_from_slice(&bytes[..32]);
+  arr.reverse();
+  F::<G1>::from_repr(arr).unwrap()
+}
+
+// why the fuck is this fucking big endian?
+fn convert_to_acir_field(f: F<G1>) -> GenericFieldElement<Fr> {
+  let mut bytes = f.to_bytes();
+  bytes.reverse();
+  GenericFieldElement::from_be_bytes_reduce(&bytes)
 }
 
 #[cfg(test)]
@@ -195,6 +237,19 @@ mod tests {
 
   use super::*;
 
+  // This is fucking stupid. Why can't we all be sane. i'm not anymore
+  #[test]
+  fn test_conversions() {
+    let f = F::<G1>::from(5);
+    let acir_f = convert_to_acir_field(f);
+    assert_eq!(acir_f, GenericFieldElement::from_repr(Fr::from(5)));
+
+    let f = GenericFieldElement::from_repr(Fr::from(3));
+    let halo2_f = convert_to_halo2_field(f);
+    assert_eq!(halo2_f, F::<G1>::from(3));
+  }
+
+  // TODO: Should probably have a check here, but I believe this is correct!
   #[test]
   fn test_mock_noir_circuit() {
     // Circuit definition:
@@ -212,20 +267,22 @@ mod tests {
     dbg!(&cs.constraints);
     dbg!(cs.num_aux());
     dbg!(cs.num_inputs());
-    // cs.finalize();
+  }
 
-    // cs.set_mode(SynthesisMode::Prove {
-    //     construct_matrices: true,
-    // });
+  #[test]
+  fn test_mock_noir_solve() {
+    // Circuit definition:
+    // x_0 * w_0 + w_1 + 2 == 0
+    let json_path = Path::new("./mock").join(format!("mock.json"));
+    let noir_json = std::fs::read(&json_path).unwrap();
 
-    // dbg!(cs.to_matrices());
-    // dbg!(cs.num_instance_variables());
-    // dbg!(cs.num_witness_variables());
-    // // NOTE, the 0th instance assignment is the constant term enabler.
-    // // This example is:
-    // // 2 * 3 + (-8) + 2 == 0
-    // cs.borrow_mut().unwrap().instance_assignment = vec![Fr::ONE, Fr::from(2)];
-    // cs.borrow_mut().unwrap().witness_assignment = vec![Fr::from(3), -Fr::from(8)];
-    // assert!(cs.is_satisfied().unwrap());
+    let program = NoirProgram::new(&noir_json);
+    // NOTE: Don't need to have the instance assignment set to 1 here, so we need a method to handle
+    // this if we were sticking with this CS.
+    let witness_map = program.solve(&[Fr::from(2)], &[Fr::from(3), -Fr::from(8)]);
+
+    let mut cs = ShapeCS::<E1>::new();
+
+    program.vanilla_synthesize(&mut cs, &[]);
   }
 }
