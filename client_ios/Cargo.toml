@@ -21,4 +21,4 @@ tracing-subscriber.workspace=true
 tokio={ workspace=true }
 
 [build-dependencies]
-cargo_metadata = "0.19.1"
+cargo_metadata="0.19.1"
