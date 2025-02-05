@@ -20,6 +20,7 @@ use crate::{
 
 pub mod circom;
 pub mod errors;
+pub mod noir;
 pub mod program;
 pub mod proof;
 pub mod setup;
