@@ -12,7 +12,7 @@ use caratls_ekm_server::TeeTlsAcceptor;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use serde::Deserialize;
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{debug, error, info};
 use ws_stream_tungstenite::WsStream;
@@ -99,6 +99,20 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let token_generator = DummyTokenGenerator { token: "dummy".to_string() };
 
   let tee_tls_acceptor = TeeTlsAcceptor::new_with_ephemeral_cert(token_generator, "example.com"); // TODO example.com
-  let tee_tls_stream = tee_tls_acceptor.accept(socket).await?;
-  proxy_service(tee_tls_stream, session_id, target_host, target_port, state).await
+  let mut tee_tls_stream = tee_tls_acceptor.accept(socket).await?;
+  proxy_service(&mut tee_tls_stream, session_id, target_host, target_port, state.clone()).await?;
+
+  // TODO wait for TLS secrets
+  // TODO wait for manifest
+  let mut buf: [u8; 7] = [0u8; 7];
+  tee_tls_stream.read_exact(&mut buf).await.unwrap();
+
+
+  // TODO decrypt session
+  let transcript = state.origo_sessions.lock().unwrap().get(session_id).cloned().unwrap();
+
+  // TODO apply manifest
+  // TODO return web proof
+
+  todo!("")
 }

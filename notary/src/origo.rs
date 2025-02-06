@@ -296,8 +296,8 @@ pub async fn websocket_notarize(
   state: Arc<SharedState>,
 ) {
   debug!("Upgraded to websocket connection");
-  let stream = WsStream::new(socket.into_inner()).compat();
-  match proxy_service(stream, &session_id, &target_host, target_port, state).await {
+  let mut stream = WsStream::new(socket.into_inner()).compat();
+  match proxy_service(&mut stream, &session_id, &target_host, target_port, state).await {
     Ok(_) => {
       info!(?session_id, "Successful notarization using websocket!");
     },
@@ -308,14 +308,14 @@ pub async fn websocket_notarize(
 }
 
 pub async fn tcp_notarize(
-  stream: TokioIo<Upgraded>,
+  mut stream: TokioIo<Upgraded>,
   session_id: String,
   target_host: String,
   target_port: u16,
   state: Arc<SharedState>,
 ) {
   debug!("Upgraded to tcp connection");
-  match proxy_service(stream, &session_id, &target_host, target_port, state).await {
+  match proxy_service(&mut stream, &session_id, &target_host, target_port, state).await {
     Ok(_) => {
       info!(?session_id, "Successful notarization using tcp!");
     },
@@ -326,7 +326,7 @@ pub async fn tcp_notarize(
 }
 
 pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
-  socket: S,
+  socket: &mut S,
   session_id: &str,
   target_host: &str,
   target_port: u16,
