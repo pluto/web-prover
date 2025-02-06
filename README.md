@@ -17,21 +17,14 @@ The repository is laid out as follows:
 
 Documentation is evolving throughout the repository as the pipeline becomes more stable.
 
-## Usage
-
-```
-make wasm
-make ios
-cargo run --release -p notary -- --config ./fixture/notary-config.toml --manifest ./fixture/notary.origo_tcp_local.json
-NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" cargo run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
-cargo run --release --bin mock_server
-```
-
 ## WASM Demo
 
 ```
-cargo run --release -p notary -- --config ./fixture/notary-config.toml --manifest ./fixture/notary.origo_tcp_local.json
-NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" make wasm
+export NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer
+export RUST_LOG=debug
+
+cargo run -p notary -- --config ./fixture/notary-config.toml --manifest ./fixture/notary.origo_tcp_local.json
+make wasm
 make wasm-demo
 open https://localhost:8090
 ```
@@ -39,13 +32,19 @@ open https://localhost:8090
 ## Native Client Demo
 
 ```
-cargo run --release -p notary -- --config ./fixture/notary-config.toml --manifest ./fixture/notary.origo_tcp_local.json
+export NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer
+export RUST_LOG=debug
 
-# TLSNotary flow
-NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" cargo run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
+cargo run -p notary -- --config ./fixture/notary-config.toml --manifest ./fixture/notary.origo_tcp_local.json
+
+# TLSNotary flow (requires --release flag or it will be slow, try release mode for notary as well)
+cargo run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
 
 # Origo flow
-NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" cargo run --release -p client -- --config ./fixture/client.origo_tcp_local.json
+cargo run -p client -- --config ./fixture/client.origo_tcp_local.json
+
+# TEE flow (uses DummyToken so it can run outside of TEE)
+cargo run -p client -- --config ./fixture/client.tee_tcp_local.json
 ```
 
 ## Feature flags

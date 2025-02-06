@@ -6,6 +6,8 @@ build  ="build.rs"
 publish=false
 
 [features]
+default=["tee-dummy-token-verifier"]
+
 websocket=[]
 tracing  =[]
 
@@ -15,6 +17,9 @@ notary_ca_cert=[]
 
 # used to disable cert verification, useful for development
 unsafe_skip_cert_verification=[]
+
+tee-dummy-token-verifier                    =[]
+tee-google-confidential-space-token-verifier=[]
 
 [build-dependencies]
 cargo_metadata="0.19.1"
