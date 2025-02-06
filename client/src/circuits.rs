@@ -76,28 +76,28 @@ pub fn construct_setup_data() -> UninitializedSetup {
         R1CSType::Raw(JSON_EXTRACTION_R1CS.to_vec()),
       ],
       witness_generator_types: vec![
-        // WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
-        // WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
-        // WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
-        WitnessGeneratorType::Wasm {
-          path:      String::from(
-            "proofs/web_proof_circuits/circom-artifacts-1024b-v0.9.0/\
-             plaintext_authentication_1024b.wasm",
-          ),
-          wtns_path: String::from("witness.wtns"),
-        },
-        WitnessGeneratorType::Wasm {
-          path:      String::from(
-            "proofs/web_proof_circuits/circom-artifacts-1024b-v0.9.0/http_verification_1024b.wasm",
-          ),
-          wtns_path: String::from("witness.wtns"),
-        },
-        WitnessGeneratorType::Wasm {
-          path:      String::from(
-            "proofs/web_proof_circuits/circom-artifacts-1024b-v0.9.0/json_extraction_1024b.wasm",
-          ),
-          wtns_path: String::from("witness.wtns"),
-        },
+        WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
+        WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
+        WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
+        // WitnessGeneratorType::Wasm {
+        //   path:      String::from(
+        //     "proofs/web_proof_circuits/circom-artifacts-1024b-v0.9.0/\
+        //      plaintext_authentication_1024b.wasm",
+        //   ),
+        //   wtns_path: String::from("witness.wtns"),
+        // },
+        // WitnessGeneratorType::Wasm {
+        //   path:      String::from(
+        //     "proofs/web_proof_circuits/circom-artifacts-1024b-v0.9.0/http_verification_1024b.
+        // wasm",   ),
+        //   wtns_path: String::from("witness.wtns"),
+        // },
+        // WitnessGeneratorType::Wasm {
+        //   path:      String::from(
+        //     "proofs/web_proof_circuits/circom-artifacts-1024b-v0.9.0/json_extraction_1024b.wasm"
+        // ,   ),
+        //   wtns_path: String::from("witness.wtns"),
+        // },
       ],
       max_rom_length:          MAX_ROM_LENGTH,
     }

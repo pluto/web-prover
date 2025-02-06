@@ -188,27 +188,27 @@ async fn test_end_to_end_proofs_simple() {
       R1CSType::Raw(JSON_EXTRACTION_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      // WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
-      WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "web_proof_circuits/circom-artifacts-1024b-v0.9.0/plaintext_authentication_1024b.wasm",
-        ),
-        wtns_path: String::from("pa.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "web_proof_circuits/circom-artifacts-1024b-v0.9.0/http_verification_1024b.wasm",
-        ),
-        wtns_path: String::from("hv.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "web_proof_circuits/circom-artifacts-1024b-v0.9.0/json_extraction_1024b.wasm",
-        ),
-        wtns_path: String::from("je.wtns"),
-      },
+      WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(
+      //     "web_proof_circuits/circom-artifacts-1024b-v0.9.0/plaintext_authentication_1024b.wasm"
+      // ,   ),
+      //   wtns_path: String::from("pa.wtns"),
+      // },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(
+      //     "web_proof_circuits/circom-artifacts-1024b-v0.9.0/http_verification_1024b.wasm",
+      //   ),
+      //   wtns_path: String::from("hv.wtns"),
+      // },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(
+      //     "web_proof_circuits/circom-artifacts-1024b-v0.9.0/json_extraction_1024b.wasm",
+      //   ),
+      //   wtns_path: String::from("je.wtns"),
+      // },
     ],
     max_rom_length:          MAX_ROM_LENGTH,
   };
@@ -458,27 +458,27 @@ async fn test_end_to_end_proofs_complex() {
       R1CSType::Raw(JSON_EXTRACTION_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      // WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
-      // WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
-      WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "web_proof_circuits/circom-artifacts-1024b-v0.9.0/plaintext_authentication_1024b.wasm",
-        ),
-        wtns_path: String::from("pa.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "web_proof_circuits/circom-artifacts-1024b-v0.9.0/http_verification_1024b.wasm",
-        ),
-        wtns_path: String::from("hv.wtns"),
-      },
-      WitnessGeneratorType::Wasm {
-        path:      String::from(
-          "web_proof_circuits/circom-artifacts-1024b-v0.9.0/json_extraction_1024b.wasm",
-        ),
-        wtns_path: String::from("je.wtns"),
-      },
+      WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(
+      //     "web_proof_circuits/circom-artifacts-1024b-v0.9.0/plaintext_authentication_1024b.wasm"
+      // ,   ),
+      //   wtns_path: String::from("pa.wtns"),
+      // },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(
+      //     "web_proof_circuits/circom-artifacts-1024b-v0.9.0/http_verification_1024b.wasm",
+      //   ),
+      //   wtns_path: String::from("hv.wtns"),
+      // },
+      // WitnessGeneratorType::Wasm {
+      //   path:      String::from(
+      //     "web_proof_circuits/circom-artifacts-1024b-v0.9.0/json_extraction_1024b.wasm",
+      //   ),
+      //   wtns_path: String::from("je.wtns"),
+      // },
     ],
     max_rom_length:          MAX_ROM_LENGTH,
   };

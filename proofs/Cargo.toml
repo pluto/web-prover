@@ -5,9 +5,6 @@ edition="2021"
 publish=false
 build  ="build.rs"
 
-[[bin]]
-name="test-prove"
-
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 circom_witnesscalc={ git="https://github.com/pluto/circom-witnesscalc" } # Fork is needed apparently??
 
