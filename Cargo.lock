@@ -1426,7 +1426,7 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
 name = "client"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-tungstenite 0.25.1",
  "base64 0.22.1",
@@ -1528,7 +1528,7 @@ dependencies = [
 
 [[package]]
 name = "client_ios"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cargo_metadata",
  "client",
@@ -1541,7 +1541,7 @@ dependencies = [
 
 [[package]]
 name = "client_wasm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cargo_metadata",
  "client",
@@ -3866,7 +3866,7 @@ dependencies = [
 
 [[package]]
 name = "notary"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "alloy-primitives",
  "async-trait",
@@ -4600,7 +4600,7 @@ dependencies = [
 
 [[package]]
 name = "proofs"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bellpepper-core",
  "bincode",
