@@ -24,7 +24,7 @@ pub struct NoirProgram {
     deserialize_with = "Program::deserialize_program_base64"
   )]
   pub bytecode: Program<GenericFieldElement<Fr>>,
-  pub inputs:   Option<Vec<F<G1>>>,
+  pub witness:  Option<Vec<F<G1>>>,
 }
 
 impl NoirProgram {
@@ -36,14 +36,18 @@ impl NoirProgram {
     &self.bytecode.unconstrained_functions
   }
 
-  pub fn set_inputs(&mut self, inputs: Vec<F<G1>>) { self.inputs = Some(inputs); }
+  pub fn set_inputs(&mut self, inputs: Vec<F<G1>>) { self.witness = Some(inputs); }
 
+  // TODO: we now need to shift this to use the `z` values as the sole public inputs, the struct
+  // should only hold witness
+  // tell clippy to shut up
+  #[allow(clippy::too_many_lines)]
   pub fn vanilla_synthesize<CS: ConstraintSystem<F<G1>>>(
     &self,
     cs: &mut CS,
     z: &[AllocatedNum<F<G1>>],
   ) -> Result<Vec<AllocatedNum<F<G1>>>, SynthesisError> {
-    let mut acvm = if self.inputs.is_some() {
+    let mut acvm = if self.witness.is_some() {
       Some(ACVM::new(
         &StubbedBlackBoxSolver(false),
         &self.circuit().opcodes,
@@ -65,7 +69,7 @@ impl NoirProgram {
     // Set up public inputs
     self.circuit().public_parameters.0.iter().for_each(|witness| {
       println!("public instance: {witness:?}");
-      if let Some(inputs) = &self.inputs {
+      if let Some(inputs) = &self.witness {
         let f = convert_to_acir_field(inputs[witness.as_usize()]);
         acvm.as_mut().unwrap().overwrite_witness(*witness, f);
       }
@@ -77,7 +81,7 @@ impl NoirProgram {
     // Set up private inputs
     self.circuit().private_parameters.iter().for_each(|witness| {
       println!("private instance: {witness:?}");
-      if let Some(inputs) = &self.inputs {
+      if let Some(inputs) = &self.witness {
         let f = convert_to_acir_field(inputs[witness.as_usize()]);
         acvm.as_mut().unwrap().overwrite_witness(*witness, f);
       }
@@ -86,7 +90,7 @@ impl NoirProgram {
       allocated_vars.insert(*witness, var);
     });
 
-    let acir_witness_map = if self.inputs.is_some() {
+    let acir_witness_map = if self.witness.is_some() {
       let _status = acvm.as_mut().unwrap().solve();
       Some(acvm.unwrap().finalize())
     } else {
@@ -94,15 +98,9 @@ impl NoirProgram {
     };
 
     let get_witness_value = |witness: &Witness| -> F<G1> {
-      if let Some(ref map) = acir_witness_map {
-        if let Some(value) = map.get(witness) {
-          convert_to_halo2_field(*value)
-        } else {
-          F::<G1>::ONE
-        }
-      } else {
-        F::<G1>::ONE
-      }
+      acir_witness_map.as_ref().map_or(F::<G1>::ONE, |map| {
+        map.get(witness).map_or(F::<G1>::ONE, |value| convert_to_halo2_field(*value))
+      })
     };
 
     // Helper to get or create a variable for a witness
@@ -114,7 +112,7 @@ impl NoirProgram {
       if let Some(&var) = allocated_vars.get(witness) {
         Ok(var)
       } else {
-        let var = AllocatedNum::alloc(cs.namespace(|| format!("aux_{}", gate_idx)), || {
+        let var = AllocatedNum::alloc(cs.namespace(|| format!("aux_{gate_idx}")), || {
           Ok(get_witness_value(witness))
         })?
         .get_variable();
@@ -172,10 +170,10 @@ impl NoirProgram {
         // Enforce the R1CS constraint: Az ∘ Bz = Cz
         // This represents our equation in the form: (left_terms) * (right_terms) = final_terms
         cs.enforce(
-          || format!("gate_{}", gate_idx),
-          |lc| left_terms.clone(),
-          |lc| right_terms.clone(),
-          |lc| final_terms,
+          || format!("gate_{gate_idx}"),
+          |_| left_terms.clone(),
+          |_| right_terms.clone(),
+          |_| final_terms,
         );
       }
     }
@@ -188,25 +186,6 @@ impl NoirProgram {
     }
 
     Ok(vec![]) // Return appropriate outputs if needed
-  }
-}
-
-// Helper function to allocate variables in the constraint system
-fn get_or_allocate_var<CS: ConstraintSystem<F<G1>>>(
-  witness_map: &mut HashMap<Witness, Variable>,
-  witness: Witness,
-  ns: impl FnOnce() -> String,
-  cs: &mut CS,
-) -> Result<Variable, SynthesisError> {
-  if let Some(var) = witness_map.get(&witness) {
-    Ok(var.clone())
-  } else {
-    let var = AllocatedNum::alloc(
-      cs.namespace(ns),
-      || Ok(F::<G1>::ONE), // Replace with actual witness value
-    )?;
-    witness_map.insert(witness, var.get_variable());
-    Ok(var.get_variable())
   }
 }
 
