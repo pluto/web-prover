@@ -138,9 +138,19 @@ pub(crate) async fn proxy(
   let payload = response.into_body().collect().await?.to_bytes();
   debug!("Response: {:?}", payload);
 
+
   // Close the connection to the server
   // TODO this closes the TLS Connection, do we want to maybe close the TCP stream instead?
   let mut client_socket = connection_receiver.await??.io.into_inner().into_inner();
+
+  if config.mode == NotaryMode::TEE {
+    let manifest = config.proving.manifest.unwrap();
+
+    println!("write from client to notary");
+    client_socket.write_all(b"what up").await.unwrap();
+
+  }
+
   client_socket.close().await?;
 
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
