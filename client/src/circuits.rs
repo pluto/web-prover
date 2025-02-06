@@ -6,13 +6,13 @@
 use proofs::program::data::{R1CSType, UninitializedSetup, WitnessGeneratorType};
 
 // -------------------------------------- 1024B circuits -------------------------------------- //
-pub const MAX_ROM_LENGTH: usize = 20;
+pub const MAX_ROM_LENGTH: usize = 100;
 
 #[allow(dead_code)]
 pub const PROVING_PARAMS_1024: &str = concat!(
   "proofs/web_proof_circuits/circom-artifacts-1024b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/serialized_setup_1024b_rom_length_20.bin"
+  "/serialized_setup_1024b_rom_length_100.bin"
 );
 
 // TODO: Not loaded dynamically on iOS (yet)
@@ -20,7 +20,7 @@ pub const PROVING_PARAMS_1024: &str = concat!(
 pub const PROVING_PARAMS_BYTES_1024: &[u8] = include_bytes!(concat!(
   "../../proofs/web_proof_circuits/circom-artifacts-1024b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/serialized_setup_1024b_rom_length_20.bin"
+  "/serialized_setup_1024b_rom_length_100.bin"
 ));
 
 // Circuit 0

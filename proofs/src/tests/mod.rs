@@ -29,12 +29,12 @@ use crate::program::{
 pub(crate) mod inputs;
 mod witnesscalc;
 
-const MAX_ROM_LENGTH: usize = 20;
+const MAX_ROM_LENGTH: usize = 100;
 const MAX_STACK_HEIGHT: usize = 10;
 const MAX_HTTP_HEADERS: usize = 25;
 
 // const SERIALIZED_SETUP: &[u8] = include_bytes!(
-//   "../../web_proof_circuits/circom-artifacts-1024b-v0.9.0/serialized_setup_1024b_rom_length_20.
+//   "../../web_proof_circuits/circom-artifacts-1024b-v0.9.0/serialized_setup_1024b_rom_length_100.
 // bin" );
 
 // Circuit 0
@@ -463,19 +463,19 @@ async fn test_end_to_end_proofs_complex() {
       WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
       // WitnessGeneratorType::Wasm {
       //   path:      String::from(
-      //     "web_proof_circuits/circom-artifacts-1024b-v0.9.0/plaintext_authentication_1024b.wasm"
+      //     "web_proof_circuits/circom-artifacts-1024b-v0.9.1/plaintext_authentication_1024b.wasm"
       // ,   ),
       //   wtns_path: String::from("pa.wtns"),
       // },
       // WitnessGeneratorType::Wasm {
       //   path:      String::from(
-      //     "web_proof_circuits/circom-artifacts-1024b-v0.9.0/http_verification_1024b.wasm",
+      //     "web_proof_circuits/circom-artifacts-1024b-v0.9.1/http_verification_1024b.wasm",
       //   ),
       //   wtns_path: String::from("hv.wtns"),
       // },
       // WitnessGeneratorType::Wasm {
       //   path:      String::from(
-      //     "web_proof_circuits/circom-artifacts-1024b-v0.9.0/json_extraction_1024b.wasm",
+      //     "web_proof_circuits/circom-artifacts-1024b-v0.9.1/json_extraction_1024b.wasm",
       //   ),
       //   wtns_path: String::from("je.wtns"),
       // },

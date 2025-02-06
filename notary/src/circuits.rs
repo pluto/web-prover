@@ -15,7 +15,7 @@ use proofs::{
 };
 use tracing::debug;
 
-pub const MAX_ROM_LENGTH: usize = 20;
+pub const MAX_ROM_LENGTH: usize = 100;
 pub const PUBLIC_IO_VARS: usize = 11;
 
 pub const PROVING_PARAMS_1024: &str = concat!(

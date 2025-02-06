@@ -514,7 +514,7 @@ impl Manifest {
         &response_inputs.ciphertext,
       )?;
 
-    let request_plaintext_step_out = build_plaintext_authentication_circuit_inputs(
+    let _ = build_plaintext_authentication_circuit_inputs(
       request_inputs,
       ciphertext_digest,
       &mut private_inputs,
@@ -522,7 +522,7 @@ impl Manifest {
     )?;
     // debug!("private_inputs: {:?}", private_inputs.len());
 
-    let (request_http_verification_step_out, _) = build_http_verification_circuit_inputs(
+    let _ = build_http_verification_circuit_inputs(
       &request_inputs.plaintext,
       ciphertext_digest,
       &headers_digest,
@@ -531,7 +531,7 @@ impl Manifest {
     )?;
     // debug!("private_inputs: {:?}", private_inputs.len());
 
-    let response_plaintext_step_out = build_plaintext_authentication_circuit_inputs(
+    let _ = build_plaintext_authentication_circuit_inputs(
       response_inputs,
       ciphertext_digest,
       &mut private_inputs,
@@ -539,16 +539,15 @@ impl Manifest {
     )?;
 
     // debug!("private_inputs: {:?}", private_inputs.len());
-    let (response_http_verification_step_out, response_body) =
-      build_http_verification_circuit_inputs(
-        &response_inputs.plaintext,
-        ciphertext_digest,
-        &headers_digest,
-        &mut private_inputs,
-        &mut fold_inputs,
-      )?;
+    let (_, response_body) = build_http_verification_circuit_inputs(
+      &response_inputs.plaintext,
+      ciphertext_digest,
+      &headers_digest,
+      &mut private_inputs,
+      &mut fold_inputs,
+    )?;
 
-    let json_extraction_step_out = build_json_extraction_circuit_inputs(
+    let _ = build_json_extraction_circuit_inputs(
       &response_body,
       ciphertext_digest,
       &self.response.body.json,

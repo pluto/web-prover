@@ -75,7 +75,7 @@ console.log(WEB_PROVER_CIRCUITS_VERSION)
 
 var proving_params = {
   aux_params: await getByteParams(
-    `circom-artifacts-1024b-v${WEB_PROVER_CIRCUITS_VERSION}/serialized_setup_1024b_rom_length_20.bin`,
+    `circom-artifacts-1024b-v${WEB_PROVER_CIRCUITS_VERSION}/serialized_setup_1024b_rom_length_100.bin`,
   ),
 };
 proofWorker.postMessage({
