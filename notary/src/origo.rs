@@ -206,7 +206,6 @@ pub async fn verify(
   .deserialize();
 
   debug!("request_verifier_digest: {:?}", proof.verifier_digest.clone());
-  debug!("verifiers.keys()={:?}", state.verifiers.keys());
 
   // Form verifier inputs
   let verifier_inputs =
@@ -222,7 +221,6 @@ pub async fn verify(
   // verification
   // debug!("request_messages {:?}", verifier_inputs.request_messages);
 
-  // TODO (sambhav): might be incorrect, is there any other better way?
   let verifier =
     initialize_verifier(payload.origo_proof.rom.circuit_data, payload.origo_proof.rom.rom);
 

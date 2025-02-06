@@ -12,7 +12,6 @@ use axum::{
   routing::{get, post},
   Router,
 };
-use circuits::Verifier;
 use errors::NotaryServerError;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
@@ -50,7 +49,6 @@ struct SharedState {
   tlsn_max_recv_data: usize,
   origo_sessions:     Arc<Mutex<HashMap<String, tls_parser::Transcript<tls_parser::Raw>>>>,
   verifier_sessions:  Arc<Mutex<HashMap<String, origo::VerifierInputs>>>,
-  verifiers:          HashMap<String, Verifier>,
   manifest:           Manifest,
 }
 
@@ -109,7 +107,6 @@ async fn main() -> Result<(), NotaryServerError> {
     tlsn_max_recv_data: c.tlsn_max_recv_data,
     origo_sessions: Default::default(),
     verifier_sessions: Default::default(),
-    verifiers: circuits::get_initialized_verifiers(),
     // TODO: This is obviously not sufficient, we need richer logic
     // for informing the notary of a valid manifest.
     manifest,
