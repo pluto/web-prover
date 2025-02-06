@@ -26,12 +26,15 @@ jobs:
           echo "::notice title=WEB_PROVER_CIRCUITS_VERSION::v$version"
 
       - name: Check cache
+        if: ${{ !env.ACT }}
         id: cached-circuits
         uses: actions/cache@v4
         with:
           path: proofs/web_proof_circuits
           key: web-prover-circuits-v${{ steps.set-version.outputs.version }}
           lookup-only: true # don't download, but still save if cache miss
+
+      - run: make artifacts
 
       - name: make web-prover-circuits
         if: steps.cached-circuits.outputs.cache-hit != 'true'

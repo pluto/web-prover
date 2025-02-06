@@ -19,6 +19,8 @@ jobs:
           path: proofs/web_proof_circuits
           key: ${{ inputs.web-prover-circuits-cache-key }}
 
+      - run: make artifacts
+
       - name: Download notary
         uses: actions/download-artifact@v4
         with:

@@ -14,10 +14,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Fetch web-prover-circuits cache
+        if: ${{ !env.ACT }}
         uses: actions/cache/restore@v4
         with:
           path: proofs/web_proof_circuits
           key: ${{ inputs.web-prover-circuits-cache-key }}
+
+      - run: make artifacts
 
       - name: Download notary
         uses: actions/download-artifact@v4

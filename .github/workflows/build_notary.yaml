@@ -21,6 +21,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: dtolnay/rust-toolchain@stable
+        if: ${{ env.ACT }}
+      - run: apt-get update && apt-get install -y clang
+        if: ${{ env.ACT }}
+
       - uses: ./.github/actions/setup-rust-ubuntu
         if: matrix.os == 'ubuntu-latest'
         with:
@@ -31,15 +36,18 @@ jobs:
           rust-cache-key: client_notary
 
       - name: Fetch web-prover-circuits cache
+        if: ${{ !env.ACT }}
         uses: actions/cache/restore@v4
         with:
           path: proofs/web_proof_circuits
           key: ${{ inputs.web-prover-circuits-cache-key }}
 
+      - run: make artifacts
+
       - run: cargo +nightly-2024-10-28 build -p notary --release
 
       - uses: actions/upload-artifact@v4
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' && !env.ACT
         with:
           name: "notary.linux.amd64"
           path: "target/release/notary"

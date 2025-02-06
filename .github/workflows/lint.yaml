@@ -24,15 +24,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: dtolnay/rust-toolchain@stable
+        if: ${{ env.ACT }}
+      - run: apt-get update && apt-get install -y clang
+        if: ${{ env.ACT }}
+
       - uses: ./.github/actions/setup-rust-ubuntu
         with:
           rust-cache-key: clippy
 
       - name: Fetch web-prover-circuits cache
+        if: ${{ !env.ACT }}
         uses: actions/cache/restore@v4
         with:
           path: proofs/web_proof_circuits
           key: ${{ inputs.web-prover-circuits-cache-key }}
+
+      - run: make artifacts
 
       - run: cargo clippy -p ${{ matrix.crate }}
 
@@ -41,6 +49,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: ${{ env.ACT }}
+      - run: apt-get update && apt-get install -y clang
+        if: ${{ env.ACT }}
 
       - uses: ./.github/actions/setup-rust-ubuntu
         with:

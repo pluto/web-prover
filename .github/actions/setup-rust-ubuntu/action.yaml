@@ -24,6 +24,7 @@ runs:
 
     - name: Cache Rust dependencies
       uses: actions/cache@v4
+      if: ${{ !env.ACT }}
       with:
         path: |
           /home/runner/.cargo
@@ -31,6 +32,7 @@ runs:
         key: rust-${{ runner.os }}-${{ inputs.rust-cache-key }}
 
     - name: Cache Rust target dependencies
+      if: ${{ !env.ACT }}
       uses: actions/cache@v4
       with:
         path: |
