@@ -4,7 +4,10 @@ use axum::{
   extract::{Query, State},
   response::Response,
 };
+#[cfg(feature = "tee-google-confidential-space-token-generator")]
 use caratls_ekm_google_confidential_space_server::GoogleConfidentialSpaceTokenGenerator;
+#[cfg(feature = "tee-dummy-token-generator")]
+use caratls_ekm_server::DummyTokenGenerator;
 use caratls_ekm_server::TeeTlsAcceptor;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
@@ -89,7 +92,12 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   target_port: u16,
   state: Arc<SharedState>,
 ) -> Result<(), NotaryServerError> {
+  #[cfg(feature = "tee-google-confidential-space-token-generator")]
   let token_generator = GoogleConfidentialSpaceTokenGenerator::new("audience");
+
+  #[cfg(feature = "tee-dummy-token-generator")]
+  let token_generator = DummyTokenGenerator { token: "dummy".to_string() };
+
   let tee_tls_acceptor = TeeTlsAcceptor::new_with_ephemeral_cert(token_generator, "example.com"); // TODO example.com
   let tee_tls_stream = tee_tls_acceptor.accept(socket).await?;
   proxy_service(tee_tls_stream, session_id, target_host, target_port, state).await
