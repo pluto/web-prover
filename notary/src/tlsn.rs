@@ -10,9 +10,10 @@ use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use p256::ecdsa::{Signature, SigningKey};
 use serde::Deserialize;
-use tlsn_verifier::tls::{Verifier, VerifierConfig};
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
+use tlsn_common::config::ProtocolConfigValidator;
+use tlsn_core::{attestation::AttestationConfig, signing::SignatureAlgId, CryptoProvider};
+use tlsn_verifier::{Verifier, VerifierConfig};
+use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{debug, error, info};
 use ws_stream_tungstenite::WsStream;
 
@@ -60,7 +61,9 @@ where S: Send + Sync
   }
 }
 
-pub async fn notary_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
+pub async fn notary_service<
+  S: futures_util::AsyncWrite + futures_util::AsyncRead + Send + Unpin + 'static,
+>(
   socket: S,
   signing_key: &SigningKey,
   session_id: &str,
@@ -69,16 +72,29 @@ pub async fn notary_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 ) -> Result<(), NotaryServerError> {
   debug!(?session_id, "Starting notarization...");
 
-  let mut config_builder = VerifierConfig::builder();
+  let mut provider = CryptoProvider::default();
+  provider.signer.set_secp256k1(&signing_key.to_bytes()).unwrap();
 
-  config_builder = config_builder
-    .id(session_id)
-    .max_transcript_size(max_sent_data.unwrap() + max_recv_data.unwrap()); // TODO unwrap, probably shouldn't be Option in the first place
+  // Setup the config. Normally a different ID would be generated
+  // for each notarization.
+  let config_validator = ProtocolConfigValidator::builder()
+    .max_sent_data(max_sent_data.unwrap())
+    .max_recv_data(max_recv_data.unwrap())
+    .build()
+    .unwrap();
 
-  let config = config_builder.build()?;
+  let config = VerifierConfig::builder()
+    .protocol_config_validator(config_validator)
+    .crypto_provider(provider)
+    .build()
+    .unwrap();
 
-  Verifier::new(config).notarize::<_, Signature>(socket.compat(), signing_key).await?;
+  let attestation_config = AttestationConfig::builder()
+    .supported_signature_algs(vec![SignatureAlgId::SECP256K1])
+    .build()
+    .unwrap();
 
+  Verifier::new(config).notarize(socket, &attestation_config).await.unwrap();
   Ok(())
 }
 
@@ -119,7 +135,7 @@ pub async fn websocket_notarize(
   max_recv_data: Option<usize>,
 ) {
   debug!("Upgraded to websocket connection");
-  let stream = WsStream::new(socket.into_inner()).compat();
+  let stream = WsStream::new(socket.into_inner());
   match notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data).await
   {
     Ok(_) => {
@@ -139,7 +155,14 @@ pub async fn tcp_notarize(
   max_recv_data: Option<usize>,
 ) {
   debug!("Upgraded to tcp connection");
-  match notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data).await
+  match notary_service(
+    stream.compat(),
+    &notary_signing_key,
+    &session_id,
+    max_sent_data,
+    max_recv_data,
+  )
+  .await
   {
     Ok(_) => {
       info!(?session_id, "Successful notarization using tcp!");

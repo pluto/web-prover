@@ -155,7 +155,7 @@ fn to_u32_array(input: &[u8]) -> Vec<u32> {
 
   // Create a new vector with padding
   let padded_input =
-    input.iter().chain(std::iter::repeat(&0).take(padding_needed)).copied().collect::<Vec<u8>>();
+    input.iter().chain(std::iter::repeat_n(&0, padding_needed)).copied().collect::<Vec<u8>>();
 
   padded_input
     .chunks(4)

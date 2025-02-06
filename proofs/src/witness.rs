@@ -24,7 +24,7 @@ impl ByteOrPad {
   /// Converts a slice of bytes to a vector of `ByteOrPad` with padding.
   pub fn from_bytes_with_padding(bytes: &[u8], padding: usize) -> Vec<ByteOrPad> {
     let mut result = bytes.iter().map(|&b| ByteOrPad::Byte(b)).collect::<Vec<_>>();
-    result.extend(std::iter::repeat(ByteOrPad::Pad).take(padding));
+    result.extend(std::iter::repeat_n(ByteOrPad::Pad, padding));
     result
   }
 
@@ -267,7 +267,7 @@ pub fn data_hasher(preimage: &[ByteOrPad]) -> F<G1> {
 }
 
 pub fn polynomial_digest(bytes: &[u8], polynomial_input: F<G1>, counter: u64) -> F<G1> {
-  let mut monomial = polynomial_input.pow(&[counter]);
+  let mut monomial = polynomial_input.pow([counter]);
   let mut accumulated = F::<G1>::ZERO;
   for byte in bytes {
     accumulated += F::<G1>::from(u64::from(*byte)) * monomial;
@@ -396,7 +396,7 @@ pub fn request_initial_digest(
   debug!(
     "WITNESS (request): hashed_digests={:?}, hex={:?}",
     hashed_digests,
-    hashed_digests.clone().into_iter().map(|f| hex::encode(f.to_bytes()))
+    hashed_digests.clone().map(|f| hex::encode(f.to_bytes()))
   );
 
   for digest in all_digests.clone() {
