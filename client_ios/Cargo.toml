@@ -1,6 +1,6 @@
 [package]
 name   ="client_ios"
-version="0.1.0"
+version="0.2.0"
 edition="2021"
 build  ="build.rs"
 publish=false
@@ -10,15 +10,15 @@ crate-type=["staticlib"]
 
 [dependencies]
 # Local
-client.workspace=true
+client={ workspace=true }
 # Serde
-serde.workspace     =true
-serde_json.workspace=true
+serde     ={ workspace=true }
+serde_json={ workspace=true }
 # Logging
-tracing.workspace           =true
-tracing-subscriber.workspace=true
+tracing           ={ workspace=true }
+tracing-subscriber={ workspace=true }
 # Async
 tokio={ workspace=true }
 
 [build-dependencies]
-cargo_metadata = "0.19.1"
+cargo_metadata="0.19.1"

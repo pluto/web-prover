@@ -1,6 +1,6 @@
 [package]
 name   ="notary"
-version="0.1.0"
+version="0.2.0"
 edition="2021"
 build  ="build.rs"
 
@@ -11,7 +11,7 @@ client={ path="../client", package="client" }
 hyper={ workspace=true, features=["client", "http1", "server"] }
 hyper-util={ workspace=true }
 serde={ workspace=true }
-serde_json.workspace=true
+serde_json={ workspace=true }
 rustls={ version="0.23.11", default-features=false, features=["logging", "tls12", "std", "ring"] }
 tokio={ workspace=true }
 tokio-util={ workspace=true, features=["compat"] }
