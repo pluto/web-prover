@@ -31,6 +31,9 @@ pub enum ProxyError {
 
   #[error("Session ID Error: {0}")]
   InvalidSessionId(String),
+
+  #[error(transparent)]
+  ProofError(#[from] proofs::errors::ProofError),
 }
 
 impl IntoResponse for ProxyError {

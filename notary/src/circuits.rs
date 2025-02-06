@@ -15,12 +15,13 @@ use proofs::{
 };
 use tracing::debug;
 
-pub const MAX_ROM_LENGTH: usize = 5;
+pub const MAX_ROM_LENGTH: usize = 100;
+pub const PUBLIC_IO_VARS: usize = 11;
 
 pub const PROVING_PARAMS_1024: &str = concat!(
   "proofs/web_proof_circuits/circom-artifacts-1024b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/serialized_setup_1024b_rom_length_5.bin"
+  "/serialized_setup_1024b_rom_length_100.bin"
 );
 
 // -------------------------------------- 1024B circuits -------------------------------------- //
@@ -108,67 +109,34 @@ pub struct Verifier {
   pub verifier_key: VerifierKey<E1, S1, S2>,
 }
 
-// TODO: add another initialization endpoint when the rom is not static
-pub fn get_initialized_verifiers() -> HashMap<String, Verifier> {
-  let decryption_label = String::from("PLAINTEXT_AUTHENTICATION");
-  let http_label = String::from("HTTP_VERIFICATION");
-  let json_label = String::from("JSON_EXTRACTION");
+pub fn initialize_verifier(rom_data: HashMap<String, CircuitData>, rom: Vec<String>) -> Verifier {
+  // let params_1024 = (PROVING_PARAMS_1024, 1024, rom_data, rom.clone());
 
-  let request_rom_data = HashMap::from([
-    (decryption_label.clone(), CircuitData { opcode: 0 }),
-    (http_label.clone(), CircuitData { opcode: 1 }),
-  ]);
-  let response_rom_data = HashMap::from([
-    ("PLAINTEXT_AUTHENTICATION_0".to_string(), CircuitData { opcode: 0 }),
-    ("PLAINTEXT_AUTHENTICATION_1".to_string(), CircuitData { opcode: 0 }),
-    (http_label.clone(), CircuitData { opcode: 1 }),
-    (json_label.clone(), CircuitData { opcode: 2 }),
-  ]);
-  let request_rom = vec![decryption_label.clone(), http_label.clone()];
-  let response_rom = vec![
-    "PLAINTEXT_AUTHENTICATION_0".to_string(),
-    "PLAINTEXT_AUTHENTICATION_1".to_string(),
-    http_label.clone(),
-    json_label.clone(),
-  ];
-
-  let request_params_1024 =
-    ("request", PROVING_PARAMS_1024, 1024, request_rom_data, request_rom.clone());
-  let response_params_1024 =
-    ("response", PROVING_PARAMS_1024, 1024, response_rom_data, response_rom.clone());
-
-  let mut verifiers = HashMap::new();
-  for (label, path, circuit_size, rom_data, rom) in [request_params_1024, response_params_1024] {
-    let bytes = std::fs::read(path).unwrap();
-    let setup_data = construct_setup_data(circuit_size);
-    let program_data = ProgramData::<Offline, NotExpanded> {
-      public_params: bytes,
-      // TODO: These are incorrect, but we don't know them until the internal parser completes.
-      // during the transition to `into_online` they're populated.
-      vk_digest_primary: F::<G1>::from(0),
-      vk_digest_secondary: F::<G2>::from(0),
-      setup_data,
-      rom,
-      rom_data,
-      initial_nivc_input: vec![F::<G1>::from(0)],
-      inputs: (Vec::new(), HashMap::new()),
-      witnesses: vec![],
-    }
-    .into_online()
-    .unwrap();
-
-    let (pk, verifier_key) =
-      CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
-    debug!(
-      "initialized pk pk_primary.digest={:?}, hex(primary)={:?}, pk_secondary.digest={:?}",
-      pk.pk_primary.vk_digest,
-      hex::encode(pk.pk_primary.vk_digest.to_bytes()),
-      pk.pk_secondary.vk_digest,
-    );
-    let verifier_digest =
-      format!("{}_{}", label, hex::encode(program_data.vk_digest_primary.to_bytes()));
-    let _ = verifiers.insert(verifier_digest, Verifier { program_data, verifier_key });
+  let bytes = std::fs::read(PROVING_PARAMS_1024).unwrap();
+  let setup_data = construct_setup_data(1024);
+  let program_data = ProgramData::<Offline, NotExpanded> {
+    public_params: bytes,
+    // TODO: These are incorrect, but we don't know them until the internal parser completes.
+    // during the transition to `into_online` they're populated.
+    vk_digest_primary: F::<G1>::from(0),
+    vk_digest_secondary: F::<G2>::from(0),
+    setup_data,
+    rom,
+    rom_data,
+    initial_nivc_input: vec![F::<G1>::from(0); PUBLIC_IO_VARS],
+    inputs: (Vec::new(), HashMap::new()),
   }
+  .into_online()
+  .unwrap();
 
-  verifiers
+  let (pk, verifier_key) =
+    CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
+  debug!(
+    "initialized pk pk_primary.digest={:?}, hex(primary)={:?}, pk_secondary.digest={:?}",
+    pk.pk_primary.vk_digest,
+    hex::encode(pk.pk_primary.vk_digest.to_bytes()),
+    pk.pk_secondary.vk_digest,
+  );
+
+  Verifier { program_data, verifier_key }
 }

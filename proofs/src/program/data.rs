@@ -1,5 +1,4 @@
 use std::{
-  default,
   fs::{self, File},
   io::Write,
   sync::Arc,
@@ -141,7 +140,6 @@ pub struct ProgramData<S: SetupStatus, W: WitnessStatus> {
   pub rom:                 Vec<String>,
   pub initial_nivc_input:  Vec<F<G1>>,
   pub inputs:              W::PrivateInputs,
-  pub witnesses:           Vec<Vec<F<G1>>>, // TODO: Ideally remove this
 }
 
 impl<S: SetupStatus> ProgramData<S, NotExpanded> {
@@ -219,7 +217,6 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
       setup_data,
       rom_data,
       initial_nivc_input,
-      witnesses,
       ..
     } = self;
     Ok(ProgramData {
@@ -230,7 +227,6 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
       rom_data,
       rom: self.rom,
       initial_nivc_input,
-      witnesses,
       inputs: private_inputs,
     })
   }
@@ -294,7 +290,7 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
     info!("init public params from parts");
     let public_params =
       PublicParams::<E1>::from_parts_unchecked(circuit_shapes, proving_params.aux_params);
-    let Self { rom, initial_nivc_input, inputs, witnesses, rom_data, .. } = self;
+    let Self { rom, initial_nivc_input, inputs, rom_data, .. } = self;
 
     Ok(ProgramData {
       public_params: Arc::new(public_params),
@@ -304,7 +300,6 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
       rom,
       initial_nivc_input,
       inputs,
-      witnesses,
       rom_data,
     })
   }
@@ -357,7 +352,7 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
     debug!("bytes_path={:?}", bytes_path);
     File::create(&bytes_path)?.write_all(&proving_param_bytes).unwrap();
 
-    let Self { rom_data, rom, initial_nivc_input, inputs, witnesses, .. } = self;
+    let Self { rom_data, rom, initial_nivc_input, inputs, .. } = self;
     Ok(ProgramData {
       public_params: proving_param_bytes,
       vk_digest_primary,
@@ -367,7 +362,6 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
       rom_data,
       rom,
       initial_nivc_input,
-      witnesses,
       inputs,
     })
   }
@@ -431,9 +425,9 @@ impl ProgramData<Online, Expanded> {
   /// - run NIVC recursive proving
   /// - run CompressedSNARK to compress proof
   /// - serialize proof
-  pub fn generate_proof(self) -> Result<FoldingProof<Vec<u8>, String>, ProofError> {
+  pub async fn generate_proof(self) -> Result<FoldingProof<Vec<u8>, String>, ProofError> {
     debug!("starting recursive proving");
-    let program_output = program::run(&self)?;
+    let program_output = program::run(&self).await?;
 
     debug!("starting proof compression");
     let compressed_snark_proof = program::compress_proof_no_setup(
@@ -510,7 +504,6 @@ mod tests {
       rom,
       initial_nivc_input: vec![F::<G1>::ONE],
       inputs: vec![HashMap::new(), HashMap::new()],
-      witnesses: vec![vec![F::<G1>::ONE]],
     }
   }
 
@@ -588,7 +581,6 @@ mod tests {
       vk_digest_secondary: F::<G2>::ZERO,
       initial_nivc_input: vec![],
       inputs: mock_inputs.input,
-      witnesses: vec![],
     };
     let program_data = program_data.into_expanded().unwrap();
     dbg!(&program_data.inputs);

@@ -24,7 +24,6 @@ pub mod program;
 pub mod proof;
 pub mod setup;
 #[cfg(test)] pub(crate) mod tests;
-pub mod witness;
 
 pub type E1 = client_side_prover::provider::Bn256EngineKZG;
 pub type E2 = GrumpkinEngine;

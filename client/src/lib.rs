@@ -13,7 +13,7 @@ mod proof;
 mod tls;
 
 pub mod tls_client_async2;
-use proofs::{errors::ProofError, proof::FoldingProof};
+use proofs::{errors::ProofError, program::manifest::NIVCRom, proof::FoldingProof};
 use serde::{Deserialize, Serialize};
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
@@ -23,8 +23,8 @@ use crate::errors::ClientErrors;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct OrigoProof {
-  pub request:  FoldingProof<Vec<u8>, String>,
-  pub response: FoldingProof<Vec<u8>, String>,
+  pub proof: FoldingProof<Vec<u8>, String>,
+  pub rom:   NIVCRom,
 }
 
 #[derive(Debug, Serialize)]

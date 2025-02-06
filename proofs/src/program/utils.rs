@@ -116,6 +116,18 @@ pub fn get_selector_vec_from_index<CS: ConstraintSystem<F<G1>>>(
   Ok(selector)
 }
 
+pub fn into_circom_input(
+  public_input: &[F<G1>],
+  private_input: &HashMap<String, Value>,
+) -> CircomInput {
+  let decimal_stringified_input: Vec<String> = public_input
+    .iter()
+    .map(|x| BigInt::from_bytes_le(num_bigint::Sign::Plus, &x.to_bytes()).to_str_radix(10))
+    .collect();
+
+  CircomInput { step_in: decimal_stringified_input, extra: private_input.clone() }
+}
+
 pub fn into_input_json(
   public_input: &[F<G1>],
   private_input: &HashMap<String, Value>,

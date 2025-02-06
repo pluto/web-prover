@@ -27,8 +27,7 @@ pub enum NotaryMode {
 /// Proving data containing [`Manifest`] and serialized witnesses used for WASM
 #[derive(Deserialize, Clone, Debug)]
 pub struct ProvingData {
-  pub witnesses: Option<Vec<Vec<u8>>>,
-  pub manifest:  Option<Manifest>,
+  pub manifest: Option<Manifest>,
 }
 
 #[derive(Deserialize, Clone, Debug)]

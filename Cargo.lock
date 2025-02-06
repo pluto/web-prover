@@ -1450,7 +1450,6 @@ dependencies = [
  "parking_lot",
  "pin-project-lite",
  "proofs",
- "rayon",
  "reqwest",
  "ring",
  "rustls 0.23.19",
@@ -3913,6 +3912,7 @@ dependencies = [
  "tower-service",
  "tracing",
  "tracing-subscriber",
+ "web-proof-circuits-witness-generator",
  "ws_stream_tungstenite 0.13.0 (git+https://github.com/pluto/ws_stream_tungstenite.git?branch=latest)",
 ]
 
@@ -4602,7 +4602,6 @@ dependencies = [
 name = "proofs"
 version = "0.2.0"
 dependencies = [
- "ark-bn254",
  "bellpepper-core",
  "bincode",
  "byteorder",
@@ -4613,15 +4612,20 @@ dependencies = [
  "halo2curves",
  "hex",
  "itertools 0.13.0",
- "light-poseidon",
+ "js-sys",
  "num-bigint 0.4.6",
  "serde",
+ "serde-wasm-bindgen",
  "serde_json",
  "thiserror 1.0.69",
  "tls-client",
+ "tokio",
  "tracing",
  "tracing-subscriber",
  "tracing-test",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-proof-circuits-witness-generator",
 ]
 
 [[package]]
@@ -7166,6 +7170,24 @@ dependencies = [
  "js-sys",
  "wasm-bindgen",
  "web-sys",
+]
+
+[[package]]
+name = "web-proof-circuits-witness-generator"
+version = "0.1.0"
+source = "git+https://github.com/pluto/web-prover-circuits#26a200f6bd85f81e6669da6adff138dd8960b6d7"
+dependencies = [
+ "anyhow",
+ "ark-bn254",
+ "client-side-prover",
+ "ff",
+ "halo2curves",
+ "light-poseidon",
+ "num-bigint 0.4.6",
+ "serde",
+ "serde_json",
+ "sppark",
+ "thiserror 2.0.6",
 ]
 
 [[package]]

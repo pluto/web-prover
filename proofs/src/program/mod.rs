@@ -107,8 +107,12 @@ pub fn setup(setup_data: &UninitializedSetup) -> PublicParams<E1> {
 
   public_params
 }
-
-pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNARK<E1>, ProofError> {
+use crate::{
+  circom::witness::generate_witness_from_browser_type, program::utils::into_circom_input,
+};
+pub async fn run(
+  program_data: &ProgramData<Online, Expanded>,
+) -> Result<RecursiveSNARK<E1>, ProofError> {
   info!("Starting SuperNova program...");
 
   // Resize the rom to be the `max_rom_length` committed to in the `S::SetupData`
@@ -141,7 +145,21 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
     memory.circuits[op_code as usize].circuit.witness =
       if wit_type == WitnessGeneratorType::Browser {
         // When running in browser, the witness is passed as input.
-        Some(program_data.witnesses[idx].clone())
+        // Some(program_data.witnesses[idx].clone())
+        let arity = memory.circuits[op_code as usize].circuit.arity();
+        let nivc_io =
+          &memory.circuits[op_code as usize].nivc_io.as_ref().ok_or_else(|| {
+            ProofError::Other(format!("nivc_io not found for op_code {}", op_code))
+          })?[..arity];
+
+        let private_input =
+          memory.circuits[op_code as usize].private_input.as_ref().ok_or_else(|| {
+            ProofError::Other(format!("private_input not found for op_code {}", op_code))
+          })?;
+
+        let circom_input = into_circom_input(nivc_io, private_input);
+        let witness = generate_witness_from_browser_type(circom_input, op_code).await?;
+        Some(witness)
       } else {
         let arity = memory.circuits[op_code as usize].circuit.arity();
         let nivc_io =

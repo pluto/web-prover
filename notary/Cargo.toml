@@ -54,8 +54,10 @@ tls-client2={ workspace=true }
 caratls_ekm_server                          ={ workspace=true }
 caratls_ekm_google_confidential_space_server={ workspace=true }
 
+web-proof-circuits-witness-generator={ git="https://github.com/pluto/web-prover-circuits" }
+
 [dev-dependencies]
 tower="0.4.13"
 
 [build-dependencies]
-cargo_metadata = "0.19.1"
+cargo_metadata="0.19.1"
