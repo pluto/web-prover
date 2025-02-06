@@ -104,6 +104,15 @@ rust-analyzer might not pick up on the llvm path, you can manually let it know v
 }
 ```
 
+#### `Error: LLVM version must be 18 or higher. Found xxxxxx.`
+
+- Follow instruction at https://apt.llvm.org/
+
+#### `[wasm-validator error in function xxxx] unexpected false: all used features should be allowed, on yyyy`
+
+- Your existing `wasm-opt` installation may conflict with the one in `wasm-pack`. Check for local installation: `$ which wasm-opt && wasm-opt --version`
+- Consider updating `wasm-pack`:  `$ cargo install --force wasm-pack`
+
 ## Release
 
 1. Update the `version` field in the appropriate `Cargo.toml` file.
