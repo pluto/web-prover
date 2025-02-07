@@ -31,6 +31,7 @@ mod witnesscalc;
 
 const MAX_ROM_LENGTH: usize = 100;
 const MAX_STACK_HEIGHT: usize = 10;
+const CIRCUIT_SIZE: usize = 1024;
 const MAX_HTTP_HEADERS: usize = 25;
 
 // const SERIALIZED_SETUP: &[u8] = include_bytes!(
@@ -71,6 +72,41 @@ const JSON_EXTRACTION_GRAPH: &[u8] = include_bytes!(concat!(
   "../../web_proof_circuits/circom-artifacts-1024b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/json_extraction_1024b.bin"
+));
+
+const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-512b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/plaintext_authentication_512b.r1cs"
+));
+const PLAINTEXT_AUTHENTICATION_512B_GRAPH: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-512b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/plaintext_authentication_512b.bin"
+));
+
+// Circuit 1
+const HTTP_VERIFICATION_512B_R1CS: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-512b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/http_verification_512b.r1cs"
+));
+const HTTP_VERIFICATION_512B_GRAPH: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-512b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/http_verification_512b.bin"
+));
+
+// Circuit 2
+const JSON_EXTRACTION_512B_R1CS: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-512b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/json_extraction_512b.r1cs"
+));
+const JSON_EXTRACTION_512B_GRAPH: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-512b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/json_extraction_512b.bin"
 ));
 
 // HTTP/1.1 200 OK
@@ -130,23 +166,52 @@ pub const CHACHA20_KEY: (&str, [u8; 32]) = ("key", [0; 32]);
 pub const CHACHA20_NONCE: (&str, [u8; 12]) = ("nonce", [0, 0, 0, 0, 0, 0, 0, 0x4a, 0, 0, 0, 0]);
 
 #[allow(dead_code)]
-fn wasm_witness_generator_type() -> [WitnessGeneratorType; 3] {
+fn wasm_witness_generator_type_512b() -> [WitnessGeneratorType; 3] {
   [
     WitnessGeneratorType::Wasm {
-      path:      String::from(
-        "web_proof_circuits/circom-artifacts-1024b-v0.9.1/plaintext_authentication_1024b.wasm",
+      path:      format!(
+        "web_proof_circuits/circom-artifacts-512b-v{}/plaintext_authentication_512b.wasm",
+        env!("WEB_PROVER_CIRCUITS_VERSION")
       ),
       wtns_path: String::from("pa.wtns"),
     },
     WitnessGeneratorType::Wasm {
-      path:      String::from(
-        "web_proof_circuits/circom-artifacts-1024b-v0.9.1/http_verification_1024b.wasm",
+      path:      format!(
+        "web_proof_circuits/circom-artifacts-512b-v{}/http_verification_512b.wasm",
+        env!("WEB_PROVER_CIRCUITS_VERSION")
       ),
       wtns_path: String::from("hv.wtns"),
     },
     WitnessGeneratorType::Wasm {
-      path:      String::from(
-        "web_proof_circuits/circom-artifacts-1024b-v0.9.1/json_extraction_1024b.wasm",
+      path:      format!(
+        "web_proof_circuits/circom-artifacts-512b-v{}/json_extraction_512b.wasm",
+        env!("WEB_PROVER_CIRCUITS_VERSION")
+      ),
+      wtns_path: String::from("je.wtns"),
+    },
+  ]
+}
+#[allow(dead_code)]
+fn wasm_witness_generator_type() -> [WitnessGeneratorType; 3] {
+  [
+    WitnessGeneratorType::Wasm {
+      path:      format!(
+        "web_proof_circuits/circom-artifacts-1024b-v{}/plaintext_authentication_1024b.wasm",
+        env!("WEB_PROVER_CIRCUITS_VERSION")
+      ),
+      wtns_path: String::from("pa.wtns"),
+    },
+    WitnessGeneratorType::Wasm {
+      path:      format!(
+        "web_proof_circuits/circom-artifacts-1024b-v{}/http_verification_1024b.wasm",
+        env!("WEB_PROVER_CIRCUITS_VERSION")
+      ),
+      wtns_path: String::from("hv.wtns"),
+    },
+    WitnessGeneratorType::Wasm {
+      path:      format!(
+        "web_proof_circuits/circom-artifacts-1024b-v{}/json_extraction_1024b.wasm",
+        env!("WEB_PROVER_CIRCUITS_VERSION")
       ),
       wtns_path: String::from("je.wtns"),
     },
@@ -255,7 +320,7 @@ async fn test_end_to_end_proofs_simple() {
 
   let manifest = mock_manifest();
   let InitialNIVCInputs { ciphertext_digest, initial_nivc_input, headers_digest } = manifest
-    .initial_inputs::<MAX_STACK_HEIGHT>(&[request_inputs.ciphertext[0].to_vec()], &[
+    .initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE>(&[request_inputs.ciphertext[0].to_vec()], &[
       CHACHA20_CIPHERTEXT.1.to_vec(),
     ])
     .unwrap();
@@ -273,7 +338,7 @@ async fn test_end_to_end_proofs_simple() {
   let mut rom = vec![String::from("PLAINTEXT_AUTHENTICATION_0")];
   let request_nonce = make_nonce(request_inputs.iv, request_inputs.seq);
   private_inputs.push(HashMap::from([
-    (String::from(CHACHA20_KEY.0), json!(to_chacha_input(&request_inputs.key.as_ref()))),
+    (String::from(CHACHA20_KEY.0), json!(to_chacha_input(request_inputs.key.as_ref()))),
     (String::from(CHACHA20_NONCE.0), json!(to_chacha_input(&request_nonce))),
     (String::from("counter"), json!(to_chacha_input(&[1]))),
     (String::from(HTTP_RESPONSE_PLAINTEXT.0), json!(&padded_request_plaintext)),
@@ -462,17 +527,20 @@ async fn test_end_to_end_proofs_complex() {
   let request_inputs = complex_request_inputs();
   let response_inputs = complex_response_inputs();
 
+  const CIRCUIT_SIZE: usize = 512;
+
   let setup_data = UninitializedSetup {
     r1cs_types:              vec![
-      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_VERIFICATION_R1CS.to_vec()),
-      R1CSType::Raw(JSON_EXTRACTION_R1CS.to_vec()),
+      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
+      R1CSType::Raw(JSON_EXTRACTION_512B_R1CS.to_vec()),
     ],
-    witness_generator_types: vec![
-      WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
-    ],
+    witness_generator_types: wasm_witness_generator_type_512b().to_vec(),
+    // vec![
+    //   WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
+    //   WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
+    //   WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
+    // ],
     max_rom_length:          MAX_ROM_LENGTH,
   };
   debug!("Setting up `Memory`...");
@@ -486,16 +554,20 @@ async fn test_end_to_end_proofs_complex() {
   });
 
   let InitialNIVCInputs { ciphertext_digest, .. } = manifest
-    .initial_inputs::<MAX_STACK_HEIGHT>(&request_inputs.ciphertext, &response_inputs.ciphertext)
+    .initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE>(
+      &request_inputs.ciphertext,
+      &response_inputs.ciphertext,
+    )
     .unwrap();
 
-  let NIVCRom { circuit_data, rom } = manifest.build_rom(&request_inputs, &response_inputs);
-  let NivcCircuitInputs { mut initial_nivc_input, fold_inputs: _, private_inputs } =
-    manifest.build_inputs(&request_inputs, &response_inputs).unwrap();
+  let NIVCRom { circuit_data, rom } =
+    manifest.build_rom::<CIRCUIT_SIZE>(&request_inputs, &response_inputs);
+  let NivcCircuitInputs { mut initial_nivc_input, fold_inputs, private_inputs } =
+    manifest.build_inputs::<CIRCUIT_SIZE>(&request_inputs, &response_inputs).unwrap();
 
   let request_body = compute_http_witness(&request_combined, HttpMaskType::Body);
   let request_body_digest = polynomial_digest(&request_body, ciphertext_digest, 0);
-  initial_nivc_input[0] = initial_nivc_input[0] - request_body_digest; // TODO: this is actually incorrect because we don't have json verification for request
+  initial_nivc_input[0] -= request_body_digest; // TODO: this is actually incorrect because we don't have json verification for request
 
   debug!("rom: {:?}", rom);
   debug!("inputs: {:?}", private_inputs.len());

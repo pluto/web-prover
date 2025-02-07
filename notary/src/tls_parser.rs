@@ -27,13 +27,12 @@ use tls_parser::{
 use tracing::{debug, error, info, trace};
 use web_proof_circuits_witness_generator::{data_hasher, ByteOrPad};
 
-use crate::errors::ProxyError;
+use crate::{
+  circuits::{CIRCUIT_SIZE_MAX, CIRCUIT_SIZE_SMALL},
+  errors::ProxyError,
+};
 
 const TRIMMED_BYTES: usize = 17;
-// TODO: Relocate and consolidate with circuits.rs
-pub const CIRCUIT_SIZE_SMALL: usize = 512;
-pub const CIRCUIT_SIZE_MAX: usize = 1024;
-pub const MAX_STACK_HEIGHT: usize = 10;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Direction {

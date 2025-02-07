@@ -22,9 +22,9 @@ use ws_stream_tungstenite::WsStream;
 
 use crate::{
   axum_websocket::WebSocket,
-  circuits::initialize_verifier,
+  circuits::{initialize_verifier, CIRCUIT_SIZE_MAX, MAX_STACK_HEIGHT},
   errors::{NotaryServerError, ProxyError},
-  tls_parser::{Direction, Transcript, UnparsedMessage, MAX_STACK_HEIGHT},
+  tls_parser::{Direction, Transcript, UnparsedMessage},
   tlsn::ProtocolUpgrade,
   SharedState,
 };
@@ -225,7 +225,7 @@ pub async fn verify(
     initialize_verifier(payload.origo_proof.rom.circuit_data, payload.origo_proof.rom.rom);
 
   let InitialNIVCInputs { initial_nivc_input, .. } =
-    state.manifest.initial_inputs::<MAX_STACK_HEIGHT>(
+    state.manifest.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE_MAX>(
       &verifier_inputs.request_messages,
       &verifier_inputs.response_messages,
     )?;

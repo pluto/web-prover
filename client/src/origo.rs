@@ -145,7 +145,7 @@ pub(crate) async fn generate_proof(
   request_inputs: EncryptionInput,
   response_inputs: EncryptionInput,
 ) -> Result<OrigoProof, ClientErrors> {
-  let setup_data = construct_setup_data();
+  let setup_data = construct_setup_data::<{ crate::circuits::CIRCUIT_SIZE_512 }>();
   let program_data = SetupParams::<Offline> {
     public_params: proving_params,
     vk_digest_primary: F::<G1>::from(0), // These need to be right.
@@ -157,7 +157,7 @@ pub(crate) async fn generate_proof(
 
   let vk_digest_primary = program_data.vk_digest_primary;
   let vk_digest_secondary = program_data.vk_digest_secondary;
-  crate::proof::construct_program_data_and_proof(
+  crate::proof::construct_program_data_and_proof::<{ crate::circuits::CIRCUIT_SIZE_512 }>(
     manifest,
     request_inputs,
     response_inputs,

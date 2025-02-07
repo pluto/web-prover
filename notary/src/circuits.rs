@@ -17,6 +17,9 @@ use tracing::debug;
 
 pub const MAX_ROM_LENGTH: usize = 100;
 pub const PUBLIC_IO_VARS: usize = 11;
+pub const CIRCUIT_SIZE_SMALL: usize = 512;
+pub const CIRCUIT_SIZE_MAX: usize = 1024;
+pub const MAX_STACK_HEIGHT: usize = 10;
 
 pub const PROVING_PARAMS_1024: &str = concat!(
   "proofs/web_proof_circuits/circom-artifacts-1024b-v",
@@ -45,6 +48,11 @@ const JSON_EXTRACTION_R1CS: &[u8] = include_bytes!(concat!(
 ));
 
 // -------------------------------------- 512B circuits -------------------------------------- //
+pub const PROVING_PARAMS_512: &str = concat!(
+  "proofs/web_proof_circuits/circom-artifacts-512b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/serialized_setup_512b_rom_length_100.bin"
+);
 // Circuit 0
 const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] = include_bytes!(concat!(
   "../../proofs/web_proof_circuits/circom-artifacts-512b-v",
@@ -113,8 +121,8 @@ pub struct Verifier {
 pub fn initialize_verifier(rom_data: HashMap<String, CircuitData>, rom: Vec<String>) -> Verifier {
   // let params_1024 = (PROVING_PARAMS_1024, 1024, rom_data, rom.clone());
 
-  let bytes = std::fs::read(PROVING_PARAMS_1024).unwrap();
-  let setup_data = construct_setup_data(1024);
+  let bytes = std::fs::read(PROVING_PARAMS_512).unwrap();
+  let setup_data = construct_setup_data(512);
   let setup_params = SetupParams::<Offline> {
     public_params: bytes,
     // TODO: These are incorrect, but we don't know them until the internal parser completes.
