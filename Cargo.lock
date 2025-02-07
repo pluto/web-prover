@@ -7238,7 +7238,7 @@ dependencies = [
 [[package]]
 name = "web-proof-circuits-witness-generator"
 version = "0.1.0"
-source = "git+https://github.com/pluto/web-prover-circuits?branch=feat%2F512b#b1639b66b14f8bc60d5a5abc2b3da28abf3fde0b"
+source = "git+https://github.com/pluto/web-prover-circuits?branch=feat%2F512b#f685e6a2b521a2f79fca85cbca9a1bf0daa103ef"
 dependencies = [
  "anyhow",
  "ark-bn254",
