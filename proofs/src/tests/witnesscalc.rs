@@ -81,8 +81,7 @@ async fn run_entry(
     private_inputs: (private_inputs, HashMap::new()),
   }
   .into_expanded(&proof_params)?;
-  let recursive_snark =
-    program::run(&setup_params, &proof_params, &instance_params, &vec![]).await?;
+  let recursive_snark = program::run(&setup_params, &proof_params, &instance_params).await?;
   Ok((setup_params, recursive_snark))
 }
 

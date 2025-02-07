@@ -4,7 +4,9 @@ use std::{
   sync::Arc,
 };
 
-use client_side_prover::{fast_serde::FastSerde, supernova::get_circuit_shapes};
+use client_side_prover::{
+  fast_serde::FastSerde, supernova::get_circuit_shapes, traits::CurveCycleEquipped,
+};
 use serde_json::json;
 
 use super::*;
@@ -75,16 +77,6 @@ pub struct UninitializedSetup {
   pub max_rom_length:          usize,
 }
 
-// TODO: What is the on disk format of these? Should I regenerate files in
-// ./proofs/web_proof_circuits with a new format? impl TryFrom<&PathBuf> for UninitializedSetup {
-//   type Error = ProofError;
-//
-//   fn try_from(file_path: &PathBuf) -> Result<Self, Self::Error> {
-//     let reader = BufReader::new(OpenOptions::new().read(true).open(file_path)?);
-//     bincode::deserialize_from(reader).map_err(Into::into)
-//   }
-// }
-
 /// Initialized Circuit Setup data, in this configuration the R1CS objects have been
 /// fully loaded for proving.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -135,15 +127,13 @@ impl WitnessStatus for NotExpanded {
   type PrivateInputs = (Vec<HashMap<String, Value>>, HashMap<String, FoldInput>);
 }
 
-/// Auxillary circuit data required to execute the ROM
+/// Auxiliary circuit data required to execute the ROM
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct CircuitData {
   /// circuit instruction opcode in [`S::SetupData`]
   pub opcode: u64,
 }
 
-// TODO: Helpers for the purpose of refactoring, remove later?
-pub type Witnesses = Vec<Vec<F<G1>>>;
 pub type RomData = HashMap<String, CircuitData>;
 pub type Rom = Vec<String>;
 pub type NivcInput = Vec<F<G1>>;
@@ -177,8 +167,6 @@ pub struct InstanceParams<W: WitnessStatus> {
   pub nivc_input:     NivcInput,
   /// Private inputs for each fold
   pub private_inputs: W::PrivateInputs,
-  // /// Public inputs for each fold
-  //  TODO: Currently missing, but requested in the PR: public_inputs
 }
 
 impl InstanceParams<NotExpanded> {
@@ -432,10 +420,9 @@ impl SetupParams<Online> {
     &self,
     proof_params: &ProofParams,
     instance_params: &InstanceParams<Expanded>,
-    witnesses: &Witnesses,
   ) -> Result<FoldingProof<Vec<u8>, String>, ProofError> {
     debug!("starting recursive proving");
-    let program_output = program::run(self, proof_params, instance_params, witnesses).await?;
+    let program_output = program::run(self, proof_params, instance_params).await?;
 
     debug!("starting proof compression");
     let compressed_snark_proof = program::compress_proof_no_setup(
@@ -588,26 +575,17 @@ mod tests {
     assert!(!instance_params.private_inputs[2].is_empty());
   }
 
-  // TODO: Fails because of error: the foreign item type
-  // `client_side_prover::supernova::PublicParams<Bn256EngineKZG>` doesn't implement `PartialEq`
-  // #[ignore]
-  // #[test]
-  // fn test_online_to_offline_serialization_round_trip() {
-  //   let (setup_params_online, ..) = create_test_program_data();
-  //   let offline_path = PathBuf::from("mock/offline/path");
-  //   let setup_params_offline =
-  //     setup_params_online.clone().into_offline(offline_path.clone()).unwrap();
-  //
-  //   // Verify round-trip serialization for `Online`
-  //   let serialized_online = serde_json::to_string(&setup_params_online).unwrap();
-  //   let deserialized_online: SetupParams<Online> =
-  //     serde_json::from_str(&serialized_online).unwrap();
-  //   assert_eq!(setup_params_online, deserialized_online);
-  //
-  //   // Verify round-trip serialization for `Offline`
-  //   let serialized_offline = serde_json::to_string(&setup_params_offline).unwrap();
-  //   let deserialized_offline: SetupParams<Offline> =
-  //     serde_json::from_str(&serialized_offline).unwrap();
-  //   assert_eq!(setup_params_offline, deserialized_offline);
-  // }
+  #[test]
+  fn test_online_to_offline_serialization_round_trip() {
+    let (setup_params_online, ..) = create_test_program_data();
+    let offline_path = PathBuf::from("/tmp/mock/offline/path");
+    let setup_params_offline =
+      setup_params_online.clone().into_offline(offline_path.clone()).unwrap();
+
+    // Verify round-trip serialization for `Offline`
+    let serialized_offline = serde_json::to_string(&setup_params_offline).unwrap();
+    let deserialized_offline: SetupParams<Offline> =
+      serde_json::from_str(&serialized_offline).unwrap();
+    assert_eq!(setup_params_offline, deserialized_offline);
+  }
 }

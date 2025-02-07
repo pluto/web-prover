@@ -21,8 +21,8 @@ use crate::{
   errors::ClientErrors,
 };
 
-/// we want to be able to specify somewhere in here what cipher suite to use.
-/// Perhapse the config object should have this information.
+/// We want to be able to specify somewhere in here what cipher suite to use.
+/// Perhaps the config object should have this information.
 pub(crate) async fn proxy(
   config: config::Config,
   session_id: String,

@@ -423,7 +423,7 @@ async fn test_end_to_end_proofs_simple() {
   let initialized_setup = initialize_setup_data(&setup_data).unwrap();
   let proof_params = ProofParams { rom: rom.clone() };
   let instance_params = InstanceParams::<NotExpanded> {
-    nivc_input:     vec![init_nivc_input],
+    nivc_input:     initial_nivc_input.to_vec(),
     private_inputs: (private_inputs, HashMap::new()),
   }
   .into_expanded(&proof_params)
@@ -436,8 +436,7 @@ async fn test_end_to_end_proofs_simple() {
     rom_data: rom_data.clone(),
   };
 
-  let recursive_snark =
-    program::run(&setup_params, &proof_params, &instance_params, &vec![]).await.unwrap();
+  let recursive_snark = program::run(&setup_params, &proof_params, &instance_params).await.unwrap();
 
   let proof = program::compress_proof_no_setup(
     &recursive_snark,
@@ -520,14 +519,13 @@ async fn test_end_to_end_proofs_complex() {
   .into_expanded(&proof_params)
   .unwrap();
 
-  let recursive_snark =
-    program::run(&setup_params, &proof_params, &instance_params, &vec![]).await.unwrap();
+  let recursive_snark = program::run(&setup_params, &proof_params, &instance_params).await.unwrap();
 
   let proof = program::compress_proof_no_setup(
     &recursive_snark,
     &setup_params.public_params,
-    program_data.vk_digest_primary,
-    program_data.vk_digest_secondary,
+    setup_params.vk_digest_primary,
+    setup_params.vk_digest_secondary,
   )
   .unwrap();
 
@@ -537,7 +535,7 @@ async fn test_end_to_end_proofs_complex() {
   assert_eq!(*recursive_snark.zi_primary().first().unwrap(), value_digest);
 
   let (z0_primary, _) =
-    setup_params.extend_public_inputs(&proof_params.rom, &vec![init_nivc_input]).unwrap();
+    setup_params.extend_public_inputs(&proof_params.rom, &initial_nivc_input.to_vec()).unwrap();
 
   let z0_secondary = vec![F::<G2>::ZERO];
 

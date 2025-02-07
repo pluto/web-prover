@@ -12,7 +12,7 @@ use proof::FoldingProof;
 use utils::into_input_json;
 
 use super::*;
-use crate::program::data::{ProofParams, SetupParams, Witnesses};
+use crate::program::data::{ProofParams, SetupParams};
 
 pub mod data;
 pub mod manifest;
@@ -115,7 +115,6 @@ pub async fn run(
   setup_params: &SetupParams<Online>,
   proof_params: &ProofParams,
   instance_params: &InstanceParams<Expanded>,
-  _witnesses: &Witnesses,
 ) -> Result<RecursiveSNARK<E1>, ProofError> {
   info!("Starting SuperNova program...");
 
@@ -203,7 +202,7 @@ pub async fn run(
     #[cfg(feature = "verify-steps")]
     {
       info!("Verifying single step...");
-      recursive_snark.verify(public_params, &z0_primary, &z0_secondary)?;
+      recursive_snark.verify(&public_params, &z0_primary, &z0_secondary)?;
       info!("Single step verification done");
     }
 
@@ -294,11 +293,7 @@ pub fn initialize_setup_data(
     .into_iter()
     .unzip();
 
-  return Ok(InitializedSetup {
-    r1cs,
-    witness_generator_types,
-    max_rom_length: setup_data.max_rom_length,
-  });
+  Ok(InitializedSetup { r1cs, witness_generator_types, max_rom_length: setup_data.max_rom_length })
 }
 
 pub fn initialize_circuit_list(setup_data: &InitializedSetup) -> Vec<RomCircuit> {

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use proofs::{
   program::{
-    data::{NotExpanded, Offline, SetupParams, Witnesses},
+    data::{NotExpanded, Offline, SetupParams},
     manifest::{EncryptionInput, Manifest, TLSEncryption},
   },
   F, G1, G2,
@@ -134,8 +134,7 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
   let manifest = config.proving.manifest.unwrap();
 
   let proof =
-    generate_proof(manifest, proving_params.unwrap(), request_inputs, response_inputs, &vec![])
-      .await?;
+    generate_proof(manifest, proving_params.unwrap(), request_inputs, response_inputs).await?;
 
   Ok(proof)
 }
@@ -145,7 +144,6 @@ pub(crate) async fn generate_proof(
   proving_params: Vec<u8>,
   request_inputs: EncryptionInput,
   response_inputs: EncryptionInput,
-  witnesses: &Witnesses,
 ) -> Result<OrigoProof, ClientErrors> {
   let setup_data = construct_setup_data();
   let program_data = SetupParams::<Offline> {
@@ -166,7 +164,6 @@ pub(crate) async fn generate_proof(
     (vk_digest_primary, vk_digest_secondary),
     program_data.public_params,
     program_data.setup_data,
-    witnesses,
   )
   .await
 
