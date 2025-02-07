@@ -117,6 +117,7 @@ async fn main() -> Result<(), NotaryServerError> {
     .route("/v1/tlsnotary", get(tlsn::notarize))
     .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
     .route("/v1/origo", get(origo::proxy))
+    // TODO (autoparallel): This handler now needs to get the `extract::Json<SignBody>` passed into it (just like `origo::sign`)
     .route("/v1/tee", get(tee::proxy))
     .route("/v1/origo/sign", post(origo::sign))
     .route("/v1/origo/verify", post(origo::verify))
