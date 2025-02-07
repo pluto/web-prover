@@ -12,7 +12,7 @@ use caratls_ekm_server::TeeTlsAcceptor;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use serde::Deserialize;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{debug, error, info};
 use ws_stream_tungstenite::WsStream;
@@ -104,15 +104,54 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
 
   // TODO wait for TLS secrets
   // TODO wait for manifest
-  let mut buf: [u8; 7] = [0u8; 7];
-  tee_tls_stream.read_exact(&mut buf).await.unwrap();
+  let mut buf: [u8; 10] = [0u8; 10];
+  tee_tls_stream.read(&mut buf).await.unwrap();
+  dbg!(buf);
 
+  // tee_tls_stream.write_all(b"foo").await.unwrap();
 
   // TODO decrypt session
-  let transcript = state.origo_sessions.lock().unwrap().get(session_id).cloned().unwrap();
+  // let transcript = state.origo_sessions.lock().unwrap().get(session_id).cloned().unwrap();
 
   // TODO apply manifest
   // TODO return web proof
 
-  todo!("")
+  todo!("end of tee_proxy_service function, we are good!")
 }
+
+// mod foo {
+//   use std::sync::Arc;
+
+//   use rustls::ServerConfig;
+//   use tokio::io::{AsyncReadExt, AsyncWriteExt};
+//   use tokio_rustls::TlsAcceptor;
+
+// use crate::{load_certs, load_private_key};
+
+//   pub async fn accept_tls_connection<S>(stream: S)
+//   where S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Unpin {
+
+//     let certs = load_certs("./fixture/certs/server-cert.pem").unwrap();
+//     let privkey = load_private_key("./fixture/certs/server-key.pem").unwrap();
+
+//     let config: Arc<ServerConfig> =
+// Arc::new(ServerConfig::builder().with_no_client_auth().with_single_cert(certs,
+// privkey).unwrap());     let acceptor = TlsAcceptor::from(config);
+
+//     match acceptor.accept(stream).await {
+//       Ok(mut tls_stream) => {
+//         println!("TLS connection established");
+
+//         let mut buf = [0u8; 1024];
+//         match tls_stream.read(&mut buf).await {
+//           Ok(n) if n > 0 => {
+//             println!("Received: {:?}", &buf[..n]);
+//             // let _ = tls_stream.write_all(b"HTTP/1.1 200 OK\r\n\r\nHello TLS!").await;
+//           },
+//           _ => println!("No data received"),
+//         }
+//       },
+//       Err(e) => eprintln!("TLS handshake failed: {:?}", e),
+//     }
+//   }
+// }
