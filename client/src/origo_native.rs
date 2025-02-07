@@ -136,7 +136,6 @@ pub(crate) async fn proxy(
 
   if config.mode == NotaryMode::TEE {
     let _manifest = config.proving.manifest.unwrap();
-
     // TODO: write manifest
     // TODO: write TLS secrets (from origo_conn)
     // TODO: read web proof (a bit awkward but proxy will have to return the it)
