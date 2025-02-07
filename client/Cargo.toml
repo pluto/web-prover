@@ -31,8 +31,7 @@ client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="8e7
 tlsn-prover={ workspace=true }
 tlsn-core  ={ workspace=true }
 
-caratls_ekm_client                          ={ workspace=true }
-caratls_ekm_google_confidential_space_client={ workspace=true }
+caratls={ workspace=true }
 
 bytes ="1"
 proofs={ workspace=true }

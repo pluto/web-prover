@@ -21,7 +21,7 @@ pub enum ClientErrors {
   Io(#[from] std::io::Error),
 
   #[error(transparent)]
-  TeeTlsConnectorError(#[from] caratls_ekm_client::TeeTlsConnectorError),
+  TeeTlsConnectorError(#[from] caratls::errors::TeeTlsError),
 
   #[error("TLS error: {0}")]
   TlsCrypto(String),

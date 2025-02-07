@@ -1144,81 +1144,25 @@ dependencies = [
 ]
 
 [[package]]
-name = "caratls_ekm_client"
+name = "caratls"
 version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=2f4631af7400eafec7a533b72d1d460fa5a66db3#2f4631af7400eafec7a533b72d1d460fa5a66db3"
+source = "git+https://github.com/pluto/caratls.git?branch=docs%2Fcleanup#63aa296c28d5b465a3cb1428a1688dfc6d68b829"
 dependencies = [
- "caratls_ekm_types",
- "rustls 0.23.19",
- "rustls-pki-types",
- "serde",
- "serde_cbor",
- "thiserror 2.0.6",
- "tokio",
- "tokio-rustls",
-]
-
-[[package]]
-name = "caratls_ekm_google_confidential_space_client"
-version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=2f4631af7400eafec7a533b72d1d460fa5a66db3#2f4631af7400eafec7a533b72d1d460fa5a66db3"
-dependencies = [
- "caratls_ekm_client",
- "caratls_ekm_google_confidential_space_types",
- "hex",
- "jsonwebtoken",
- "reqwest",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "caratls_ekm_google_confidential_space_server"
-version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=2f4631af7400eafec7a533b72d1d460fa5a66db3#2f4631af7400eafec7a533b72d1d460fa5a66db3"
-dependencies = [
- "caratls_ekm_google_confidential_space_types",
- "caratls_ekm_server",
  "hex",
  "http-body-util",
  "hyper",
  "hyper-util",
  "jsonwebtoken",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "caratls_ekm_google_confidential_space_types"
-version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=2f4631af7400eafec7a533b72d1d460fa5a66db3#2f4631af7400eafec7a533b72d1d460fa5a66db3"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "caratls_ekm_server"
-version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=2f4631af7400eafec7a533b72d1d460fa5a66db3#2f4631af7400eafec7a533b72d1d460fa5a66db3"
-dependencies = [
- "caratls_ekm_types",
  "rcgen",
+ "reqwest",
  "rustls 0.23.19",
  "rustls-pki-types",
+ "serde",
  "serde_cbor",
+ "serde_json",
  "thiserror 2.0.6",
  "tokio",
  "tokio-rustls",
-]
-
-[[package]]
-name = "caratls_ekm_types"
-version = "0.1.0"
-source = "git+https://github.com/pluto/caratls.git?rev=2f4631af7400eafec7a533b72d1d460fa5a66db3#2f4631af7400eafec7a533b72d1d460fa5a66db3"
-dependencies = [
- "serde",
 ]
 
 [[package]]
@@ -1431,8 +1375,7 @@ dependencies = [
  "async-tungstenite 0.25.1",
  "base64 0.22.1",
  "bytes",
- "caratls_ekm_client",
- "caratls_ekm_google_confidential_space_client",
+ "caratls",
  "cargo_metadata",
  "chrono",
  "clap",
@@ -3873,8 +3816,7 @@ dependencies = [
  "axum",
  "axum-core",
  "base64 0.21.7",
- "caratls_ekm_google_confidential_space_server",
- "caratls_ekm_server",
+ "caratls",
  "cargo_metadata",
  "clap",
  "client",

@@ -1,7 +1,7 @@
 use std::{ops::Deref, sync::Arc};
 
-use caratls_ekm_client::TeeTlsConnector;
-use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
+use caratls::client::TeeTlsConnector;
+use caratls::providers::client::GoogleConfidentialSpaceTokenVerifier;
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
