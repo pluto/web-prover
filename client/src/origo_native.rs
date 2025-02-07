@@ -5,20 +5,15 @@ use caratls_ekm_client::DummyTokenVerifier;
 use caratls_ekm_client::TeeTlsConnector;
 #[cfg(feature = "tee-google-confidential-space-token-verifier")]
 use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
-use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
-use hyper_util::rt::TokioIo;
 use proofs::{
   program::{
-    self,
-    data::{NotExpanded, Offline, ProgramData},
-    manifest::{EncryptionInput, Manifest},
+    data::{NotExpanded, Offline, ProgramData}, manifest::{EncryptionInput, Manifest},
   },
   F, G1, G2,
 };
 use tls_client2::origo::OrigoConnection;
-// use tokio::io::AsyncWriteExt;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
