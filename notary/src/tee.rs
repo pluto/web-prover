@@ -110,6 +110,7 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
 
   // TODO wait for manifest
   let manifest = recover_manifest(&mut tee_tls_stream).await;
+  dbg!(manifest);
 
   // Keep reading into buf until you get the ending byte
   loop {
@@ -134,14 +135,14 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
 async fn recover_manifest<R: AsyncReadExt + Unpin>(stream: &mut R) -> Manifest {
   // Buffer to store the "header" (4 bytes, indicating the length of the Manifest)
   let mut len_buf = [0u8; 4];
-  stream.read_exact(&mut len_buf).await?;
+  stream.read_exact(&mut len_buf).await.unwrap();
 
   // Deserialize the length prefix (convert from little-endian to usize)
   let manifest_length = u32::from_le_bytes(len_buf) as usize;
 
   // Allocate a buffer to hold only the bytes needed for the Manifest
   let mut manifest_buf = vec![0u8; manifest_length];
-  stream.read_exact(&mut manifest_buf).await?;
+  stream.read_exact(&mut manifest_buf).await.unwrap();
 
   Manifest::from_wire_bytes(&manifest_buf)
 }
