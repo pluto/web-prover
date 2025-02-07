@@ -226,9 +226,16 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
     #[cfg(feature = "tracing")]
     debug!("client shutdown");
 
-    _ = server_tx.close().await;
+    // _ = server_tx.close().await; // MATT: socket is closed
+
     tx_receiver.close();
     rx_sender.close_channel();
+
+    println!("-----------------------------------------------");
+    server_tx.write_all(b"what").await.unwrap();
+
+    // socket.write_all(b"what").await.unwrap();
+    println!("-----------------------------------------------");
 
     #[cfg(feature = "tracing")]
     trace!(
