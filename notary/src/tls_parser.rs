@@ -123,6 +123,8 @@ impl Transcript<Raw> {
   }
 }
 
+// TODO (autoparallel): If `Flattened` exists purely as an itermediate state between `Raw` and
+// `Parsed`, could we just bypass it?
 impl Transcript<Flattened> {
   /// Transform raw data into more structured TLS data by
   /// processing with handhsake keys.
