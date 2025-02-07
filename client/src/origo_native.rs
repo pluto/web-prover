@@ -5,14 +5,17 @@ use caratls_ekm_client::DummyTokenVerifier;
 use caratls_ekm_client::TeeTlsConnector;
 #[cfg(feature = "tee-google-confidential-space-token-verifier")]
 use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
+use futures::AsyncWriteExt;
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use proofs::{
   program::{
-    data::{NotExpanded, Offline, ProgramData}, manifest::{EncryptionInput, Manifest},
+    data::{NotExpanded, Offline, ProgramData},
+    manifest::{EncryptionInput, Manifest},
   },
   F, G1, G2,
 };
+use serde::Serialize;
 use tls_client2::origo::OrigoConnection;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
@@ -101,7 +104,7 @@ pub(crate) async fn proxy(
   let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
 
   // Either bind client to TEE TLS connection or plain TLS connection
-  let (client_tls_conn, client_tls_fut) = if config.mode == NotaryMode::TEE {
+  let notary_tls_stream = if config.mode == NotaryMode::TEE {
     #[cfg(feature = "tee-google-confidential-space-token-verifier")]
     let token_verifier = GoogleConfidentialSpaceTokenVerifier::new("audience").await; // TODO pass in as function input
 
@@ -109,11 +112,33 @@ pub(crate) async fn proxy(
     let token_verifier = DummyTokenVerifier { expect_token: "dummy".to_string() };
 
     let tee_tls_connector = TeeTlsConnector::new(token_verifier, "example.com"); // TODO example.com
-    let tee_tls_stream = tee_tls_connector.connect(notary_tls_socket).await?;
-    crate::tls_client_async2::bind_client(tee_tls_stream.compat(), client)
+    tee_tls_connector.connect(notary_tls_socket).await?
   } else {
-    crate::tls_client_async2::bind_client(notary_tls_socket.compat(), client)
+    // TODO: This is NOT WORKING, however I didn't want to deal with fixing types for `bind_client`
+    //  and transforming TLS sessions, so I just duplicated a bunch of code to satisfy the type
+    //  checker
+    // TODO: To reproduce failure, run client in Origo mode: cargo run -p client --
+    // --config ./fixture/client.origo_tcp_local.json
+    let client_notary_config = if cfg!(feature = "unsafe_skip_cert_verification") {
+      rustls::ClientConfig::builder()
+        .dangerous()
+        .with_custom_certificate_verifier(crate::tls::unsafe_tls::SkipServerVerification::new())
+        .with_no_client_auth()
+    } else {
+      rustls::ClientConfig::builder()
+        .with_root_certificates(crate::tls::rustls_default_root_store())
+        .with_no_client_auth()
+    };
+    let notary_connector = tokio_rustls::TlsConnector::from(Arc::new(client_notary_config));
+    notary_connector
+      .connect(
+        rustls::pki_types::ServerName::try_from(config.notary_host.clone())?,
+        notary_tls_socket,
+      )
+      .await?
   };
+  let (client_tls_conn, client_tls_fut) =
+    crate::tls_client_async2::bind_client(notary_tls_stream.compat(), client);
 
   // start client tls connection
   let tls_fut_task = tokio::spawn(client_tls_fut);
@@ -130,20 +155,22 @@ pub(crate) async fn proxy(
   let payload = response.into_body().collect().await?.to_bytes();
   debug!("Response: {:?}", payload);
 
-  let hyper::client::conn::http1::Parts { io: _client_tls_conn, .. } =
-    connection_task.await.unwrap().unwrap();
+  let hyper::client::conn::http1::Parts { io: _client_tls_conn, .. } = connection_task.await??;
 
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
 
+  // wait for tls connection
+  let (_, mut reunited_socket) = tls_fut_task.await?.unwrap();
+
   if config.mode == NotaryMode::TEE {
-    let _manifest = config.proving.manifest.unwrap();
+    let manifest_bytes = config.proving.manifest.unwrap().to_wire_bytes();
+    reunited_socket.write_all(&manifest_bytes).await?;
     // TODO: write manifest
     // TODO: write TLS secrets (from origo_conn)
     // TODO: read web proof (a bit awkward but proxy will have to return the it)
   }
 
-  // wait for tls connection
-  let _ = tls_fut_task.await.unwrap().unwrap();
+  reunited_socket.write_all(b"3").await?;
 
   Ok(origo_conn)
 }

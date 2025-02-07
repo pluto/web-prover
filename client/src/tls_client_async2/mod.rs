@@ -24,7 +24,7 @@ use futures::{
 use tls_client2::ClientConnection;
 #[cfg(not(feature = "tracing"))] use tracing::warn;
 #[cfg(feature = "tracing")]
-use tracing::{debug, debug_span, error, trace, warn, Instrument};
+use tracing::{debug, debug_span, error, trace, Instrument};
 
 const RX_TLS_BUF_SIZE: usize = 1 << 13; // 8 KiB
 const RX_BUF_SIZE: usize = 1 << 13; // 8 KiB
@@ -54,12 +54,12 @@ pub struct ClosedConnection {
 ///
 /// This future must be polled in order for the connection to make progress.
 #[must_use = "futures do nothing unless polled"]
-pub struct ConnectionFuture {
-  fut: Pin<Box<dyn Future<Output = Result<ClosedConnection, ConnectionError>> + Send>>,
+pub struct ConnectionFuture<T> {
+  fut: Pin<Box<dyn Future<Output = Result<(ClosedConnection, T), ConnectionError>> + Send>>,
 }
 
-impl Future for ConnectionFuture {
-  type Output = Result<ClosedConnection, ConnectionError>;
+impl<T> Future for ConnectionFuture<T> {
+  type Output = Result<(ClosedConnection, T), ConnectionError>;
 
   fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
     self.fut.poll_unpin(cx)
@@ -76,7 +76,7 @@ impl Future for ConnectionFuture {
 pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
   socket: T,
   mut client: ClientConnection,
-) -> (TlsConnection, ConnectionFuture) {
+) -> (TlsConnection, ConnectionFuture<T>) {
   let (tx_sender, mut tx_receiver) = mpsc::channel(1 << 14);
   let (mut rx_sender, rx_receiver) = mpsc::channel(1 << 14);
 
@@ -231,15 +231,8 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
     tx_receiver.close();
     rx_sender.close_channel();
 
-    // TODO: Okay, great, we can write here after bind_client did its thing
-    //       but writing here is not useful, so we want to return the socket
-    //       back to the caller. This allows the caller to take back the socket
-    //       and read/write on it.
-    println!("-----------------------------------------------");
-    // let x = server_rx.reunite(server_tx).unwrap();
-    server_tx.write_all(b"what").await.unwrap();
-    // socket.write_all(b"what").await.unwrap(); // not possible because we split the socket above
-    println!("-----------------------------------------------");
+    let mut reunited_socket = server_rx.reunite(server_tx).unwrap();
+    reunited_socket.write_all(b"1111").await.unwrap();
 
     #[cfg(feature = "tracing")]
     trace!(
@@ -249,7 +242,7 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
       recv.len()
     );
 
-    Ok(ClosedConnection { client, sent, recv })
+    Ok((ClosedConnection { client, sent, recv }, reunited_socket))
   };
 
   #[cfg(feature = "tracing")]

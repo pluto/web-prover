@@ -325,7 +325,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
     }
 
     // MATT: this shutsdown the target connection, but not the socket, right?
-    tcp_write.shutdown().await.unwrap();
+    tcp_write.shutdown().await?;
     Ok(())
   };
 

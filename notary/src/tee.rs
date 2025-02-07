@@ -11,6 +11,7 @@ use caratls_ekm_server::DummyTokenGenerator;
 use caratls_ekm_server::TeeTlsAcceptor;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
+use proofs::program::{manifest, manifest::Manifest};
 use serde::Deserialize;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
@@ -102,11 +103,24 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let mut tee_tls_stream = tee_tls_acceptor.accept(socket).await?;
   proxy_service(&mut tee_tls_stream, session_id, target_host, target_port, state.clone()).await?;
 
+  debug!("Waiting for bytes to be read:");
+
   // TODO wait for TLS secrets
+
+
   // TODO wait for manifest
-  let mut buf: [u8; 10] = [0u8; 10];
-  tee_tls_stream.read(&mut buf).await.unwrap();
-  dbg!(buf);
+  let manifest = recover_manifest(&mut tee_tls_stream).await;
+
+  // Keep reading into buf until you get the ending byte
+  loop {
+    let mut buf: [u8; 10] = [0u8; 10];
+    tee_tls_stream.read(&mut buf).await?;
+    dbg!(buf);
+    if buf.to_vec().iter().all(|b| *b == 0) {
+      debug!("Got all bytes");
+      break;
+    }
+  }
 
   // TODO decrypt session with TLS secrets
   let transcript = state.origo_sessions.lock().unwrap().get(session_id).cloned().unwrap();
@@ -115,4 +129,19 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   // TODO return web proof
 
   Ok(())
+}
+
+async fn recover_manifest<R: AsyncReadExt + Unpin>(stream: &mut R) -> Manifest {
+  // Buffer to store the "header" (4 bytes, indicating the length of the Manifest)
+  let mut len_buf = [0u8; 4];
+  stream.read_exact(&mut len_buf).await?;
+
+  // Deserialize the length prefix (convert from little-endian to usize)
+  let manifest_length = u32::from_le_bytes(len_buf) as usize;
+
+  // Allocate a buffer to hold only the bytes needed for the Manifest
+  let mut manifest_buf = vec![0u8; manifest_length];
+  stream.read_exact(&mut manifest_buf).await?;
+
+  Manifest::from_wire_bytes(&manifest_buf)
 }
