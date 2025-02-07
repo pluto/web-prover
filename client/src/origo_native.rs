@@ -105,51 +105,29 @@ pub(crate) async fn proxy(
   // TODO notary_tls_socket needs to implement futures::AsyncRead/Write, find a better wrapper here
   let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
 
-  #[cfg(feature = "tee-google-confidential-space-token-verifier")]
-  let token_verifier = GoogleConfidentialSpaceTokenVerifier::new("audience").await; // TODO pass in as function input
-
-  #[cfg(feature = "tee-dummy-token-verifier")]
-  let token_verifier = DummyTokenVerifier { expect_token: "dummy".to_string() };
-
-  let tee_tls_connector = TeeTlsConnector::new(token_verifier, "example.com"); // TODO example.com
-  let tee_tls_stream = tee_tls_connector.connect(notary_tls_socket).await?;
-
   // Either bind client to TEE TLS connection or plain TLS connection
-  let (client_tls_conn, tls_fut) = if config.mode == NotaryMode::TEE {
+  let (client_tls_conn, client_tls_fut) = if config.mode == NotaryMode::TEE {
+    #[cfg(feature = "tee-google-confidential-space-token-verifier")]
+    let token_verifier = GoogleConfidentialSpaceTokenVerifier::new("audience").await; // TODO pass in as function input
+
+    #[cfg(feature = "tee-dummy-token-verifier")]
+    let token_verifier = DummyTokenVerifier { expect_token: "dummy".to_string() };
+
+    let tee_tls_connector = TeeTlsConnector::new(token_verifier, "example.com"); // TODO example.com
+    let tee_tls_stream = tee_tls_connector.connect(notary_tls_socket).await?;
     crate::tls_client_async2::bind_client(tee_tls_stream.compat(), client)
   } else {
-    // crate::tls_client_async2::bind_client(notary_tls_socket.compat(), client)
-    todo!("oh oh")
+    crate::tls_client_async2::bind_client(notary_tls_socket.compat(), client)
   };
 
-  // TODO: What do with tls_fut? what do with tls_receiver?
-  // let (tls_sender, _tls_receiver) = oneshot::channel();
-  // let handled_tls_fut = async {
-  //   let result = tls_fut.await.unwrap();
-  //   let _ = tls_sender.send(result);
-  // };
-  let tls_fut_task = tokio::spawn(tls_fut);
+  // start client tls connection
+  let tls_fut_task = tokio::spawn(client_tls_fut);
 
+  // perform http handshake on client tls connection and send request
   let client_tls_conn = hyper_util::rt::TokioIo::new(client_tls_conn.compat());
-
-  // use hyper::rt::;
-  // use tokio::io::AsyncWriteExt;
-  // client_tls_conn.inner().write_all(b"hello");
-
   let (mut request_sender, connection) =
     hyper::client::conn::http1::handshake(client_tls_conn).await?;
-
   let connection_task = tokio::spawn(connection.without_shutdown());
-
-  // let (connection_sender, connection_receiver) = oneshot::channel();
-  // let connection_fut = connection.without_shutdown();
-  // let handled_connection_fut = async {
-  //   let result = connection_fut.await;
-  //   let _ = connection_sender.send(result);
-  // };
-  // tokio::spawn(handled_connection_fut);
-  // let (mut connection_sender, connection) =
-
   let response = request_sender.send_request(config.to_request()?).await?;
 
   assert_eq!(response.status(), StatusCode::OK);
@@ -157,53 +135,21 @@ pub(crate) async fn proxy(
   let payload = response.into_body().collect().await?.to_bytes();
   debug!("Response: {:?}", payload);
 
-  // Close the connection to the server
-  // TODO this closes the TLS Connection, do we want to maybe close the TCP stream instead?
-  // let mut client_socket = connection_receiver.await??.io; // .into_inner(); // .into_inner();
-  // let mut foo = connection_receiver.await.unwrap().unwrap().io.into_inner().into_inner();
-
-  let hyper::client::conn::http1::Parts { io: client_tls_conn, .. } =
+  let hyper::client::conn::http1::Parts { io: _client_tls_conn, .. } =
     connection_task.await.unwrap().unwrap();
 
+  let origo_conn = origo_conn.lock().unwrap().deref().clone();
+
   if config.mode == NotaryMode::TEE {
-    let manifest = config.proving.manifest.unwrap();
+    let _manifest = config.proving.manifest.unwrap();
 
-    println!("write from client to notary");
-
-    // the method `write` exists for struct `TokioIo<Compat<TlsConnection>>`, but its trait
-    // bounds were not satisfied the following trait bounds were not satisfied:
-    // `TokioIo<tokio_util::compat::Compat<TlsConnection>>: futures::AsyncWrite`
-    // which is required by `TokioIo<tokio_util::compat::Compat<TlsConnection>>:
-    // futures::AsyncWriteExt`
-    // let mut tls_conn = client_tls_conn.into_inner().into_inner();
-    // use tokio::io::AsyncWriteExt;
-    // tee_tls_stream.write(b"what").await.unwrap();
-
-    // client_tls_conn.into_inner().into_inner().write_all(b"what").await.unwrap();
-    // tee_tls_stream.compat().write_all(b"what")
-
-    // let mut buf: [u8; 3] = [0u8; 3];
-    // tls_conn.read_exact(&mut buf).await.unwrap();
-
-    // use tokio::io::AsyncWriteExt;
-
-    // use futures::AsyncWriteExt;
-    // use tokio_util::compat::FuturesAsyncWriteCompatExt;
-    // use tokio::io::AsyncWriteExt;
-    // let mut socket = TokioIo::new(notary_tls_socket);
-    // socket.write_all(b"what").await.unwrap();
-    // notary_tls_socket.into_inner().write_all(b"what up").await.unwrap();
-
-    // client_socket.inner().write_all(b"what up").await.unwrap();
-    // client_tls_conn.into_inner().write_all(b"what up").await.unwrap();
+    // TODO: write manifest
+    // TODO: write TLS secrets (from origo_conn)
+    // TODO: read web proof (a bit awkward but proxy will have to return the it)
   }
 
-  // client_tls_conn.into_inner().into_inner().close().await.unwrap();
-
-  // client_socket.close().await?;
-
+  // wait for tls connection
   let _ = tls_fut_task.await.unwrap().unwrap();
 
-  let origo_conn = origo_conn.lock().unwrap().deref().clone();
   Ok(origo_conn)
 }

@@ -226,15 +226,14 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
     #[cfg(feature = "tracing")]
     debug!("client shutdown");
 
-    // _ = server_tx.close().await; // MATT: socket is closed
+    // _ = server_tx.close().await; // MATT: socket can't be closed if we still need it
 
     tx_receiver.close();
     rx_sender.close_channel();
 
     println!("-----------------------------------------------");
     server_tx.write_all(b"what").await.unwrap();
-
-    // socket.write_all(b"what").await.unwrap();
+    // socket.write_all(b"what").await.unwrap(); // not possible because we split the socket above
     println!("-----------------------------------------------");
 
     #[cfg(feature = "tracing")]

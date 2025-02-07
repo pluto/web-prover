@@ -308,8 +308,6 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
 
   let (mut socket_read, mut socket_write) = tokio::io::split(socket);
 
-  // tokio::io::copy_bidirectional_with_sizes(&mut socket, &mut tcp_stream, 8192, 8192).await.unwrap();
-
   let messages = Arc::new(Mutex::new(Vec::new()));
   let client_to_server = async {
     let mut buf = [0u8; 8192];
@@ -347,7 +345,7 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
       }
     }
 
-    // MATT: this shuts down the socket connection
+    // MATT: this shuts down the socket connection, can't do that here
     // socket_write.shutdown().await.unwrap();
     Ok(())
   };
@@ -362,6 +360,5 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
     .unwrap()
     .insert(session_id.to_string(), Transcript { payload: messages.lock().unwrap().to_vec() });
 
-  // Ok(socket)
   Ok(())
 }
