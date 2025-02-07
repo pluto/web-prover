@@ -231,7 +231,12 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
     tx_receiver.close();
     rx_sender.close_channel();
 
+    // TODO: Okay, great, we can write here after bind_client did its thing
+    //       but writing here is not useful, so we want to return the socket
+    //       back to the caller. This allows the caller to take back the socket
+    //       and read/write on it.
     println!("-----------------------------------------------");
+    // let x = server_rx.reunite(server_tx).unwrap();
     server_tx.write_all(b"what").await.unwrap();
     // socket.write_all(b"what").await.unwrap(); // not possible because we split the socket above
     println!("-----------------------------------------------");
