@@ -104,15 +104,13 @@ impl Manifest {
 
     /// Serializes the `Manifest` without any "header".
     fn to_bytes(&self) -> Vec<u8> {
-        // Serializing to JSON first because `untagged` in `JsonKey` break bincode
-        let as_json = serde_json::ser::to_string(self).unwrap();
-        as_json.as_bytes().to_vec()
-    }
+        // Serializing as JSON `untagged` in `JsonKey` break bincode
+    serde_json::to_vec(&self).unwrap()
+  }
 
     /// Deserializes a `Manifest` from raw bytes without any "header".
     fn from_bytes(bytes: &[u8]) -> Manifest {
-        let as_json = String::from_utf8(bytes.to_vec()).unwrap();
-        serde_json::from_str(&as_json).unwrap()
+        serde_json::from_slice(&bytes).unwrap()
     }
 }
 

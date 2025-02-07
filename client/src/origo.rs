@@ -10,6 +10,7 @@ use proofs::{
   F, G1, G2,
 };
 use serde::{Deserialize, Serialize};
+use tls_client2::origo::OrigoConnection;
 use tracing::debug;
 
 use crate::{
@@ -173,4 +174,72 @@ pub(crate) async fn generate_proof(
   .await
 
   // return Ok(OrigoProof(proof));
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OrigoSecrets(HashMap<String, Vec<u8>>);
+
+impl OrigoSecrets {
+  pub fn from_origo_conn(origo_conn: &OrigoConnection) -> Self {
+    Self(origo_conn.secret_map.clone())
+  }
+
+  /// Serializes the `OrigoSecrets` into a length-prefixed byte array.
+  pub fn to_wire_bytes(&self) -> Vec<u8> {
+    let serialized = self.to_bytes();
+    let length = serialized.len() as u32;
+    // Create the "header" with the length (as little-endian bytes)
+    let mut wire_data = length.to_le_bytes().to_vec();
+    wire_data.extend(serialized);
+    wire_data
+  }
+
+  /// Deserializes a `OrigoSecrets` from a length-prefixed byte buffer.
+  ///
+  /// Expects a buffer with a 4-byte little-endian "header" followed by the serialized data.
+  pub fn from_wire_bytes(buffer: &[u8]) -> Self {
+    // Confirm the buffer is at least large enough to contain the "header"
+    if buffer.len() < 4 {
+      panic!("Unexpected buffer length: {} < 4", buffer.len());
+    }
+
+    // Extract the first 4 bytes as the length prefix
+    let length_bytes = &buffer[..4];
+    let length = u32::from_le_bytes(length_bytes.try_into().unwrap()) as usize;
+
+    // Ensure the buffer contains enough data for the length specified
+    if buffer.len() < 4 + length {
+      panic!("Unexpected buffer length: {} < {} + 4", buffer.len(), length);
+    }
+
+    // Extract the serialized data from the buffer
+    let serialized_data = &buffer[4..4 + length];
+    Self::from_bytes(serialized_data).unwrap()
+  }
+
+  fn to_bytes(&self) -> Vec<u8> { serde_json::to_vec(&self).unwrap() }
+
+  fn from_bytes(bytes: &[u8]) -> Result<Self, ClientErrors> {
+    let secrets: HashMap<String, Vec<u8>> = serde_json::from_slice(bytes)?;
+    Ok(Self(secrets))
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  #[test]
+  fn test_manifest_serialization() {
+    let mut origo_conn = OrigoConnection::new();
+    origo_conn.secret_map.insert("Handshake:server_iv".to_string(), vec![1, 2, 3]);
+    let origo_secrets = OrigoSecrets::from_origo_conn(&origo_conn);
+
+    let serialized = origo_secrets.to_bytes();
+    let deserialized: OrigoSecrets = OrigoSecrets::from_bytes(&serialized).unwrap();
+    assert_eq!(origo_secrets, deserialized);
+
+    let wire_serialized = origo_secrets.to_wire_bytes();
+    let wire_deserialized: OrigoSecrets = OrigoSecrets::from_wire_bytes(&wire_serialized);
+    assert_eq!(origo_secrets, wire_deserialized);
+  }
 }

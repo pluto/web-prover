@@ -231,8 +231,7 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
     tx_receiver.close();
     rx_sender.close_channel();
 
-    let mut reunited_socket = server_rx.reunite(server_tx).unwrap();
-    reunited_socket.write_all(b"1111").await.unwrap();
+    let reunited_socket = server_rx.reunite(server_tx).unwrap();
 
     #[cfg(feature = "tracing")]
     trace!(

@@ -17,7 +17,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{debug, error, info};
 use ws_stream_tungstenite::WsStream;
-
+use client::origo::OrigoSecrets;
 use crate::{
   axum_websocket::WebSocket, errors::NotaryServerError, origo::proxy_service,
   tlsn::ProtocolUpgrade, SharedState,
@@ -103,14 +103,15 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let mut tee_tls_stream = tee_tls_acceptor.accept(socket).await?;
   proxy_service(&mut tee_tls_stream, session_id, target_host, target_port, state.clone()).await?;
 
-  debug!("Waiting for bytes to be read:");
+  let manifest_bytes = read_wire_struct(&mut tee_tls_stream).await;
+  // TODO: Consider implementing from_stream instead of read_wire_struct
+  let manifest = Manifest::from_wire_bytes(&manifest_bytes);
+  dbg!(manifest);
 
   // TODO wait for TLS secrets
-
-
-  // TODO wait for manifest
-  let manifest = recover_manifest(&mut tee_tls_stream).await;
-  dbg!(manifest);
+  let secret_bytes = read_wire_struct(&mut tee_tls_stream).await;
+  let origo_secrets = OrigoSecrets::from_wire_bytes(&secret_bytes);
+  dbg!(origo_secrets);
 
   // Keep reading into buf until you get the ending byte
   loop {
@@ -132,17 +133,24 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   Ok(())
 }
 
-async fn recover_manifest<R: AsyncReadExt + Unpin>(stream: &mut R) -> Manifest {
-  // Buffer to store the "header" (4 bytes, indicating the length of the Manifest)
+async fn read_wire_struct<R: AsyncReadExt + Unpin>(stream: &mut R) -> Vec<u8> {
+  // Buffer to store the "header" (4 bytes, indicating the length of the struct)
   let mut len_buf = [0u8; 4];
   stream.read_exact(&mut len_buf).await.unwrap();
+  // dbg!(format!("len_buf={:?}", len_buf));
 
   // Deserialize the length prefix (convert from little-endian to usize)
-  let manifest_length = u32::from_le_bytes(len_buf) as usize;
+  let body_len = u32::from_le_bytes(len_buf) as usize;
+  dbg!(format!("body_len={body_len}"));
 
-  // Allocate a buffer to hold only the bytes needed for the Manifest
-  let mut manifest_buf = vec![0u8; manifest_length];
-  stream.read_exact(&mut manifest_buf).await.unwrap();
+  // Allocate a buffer to hold only the bytes needed for the struct
+  let mut body_buf = vec![0u8; body_len];
+  stream.read_exact(&mut body_buf).await.unwrap();
+  // dbg!(format!("manifest_buf={:?}", manifest_buf));
 
-  Manifest::from_wire_bytes(&manifest_buf)
+  // Prepend len_buf to manifest_buf
+  let mut wire_struct_buf = len_buf.to_vec();
+  wire_struct_buf.extend(body_buf);
+
+  wire_struct_buf
 }
