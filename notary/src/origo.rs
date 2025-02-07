@@ -22,7 +22,7 @@ use ws_stream_tungstenite::WsStream;
 
 use crate::{
   axum_websocket::WebSocket,
-  circuits::{initialize_verifier, CIRCUIT_SIZE_MAX, MAX_STACK_HEIGHT},
+  circuits::{initialize_verifier, CIRCUIT_SIZE_MAX, CIRCUIT_SIZE_SMALL, MAX_STACK_HEIGHT},
   errors::{NotaryServerError, ProxyError},
   tls_parser::{Direction, Transcript, UnparsedMessage},
   tlsn::ProtocolUpgrade,
@@ -205,7 +205,7 @@ pub async fn verify(
   }
   .deserialize();
 
-  debug!("request_verifier_digest: {:?}", proof.verifier_digest.clone());
+  debug!("verifier_digest: {:?}", proof.verifier_digest.clone());
 
   // Form verifier inputs
   let verifier_inputs =
@@ -221,11 +221,13 @@ pub async fn verify(
   // verification
   // debug!("request_messages {:?}", verifier_inputs.request_messages);
 
+  debug!("circuits {:?}", payload.origo_proof.rom.circuit_data);
+  debug!("rom {:?}", payload.origo_proof.rom.rom);
   let verifier =
     initialize_verifier(payload.origo_proof.rom.circuit_data, payload.origo_proof.rom.rom);
 
   let InitialNIVCInputs { initial_nivc_input, .. } =
-    state.manifest.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE_MAX>(
+    state.manifest.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE_SMALL>(
       &verifier_inputs.request_messages,
       &verifier_inputs.response_messages,
     )?;
@@ -242,7 +244,7 @@ pub async fn verify(
   ) {
     Ok(_) => true,
     Err(e) => {
-      error!("Error verifying request proof: {:?}", e);
+      error!("Error verifying proof: {:?}", e);
       false
     },
   };

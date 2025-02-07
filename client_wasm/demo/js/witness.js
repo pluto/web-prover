@@ -19,7 +19,7 @@ const getWitnessGenerator = async function (circuit) {
       : window.location.origin;
 
   const wasmUrl = new URL(
-    `build/circom-artifacts-1024b-v${WEB_PROVER_CIRCUITS_VERSION}/${circuit}.wasm`,
+    `build/circom-artifacts-512b-v${WEB_PROVER_CIRCUITS_VERSION}/${circuit}.wasm`,
     origin,
   ).toString();
   const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
@@ -36,9 +36,9 @@ async function generateWitness(input, wasm) {
 }
 
 const circuits_label = [
-  "plaintext_authentication_1024b",
-  "http_verification_1024b",
-  "json_extraction_1024b",
+  "plaintext_authentication_512b",
+  "http_verification_512b",
+  "json_extraction_512b",
 ];
 
 export const generateWitnessBytes = async function (inputs, rom) {
