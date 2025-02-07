@@ -2,20 +2,22 @@ artifacts:
 	cd proofs && make web-prover-circuits
 
 check-llvm:
-	@if ! command -v llvm-config > /dev/null 2>&1; then \
-	    echo "Error: LLVM is not installed or not in PATH."; \
-	    exit 1; \
-	fi
-	@LLVM_VERSION=$$(llvm-config --version); \
+	@PATH="/opt/homebrew/opt/llvm@18/bin:/opt/homebrew/opt/llvm/bin:$$PATH"; \
+	if ! command -v llvm-config > /dev/null 2>&1; then \
+		echo "Error: LLVM is not installed or not in PATH."; \
+		exit 1; \
+	fi; \
+	LLVM_VERSION=$$(llvm-config --version); \
 	if [ "$${LLVM_VERSION%%.*}" -lt 18 ]; then \
-	    echo "Error: LLVM version must be 18 or higher. Found $$LLVM_VERSION."; \
-	    exit 1; \
+		echo "Error: LLVM version must be 18 or higher. Found $$LLVM_VERSION."; \
+		exit 1; \
 	fi
 
 wasm: check-llvm artifacts
 	@# NOTE: This build depends on RUSTFLAGS in the client_wasm/.cargo/config.toml
 	-cargo install wasm-pack
 	-cd client_wasm/demo/static && rm -f build && ln -s ../../../proofs/web_proof_circuits build && cd ../../..
+	PATH="/opt/homebrew/opt/llvm@18/bin:/opt/homebrew/opt/llvm/bin:$$PATH"; \
 	LLVM_PATH=$$(dirname $$(command -v llvm-config)); \
 	PATH="$$LLVM_PATH:$$PATH"; \
 	cd client_wasm && \
@@ -25,6 +27,7 @@ wasm: check-llvm artifacts
 wasm-debug: check-llvm artifacts
 	-cargo install wasm-pack
 	-cd client_wasm/demo/static && rm -f build && ln -s ../../../proofs/web_proof_circuits build && cd ../../..
+	PATH="/opt/homebrew/opt/llvm@18/bin:/opt/homebrew/opt/llvm/bin:$$PATH"; \
 	LLVM_PATH=$$(dirname $$(command -v llvm-config)); \
 	PATH="$$LLVM_PATH:$$PATH"; \
 	cd client_wasm && \
