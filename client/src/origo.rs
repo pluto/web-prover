@@ -2,6 +2,7 @@
 use std::collections::HashMap;
 
 use proofs::{
+  circuits::construct_setup_data,
   program::{
     data::{NotExpanded, Offline, SetupParams},
     manifest::{EncryptionInput, Manifest, TLSEncryption},
@@ -12,7 +13,6 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::{
-  circuits::construct_setup_data,
   config::{self},
   errors::ClientErrors,
   tls::decrypt_tls_ciphertext,
@@ -157,7 +157,7 @@ pub(crate) async fn generate_proof(
 
   let vk_digest_primary = program_data.vk_digest_primary;
   let vk_digest_secondary = program_data.vk_digest_secondary;
-  crate::proof::construct_program_data_and_proof::<{ crate::circuits::CIRCUIT_SIZE_512 }>(
+  crate::proof::construct_program_data_and_proof::<{ proofs::circuits::CIRCUIT_SIZE_512 }>(
     manifest,
     request_inputs,
     response_inputs,

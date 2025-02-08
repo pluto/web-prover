@@ -1532,6 +1532,7 @@ version = "0.2.0"
 dependencies = [
  "cargo_metadata",
  "client",
+ "proofs",
  "serde",
  "serde_json",
  "tokio",

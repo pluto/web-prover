@@ -2,7 +2,10 @@ use std::io::Cursor;
 
 use k256::elliptic_curve::Field;
 use nom::{bytes::streaming::take, IResult};
-use proofs::{F, G1};
+use proofs::{
+  circuits::{CIRCUIT_SIZE_1024, CIRCUIT_SIZE_512},
+  F, G1,
+};
 use tls_client2::{
   hash_hs::HandshakeHashBuffer,
   internal::msgs::hsjoiner::HandshakeJoiner,
@@ -27,10 +30,7 @@ use tls_parser::{
 use tracing::{debug, error, info, trace};
 use web_proof_circuits_witness_generator::{data_hasher, ByteOrPad};
 
-use crate::{
-  circuits::{CIRCUIT_SIZE_MAX, CIRCUIT_SIZE_SMALL},
-  errors::ProxyError,
-};
+use crate::errors::ProxyError;
 
 const TRIMMED_BYTES: usize = 17;
 
@@ -319,7 +319,7 @@ impl Transcript<Parsed> {
     let mut result = Vec::new();
 
     fn get_hashes(bytes: Vec<u8>) -> Vec<F<G1>> {
-      vec![CIRCUIT_SIZE_SMALL, CIRCUIT_SIZE_MAX]
+      vec![CIRCUIT_SIZE_512, CIRCUIT_SIZE_1024]
         .into_iter()
         .filter(|&size| bytes.len() <= size)
         .map(|size| {
