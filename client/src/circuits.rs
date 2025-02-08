@@ -16,6 +16,11 @@ pub const PROVING_PARAMS_1024: &str = concat!(
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/serialized_setup_1024b_rom_length_100.bin"
 );
+pub const PROVING_PARAMS_512: &str = concat!(
+  "proofs/web_proof_circuits/circom-artifacts-512b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/serialized_setup_512b_rom_length_100.bin"
+);
 
 // TODO: Not loaded dynamically on iOS (yet)
 #[cfg(not(target_arch = "wasm32"))]

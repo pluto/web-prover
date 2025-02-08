@@ -12,5 +12,5 @@ rustflags=[
   "-C",
   "opt-level=z",
   "-C",
-  "link-args=--shared-memory --max-memory=4294967296",
+  "link-args=--shared-memory --max-memory=2359296000",
 ]
