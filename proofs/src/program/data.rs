@@ -139,7 +139,7 @@ pub type Rom = Vec<String>;
 pub type NivcInput = Vec<F<G1>>;
 
 /// Represents configuration and circuit data required for initializing the proving system.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SetupParams<S: SetupStatus> {
   /// Public parameters of the proving system. Maps to the client-side prover parameters.
   pub public_params:       S::PublicParams,
@@ -152,6 +152,19 @@ pub struct SetupParams<S: SetupStatus> {
   pub setup_data:          S::SetupData,
   /// A mapping between ROM opcodes and circuit configuration.
   pub rom_data:            RomData,
+}
+
+impl<S: SetupStatus> PartialEq for SetupParams<S>
+where S::SetupData: PartialEq
+{
+  fn eq(&self, other: &Self) -> bool {
+    // TODO: Supernova types are not supporting PartialEq
+    // self.public_params == other.public_params &&
+    self.vk_digest_primary == other.vk_digest_primary
+      && self.vk_digest_secondary == other.vk_digest_secondary
+      && self.setup_data == other.setup_data
+      && self.rom_data == other.rom_data
+  }
 }
 
 /// Defines the logic of the proof program.
@@ -577,15 +590,23 @@ mod tests {
 
   #[test]
   fn test_online_to_offline_serialization_round_trip() {
+    let temp_dir = tempdir::TempDir::new("setup").unwrap();
+    let offline_path = temp_dir.path().join("offline");
+
     let (setup_params_online, ..) = create_test_program_data();
-    let offline_path = PathBuf::from("/tmp/mock/offline/path");
-    let setup_params_offline =
-      setup_params_online.clone().into_offline(offline_path.clone()).unwrap();
+    let setup_params_offline = setup_params_online.into_offline(offline_path).unwrap();
+
+    // Matches itself
+    assert_eq!(setup_params_offline, setup_params_offline);
 
     // Verify round-trip serialization for `Offline`
     let serialized_offline = serde_json::to_string(&setup_params_offline).unwrap();
     let deserialized_offline: SetupParams<Offline> =
       serde_json::from_str(&serialized_offline).unwrap();
     assert_eq!(setup_params_offline, deserialized_offline);
+
+    // Can be "onlined"
+    let result = deserialized_offline.into_online();
+    assert!(result.is_ok());
   }
 }
