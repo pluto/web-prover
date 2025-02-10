@@ -12,6 +12,7 @@ use proof::FoldingProof;
 use utils::into_input_json;
 
 use super::*;
+use crate::program::data::{ProofParams, SetupParams};
 
 pub mod data;
 pub mod manifest;
@@ -111,12 +112,15 @@ use crate::{
   circom::witness::generate_witness_from_browser_type, program::utils::into_circom_input,
 };
 pub async fn run(
-  program_data: &ProgramData<Online, Expanded>,
+  setup_params: &SetupParams<Online>,
+  proof_params: &ProofParams,
+  instance_params: &InstanceParams<Expanded>,
 ) -> Result<RecursiveSNARK<E1>, ProofError> {
   info!("Starting SuperNova program...");
 
   // Resize the rom to be the `max_rom_length` committed to in the `S::SetupData`
-  let (z0_primary, resized_rom) = program_data.extend_public_inputs(None)?;
+  let (z0_primary, resized_rom) =
+    setup_params.extend_public_inputs(&proof_params.rom, &instance_params.nivc_input)?;
   let z0_secondary = vec![F::<G2>::ZERO];
 
   let mut recursive_snark_option = None;
@@ -124,7 +128,7 @@ pub async fn run(
 
   // TODO (Colin): We are basically creating a `R1CS` for each circuit here, then also creating
   // `R1CSWithArity` for the circuits in the `PublicParams`. Surely we don't need both?
-  let circuits = initialize_circuit_list(&program_data.setup_data); // TODO: AwK?
+  let circuits = initialize_circuit_list(&setup_params.setup_data); // TODO: AwK?
 
   let mut memory = Memory { rom: resized_rom.clone(), circuits };
 
@@ -135,17 +139,18 @@ pub async fn run(
   {
     info!("Step {} of ROM", idx);
     debug!("Opcode = {:?}", op_code);
-    memory.circuits[op_code as usize].private_input = Some(program_data.inputs[idx].clone());
+    memory.circuits[op_code as usize].private_input =
+      Some(instance_params.private_inputs[idx].clone());
     // trace!("private input: {:?}", memory.circuits[op_code as usize].private_input);
     memory.circuits[op_code as usize].nivc_io = Some(next_public_input);
 
     let wit_type = memory.circuits[op_code as usize].witness_generator_type.clone();
-    let public_params = &program_data.public_params;
+    let public_params = &setup_params.public_params;
 
     memory.circuits[op_code as usize].circuit.witness =
       if wit_type == WitnessGeneratorType::Browser {
         // When running in browser, the witness is passed as input.
-        // Some(program_data.witnesses[idx].clone())
+        // Some(witnesses[idx].clone())
         let arity = memory.circuits[op_code as usize].circuit.arity();
         let nivc_io =
           &memory.circuits[op_code as usize].nivc_io.as_ref().ok_or_else(|| {
@@ -197,7 +202,7 @@ pub async fn run(
     #[cfg(feature = "verify-steps")]
     {
       info!("Verifying single step...");
-      recursive_snark.verify(public_params, &z0_primary, &z0_secondary)?;
+      recursive_snark.verify(&public_params, &z0_primary, &z0_secondary)?;
       info!("Single step verification done");
     }
 
@@ -288,11 +293,7 @@ pub fn initialize_setup_data(
     .into_iter()
     .unzip();
 
-  return Ok(InitializedSetup {
-    r1cs,
-    witness_generator_types,
-    max_rom_length: setup_data.max_rom_length,
-  });
+  Ok(InitializedSetup { r1cs, witness_generator_types, max_rom_length: setup_data.max_rom_length })
 }
 
 pub fn initialize_circuit_list(setup_data: &InitializedSetup) -> Vec<RomCircuit> {

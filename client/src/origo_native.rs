@@ -5,6 +5,13 @@ use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVe
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
+use proofs::{
+  program::{
+    data::{Offline, SetupParams},
+    manifest::{EncryptionInput, Manifest},
+  },
+  F, G1, G2,
+};
 use tls_client2::origo::OrigoConnection;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
@@ -14,8 +21,8 @@ use crate::{
   errors::ClientErrors,
 };
 
-/// we want to be able to specify somewhere in here what cipher suite to use.
-/// Perhapse the config object should have this information.
+/// We want to be able to specify somewhere in here what cipher suite to use.
+/// Perhaps the config object should have this information.
 pub(crate) async fn proxy(
   config: config::Config,
   session_id: String,
@@ -77,11 +84,10 @@ pub(crate) async fn proxy(
     .header("Host", config.notary_host.clone())
     .header("Connection", "Upgrade")
     .header("Upgrade", "TCP")
-    .body(http_body_util::Full::default())
-    .unwrap();
+    .body(http_body_util::Full::default())?;
 
   let response = request_sender.send_request(request).await?;
-  assert!(response.status() == hyper::StatusCode::SWITCHING_PROTOCOLS);
+  assert_eq!(response.status(), hyper::StatusCode::SWITCHING_PROTOCOLS);
 
   // Claim back the TLS socket after the HTTP to TCP upgrade is done
   let hyper::client::conn::http1::Parts { io: notary_tls_socket, .. } = connection_task.await??;

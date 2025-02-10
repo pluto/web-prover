@@ -22,7 +22,7 @@ use futures::{
   AsyncWriteExt, Future, FutureExt, SinkExt, StreamExt,
 };
 use tls_client2::ClientConnection;
-use tracing::warn;
+#[cfg(not(feature = "tracing"))] use tracing::warn;
 #[cfg(feature = "tracing")]
 use tracing::{debug, debug_span, error, trace, warn, Instrument};
 

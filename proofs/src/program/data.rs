@@ -1,10 +1,12 @@
 use std::{
-  fs::{self, File},
-  io::Write,
+  fs::{self, File, OpenOptions},
+  io::{BufReader, Write},
   sync::Arc,
 };
 
-use client_side_prover::{fast_serde::FastSerde, supernova::get_circuit_shapes};
+use client_side_prover::{
+  fast_serde::FastSerde, supernova::get_circuit_shapes, traits::CurveCycleEquipped,
+};
 use serde_json::json;
 
 use super::*;
@@ -39,7 +41,7 @@ impl FoldInput {
 }
 
 /// R1CS file type
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum R1CSType {
   /// file path
   #[serde(rename = "file")]
@@ -65,7 +67,7 @@ pub enum WitnessGeneratorType {
 
 /// Uninitialized Circuit Setup data, in this configuration the R1CS objects have not
 /// been initialized and require a bulky initialize process.
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct UninitializedSetup {
   /// vector of all circuits' r1cs
   pub r1cs_types:              Vec<R1CSType>,
@@ -77,7 +79,7 @@ pub struct UninitializedSetup {
 
 /// Initialized Circuit Setup data, in this configuration the R1CS objects have been
 /// fully loaded for proving.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct InitializedSetup {
   /// vector of all circuits' r1cs
   pub r1cs:                    Vec<Arc<R1CS>>,
@@ -93,11 +95,14 @@ pub trait SetupStatus {
   type SetupData;
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Online;
 impl SetupStatus for Online {
   type PublicParams = Arc<PublicParams<E1>>;
   type SetupData = Arc<InitializedSetup>;
 }
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Offline;
 impl SetupStatus for Offline {
   type PublicParams = Vec<u8>;
@@ -122,28 +127,63 @@ impl WitnessStatus for NotExpanded {
   type PrivateInputs = (Vec<HashMap<String, Value>>, HashMap<String, FoldInput>);
 }
 
-/// Auxillary circuit data required to execute the ROM
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// Auxiliary circuit data required to execute the ROM
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct CircuitData {
   /// circuit instruction opcode in [`S::SetupData`]
   pub opcode: u64,
 }
 
-#[derive(Debug)]
-pub struct ProgramData<S: SetupStatus, W: WitnessStatus> {
+pub type RomData = HashMap<String, CircuitData>;
+pub type Rom = Vec<String>;
+pub type NivcInput = Vec<F<G1>>;
+
+/// Represents configuration and circuit data required for initializing the proving system.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct SetupParams<S: SetupStatus> {
+  /// Public parameters of the proving system. Maps to the client-side prover parameters.
   pub public_params:       S::PublicParams,
   // TODO: Refactor this onto the PublicParams object and share the ProvingParams abstraction
+  /// Setup-specific verification key digest for the primary elliptic curve.
   pub vk_digest_primary:   <E1 as Engine>::Scalar,
+  /// Setup-specific verification key digest for the secondary elliptic curve.
   pub vk_digest_secondary: <Dual<E1> as Engine>::Scalar,
+  /// Describes R1CS configurations used in proving setup.
   pub setup_data:          S::SetupData,
-  pub rom_data:            HashMap<String, CircuitData>,
-  pub rom:                 Vec<String>,
-  pub initial_nivc_input:  Vec<F<G1>>,
-  pub inputs:              W::PrivateInputs,
+  /// A mapping between ROM opcodes and circuit configuration.
+  pub rom_data:            RomData,
 }
 
-impl<S: SetupStatus> ProgramData<S, NotExpanded> {
-  /// Converts a program data instance into an expanded form by distributing fold inputs across
+impl<S: SetupStatus> PartialEq for SetupParams<S>
+where S::SetupData: PartialEq
+{
+  fn eq(&self, other: &Self) -> bool {
+    // TODO: Supernova types are not supporting PartialEq
+    // self.public_params == other.public_params &&
+    self.vk_digest_primary == other.vk_digest_primary
+      && self.vk_digest_secondary == other.vk_digest_secondary
+      && self.setup_data == other.setup_data
+      && self.rom_data == other.rom_data
+  }
+}
+
+/// Defines the logic of the proof program.
+pub struct ProofParams {
+  /// Represents sequence of circuit operations (circuit "bytecode")
+  pub rom: Rom,
+}
+
+/// Contains inputs and state specific to a single proof generation instance.
+#[derive(Debug)]
+pub struct InstanceParams<W: WitnessStatus> {
+  /// Initial public input for NIVC
+  pub nivc_input:     NivcInput,
+  /// Private inputs for each fold
+  pub private_inputs: W::PrivateInputs,
+}
+
+impl InstanceParams<NotExpanded> {
+  /// Converts proving instance parameters into an expanded form by distributing fold inputs across
   /// their corresponding circuit instances in the ROM.
   ///
   /// This method performs the following steps:
@@ -159,7 +199,7 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
   /// # Returns
   ///
   /// Returns a `Result` containing either:
-  /// * `Ok(ProgramData<S, Expanded>)` - The expanded program data with distributed inputs
+  /// * `Ok(InstanceParams<Expanded>)` - The expanded instance with distributed inputs
   /// * `Err(ProofError)` - If the expansion process fails
   ///
   /// # Errors
@@ -167,10 +207,6 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
   /// This function will return an error if:
   /// * A circuit label in the inputs is not found in the ROM
   /// * Input distribution fails
-  ///
-  /// # Type Parameters
-  ///
-  /// * `S` - The program status type parameter (Online/Offline) carried over from the original data
   ///
   /// # Details
   ///
@@ -182,21 +218,24 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
   ///
   /// The resulting expanded form contains individual private inputs for each ROM position, with
   /// fold inputs properly distributed according to circuit usage.
-  pub fn into_expanded(self) -> Result<ProgramData<S, Expanded>, ProofError> {
-    assert!(self.inputs.0.len() == self.rom.len());
+  pub fn into_expanded(
+    self,
+    proof_params: &ProofParams,
+  ) -> Result<InstanceParams<Expanded>, ProofError> {
+    assert_eq!(self.private_inputs.0.len(), proof_params.rom.len());
 
     let mut instruction_usage: HashMap<String, Vec<usize>> = HashMap::new();
-    for (index, circuit) in self.rom.iter().enumerate() {
+    for (index, circuit) in proof_params.rom.iter().enumerate() {
       if let Some(usage) = instruction_usage.get_mut(circuit.as_str()) {
         usage.push(index);
       } else {
         instruction_usage.insert(circuit.clone(), vec![index]);
       }
     }
-    let mut private_inputs: Vec<HashMap<String, Value>> = self.inputs.0;
+    let mut private_inputs: Vec<HashMap<String, Value>> = self.private_inputs.0;
 
     // add fold input sliced to chunks and add to private input
-    for (circuit_label, fold_inputs) in self.inputs.1.iter() {
+    for (circuit_label, fold_inputs) in self.private_inputs.1.iter() {
       let inputs = match instruction_usage.get(circuit_label) {
         Some(inputs) => inputs,
         None =>
@@ -208,32 +247,15 @@ impl<S: SetupStatus> ProgramData<S, NotExpanded> {
       }
     }
 
-    assert!(private_inputs.len() == self.rom.len());
+    assert_eq!(private_inputs.len(), proof_params.rom.len());
 
-    let Self {
-      public_params,
-      vk_digest_primary,
-      vk_digest_secondary,
-      setup_data,
-      rom_data,
-      initial_nivc_input,
-      ..
-    } = self;
-    Ok(ProgramData {
-      public_params,
-      vk_digest_primary,
-      vk_digest_secondary,
-      setup_data,
-      rom_data,
-      rom: self.rom,
-      initial_nivc_input,
-      inputs: private_inputs,
-    })
+    let Self { nivc_input: initial_nivc_input, .. } = self;
+    Ok(InstanceParams { nivc_input: initial_nivc_input, private_inputs })
   }
 }
 
-impl<W: WitnessStatus> ProgramData<Offline, W> {
-  /// Converts an offline program data instance back into an online version by decompressing and
+impl SetupParams<Offline> {
+  /// Converts an offline setup parameters instance back into an online version by decompressing and
   /// deserializing the public parameters and reconstructing the circuit shapes.
   ///
   /// This method performs the following steps:
@@ -250,7 +272,7 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
   /// # Returns
   ///
   /// Returns a `Result` containing either:
-  /// * `Ok(ProgramData<Online, W>)` - The converted online program data
+  /// * `Ok(SetupParams<Online>)` - The converted online program data
   /// * `Err(ProofError)` - If any step in the conversion process fails
   ///
   /// # Errors
@@ -259,19 +281,12 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
   /// * Circuit initialization fails
   /// * Circuit shape generation fails
   ///
-  /// # Type Parameters
-  ///
-  /// * `W: WitnessStatus` - The witness status type parameter carried over from the original
-  ///   program data
-  ///
   /// # Features
   ///
   /// When compiled with the "timing" feature, this function will output timing information for:
   /// * Reading and deserializing auxiliary parameters
   /// * Generating circuit shapes
-  ///
-  /// # Example
-  pub fn into_online(self) -> Result<ProgramData<Online, W>, ProofError> {
+  pub fn into_online(self) -> Result<SetupParams<Online>, ProofError> {
     debug!("init proving params, proving_param_bytes={:?}", self.public_params.len());
     let proving_params = ProvingParams::from_bytes(&self.public_params).unwrap();
 
@@ -290,23 +305,20 @@ impl<W: WitnessStatus> ProgramData<Offline, W> {
     info!("init public params from parts");
     let public_params =
       PublicParams::<E1>::from_parts_unchecked(circuit_shapes, proving_params.aux_params);
-    let Self { rom, initial_nivc_input, inputs, rom_data, .. } = self;
+    let Self { rom_data, .. } = self;
 
-    Ok(ProgramData {
+    Ok(SetupParams {
       public_params: Arc::new(public_params),
       vk_digest_primary: proving_params.vk_digest_primary,
       vk_digest_secondary: proving_params.vk_digest_secondary,
       setup_data: Arc::new(initialized_setup),
-      rom,
-      initial_nivc_input,
-      inputs,
       rom_data,
     })
   }
 }
 
-impl<W: WitnessStatus> ProgramData<Online, W> {
-  /// Converts an online program data instance into an offline version by serializing
+impl SetupParams<Online> {
+  /// Converts an online setup parameters instance into an offline version by serializing
   /// the public parameters to disk.
   ///
   /// This method performs the following steps:
@@ -323,7 +335,7 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   /// # Returns
   ///
   /// Returns a `Result` containing either:
-  /// * `Ok(ProgramData<Offline, W>)` - The converted offline program data
+  /// * `Ok(SetupParams<Offline>)` - The converted offline program data
   /// * `Err(ProofError)` - If any step in the conversion process fails
   ///
   /// # Errors
@@ -331,12 +343,7 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   /// This function will return an error if:
   /// * Bytes serialization fails
   /// * File system operations fail (creating directories or writing file)
-  ///
-  /// # Type Parameters
-  ///
-  /// * `W: WitnessStatus` - The witness status type parameter carried over from the original
-  ///   program data
-  pub fn into_offline(self, path: PathBuf) -> Result<ProgramData<Offline, W>, ProofError> {
+  pub fn into_offline(self, path: PathBuf) -> Result<SetupParams<Offline>, ProofError> {
     let exclusive = Arc::try_unwrap(self.public_params).unwrap();
     let (_, aux_params) = exclusive.into_parts();
     let vk_digest_primary = self.vk_digest_primary;
@@ -350,19 +357,16 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
 
     let bytes_path = path.with_extension("bytes");
     debug!("bytes_path={:?}", bytes_path);
-    File::create(&bytes_path)?.write_all(&proving_param_bytes).unwrap();
+    File::create(&bytes_path)?.write_all(&proving_param_bytes)?;
 
-    let Self { rom_data, rom, initial_nivc_input, inputs, .. } = self;
-    Ok(ProgramData {
+    let Self { rom_data, .. } = self;
+    Ok(SetupParams {
       public_params: proving_param_bytes,
       vk_digest_primary,
       vk_digest_secondary,
       // TODO: This approach is odd, refactor with #375
       setup_data: Default::default(),
       rom_data,
-      rom,
-      initial_nivc_input,
-      inputs,
     })
   }
 
@@ -376,7 +380,10 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   ///    - The expanded ROM opcodes converted to field elements
   ///
   /// # Arguments
-  /// - `input_override`: Optional override for the initial_nivc_input used during verification.
+  ///
+  /// * `rom` - A reference to the ROM (sequence of circuit operations) containing circuit
+  ///   configurations.
+  /// * `initial_nivc_input` - The initial public input required for NIVC.
   ///
   /// # Returns
   ///
@@ -390,11 +397,11 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   /// - Any opcode configuration specified in the ROM is not found in `rom_data`
   pub fn extend_public_inputs(
     &self,
-    input_override: Option<Vec<F<G1>>>,
+    rom: &Rom,
+    initial_nivc_input: &NivcInput,
   ) -> Result<(Vec<F<G1>>, Vec<u64>), ProofError> {
     // TODO: This is currently enabled for _either_ Expanded or NotExpanded
-    let mut rom = self
-      .rom
+    let mut rom = rom
       .iter()
       .map(|opcode_config| {
         self
@@ -409,10 +416,7 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
 
     rom.resize(self.setup_data.max_rom_length, u64::MAX);
 
-    let mut z0_primary: Vec<F<G1>> = match input_override {
-      Some(input) => input,
-      None => self.initial_nivc_input.clone(),
-    };
+    let mut z0_primary: Vec<F<G1>> = initial_nivc_input.clone();
     z0_primary.push(F::<G1>::ZERO); // rom_index = 0
     z0_primary.extend(rom.iter().map(|opcode| <E1 as Engine>::Scalar::from(*opcode)));
     debug!("z0_primary={:?}", z0_primary);
@@ -420,14 +424,18 @@ impl<W: WitnessStatus> ProgramData<Online, W> {
   }
 }
 
-impl ProgramData<Online, Expanded> {
-  /// generates NIVC proof from [`ProgramData`]
+impl SetupParams<Online> {
+  /// Generates NIVC proof from [`InstanceParams`]
   /// - run NIVC recursive proving
   /// - run CompressedSNARK to compress proof
   /// - serialize proof
-  pub async fn generate_proof(self) -> Result<FoldingProof<Vec<u8>, String>, ProofError> {
+  pub async fn generate_proof(
+    &self,
+    proof_params: &ProofParams,
+    instance_params: &InstanceParams<Expanded>,
+  ) -> Result<FoldingProof<Vec<u8>, String>, ProofError> {
     debug!("starting recursive proving");
-    let program_output = program::run(&self).await?;
+    let program_output = program::run(self, proof_params, instance_params).await?;
 
     debug!("starting proof compression");
     let compressed_snark_proof = program::compress_proof_no_setup(
@@ -473,7 +481,7 @@ mod tests {
   }
 
   // Helper function to create test program data
-  fn create_test_program_data() -> ProgramData<Online, Expanded> {
+  fn create_test_program_data() -> (SetupParams<Online>, ProofParams, InstanceParams<Expanded>) {
     // Load add.r1cs from examples
     let add_r1cs = include_bytes!("../../examples/circuit_data/add_external.r1cs");
     let r1cs = R1CSType::Raw(add_r1cs.to_vec());
@@ -490,30 +498,34 @@ mod tests {
       r1cs_types:              vec![r1cs],
       witness_generator_types: vec![WitnessGeneratorType::Raw(vec![])],
     };
-    let initilized_setup = initialize_setup_data(&setup_data).unwrap();
+    let initialized_setup = initialize_setup_data(&setup_data).unwrap();
 
     let public_params = program::setup(&setup_data);
     let (prover_key, _vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
 
-    ProgramData {
+    let setup_params = SetupParams {
       public_params: Arc::new(public_params),
-      setup_data: Arc::new(initilized_setup),
+      setup_data: Arc::new(initialized_setup),
       vk_digest_primary: prover_key.pk_primary.vk_digest,
       vk_digest_secondary: prover_key.pk_secondary.vk_digest,
       rom_data,
-      rom,
-      initial_nivc_input: vec![F::<G1>::ONE],
-      inputs: vec![HashMap::new(), HashMap::new()],
-    }
+    };
+    let proof_params = ProofParams { rom };
+    let instance_params = InstanceParams {
+      nivc_input:     vec![F::<G1>::ONE],
+      private_inputs: vec![HashMap::new(), HashMap::new()],
+    };
+
+    (setup_params, proof_params, instance_params)
   }
 
   #[test]
   fn test_extend_public_inputs() {
     // Setup test data
-    let program_data = create_test_program_data();
+    let (setup_params, proof_params, instance_params) = create_test_program_data();
 
     // Test successful case
-    let result = program_data.extend_public_inputs(None);
+    let result = setup_params.extend_public_inputs(&proof_params.rom, &instance_params.nivc_input);
     assert!(result.is_ok());
 
     let (z0_primary, expanded_rom) = result.unwrap();
@@ -521,12 +533,12 @@ mod tests {
     // Verify z0_primary structure
     assert_eq!(
       z0_primary.len(),
-      program_data.initial_nivc_input.len() + 1 + program_data.setup_data.max_rom_length
+      instance_params.nivc_input.len() + 1 + setup_params.setup_data.max_rom_length
     );
-    assert_eq!(z0_primary[program_data.initial_nivc_input.len()], F::<G1>::ZERO); // Check ROM index is 0
+    assert_eq!(z0_primary[instance_params.nivc_input.len()], F::<G1>::ZERO); // Check ROM index is 0
 
     // Verify ROM expansion
-    assert_eq!(expanded_rom.len(), program_data.setup_data.max_rom_length);
+    assert_eq!(expanded_rom.len(), setup_params.setup_data.max_rom_length);
     assert_eq!(expanded_rom[0], 1u64); // First opcode
     assert_eq!(expanded_rom[1], 2u64); // Second opcode
     assert_eq!(expanded_rom[2], u64::MAX); // Padding
@@ -534,12 +546,12 @@ mod tests {
 
   #[test]
   fn test_extend_public_inputs_missing_opcode() {
-    let mut program_data = create_test_program_data();
+    let (setup_params, mut proof_params, instance_params) = create_test_program_data();
 
     // Add an opcode config that doesn't exist in rom_data
-    program_data.rom.push("nonexistent".to_string());
+    proof_params.rom.push("nonexistent".to_string());
 
-    let result = program_data.extend_public_inputs(None);
+    let result = setup_params.extend_public_inputs(&proof_params.rom, &instance_params.nivc_input);
     assert!(result.is_err());
     assert!(matches!(
         result.unwrap_err(),
@@ -557,35 +569,42 @@ mod tests {
     assert!(mock_inputs.input.1.contains_key("CIRCUIT_3"));
   }
 
-  #[ignore]
   #[test]
   #[tracing_test::traced_test]
   fn test_expand_private_inputs() {
-    let setup_data = UninitializedSetup {
-      r1cs_types:              vec![R1CSType::Raw(vec![])],
-      witness_generator_types: vec![WitnessGeneratorType::Raw(vec![])],
-      max_rom_length:          3,
-    };
-
     let mock_inputs: MockInputs = serde_json::from_str(JSON).unwrap();
-    let program_data = ProgramData::<Offline, NotExpanded> {
-      public_params: vec![],
-      setup_data,
-      rom_data: HashMap::from([
-        (String::from("CIRCUIT_1"), CircuitData { opcode: 0 }),
-        (String::from("CIRCUIT_2"), CircuitData { opcode: 1 }),
-        (String::from("CIRCUIT_3"), CircuitData { opcode: 2 }),
-      ]),
+    let proof_params = ProofParams {
       rom: vec![String::from("CIRCUIT_1"), String::from("CIRCUIT_2"), String::from("CIRCUIT_3")],
-      vk_digest_primary: F::<G1>::ZERO,
-      vk_digest_secondary: F::<G2>::ZERO,
-      initial_nivc_input: vec![],
-      inputs: mock_inputs.input,
     };
-    let program_data = program_data.into_expanded().unwrap();
-    dbg!(&program_data.inputs);
-    assert!(!program_data.inputs[0].is_empty());
-    assert!(!program_data.inputs[1].is_empty());
-    assert!(!program_data.inputs[2].is_empty());
+    let instance_params =
+      InstanceParams::<NotExpanded> { nivc_input: vec![], private_inputs: mock_inputs.input }
+        .into_expanded(&proof_params)
+        .unwrap();
+    dbg!(&instance_params.private_inputs);
+    assert!(!instance_params.private_inputs[0].is_empty());
+    assert!(!instance_params.private_inputs[1].is_empty());
+    assert!(!instance_params.private_inputs[2].is_empty());
+  }
+
+  #[test]
+  fn test_online_to_offline_serialization_round_trip() {
+    let temp_dir = tempdir::TempDir::new("setup").unwrap();
+    let offline_path = temp_dir.path().join("offline");
+
+    let (setup_params_online, ..) = create_test_program_data();
+    let setup_params_offline = setup_params_online.into_offline(offline_path).unwrap();
+
+    // Matches itself
+    assert_eq!(setup_params_offline, setup_params_offline);
+
+    // Verify round-trip serialization for `Offline`
+    let serialized_offline = serde_json::to_string(&setup_params_offline).unwrap();
+    let deserialized_offline: SetupParams<Offline> =
+      serde_json::from_str(&serialized_offline).unwrap();
+    assert_eq!(setup_params_offline, deserialized_offline);
+
+    // Can be "onlined"
+    let result = deserialized_offline.into_online();
+    assert!(result.is_ok());
   }
 }

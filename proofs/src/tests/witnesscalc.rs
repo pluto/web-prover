@@ -1,6 +1,5 @@
 use std::{str::FromStr, sync::Arc};
 
-use program::data::Expanded;
 use serde_json::json;
 
 use super::*;
@@ -36,7 +35,7 @@ fn get_setup_data() -> UninitializedSetup {
 
 async fn run_entry(
   setup_data: UninitializedSetup,
-) -> Result<(ProgramData<Online, Expanded>, RecursiveSNARK<E1>), ProofError> {
+) -> Result<(SetupParams<Online>, RecursiveSNARK<E1>), ProofError> {
   let mut external_input0: HashMap<String, Value> = HashMap::new();
   external_input0.insert("external".to_string(), json!(EXTERNAL_INPUTS[0]));
   let mut external_input1: HashMap<String, Value> = HashMap::new();
@@ -67,21 +66,23 @@ async fn run_entry(
   rom.push(String::from("SWAP_MEMORY"));
   private_inputs.push(HashMap::new());
   let public_params = program::setup(&setup_data);
-  let initialized_setup = initialize_setup_data(&setup_data).unwrap();
+  let initialized_setup = initialize_setup_data(&setup_data)?;
 
-  let program_data = ProgramData::<Online, NotExpanded> {
+  let setup_params = SetupParams::<Online> {
     public_params: Arc::new(public_params),
     setup_data: Arc::new(initialized_setup),
     rom_data,
-    rom,
     vk_digest_primary: F::<G1>::ZERO,
     vk_digest_secondary: F::<G2>::ZERO,
-    initial_nivc_input: vec![F::<G1>::from(1), F::<G1>::from(2)],
-    inputs: (private_inputs, HashMap::new()),
+  };
+  let proof_params = ProofParams { rom };
+  let instance_params = InstanceParams::<NotExpanded> {
+    nivc_input:     vec![F::<G1>::from(1), F::<G1>::from(2)],
+    private_inputs: (private_inputs, HashMap::new()),
   }
-  .into_expanded()?;
-  let recursive_snark = program::run(&program_data).await.unwrap();
-  Ok((program_data, recursive_snark))
+  .into_expanded(&proof_params)?;
+  let recursive_snark = program::run(&setup_params, &proof_params, &instance_params).await?;
+  Ok((setup_params, recursive_snark))
 }
 
 #[tokio::test]
@@ -118,20 +119,20 @@ async fn test_run() {
 #[tracing_test::traced_test]
 async fn test_run_serialized_verify() {
   let setup_data = get_setup_data();
-  let (program_data, recursive_snark) = run_entry(setup_data.clone()).await.unwrap();
+  let (instance_params, recursive_snark) = run_entry(setup_data.clone()).await.unwrap();
 
-  // Pseudo-offline the `PublicParams` and regenerate it
-  let mut program_data =
-    program_data.into_offline(PathBuf::from_str(TEST_OFFLINE_PATH).unwrap()).unwrap();
-  program_data.setup_data = setup_data.clone();
-  let program_data = program_data.into_online().unwrap();
+  // Pseudo-offline the `SetupParams` and regenerate it
+  let mut setup_params =
+    instance_params.into_offline(PathBuf::from_str(TEST_OFFLINE_PATH).unwrap()).unwrap();
+  setup_params.setup_data = setup_data.clone();
+  let setup_params = setup_params.into_online().unwrap();
 
   // Create the compressed proof with the offlined `PublicParams`
-  let proof = program::compress_proof(&recursive_snark, &program_data.public_params).unwrap();
+  let proof = program::compress_proof(&recursive_snark, &setup_params.public_params).unwrap();
   let serialized_compressed_proof = proof.serialize();
   let proof = serialized_compressed_proof.deserialize();
 
-  // Extend the initial state input with the ROM (happens internally inside of `program::run`, so
+  // Extend the initial state input with the ROM (happens internally inside `program::run`, so
   // we do it out here just for the test)
   let mut z0_primary = vec![F::<G1>::ONE, F::<G1>::from(2)];
   z0_primary.push(F::<G1>::ZERO);
@@ -147,8 +148,8 @@ async fn test_run_serialized_verify() {
   z0_primary.extend_from_slice(&rom);
 
   // Check that it verifies with offlined `PublicParams` regenerated pkey vkey
-  let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
-  let res = proof.proof.verify(&program_data.public_params, &vk, &z0_primary, &[F::<G2>::ZERO]);
+  let (_pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&setup_params.public_params).unwrap();
+  let res = proof.proof.verify(&setup_params.public_params, &vk, &z0_primary, &[F::<G2>::ZERO]);
   assert!(res.is_ok());
   std::fs::remove_file(PathBuf::from_str(TEST_OFFLINE_PATH).unwrap()).unwrap();
 }

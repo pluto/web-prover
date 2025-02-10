@@ -229,12 +229,13 @@ pub async fn verify(
       &verifier_inputs.request_messages,
       &verifier_inputs.response_messages,
     )?;
-  let (z0_primary, _) =
-    verifier.program_data.extend_public_inputs(Some(initial_nivc_input.to_vec())).unwrap();
+  let (z0_primary, _) = verifier
+    .setup_params
+    .extend_public_inputs(&verifier.proof_params.rom, &initial_nivc_input.to_vec())?;
   let z0_secondary = vec![F::<G2>::from(0)];
 
   let valid = match proof.proof.verify(
-    &verifier.program_data.public_params,
+    &verifier.setup_params.public_params,
     &verifier.verifier_key,
     &z0_primary,
     &z0_secondary,

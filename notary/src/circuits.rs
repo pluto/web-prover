@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
 use proofs::{
   program::data::{
-    CircuitData, NotExpanded, Offline, Online, ProgramData, R1CSType, UninitializedSetup,
-    WitnessGeneratorType,
+    CircuitData, InstanceParams, NotExpanded, Offline, Online, ProofParams, R1CSType, SetupParams,
+    UninitializedSetup, WitnessGeneratorType,
   },
   E1, F, G1, G2, S1, S2,
 };
@@ -105,7 +105,8 @@ pub fn construct_setup_data(plaintext_length: usize) -> UninitializedSetup {
 }
 
 pub struct Verifier {
-  pub program_data: ProgramData<Online, NotExpanded>,
+  pub setup_params: SetupParams<Online>,
+  pub proof_params: ProofParams,
   pub verifier_key: VerifierKey<E1, S1, S2>,
 }
 
@@ -114,23 +115,21 @@ pub fn initialize_verifier(rom_data: HashMap<String, CircuitData>, rom: Vec<Stri
 
   let bytes = std::fs::read(PROVING_PARAMS_1024).unwrap();
   let setup_data = construct_setup_data(1024);
-  let program_data = ProgramData::<Offline, NotExpanded> {
+  let setup_params = SetupParams::<Offline> {
     public_params: bytes,
     // TODO: These are incorrect, but we don't know them until the internal parser completes.
     // during the transition to `into_online` they're populated.
     vk_digest_primary: F::<G1>::from(0),
     vk_digest_secondary: F::<G2>::from(0),
     setup_data,
-    rom,
     rom_data,
-    initial_nivc_input: vec![F::<G1>::from(0); PUBLIC_IO_VARS],
-    inputs: (Vec::new(), HashMap::new()),
   }
   .into_online()
   .unwrap();
+  let proof_params = ProofParams { rom };
 
   let (pk, verifier_key) =
-    CompressedSNARK::<E1, S1, S2>::setup(&program_data.public_params).unwrap();
+    CompressedSNARK::<E1, S1, S2>::setup(&setup_params.public_params).unwrap();
   debug!(
     "initialized pk pk_primary.digest={:?}, hex(primary)={:?}, pk_secondary.digest={:?}",
     pk.pk_primary.vk_digest,
@@ -138,5 +137,5 @@ pub fn initialize_verifier(rom_data: HashMap<String, CircuitData>, rom: Vec<Stri
     pk.pk_secondary.vk_digest,
   );
 
-  Verifier { program_data, verifier_key }
+  Verifier { setup_params, proof_params, verifier_key }
 }

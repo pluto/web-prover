@@ -224,10 +224,10 @@ fn decrypt_chunk(
     },
   };
 
-  return Ok(DecryptedChunk {
+  Ok(DecryptedChunk {
     plaintext: decrypted_message.payload.0.to_vec(),
     aad:       hex::decode(&meta.additional_data)?,
-  });
+  })
 }
 
 fn parse_cipher_key(key: &[u8]) -> Result<CipherSuiteKey, ClientErrors> {
