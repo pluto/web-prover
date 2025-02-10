@@ -16,6 +16,8 @@ use proofs::{
 };
 use tracing::debug;
 
+use crate::errors::ProxyError;
+
 pub struct Verifier {
   pub setup_params: SetupParams<Online>,
   pub proof_params: ProofParams,

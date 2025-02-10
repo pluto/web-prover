@@ -32,7 +32,6 @@ use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod axum_websocket;
-mod circuits;
 mod config;
 mod errors;
 mod origo;
@@ -40,6 +39,7 @@ mod tcp;
 mod tee;
 mod tls_parser;
 mod tlsn;
+mod verifier;
 mod websocket_proxy;
 
 struct SharedState {
