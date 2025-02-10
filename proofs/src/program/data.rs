@@ -569,8 +569,6 @@ mod tests {
     assert!(mock_inputs.input.1.contains_key("CIRCUIT_3"));
   }
 
-  // TODO: This test is passing when un-ignored. Why was it ignored? Takes a long time on CI?
-  #[ignore]
   #[test]
   #[tracing_test::traced_test]
   fn test_expand_private_inputs() {
