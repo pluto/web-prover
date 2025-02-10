@@ -78,33 +78,33 @@ const PLAINTEXT_AUTHENTICATION_256B_R1CS: &[u8] = include_bytes!(concat!(
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/plaintext_authentication_256b.r1cs"
 ));
-// const PLAINTEXT_AUTHENTICATION_256B_GRAPH: &[u8] = include_bytes!(concat!(
-//   "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
-//   env!("WEB_PROVER_CIRCUITS_VERSION"),
-//   "/plaintext_authentication_256b.bin"
-// ));
+const PLAINTEXT_AUTHENTICATION_256B_GRAPH: &[u8] = include_bytes!(concat!(
+  "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/plaintext_authentication_256b.bin"
+));
 // Circuit 1
 const HTTP_VERIFICATION_256B_R1CS: &[u8] = include_bytes!(concat!(
   "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/http_verification_256b.r1cs"
 ));
-// const HTTP_VERIFICATION_256B_GRAPH: &[u8] = include_bytes!(concat!(
-//   "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
-//   env!("WEB_PROVER_CIRCUITS_VERSION"),
-//   "/http_verification_256b.bin"
-// ));
+const HTTP_VERIFICATION_256B_GRAPH: &[u8] = include_bytes!(concat!(
+  "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/http_verification_256b.bin"
+));
 // Circuit 2
 const JSON_EXTRACTION_256B_R1CS: &[u8] = include_bytes!(concat!(
   "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/json_extraction_256b.r1cs"
 ));
-// const JSON_EXTRACTION_256B_GRAPH: &[u8] = include_bytes!(concat!(
-//   "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
-//   env!("WEB_PROVER_CIRCUITS_VERSION"),
-//   "/json_extraction_256b.bin"
-// ));
+const JSON_EXTRACTION_256B_GRAPH: &[u8] = include_bytes!(concat!(
+  "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/json_extraction_256b.bin"
+));
 
 pub fn construct_setup_data<const CIRCUIT_SIZE: usize>() -> Result<UninitializedSetup, ProofError> {
   let r1cs_types = match CIRCUIT_SIZE {
@@ -125,9 +125,9 @@ pub fn construct_setup_data<const CIRCUIT_SIZE: usize>() -> Result<Uninitialized
   {
     let witness_generator_types = match CIRCUIT_SIZE {
       CIRCUIT_SIZE_256 => vec![
-        // WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_256B_GRAPH.to_vec()),
-        // WitnessGeneratorType::Raw(HTTP_VERIFICATION_256B_GRAPH.to_vec()),
-        // WitnessGeneratorType::Raw(JSON_EXTRACTION_256B_GRAPH.to_vec()),
+        WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_256B_GRAPH.to_vec()),
+        WitnessGeneratorType::Raw(HTTP_VERIFICATION_256B_GRAPH.to_vec()),
+        WitnessGeneratorType::Raw(JSON_EXTRACTION_256B_GRAPH.to_vec()),
       ],
       CIRCUIT_SIZE_512 => vec![
         WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_512B_GRAPH.to_vec()),
