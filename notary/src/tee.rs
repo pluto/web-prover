@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
+  extract,
   extract::{Query, State},
   response::Response,
 };
@@ -9,6 +10,7 @@ use caratls_ekm_google_confidential_space_server::GoogleConfidentialSpaceTokenGe
 #[cfg(feature = "tee-dummy-token-generator")]
 use caratls_ekm_server::DummyTokenGenerator;
 use caratls_ekm_server::TeeTlsAcceptor;
+use client::origo::{OrigoSecrets, SignBody};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use proofs::program::{manifest, manifest::Manifest};
@@ -17,7 +19,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{debug, error, info};
 use ws_stream_tungstenite::WsStream;
-use client::origo::OrigoSecrets;
+
 use crate::{
   axum_websocket::WebSocket, errors::NotaryServerError, origo::proxy_service,
   tlsn::ProtocolUpgrade, SharedState,
@@ -106,26 +108,28 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let manifest_bytes = read_wire_struct(&mut tee_tls_stream).await;
   // TODO: Consider implementing from_stream instead of read_wire_struct
   let manifest = Manifest::from_wire_bytes(&manifest_bytes);
-  dbg!(manifest);
+  // dbg!(&manifest);
 
   // TODO wait for TLS secrets
   let secret_bytes = read_wire_struct(&mut tee_tls_stream).await;
   let origo_secrets = OrigoSecrets::from_wire_bytes(&secret_bytes);
-  dbg!(origo_secrets);
+  // dbg!(&origo_secrets);
 
-  // Keep reading into buf until you get the ending byte
-  loop {
-    let mut buf: [u8; 10] = [0u8; 10];
-    tee_tls_stream.read(&mut buf).await?;
-    dbg!(buf);
-    if buf.to_vec().iter().all(|b| *b == 0) {
-      debug!("Got all bytes");
-      break;
-    }
-  }
+  let handshake_server_key =
+    origo_secrets.handshake_server_key().expect("Handshake server key missing");
+  let handshake_server_iv =
+    origo_secrets.handshake_server_iv().expect("Handshake server IV missing");
 
-  // TODO decrypt session with TLS secrets
+  // TODO (autoparallel): This duplicates some code we see in `notary/src/origo.rs`, so we could
+  //  maybe clean this up and share code.
   let transcript = state.origo_sessions.lock().unwrap().get(session_id).cloned().unwrap();
+  let parsed_transcript = transcript
+    .into_flattened()
+    .unwrap()
+      // TODO: Panics with error: called `Result::unwrap()` on an `Err` value: TlsParser { position: 4142, remaining: 64, e: "Parsing requires 135 bytes/chars" }
+    .into_parsed(&handshake_server_key, &handshake_server_iv)
+    .unwrap();
+  dbg!(parsed_transcript);
 
   // TODO apply manifest
   // TODO return web proof
@@ -133,6 +137,7 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   Ok(())
 }
 
+// TODO: Refactor into struct helpers/trait
 async fn read_wire_struct<R: AsyncReadExt + Unpin>(stream: &mut R) -> Vec<u8> {
   // Buffer to store the "header" (4 bytes, indicating the length of the struct)
   let mut len_buf = [0u8; 4];
@@ -141,7 +146,7 @@ async fn read_wire_struct<R: AsyncReadExt + Unpin>(stream: &mut R) -> Vec<u8> {
 
   // Deserialize the length prefix (convert from little-endian to usize)
   let body_len = u32::from_le_bytes(len_buf) as usize;
-  dbg!(format!("body_len={body_len}"));
+  // dbg!(format!("body_len={body_len}"));
 
   // Allocate a buffer to hold only the bytes needed for the struct
   let mut body_buf = vec![0u8; body_len];

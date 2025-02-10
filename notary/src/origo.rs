@@ -64,9 +64,10 @@ pub async fn sign(
 ) -> Result<Json<SignReply>, ProxyError> {
   let transcript = state.origo_sessions.lock().unwrap().get(&query.session_id).cloned().unwrap();
 
-  let r = transcript
-    .into_flattened()?
-    .into_parsed(payload.handshake_server_key, payload.handshake_server_iv);
+  let handshake_server_key = hex::decode(payload.handshake_server_key).unwrap();
+  let handshake_server_iv = hex::decode(payload.handshake_server_iv).unwrap();
+
+  let r = transcript.into_flattened()?.into_parsed(&handshake_server_key, &handshake_server_iv);
   let parsed_transcript = match r {
     Ok(p) => p,
     Err(e) => {

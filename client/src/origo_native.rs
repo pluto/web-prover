@@ -18,13 +18,13 @@ use proofs::{
 use serde::{Deserialize, Serialize};
 use tls_client2::origo::OrigoConnection;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
-use tracing::debug;
+use tracing::{debug, error};
 
 use crate::{
   config::{self, NotaryMode},
   errors::ClientErrors,
+  origo::OrigoSecrets,
 };
-use crate::origo::OrigoSecrets;
 
 /// We want to be able to specify somewhere in here what cipher suite to use.
 /// Perhaps the config object should have this information.
@@ -160,7 +160,6 @@ pub(crate) async fn proxy(
 
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
 
-
   if config.mode == NotaryMode::TEE {
     // wait for tls connection
     let (_, mut reunited_socket) = tls_fut_task.await?.unwrap();
@@ -173,7 +172,6 @@ pub(crate) async fn proxy(
 
     // TODO: read web proof (a bit awkward but proxy will have to return the it)
   }
-
 
   Ok(origo_conn)
 }

@@ -180,6 +180,14 @@ pub(crate) async fn generate_proof(
 pub struct OrigoSecrets(HashMap<String, Vec<u8>>);
 
 impl OrigoSecrets {
+  pub fn handshake_server_iv(&self) -> Option<Vec<u8>> {
+    self.0.get("Handshake:server_iv").map(|iv| iv.clone())
+  }
+
+  pub fn handshake_server_key(&self) -> Option<Vec<u8>> {
+    self.0.get("Handshake:server_key").map(|key| key.clone())
+  }
+
   pub fn from_origo_conn(origo_conn: &OrigoConnection) -> Self {
     Self(origo_conn.secret_map.clone())
   }
