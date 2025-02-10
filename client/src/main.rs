@@ -33,7 +33,7 @@ async fn main() -> Result<(), ClientErrors> {
   let mut config: Config = serde_json::from_str(&config_json)?;
   config.set_session_id();
 
-  let proving_params = std::fs::read(proofs::circuits::PROVING_PARAMS_512).unwrap();
+  let proving_params = std::fs::read(proofs::circuits::PROVING_PARAMS_256).unwrap();
   let proof = client::prover_inner(config, Some(proving_params)).await?;
   let proof_json = serde_json::to_string_pretty(&proof)?;
   println!("Proving Successful: proof_len={:?}", proof_json.len());

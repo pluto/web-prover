@@ -157,7 +157,7 @@ pub(crate) async fn generate_proof(
 
   let vk_digest_primary = program_data.vk_digest_primary;
   let vk_digest_secondary = program_data.vk_digest_secondary;
-  crate::proof::construct_program_data_and_proof::<{ proofs::circuits::CIRCUIT_SIZE_512 }>(
+  crate::proof::construct_program_data_and_proof::<{ proofs::circuits::CIRCUIT_SIZE_256 }>(
     manifest,
     request_inputs,
     response_inputs,

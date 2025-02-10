@@ -10,7 +10,7 @@ use client::origo::{SignBody, VerifyBody, VerifyReply};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use proofs::{
-  circuits::{CIRCUIT_SIZE_512, MAX_STACK_HEIGHT},
+  circuits::{CIRCUIT_SIZE_256, MAX_STACK_HEIGHT},
   program::manifest::InitialNIVCInputs,
   proof::FoldingProof,
   F, G1, G2,
@@ -27,10 +27,10 @@ use ws_stream_tungstenite::WsStream;
 
 use crate::{
   axum_websocket::WebSocket,
-  circuits::initialize_verifier,
   errors::{NotaryServerError, ProxyError},
   tls_parser::{Direction, Transcript, UnparsedMessage},
   tlsn::ProtocolUpgrade,
+  verifier::initialize_verifier,
   SharedState,
 };
 
@@ -229,10 +229,10 @@ pub async fn verify(
   debug!("circuits {:?}", payload.origo_proof.rom.circuit_data);
   debug!("rom {:?}", payload.origo_proof.rom.rom);
   let verifier =
-    initialize_verifier(payload.origo_proof.rom.circuit_data, payload.origo_proof.rom.rom);
+    initialize_verifier(payload.origo_proof.rom.circuit_data, payload.origo_proof.rom.rom)?;
 
   let InitialNIVCInputs { initial_nivc_input, .. } =
-    state.manifest.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE_512>(
+    state.manifest.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE_256>(
       &verifier_inputs.request_messages,
       &verifier_inputs.response_messages,
     )?;
