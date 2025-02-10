@@ -139,7 +139,7 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
 
   // Response Preparation
   let response_key = parse_cipher_key(&witness.response.aead_key)?;
-  let response_iv: [u8; 12] = witness.response.aead_iv[..12].try_into().unwrap();
+  let response_iv: [u8; 12] = witness.response.aead_iv[..12].try_into()?;
   let response_seq = request_seq + request_plaintext.len() as u64;
   let (response_ciphertext, response_plaintext): (Vec<_>, Vec<_>) = witness
     .response
@@ -196,7 +196,7 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
 }
 
 fn decrypt_chunk(
-  ciphertext: &Vec<u8>,
+  ciphertext: &[u8],
   key: &CipherSuiteKey,
   iv: [u8; 12],
   sequence_number: u64,
@@ -208,7 +208,7 @@ fn decrypt_chunk(
         &OpaqueMessage {
           typ:     ContentType::ApplicationData,
           version: ProtocolVersion::TLSv1_3,
-          payload: Payload::new(ciphertext.clone()),
+          payload: Payload::new(ciphertext.to_owned()),
         },
         sequence_number,
       )?
@@ -219,7 +219,7 @@ fn decrypt_chunk(
         &OpaqueMessage {
           typ:     ContentType::ApplicationData,
           version: ProtocolVersion::TLSv1_3,
-          payload: Payload::new(ciphertext.clone()),
+          payload: Payload::new(ciphertext.to_owned()),
         },
         sequence_number,
       )?

@@ -181,11 +181,11 @@ pub struct OrigoSecrets(HashMap<String, Vec<u8>>);
 
 impl OrigoSecrets {
   pub fn handshake_server_iv(&self) -> Option<Vec<u8>> {
-    self.0.get("Handshake:server_iv").map(|iv| iv.clone())
+    self.0.get("Handshake:server_iv").cloned()
   }
 
   pub fn handshake_server_key(&self) -> Option<Vec<u8>> {
-    self.0.get("Handshake:server_key").map(|key| key.clone())
+    self.0.get("Handshake:server_key").cloned()
   }
 
   pub fn from_origo_conn(origo_conn: &OrigoConnection) -> Self {

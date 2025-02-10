@@ -50,16 +50,24 @@ pub struct ClosedConnection {
   pub recv:   Vec<u8>,
 }
 
+/// A result type alias for a closed connection and its associated socket. Primarily returned by
+/// `bind_client` to represent the outcome of establishing a client connection.
+///
+/// This alias represents one of the following outcomes:
+/// - A successful [`ClosedConnection`] paired with a socket of type `T`.
+/// - A failure encapsulated in a [`ConnectionError`].
+pub type MaybeConnectionWithSocket<T> = Result<(ClosedConnection, T), ConnectionError>;
+
 /// A future which runs the TLS connection to completion.
 ///
 /// This future must be polled in order for the connection to make progress.
 #[must_use = "futures do nothing unless polled"]
 pub struct ConnectionFuture<T> {
-  fut: Pin<Box<dyn Future<Output = Result<(ClosedConnection, T), ConnectionError>> + Send>>,
+  fut: Pin<Box<dyn Future<Output = MaybeConnectionWithSocket<T>> + Send>>,
 }
 
 impl<T> Future for ConnectionFuture<T> {
-  type Output = Result<(ClosedConnection, T), ConnectionError>;
+  type Output = MaybeConnectionWithSocket<T>;
 
   fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
     self.fut.poll_unpin(cx)

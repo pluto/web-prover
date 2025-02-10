@@ -8,17 +8,9 @@ use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVe
 use futures::AsyncWriteExt;
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
-use proofs::{
-  program::{
-    data::{NotExpanded, Offline, ProgramData},
-    manifest::{EncryptionInput, Manifest},
-  },
-  F, G1, G2,
-};
-use serde::{Deserialize, Serialize};
 use tls_client2::origo::OrigoConnection;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
-use tracing::{debug, error};
+use tracing::debug;
 
 use crate::{
   config::{self, NotaryMode},
