@@ -1544,7 +1544,7 @@ dependencies = [
 
 [[package]]
 name = "client_wasm"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "cargo_metadata",
  "client",
@@ -3877,7 +3877,7 @@ dependencies = [
 
 [[package]]
 name = "notary"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "alloy-primitives",
  "async-trait",
