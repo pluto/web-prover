@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
 use proofs::{
-  circuits::{construct_setup_data, PROVING_PARAMS_512},
+  circuits::{construct_setup_data_from_fs, PROVING_PARAMS_512},
   program::data::{CircuitData, Offline, Online, ProofParams, SetupParams},
   E1, F, G1, G2, S1, S2,
 };
@@ -36,7 +36,7 @@ pub fn flatten_rom(rom: Vec<String>) -> Vec<String> {
 
 pub fn initialize_verifier() -> Result<Verifier, ProxyError> {
   let bytes = std::fs::read(PROVING_PARAMS_512)?;
-  let setup_data = construct_setup_data::<{ proofs::circuits::CIRCUIT_SIZE_512 }>()?;
+  let setup_data = construct_setup_data_from_fs::<{ proofs::circuits::CIRCUIT_SIZE_512 }>()?;
   let rom_data = HashMap::from([
     (String::from("PLAINTEXT_AUTHENTICATION"), CircuitData { opcode: 0 }),
     (String::from("HTTP_VERIFICATION"), CircuitData { opcode: 1 }),

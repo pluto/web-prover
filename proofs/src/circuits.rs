@@ -114,7 +114,8 @@ fn load_bytes(path: &str) -> Result<Vec<u8>, std::io::Error> {
   fs::read(artifact_path)
 }
 
-pub fn construct_setup_data<const CIRCUIT_SIZE: usize>() -> Result<UninitializedSetup, ProofError> {
+pub fn construct_setup_data_from_fs<const CIRCUIT_SIZE: usize>(
+) -> Result<UninitializedSetup, ProofError> {
   let r1cs_types = match CIRCUIT_SIZE {
     CIRCUIT_SIZE_256 => vec![
       R1CSType::Raw(load_bytes(PLAINTEXT_AUTHENTICATION_256B_R1CS)?),
@@ -129,51 +130,19 @@ pub fn construct_setup_data<const CIRCUIT_SIZE: usize>() -> Result<Uninitialized
     _ => return Err(ProofError::InvalidCircuitSize),
   };
 
-  #[cfg(not(target_arch = "wasm32"))]
-  {
-    let witness_generator_types = match CIRCUIT_SIZE {
-      CIRCUIT_SIZE_256 => vec![
-        WitnessGeneratorType::Raw(load_bytes(PLAINTEXT_AUTHENTICATION_256B_GRAPH)?),
-        WitnessGeneratorType::Raw(load_bytes(HTTP_VERIFICATION_256B_GRAPH)?),
-        WitnessGeneratorType::Raw(load_bytes(JSON_EXTRACTION_256B_GRAPH)?),
-      ],
-      CIRCUIT_SIZE_512 => vec![
-        WitnessGeneratorType::Raw(load_bytes(PLAINTEXT_AUTHENTICATION_512B_GRAPH)?),
-        WitnessGeneratorType::Raw(load_bytes(HTTP_VERIFICATION_512B_GRAPH)?),
-        WitnessGeneratorType::Raw(load_bytes(JSON_EXTRACTION_512B_GRAPH)?),
-      ],
-      _ => return Err(ProofError::InvalidCircuitSize),
-    };
-
-    Ok(UninitializedSetup { r1cs_types, witness_generator_types, max_rom_length: MAX_ROM_LENGTH })
-  }
-
-  #[cfg(target_arch = "wasm32")]
-  {
-    Ok(UninitializedSetup {
-      r1cs_types,
-      witness_generator_types: vec![WitnessGeneratorType::Browser; 3],
-      max_rom_length: MAX_ROM_LENGTH,
-    })
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use crate::{
-    circuits::{construct_setup_data, CIRCUIT_SIZE_256},
-    program::data::UninitializedSetup,
+  let witness_generator_types = match CIRCUIT_SIZE {
+    CIRCUIT_SIZE_256 => vec![
+      WitnessGeneratorType::Raw(load_bytes(PLAINTEXT_AUTHENTICATION_256B_GRAPH)?),
+      WitnessGeneratorType::Raw(load_bytes(HTTP_VERIFICATION_256B_GRAPH)?),
+      WitnessGeneratorType::Raw(load_bytes(JSON_EXTRACTION_256B_GRAPH)?),
+    ],
+    CIRCUIT_SIZE_512 => vec![
+      WitnessGeneratorType::Raw(load_bytes(PLAINTEXT_AUTHENTICATION_512B_GRAPH)?),
+      WitnessGeneratorType::Raw(load_bytes(HTTP_VERIFICATION_512B_GRAPH)?),
+      WitnessGeneratorType::Raw(load_bytes(JSON_EXTRACTION_512B_GRAPH)?),
+    ],
+    _ => return Err(ProofError::InvalidCircuitSize),
   };
 
-  #[test]
-  fn test_setup_data_persistence() {
-    let expected_setup = construct_setup_data::<CIRCUIT_SIZE_256>().unwrap();
-    let setup_dir = tempdir::TempDir::new("setup").unwrap().path().to_path_buf();
-    std::fs::create_dir_all(&setup_dir).unwrap();
-    let setup_path = setup_dir.join("setup.bin");
-    expected_setup.to_path(&setup_path).unwrap();
-
-    let actual_setup = UninitializedSetup::from_path(&setup_path).unwrap();
-    assert_eq!(expected_setup, actual_setup);
-  }
+  Ok(UninitializedSetup { r1cs_types, witness_generator_types, max_rom_length: MAX_ROM_LENGTH })
 }

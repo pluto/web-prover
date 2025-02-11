@@ -2,9 +2,9 @@
 use std::collections::HashMap;
 
 use proofs::{
-  circuits::construct_setup_data,
+  circuits::construct_setup_data_from_fs,
   program::{
-    data::{Offline, SetupParams},
+    data::{Offline, SetupParams, UninitializedSetup},
     manifest::{EncryptionInput, Manifest, TLSEncryption},
   },
   F, G1, G2,
@@ -100,7 +100,7 @@ pub async fn verify(
   };
 
   let response = client.post(url).json(&verify_body).send().await?;
-  assert!(response.status() == hyper::StatusCode::OK, "response={:?}", response);
+  assert_eq!(response.status(), hyper::StatusCode::OK, "response={:?}", response);
   let verify_response = response.json::<VerifyReply>().await?;
 
   debug!("\n{:?}\n\n", verify_response.clone());
@@ -111,6 +111,7 @@ pub async fn verify(
 pub(crate) async fn proxy_and_sign_and_generate_proof(
   config: config::Config,
   proving_params: Option<Vec<u8>>,
+  setup_data: UninitializedSetup,
 ) -> Result<OrigoProof, ClientErrors> {
   let session_id = config.session_id.clone();
 
@@ -141,7 +142,8 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
   let manifest = config.proving.manifest.unwrap();
 
   let proof =
-    generate_proof(manifest, proving_params.unwrap(), request_inputs, response_inputs).await?;
+    generate_proof(manifest, proving_params.unwrap(), setup_data, request_inputs, response_inputs)
+      .await?;
 
   Ok(proof)
 }
@@ -149,10 +151,10 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
 pub(crate) async fn generate_proof(
   manifest: Manifest,
   proving_params: Vec<u8>,
+  setup_data: UninitializedSetup,
   request_inputs: EncryptionInput,
   response_inputs: EncryptionInput,
 ) -> Result<OrigoProof, ClientErrors> {
-  let setup_data = construct_setup_data::<{ proofs::circuits::CIRCUIT_SIZE_512 }>()?;
   let program_data = SetupParams::<Offline> {
     public_params: proving_params,
     vk_digest_primary: F::<G1>::from(0), // These need to be right.

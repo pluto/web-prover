@@ -99,6 +99,9 @@ pub enum ClientErrors {
   #[error(transparent)]
   Canceled(#[from] futures::channel::oneshot::Canceled),
 
+  #[error("Missing setup data")]
+  MissingSetupData,
+
   #[error("Manifest missing")]
   ManifestMissingError,
 }
