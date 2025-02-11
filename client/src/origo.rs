@@ -29,6 +29,7 @@ pub struct SignBody {
 pub struct VerifyBody {
   pub session_id:  String,
   pub origo_proof: OrigoProof,
+  pub manifest:    Manifest,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

@@ -227,7 +227,7 @@ pub async fn verify(
   let verifier = &state.verifier;
 
   let InitialNIVCInputs { initial_nivc_input, .. } =
-    state.manifest.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE_512>(
+    payload.manifest.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE_512>(
       &verifier_inputs.request_messages,
       &verifier_inputs.response_messages,
     )?;
