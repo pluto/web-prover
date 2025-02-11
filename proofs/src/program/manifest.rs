@@ -386,7 +386,7 @@ fn build_json_extraction_circuit_inputs<const CIRCUIT_SIZE: usize>(
     private_inputs.push(HashMap::from([
       (
         String::from(DATA_SIGNAL_NAME),
-        json!(&ByteOrPad::pad_to_nearest_multiple(&pt, CIRCUIT_SIZE)),
+        json!(&ByteOrPad::pad_to_nearest_multiple(pt, CIRCUIT_SIZE)),
       ),
       (
         String::from("ciphertext_digest"),
@@ -422,11 +422,11 @@ impl Manifest {
   ) -> Result<InitialNIVCInputs, ProofError> {
     let padded_request_ciphertext = request_ciphertext
       .iter()
-      .map(|c| ByteOrPad::pad_to_nearest_multiple(&c, CIRCUIT_SIZE))
+      .map(|c| ByteOrPad::pad_to_nearest_multiple(c, CIRCUIT_SIZE))
       .collect::<Vec<Vec<ByteOrPad>>>();
     let padded_response_ciphertext = response_ciphertext
       .iter()
-      .map(|c| ByteOrPad::pad_to_nearest_multiple(&c, CIRCUIT_SIZE))
+      .map(|c| ByteOrPad::pad_to_nearest_multiple(c, CIRCUIT_SIZE))
       .collect::<Vec<Vec<ByteOrPad>>>();
 
     let mut ciphertext_digest = F::<G1>::ZERO;

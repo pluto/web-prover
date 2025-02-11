@@ -9,7 +9,6 @@ fn main() {
   println!("cargo:rerun-if-changed=../.git/refs/heads/main");
 
   // add custom trusted CA (useful for local debugging)
-  println!("helpp!!");
   if let Ok(notary_ca_cert_path) = env::var("NOTARY_CA_CERT_PATH") {
     println!("Using NOTARY_CA_CERT_PATH={}", notary_ca_cert_path);
     println!("cargo:rustc-cfg=feature=\"notary_ca_cert\"");
