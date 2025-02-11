@@ -22,8 +22,7 @@ ff                                  ={ version="0.13", default-features=false, f
 bellpepper-core                     ="0.4"
 halo2curves                         ="0.6.1"
 url                                 ="2.5"
-web-proof-circuits-witness-generator={ git="https://github.com/pluto/web-prover-circuits" }
-# web-proof-circuits-witness-generator={ path="../../web-prover-circuits/witness-generator" }
+web-proof-circuits-witness-generator={ workspace=true }
 
 byteorder ="1.5"
 num-bigint="0.4"

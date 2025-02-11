@@ -496,6 +496,12 @@ fn build_plaintext_authentication_circuit_inputs<const CIRCUIT_SIZE: usize>(
   let mut plaintext_step_out = F::<G1>::ZERO;
 
   let key = inputs.key.as_ref();
+  debug!("key: {:?}", key);
+  debug!("iv: {:?}", inputs.iv);
+  debug!("seq: {:?}", inputs.seq);
+  debug!("aad: {:?}", inputs.aad);
+  debug!("plaintext: {:?}", inputs.plaintext);
+  debug!("ciphertext: {:?}", inputs.ciphertext);
   assert_eq!(key.len(), 32, "Only CHACHA20POLY1305 is supported for now");
 
   let counter_step = CIRCUIT_SIZE / 64;
@@ -572,6 +578,8 @@ fn build_http_verification_circuit_inputs<const CIRCUIT_SIZE: usize>(
 ) -> Result<(F<G1>, Vec<u8>), ProofError> {
   // pad request plaintext and ciphertext to circuit size
   let plaintext = plaintext_chunks.iter().flatten().cloned().collect::<Vec<u8>>();
+  debug!("plaintext: {:?}", plaintext.len());
+  debug!("plaintext: {:?}", plaintext);
 
   let mut main_digests =
     headers_digest.iter().map(|h| field_element_to_base10_string(*h)).collect::<Vec<_>>();
@@ -654,6 +662,8 @@ fn build_json_extraction_circuit_inputs<const CIRCUIT_SIZE: usize>(
   let value_digest = polynomial_digest(&value, polynomial_input, 0);
 
   // no need to supply padded input as state is always from valid ascii
+  debug!("inputs: {:?}", inputs.len());
+  debug!("inputs: {:?}", inputs);
   let states = parse::<MAX_STACK_HEIGHT>(inputs, polynomial_input)?;
   for (i, pt) in inputs.chunks(CIRCUIT_SIZE).enumerate() {
     let state = if i == 0 {
@@ -772,13 +782,16 @@ impl Manifest {
     let header_verification_lock = all_digest.iter().map(|d| poseidon::<1>(&[*d])).sum::<F<G1>>();
     let num_matches = 1 + self.request.headers.len() + 1 + self.response.headers.len();
 
+    let initial_http_machine_digest =
+      polynomial_digest(&[1, 0, 0, 0, 0, 0, 0, 1], ciphertext_digest, 0);
+
     Ok(InitialNIVCInputs {
       ciphertext_digest,
       initial_nivc_input: [
         ciphertext_digest,
         F::<G1>::ONE,
         F::<G1>::ONE,
-        F::<G1>::ONE,
+        initial_http_machine_digest,
         header_verification_lock,
         F::<G1>::from(num_matches as u64),
         F::<G1>::ZERO,
