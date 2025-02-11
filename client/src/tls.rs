@@ -44,7 +44,7 @@ pub fn tls_client2_default_root_store(
   }));
 
   if let Some(trust_anchors) = additional_trust_anchors {
-    for (trust_anchor) in trust_anchors.iter() {
+    for trust_anchor in trust_anchors.iter() {
       let certificate = pki_types::CertificateDer::from(trust_anchor.clone());
       let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
       assert_eq!(added, 1); // TODO there is probably a better way
