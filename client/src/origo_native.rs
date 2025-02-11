@@ -119,7 +119,9 @@ pub(crate) async fn proxy(
         .with_no_client_auth()
     } else {
       rustls::ClientConfig::builder()
-        .with_root_certificates(crate::tls::rustls_default_root_store())
+        .with_root_certificates(crate::tls::rustls_default_root_store(
+          config.notary_ca_cert.clone().map(|c| vec![c]),
+        ))
         .with_no_client_auth()
     };
     let notary_connector = tokio_rustls::TlsConnector::from(Arc::new(client_notary_config));

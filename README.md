@@ -113,10 +113,6 @@ rust-analyzer might not pick up on the llvm path, you can manually let it know v
 }
 ```
 
-#### `ERROR notary: 349: TLS acceptance error: received fatal alert: UnknownCA`
-
-Try clearing your cache (`cargo clean`) and building in release mode (`--release`)
-
 #### `Error: LLVM version must be 18 or higher. Found xxxxxx.`
 
 - Follow instruction at https://apt.llvm.org/

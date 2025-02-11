@@ -349,7 +349,7 @@ fn build_http_verification_circuit_inputs<const CIRCUIT_SIZE: usize>(
   let mut main_digests =
     headers_digest.iter().map(|h| field_element_to_base10_string(*h)).collect::<Vec<_>>();
   main_digests
-    .extend(std::iter::repeat("0".to_string()).take(MAX_HTTP_HEADERS + 1 - headers_digest.len()));
+    .extend(std::iter::repeat_n("0".to_string(), MAX_HTTP_HEADERS + 1 - headers_digest.len()));
 
   debug!("main_digests: {:?}", main_digests);
 
