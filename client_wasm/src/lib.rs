@@ -1,6 +1,6 @@
 use std::panic;
 
-use client::config::Config;
+use client::{config::Config, UninitializedSetup};
 use tlsn_core::proof::TlsProof;
 use tracing::debug;
 use tracing_subscriber::{
@@ -33,17 +33,51 @@ impl ProvingParamsWasm {
 }
 
 #[wasm_bindgen]
-pub async fn prover(config: JsValue, proving_params: ProvingParamsWasm) -> Result<String, JsValue> {
+pub struct UninitializedSetupWasm {
+  pub(crate) r1cs_types:              Vec<js_sys::Uint8Array>,
+  pub(crate) witness_generator_types: Vec<js_sys::Uint8Array>,
+}
+
+#[wasm_bindgen]
+impl UninitializedSetupWasm {
+  #[wasm_bindgen(constructor)]
+  pub fn new(
+    r1cs_types: Vec<js_sys::Uint8Array>,
+    witness_generator_types: Vec<js_sys::Uint8Array>,
+  ) -> Self {
+    Self { r1cs_types, witness_generator_types }
+  }
+}
+
+impl UninitializedSetupWasm {
+  pub fn to_canonical(&self) -> UninitializedSetup {
+    let r1cs_types = self.r1cs_types.iter().map(|r1cs| r1cs.to_vec()).collect();
+    let witness_generator_types =
+      self.witness_generator_types.iter().map(|wgt| wgt.to_vec()).collect();
+    UninitializedSetup::from_raw_parts(r1cs_types, witness_generator_types)
+  }
+}
+
+#[wasm_bindgen]
+pub async fn prover(
+  config: JsValue,
+  proving_params: ProvingParamsWasm,
+  setup_data: UninitializedSetupWasm,
+) -> Result<String, JsValue> {
   panic::set_hook(Box::new(console_error_panic_hook::hook));
 
   debug!("start config serde");
-  let mut config: Config = serde_wasm_bindgen::from_value(config).unwrap(); // TODO replace unwrap
+  let mut config: Config = serde_wasm_bindgen::from_value(config)?;
   config.set_session_id();
   debug!("end config serde");
 
-  let proof = client::prover_inner(config, Some(proving_params.aux_params.to_vec()))
-    .await
-    .map_err(|e| JsValue::from_str(&format!("Could not produce proof: {:?}", e)))?;
+  let proof = client::prover_inner(
+    config,
+    Some(proving_params.aux_params.to_vec()),
+    Some(setup_data.to_canonical()),
+  )
+  .await
+  .map_err(|e| JsValue::from_str(&format!("Could not produce proof: {:?}", e)))?;
 
   serde_json::to_string_pretty(&proof)
     .map_err(|e| JsValue::from_str(&format!("Could not serialize proof: {:?}", e)))

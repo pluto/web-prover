@@ -16,7 +16,11 @@ use std::collections::HashMap;
 
 use origo::SignedVerificationReply;
 use proofs::{
-  program::manifest::{Manifest, NIVCRom},
+  circuits::{construct_setup_data_from_fs, CIRCUIT_SIZE_512},
+  program::{
+    data::UninitializedSetup,
+    manifest::{Manifest, NIVCRom},
+  },
   proof::FoldingProof,
 };
 use serde::{Deserialize, Serialize};
@@ -50,11 +54,12 @@ pub fn get_web_prover_circuits_version() -> String {
 pub async fn prover_inner(
   config: config::Config,
   proving_params: Option<Vec<u8>>,
+  setup_data: Option<UninitializedSetup>,
 ) -> Result<Proof, errors::ClientErrors> {
   info!("GIT_HASH: {}", env!("GIT_HASH"));
   match config.mode {
     config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
-    config::NotaryMode::Origo => prover_inner_origo(config, proving_params).await,
+    config::NotaryMode::Origo => prover_inner_origo(config, proving_params, setup_data).await,
     config::NotaryMode::TEE => prover_inner_tee(config).await,
     config::NotaryMode::Proxy => prover_inner_proxy(config).await,
   }
@@ -97,10 +102,22 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, erro
 pub async fn prover_inner_origo(
   config: config::Config,
   proving_params: Option<Vec<u8>>,
+  setup_data: Option<UninitializedSetup>,
 ) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id.clone();
 
-  let mut proof = origo::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
+  let setup_data = if let Some(setup_data) = setup_data {
+    Ok(setup_data)
+  } else if !cfg!(target_os = "ios") && !cfg!(target_arch = "wasm32") {
+    // TODO: How do we decide which CIRCUIT_SIZE_* to use here?
+    construct_setup_data_from_fs::<CIRCUIT_SIZE_512>()
+      .map_err(|e| ClientErrors::Other(e.to_string()))
+  } else {
+    Err(ClientErrors::MissingSetupData)
+  }?;
+
+  let mut proof =
+    origo::proxy_and_sign_and_generate_proof(config.clone(), proving_params, setup_data).await?;
 
   let manifest =
     config.proving.manifest.clone().ok_or(errors::ClientErrors::ManifestMissingError)?;
