@@ -26,17 +26,17 @@ pub const PROVING_PARAMS_BYTES_512: &[u8] = include_bytes!(concat!(
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/serialized_setup_512b_rom_length_100.bin"
 ));
-pub const PROVING_PARAMS_256: &str = concat!(
-  "proofs/web_proof_circuits/circom-artifacts-256b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/serialized_setup_256b_rom_length_100.bin"
-);
-#[cfg(not(target_arch = "wasm32"))]
-pub const PROVING_PARAMS_BYTES_256: &[u8] = include_bytes!(concat!(
-  "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/serialized_setup_256b_rom_length_100.bin"
-));
+// pub const PROVING_PARAMS_256: &str = concat!(
+//   "proofs/web_proof_circuits/circom-artifacts-256b-v",
+//   env!("WEB_PROVER_CIRCUITS_VERSION"),
+//   "/serialized_setup_256b_rom_length_100.bin"
+// );
+// #[cfg(not(target_arch = "wasm32"))]
+// pub const PROVING_PARAMS_BYTES_256: &[u8] = include_bytes!(concat!(
+//   "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
+//   env!("WEB_PROVER_CIRCUITS_VERSION"),
+//   "/serialized_setup_256b_rom_length_100.bin"
+// ));
 
 // -------------------------------------- 512B circuits -------------------------------------- //
 // Circuit 0

@@ -7,11 +7,8 @@ use std::collections::HashMap;
 
 use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
 use proofs::{
-  circuits::{construct_setup_data, PROVING_PARAMS_512, PUBLIC_IO_VARS},
-  program::data::{
-    CircuitData, InstanceParams, NotExpanded, Offline, Online, ProofParams, R1CSType, SetupParams,
-    UninitializedSetup, WitnessGeneratorType,
-  },
+  circuits::{construct_setup_data, PROVING_PARAMS_512},
+  program::data::{CircuitData, Offline, Online, ProofParams, SetupParams},
   E1, F, G1, G2, S1, S2,
 };
 use tracing::debug;
@@ -24,11 +21,12 @@ pub struct Verifier {
   pub verifier_key: VerifierKey<E1, S1, S2>,
 }
 
-pub fn initialize_verifier(rom_data: HashMap<String, CircuitData>, rom: Vec<String>) -> Verifier {
-  // let params_1024 = (PROVING_PARAMS_1024, 1024, rom_data, rom.clone());
-
-  let bytes = std::fs::read(PROVING_PARAMS_512).unwrap();
-  let setup_data = construct_setup_data();
+pub fn initialize_verifier(
+  rom_data: HashMap<String, CircuitData>,
+  rom: Vec<String>,
+) -> Result<Verifier, ProxyError> {
+  let bytes = std::fs::read(PROVING_PARAMS_512)?;
+  let setup_data = construct_setup_data::<{ proofs::circuits::CIRCUIT_SIZE_512 }>()?;
   let setup_params = SetupParams::<Offline> {
     public_params: bytes,
     // TODO: These are incorrect, but we don't know them until the internal parser completes.
@@ -38,12 +36,10 @@ pub fn initialize_verifier(rom_data: HashMap<String, CircuitData>, rom: Vec<Stri
     setup_data,
     rom_data,
   }
-  .into_online()
-  .unwrap();
+  .into_online()?;
   let proof_params = ProofParams { rom };
 
-  let (pk, verifier_key) =
-    CompressedSNARK::<E1, S1, S2>::setup(&setup_params.public_params).unwrap();
+  let (pk, verifier_key) = CompressedSNARK::<E1, S1, S2>::setup(&setup_params.public_params)?;
   debug!(
     "initialized pk pk_primary.digest={:?}, hex(primary)={:?}, pk_secondary.digest={:?}",
     pk.pk_primary.vk_digest,
@@ -51,5 +47,5 @@ pub fn initialize_verifier(rom_data: HashMap<String, CircuitData>, rom: Vec<Stri
     pk.pk_secondary.vk_digest,
   );
 
-  Verifier { setup_params, proof_params, verifier_key }
+  Ok(Verifier { setup_params, proof_params, verifier_key })
 }

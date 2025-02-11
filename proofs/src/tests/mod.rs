@@ -184,7 +184,7 @@ async fn test_end_to_end_proofs_get() {
     )
     .unwrap();
 
-  let NIVCRom { circuit_data, rom } =
+  let NIVCRom { circuit_data: rom_data, rom } =
     manifest.build_rom::<CIRCUIT_SIZE>(&request_inputs, &response_inputs);
   let NivcCircuitInputs { initial_nivc_input, fold_inputs: _, private_inputs } =
     manifest.build_inputs::<CIRCUIT_SIZE>(&request_inputs, &response_inputs).unwrap();
@@ -208,7 +208,7 @@ async fn test_end_to_end_proofs_get() {
     vk_digest_primary,
     vk_digest_secondary,
     setup_data: Arc::new(initialized_setup),
-    rom_data: rom_data.clone(),
+    rom_data,
   };
 
   let recursive_snark = program::run(&setup_params, &proof_params, &instance_params).await.unwrap();
@@ -272,7 +272,7 @@ async fn test_end_to_end_proofs_post() {
 
   let NIVCRom { circuit_data, rom } =
     manifest.build_rom::<CIRCUIT_SIZE>(&request_inputs, &response_inputs);
-  let NivcCircuitInputs { mut initial_nivc_input, fold_inputs, private_inputs } =
+  let NivcCircuitInputs { mut initial_nivc_input, fold_inputs: _, private_inputs } =
     manifest.build_inputs::<CIRCUIT_SIZE>(&request_inputs, &response_inputs).unwrap();
 
   let request_body = compute_http_witness(&request_combined, HttpMaskType::Body);

@@ -2,7 +2,7 @@ use std::io::Cursor;
 
 use k256::elliptic_curve::Field;
 use nom::{bytes::streaming::take, IResult};
-use proofs::{circuits::CIRCUIT_SIZE_256, F, G1};
+use proofs::{circuits::CIRCUIT_SIZE_512, F, G1};
 use tls_client2::{
   hash_hs::HandshakeHashBuffer,
   internal::msgs::hsjoiner::HandshakeJoiner,
@@ -316,7 +316,7 @@ impl Transcript<Parsed> {
     let mut result = Vec::new();
 
     fn get_hashes(bytes: Vec<u8>) -> Vec<F<G1>> {
-      vec![CIRCUIT_SIZE_256]
+      vec![CIRCUIT_SIZE_512]
         .into_iter()
         .filter(|&size| bytes.len() <= size)
         .map(|size| {

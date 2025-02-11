@@ -1,12 +1,10 @@
 use std::{
-  fs::{self, File, OpenOptions},
-  io::{BufReader, Write},
+  fs::{self, File},
+  io::Write,
   sync::Arc,
 };
 
-use client_side_prover::{
-  fast_serde::FastSerde, supernova::get_circuit_shapes, traits::CurveCycleEquipped,
-};
+use client_side_prover::{fast_serde::FastSerde, supernova::get_circuit_shapes};
 use serde_json::json;
 
 use super::*;
