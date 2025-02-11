@@ -5,7 +5,6 @@ use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVe
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
-use p256::elliptic_curve::ff::derive::bitvec::vec;
 use proofs::{
   program::{
     data::{Offline, SetupParams},

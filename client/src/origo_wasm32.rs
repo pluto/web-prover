@@ -31,7 +31,7 @@ pub(crate) async fn proxy(
     config.target_port()?,
   );
 
-  let root_store = crate::tls::tls_client2_default_root_store();
+  let root_store = crate::tls::tls_client2_default_root_store(config.notary_ca_cert.clone().map(|c| vec![c]));
 
   let client_config = tls_client2::ClientConfig::builder()
     .with_safe_defaults()
