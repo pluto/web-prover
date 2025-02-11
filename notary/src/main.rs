@@ -103,9 +103,9 @@ async fn main() -> Result<(), NotaryServerError> {
     origo_signing_key:  load_origo_signing_key(&c.origo_signing_key),
     tlsn_max_sent_data: c.tlsn_max_sent_data,
     tlsn_max_recv_data: c.tlsn_max_recv_data,
-    origo_sessions: Default::default(),
-    verifier_sessions: Default::default(),
-    verifier: verifier::initialize_verifier().unwrap(),
+    origo_sessions:     Default::default(),
+    verifier_sessions:  Default::default(),
+    verifier:           verifier::initialize_verifier().unwrap(),
   });
 
   let router = Router::new()
