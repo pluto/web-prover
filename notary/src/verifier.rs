@@ -1,5 +1,5 @@
 //! Brings in circuit from [web-prover-circuits](https://github.com/pluto/web-prover-circuits) and witnesscalc graph binaries to be embedded into the client during compile time.
-//! Contains 512B, 1024B following circuits:
+//! Contains 512B, 256B following circuits:
 //! - AES: AES encryption
 //! - HTTP: HTTP parsing and locking
 //! - JSON: JSON extract

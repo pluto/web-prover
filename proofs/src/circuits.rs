@@ -8,7 +8,7 @@ use crate::{
   program::data::{R1CSType, UninitializedSetup, WitnessGeneratorType},
 };
 
-// -------------------------------------- 1024B circuits -------------------------------------- //
+// -------------------------------------- circuits -------------------------------------- //
 pub const MAX_ROM_LENGTH: usize = 100;
 pub const CIRCUIT_SIZE_512: usize = 512;
 pub const CIRCUIT_SIZE_256: usize = 256;

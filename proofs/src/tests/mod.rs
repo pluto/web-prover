@@ -8,13 +8,12 @@ use std::sync::Arc;
 use client_side_prover::supernova::RecursiveSNARK;
 use inputs::{
   complex_manifest, complex_request_inputs, complex_response_inputs, simple_request_inputs,
+  simple_response_inputs, TEST_MANIFEST,
 };
-use serde_json::json;
 use web_proof_circuits_witness_generator::{
-  data_hasher, field_element_to_base10_string,
-  http::{compute_http_witness, HttpMaskType, RawHttpMachine},
-  json::{JsonKey, RawJsonMachine},
-  polynomial_digest, ByteOrPad,
+  http::{compute_http_witness, HttpMaskType},
+  json::JsonKey,
+  polynomial_digest,
 };
 
 use super::*;
@@ -22,8 +21,7 @@ use crate::program::{
   data::{CircuitData, NotExpanded, ProofParams, SetupParams, UninitializedSetup},
   initialize_setup_data,
   manifest::{
-    make_nonce, to_chacha_input, InitialNIVCInputs, Manifest, NIVCRom, NivcCircuitInputs, Request,
-    Response, ResponseBody,
+    InitialNIVCInputs, Manifest, NIVCRom, NivcCircuitInputs, Request, Response, ResponseBody,
   },
 };
 pub(crate) mod inputs;
@@ -31,8 +29,7 @@ mod witnesscalc;
 
 const MAX_ROM_LENGTH: usize = 100;
 const MAX_STACK_HEIGHT: usize = 10;
-const CIRCUIT_SIZE: usize = 1024;
-const MAX_HTTP_HEADERS: usize = 25;
+const CIRCUIT_SIZE: usize = 512;
 
 // Circuit 0
 const PLAINTEXT_AUTHENTICATION_256B_R1CS: &[u8] = include_bytes!(concat!(
@@ -188,25 +185,25 @@ fn wasm_witness_generator_type_512b() -> [WitnessGeneratorType; 3] {
   ]
 }
 #[allow(dead_code)]
-fn wasm_witness_generator_type() -> [WitnessGeneratorType; 3] {
+fn wasm_witness_generator_type_256b() -> [WitnessGeneratorType; 3] {
   [
     WitnessGeneratorType::Wasm {
       path:      format!(
-        "web_proof_circuits/circom-artifacts-1024b-v{}/plaintext_authentication_1024b.wasm",
+        "web_proof_circuits/circom-artifacts-256b-v{}/plaintext_authentication_256b.wasm",
         env!("WEB_PROVER_CIRCUITS_VERSION")
       ),
       wtns_path: String::from("pa.wtns"),
     },
     WitnessGeneratorType::Wasm {
       path:      format!(
-        "web_proof_circuits/circom-artifacts-1024b-v{}/http_verification_1024b.wasm",
+        "web_proof_circuits/circom-artifacts-256b-v{}/http_verification_256b.wasm",
         env!("WEB_PROVER_CIRCUITS_VERSION")
       ),
       wtns_path: String::from("hv.wtns"),
     },
     WitnessGeneratorType::Wasm {
       path:      format!(
-        "web_proof_circuits/circom-artifacts-1024b-v{}/json_extraction_1024b.wasm",
+        "web_proof_circuits/circom-artifacts-256b-v{}/json_extraction_256b.wasm",
         env!("WEB_PROVER_CIRCUITS_VERSION")
       ),
       wtns_path: String::from("je.wtns"),
@@ -214,7 +211,8 @@ fn wasm_witness_generator_type() -> [WitnessGeneratorType; 3] {
   ]
 }
 
-pub fn mock_manifest() -> Manifest {
+#[allow(dead_code)]
+pub(crate) fn mock_manifest() -> Manifest {
   let request = Request {
     method:  "GET".to_string(),
     url:     "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json".to_string(),
@@ -247,236 +245,43 @@ pub fn mock_manifest() -> Manifest {
 
 #[tokio::test]
 #[tracing_test::traced_test]
-async fn test_end_to_end_proofs_simple() {
-  // HTTP/1.1 200 OK
-  // content-type: application/json; charset=utf-8
-  // content-encoding: gzip
-  // Transfer-Encoding: chunked
-  //
-  // {
-  //    "data": {
-  //        "items": [
-  //            {
-  //                "data": "Artist",
-  //                "profile": {
-  //                    "name": "Taylor Swift"
-  //                }
-  //            }
-  //        ]
-  //    }
-  // }
-
+async fn test_end_to_end_proofs_get() {
   let setup_data = UninitializedSetup {
     r1cs_types:              vec![
-      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
-      R1CSType::Raw(JSON_EXTRACTION_512B_R1CS.to_vec()),
+      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_256B_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_VERIFICATION_256B_R1CS.to_vec()),
+      R1CSType::Raw(JSON_EXTRACTION_256B_R1CS.to_vec()),
     ],
     witness_generator_types: vec![
-      WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_512B_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_VERIFICATION_512B_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_EXTRACTION_512B_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_256B_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_VERIFICATION_256B_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_EXTRACTION_256B_GRAPH.to_vec()),
     ],
     max_rom_length:          MAX_ROM_LENGTH,
   };
   debug!("Setting up `Memory`...");
   let public_params = program::setup(&setup_data);
-  debug!("Creating ROM");
-  let rom_data = HashMap::from([
-    (String::from("PLAINTEXT_AUTHENTICATION_0"), CircuitData { opcode: 0 }),
-    (String::from("HTTP_VERIFICATION_0"), CircuitData { opcode: 1 }),
-    (String::from("PLAINTEXT_AUTHENTICATION_1"), CircuitData { opcode: 0 }),
-    (String::from("HTTP_VERIFICATION_1"), CircuitData { opcode: 1 }),
-    (String::from("JSON_EXTRACTION_0"), CircuitData { opcode: 2 }),
-  ]);
 
   debug!("Creating `private_inputs`...");
 
   let request_inputs = simple_request_inputs();
+  let response_inputs = simple_response_inputs();
+  let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
-  let padded_request_plaintext = ByteOrPad::from_bytes_with_padding(
-    &request_inputs.plaintext[0],
-    1024 - request_inputs.plaintext[0].len(),
-  );
-  let padded_request_ciphertext = ByteOrPad::from_bytes_with_padding(
-    &request_inputs.ciphertext[0],
-    1024 - request_inputs.ciphertext[0].len(),
-  );
-
-  let padded_response_plaintext = ByteOrPad::from_bytes_with_padding(
-    &HTTP_RESPONSE_PLAINTEXT.1,
-    1024 - HTTP_RESPONSE_PLAINTEXT.1.len(),
-  );
-  let padded_response_ciphertext =
-    ByteOrPad::from_bytes_with_padding(&CHACHA20_CIPHERTEXT.1, 1024 - CHACHA20_CIPHERTEXT.1.len());
-
-  assert_eq!(padded_request_plaintext.len(), padded_request_ciphertext.len());
-  assert!(padded_response_plaintext.len() == padded_response_ciphertext.len());
-  assert_eq!(padded_response_ciphertext.len(), 1024);
-
-  let manifest = mock_manifest();
-  let InitialNIVCInputs { ciphertext_digest, initial_nivc_input, headers_digest } = manifest
-    .initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE>(&[request_inputs.ciphertext[0].to_vec()], &[
-      CHACHA20_CIPHERTEXT.1.to_vec(),
-    ])
-    .unwrap();
-
-  let mut main_digests =
-    headers_digest.iter().map(|h| field_element_to_base10_string(*h)).collect::<Vec<_>>();
-  main_digests
-    .extend(std::iter::repeat("0".to_string()).take(MAX_HTTP_HEADERS + 1 - headers_digest.len()));
-
-  let mut private_inputs = vec![];
-
-  debug!("Creating ROM and inputs...");
-
-  debug!("Creating request plaintext authentication private inputs...");
-  let mut rom = vec![String::from("PLAINTEXT_AUTHENTICATION_0")];
-  let request_nonce = make_nonce(request_inputs.iv, request_inputs.seq);
-  private_inputs.push(HashMap::from([
-    (String::from(CHACHA20_KEY.0), json!(to_chacha_input(request_inputs.key.as_ref()))),
-    (String::from(CHACHA20_NONCE.0), json!(to_chacha_input(&request_nonce))),
-    (String::from("counter"), json!(to_chacha_input(&[1]))),
-    (String::from(HTTP_RESPONSE_PLAINTEXT.0), json!(&padded_request_plaintext)),
-    (
-      String::from("ciphertext_digest"),
-      json!(BigInt::from_bytes_le(num_bigint::Sign::Plus, &ciphertext_digest.to_bytes())
-        .to_str_radix(10)),
-    ),
-  ]));
-  let mut part_ciphertext_digest = data_hasher(&padded_request_ciphertext, F::<G1>::ZERO);
-  let request_plaintext_digest =
-    polynomial_digest(&request_inputs.plaintext[0], ciphertext_digest, 0);
-  let plaintext_authentication_step_out =
-    initial_nivc_input[0] - part_ciphertext_digest + request_plaintext_digest;
-  debug!(
-    "plaintext_authentication_step_out: {:?}",
-    field_element_to_base10_string(plaintext_authentication_step_out)
-  );
-
-  debug!("Creating response http verification private inputs...");
-  rom.push(String::from("HTTP_VERIFICATION_0"));
-  private_inputs.push(HashMap::from([
-    (String::from("data"), json!(&padded_request_plaintext)),
-    (
-      String::from("ciphertext_digest"),
-      json!(BigInt::from_bytes_le(num_bigint::Sign::Plus, &ciphertext_digest.to_bytes())
-        .to_str_radix(10)),
-    ),
-    (String::from("main_digests"), json!(main_digests)),
-    (String::from("machine_state"), json!(RawHttpMachine::initial_state())),
-  ]));
-  let http_verification_step_out = plaintext_authentication_step_out - request_plaintext_digest;
-  debug!(
-    "http_verification_step_out: {:?}",
-    field_element_to_base10_string(http_verification_step_out)
-  );
-
-  debug!("Creating response plaintext authentication private inputs...");
-  rom.push(String::from("PLAINTEXT_AUTHENTICATION_1"));
-  let response_nonce = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4a, 0x00, 0x00, 0x00, 0x00];
-  private_inputs.push(HashMap::from([
-    (String::from(CHACHA20_KEY.0), json!(to_chacha_input(&CHACHA20_KEY.1))),
-    (String::from(CHACHA20_NONCE.0), json!(to_chacha_input(&response_nonce))),
-    (String::from("counter"), json!(to_chacha_input(&[1]))),
-    (String::from(HTTP_RESPONSE_PLAINTEXT.0), json!(&padded_response_plaintext)),
-    (
-      String::from("ciphertext_digest"),
-      json!(BigInt::from_bytes_le(num_bigint::Sign::Plus, &ciphertext_digest.to_bytes())
-        .to_str_radix(10)),
-    ),
-  ]));
-  part_ciphertext_digest = data_hasher(&padded_response_ciphertext, part_ciphertext_digest);
-  let response_plaintext_digest = polynomial_digest(
-    &HTTP_RESPONSE_PLAINTEXT.1,
-    ciphertext_digest,
-    request_inputs.plaintext[0].len() as u64,
-  );
-  let plaintext_authentication_step_out =
-    http_verification_step_out - part_ciphertext_digest + response_plaintext_digest;
-  debug!(
-    "plaintext_authentication_step_out: {:?}",
-    field_element_to_base10_string(plaintext_authentication_step_out)
-  );
-
-  debug!("Creating response HTTP verification private inputs...");
-  rom.push(String::from("HTTP_VERIFICATION_1"));
-  private_inputs.push(HashMap::from([
-    (String::from("data"), json!(&padded_response_plaintext)),
-    (
-      String::from("ciphertext_digest"),
-      json!(BigInt::from_bytes_le(num_bigint::Sign::Plus, &ciphertext_digest.to_bytes())
-        .to_str_radix(10)),
-    ),
-    (String::from("main_digests"), json!(main_digests)),
-    (String::from("machine_state"), json!(RawHttpMachine::initial_state())),
-  ]));
-  let http_response_body = compute_http_witness(
-    &HTTP_RESPONSE_PLAINTEXT.1,
-    web_proof_circuits_witness_generator::http::HttpMaskType::Body,
-  );
-  let body_digest = polynomial_digest(&http_response_body, ciphertext_digest, 0);
-  let http_verification_step_out =
-    plaintext_authentication_step_out - response_plaintext_digest + body_digest;
-  debug!(
-    "http_verification_step_out: {:?}",
-    field_element_to_base10_string(http_verification_step_out)
-  );
-
-  let key_sequence = [
-    JsonKey::String(String::from("data")),
-    JsonKey::String(String::from("items")),
-    JsonKey::Num(0),
-    JsonKey::String(String::from("profile")),
-    JsonKey::String(String::from("name")),
-  ];
-  let raw_response_json_machine =
-    RawJsonMachine::<MAX_STACK_HEIGHT>::from_chosen_sequence_and_input(
-      ciphertext_digest,
-      &key_sequence,
+  let InitialNIVCInputs { ciphertext_digest, .. } = manifest
+    .initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE>(
+      &request_inputs.ciphertext,
+      &response_inputs.ciphertext,
     )
     .unwrap();
-  let sequence_digest = raw_response_json_machine.compress_tree_hash();
 
-  let val = "Taylor Swift".as_bytes();
+  let NIVCRom { circuit_data, rom } =
+    manifest.build_rom::<CIRCUIT_SIZE>(&request_inputs, &response_inputs);
+  let NivcCircuitInputs { initial_nivc_input, fold_inputs: _, private_inputs } =
+    manifest.build_inputs::<CIRCUIT_SIZE>(&request_inputs, &response_inputs).unwrap();
+
+  let val = "world".as_bytes();
   let value_digest = &polynomial_digest(val, ciphertext_digest, 0);
-
-  let json_state = RawJsonMachine::<MAX_STACK_HEIGHT>::initial_state();
-  let json_state = json_state
-    .flatten()
-    .iter()
-    .map(|f| field_element_to_base10_string(*f))
-    .collect::<Vec<String>>();
-
-  let padded_http_response_body =
-    ByteOrPad::from_bytes_with_padding(&http_response_body, 1024 - http_response_body.len());
-  rom.push(String::from("JSON_EXTRACTION_0"));
-  private_inputs.push(HashMap::from([
-    (String::from("data"), json!(&padded_http_response_body)),
-    (
-      String::from("ciphertext_digest"),
-      json!(BigInt::from_bytes_le(num_bigint::Sign::Plus, &ciphertext_digest.to_bytes())
-        .to_str_radix(10)),
-    ),
-    (
-      String::from("value_digest"),
-      json!(
-        BigInt::from_bytes_le(num_bigint::Sign::Plus, &value_digest.to_bytes()).to_str_radix(10)
-      ),
-    ),
-    (
-      String::from("sequence_digest"),
-      json!(
-        BigInt::from_bytes_le(num_bigint::Sign::Plus, &sequence_digest.to_bytes()).to_str_radix(10)
-      ),
-    ),
-    (String::from("state"), json!(json_state)),
-  ]));
-  let json_extraction_step_out = http_verification_step_out - body_digest + value_digest;
-  debug!(
-    "json_extraction_step_out: {:?}",
-    field_element_to_base10_string(json_extraction_step_out)
-  );
 
   let (pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
   let vk_digest_primary = pk.pk_primary.vk_digest;
@@ -518,7 +323,7 @@ async fn test_end_to_end_proofs_simple() {
 
 #[tokio::test]
 #[tracing_test::traced_test]
-async fn test_end_to_end_proofs_complex() {
+async fn test_end_to_end_proofs_post() {
   let manifest = complex_manifest();
   let request_inputs = complex_request_inputs();
   let response_inputs = complex_response_inputs();
@@ -531,12 +336,12 @@ async fn test_end_to_end_proofs_complex() {
       R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
       R1CSType::Raw(JSON_EXTRACTION_512B_R1CS.to_vec()),
     ],
-    witness_generator_types: wasm_witness_generator_type_512b().to_vec(),
-    // vec![
-    //   WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_GRAPH.to_vec()),
-    //   WitnessGeneratorType::Raw(HTTP_VERIFICATION_GRAPH.to_vec()),
-    //   WitnessGeneratorType::Raw(JSON_EXTRACTION_GRAPH.to_vec()),
-    // ],
+    witness_generator_types: // wasm_witness_generator_type_512b().to_vec(),
+    vec![
+      WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_512B_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_VERIFICATION_512B_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_EXTRACTION_512B_GRAPH.to_vec()),
+    ],
     max_rom_length:          MAX_ROM_LENGTH,
   };
   debug!("Setting up `Memory`...");
