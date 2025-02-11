@@ -49,7 +49,7 @@ struct SharedState {
   tlsn_max_recv_data: usize,
   origo_sessions:     Arc<Mutex<HashMap<String, tls_parser::Transcript<tls_parser::Raw>>>>,
   verifier_sessions:  Arc<Mutex<HashMap<String, origo::VerifierInputs>>>,
-  verifier:  verifier::Verifier,
+  verifier:           verifier::Verifier,
   manifest:           Manifest,
 }
 

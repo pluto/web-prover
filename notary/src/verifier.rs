@@ -21,19 +21,17 @@ pub struct Verifier {
 }
 
 pub fn flatten_rom(rom: Vec<String>) -> Vec<String> {
-    rom
-      .iter()
-      .map(|s| {
-          s.rfind('_')
-              .and_then(|i| if s[i+1..].chars().all(|c| c.is_ascii_digit()) {
-                  Some(&s[..i])
-              } else {
-                  None
-              })
-              .unwrap_or(s)
-              .to_string()
-      })
-      .collect()
+  rom
+    .iter()
+    .map(|s| {
+      s.rfind('_')
+        .and_then(
+          |i| if s[i + 1..].chars().all(|c| c.is_ascii_digit()) { Some(&s[..i]) } else { None },
+        )
+        .unwrap_or(s)
+        .to_string()
+    })
+    .collect()
 }
 
 pub fn initialize_verifier() -> Result<Verifier, ProxyError> {
