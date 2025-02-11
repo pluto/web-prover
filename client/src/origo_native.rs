@@ -42,6 +42,7 @@ pub(crate) async fn proxy(
     tls_client2::ServerName::try_from(config.target_host()?.as_str()).unwrap(),
   )?;
 
+  // TODO: do we actually need this feature flag?!
   let client_notary_config = if cfg!(feature = "unsafe_skip_cert_verification") {
     // if feature `unsafe_skip_cert_verification` is active, build a TLS client
     // which does not verify the certificate

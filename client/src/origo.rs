@@ -49,8 +49,19 @@ pub async fn sign(
     session_id.clone(),
   );
 
-  // TODO use config.notary_ca_cert
+  // TODO reqwest uses browsers fetch API for WASM target? if true, can't add trust anchors
+  #[cfg(target_arch = "wasm32")]
   let client = reqwest::ClientBuilder::new().build()?;
+
+  #[cfg(not(target_arch = "wasm32"))]
+  let client = {
+    let mut client_builder = reqwest::ClientBuilder::new().use_rustls_tls();
+    if let Some(cert) = config.notary_ca_cert {
+      client_builder =
+        client_builder.add_root_certificate(reqwest::tls::Certificate::from_der(&cert)?);
+    }
+    client_builder.build()?
+  };
 
   let response = client.post(url).json(&sb).send().await?;
   assert!(response.status() == hyper::StatusCode::OK);
@@ -72,8 +83,19 @@ pub async fn verify(
     config.notary_port.clone(),
   );
 
-  // TODO use config.notary_ca_cert
+  // TODO reqwest uses browsers fetch API for WASM target? if true, can't add trust anchors
+  #[cfg(target_arch = "wasm32")]
   let client = reqwest::ClientBuilder::new().build()?;
+
+  #[cfg(not(target_arch = "wasm32"))]
+  let client = {
+    let mut client_builder = reqwest::ClientBuilder::new().use_rustls_tls();
+    if let Some(cert) = config.notary_ca_cert {
+      client_builder =
+        client_builder.add_root_certificate(reqwest::tls::Certificate::from_der(&cert)?);
+    }
+    client_builder.build()?
+  };
 
   let response = client.post(url).json(&verify_body).send().await?;
   assert!(response.status() == hyper::StatusCode::OK);
