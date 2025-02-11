@@ -49,9 +49,6 @@ pub async fn sign(
     session_id.clone(),
   );
 
-  #[allow(unused_variables)]
-  let client: reqwest::Client = reqwest::ClientBuilder::new().build()?;
-
   // TODO: recheck use of rustls backend
   let mut client_builder = reqwest::ClientBuilder::new().use_rustls_tls();
   if let Some(cert) = config.notary_ca_cert {
