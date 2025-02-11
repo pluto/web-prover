@@ -8,8 +8,7 @@ use caratls_ekm_client::DummyTokenVerifier;
 use caratls_ekm_client::TeeTlsConnector;
 #[cfg(feature = "tee-google-confidential-space-token-verifier")]
 use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
-use futures::AsyncWriteExt;
-use futures::channel::oneshot;
+use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use hyper_util::rt::TokioIo;
@@ -24,8 +23,8 @@ use crate::{
   config::{self, Config, NotaryMode},
   errors::ClientErrors,
   origo::OrigoSecrets,
+  tls_client_async2::TlsConnection,
 };
-use crate::tls_client_async2::TlsConnection;
 
 // TODO: Can be refactored further with shared logic from origo_wasm32.rs
 
@@ -47,12 +46,12 @@ async fn handle_generic_mode(
   session_id: String,
 ) -> Result<OrigoConnection, ClientErrors> {
   let root_store =
-      crate::tls::tls_client2_default_root_store(config.notary_ca_cert.clone().map(|c| vec![c]));
+    crate::tls::tls_client2_default_root_store(config.notary_ca_cert.clone().map(|c| vec![c]));
 
   let client_config = tls_client2::ClientConfig::builder()
-      .with_safe_defaults()
-      .with_root_certificates(root_store)
-      .with_no_client_auth();
+    .with_safe_defaults()
+    .with_root_certificates(root_store)
+    .with_no_client_auth();
 
   let origo_conn = Arc::new(std::sync::Mutex::new(OrigoConnection::new()));
   let client = tls_client2::ClientConnection::new(
@@ -66,48 +65,48 @@ async fn handle_generic_mode(
     // if feature `unsafe_skip_cert_verification` is active, build a TLS client
     // which does not verify the certificate
     rustls::ClientConfig::builder()
-        .dangerous()
-        .with_custom_certificate_verifier(crate::tls::unsafe_tls::SkipServerVerification::new())
-        .with_no_client_auth()
+      .dangerous()
+      .with_custom_certificate_verifier(crate::tls::unsafe_tls::SkipServerVerification::new())
+      .with_no_client_auth()
   } else {
     rustls::ClientConfig::builder()
-        .with_root_certificates(crate::tls::rustls_default_root_store(
-          config.notary_ca_cert.clone().map(|c| vec![c]),
-        ))
-        .with_no_client_auth()
+      .with_root_certificates(crate::tls::rustls_default_root_store(
+        config.notary_ca_cert.clone().map(|c| vec![c]),
+      ))
+      .with_no_client_auth()
   };
 
   let notary_connector =
-      tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));
+    tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));
 
   let notary_socket =
-      tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port)).await?;
+    tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port)).await?;
 
   let notary_tls_socket = notary_connector
-      .connect(rustls::pki_types::ServerName::try_from(config.notary_host.clone())?, notary_socket)
-      .await?;
+    .connect(rustls::pki_types::ServerName::try_from(config.notary_host.clone())?, notary_socket)
+    .await?;
 
   let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
   let (mut request_sender, connection) =
-      hyper::client::conn::http1::handshake(notary_tls_socket).await?;
+    hyper::client::conn::http1::handshake(notary_tls_socket).await?;
   let connection_task = tokio::spawn(connection.without_shutdown());
 
   // TODO build sanitized query
   let request: Request<Full<Bytes>> = hyper::Request::builder()
-      .uri(format!(
-        "https://{}:{}/v1/{}?session_id={}&target_host={}&target_port={}",
-        config.notary_host.clone(),
-        config.notary_port.clone(),
-        if config.mode == NotaryMode::TEE { "tee" } else { "origo" },
-        session_id.clone(),
-        config.target_host()?,
-        config.target_port()?,
-      ))
-      .method("GET")
-      .header("Host", config.notary_host.clone())
-      .header("Connection", "Upgrade")
-      .header("Upgrade", "TCP")
-      .body(http_body_util::Full::default())?;
+    .uri(format!(
+      "https://{}:{}/v1/{}?session_id={}&target_host={}&target_port={}",
+      config.notary_host.clone(),
+      config.notary_port.clone(),
+      if config.mode == NotaryMode::TEE { "tee" } else { "origo" },
+      session_id.clone(),
+      config.target_host()?,
+      config.target_port()?,
+    ))
+    .method("GET")
+    .header("Host", config.notary_host.clone())
+    .header("Connection", "Upgrade")
+    .header("Upgrade", "TCP")
+    .body(http_body_util::Full::default())?;
 
   let response = request_sender.send_request(request).await?;
   assert_eq!(response.status(), hyper::StatusCode::SWITCHING_PROTOCOLS);
@@ -118,7 +117,8 @@ async fn handle_generic_mode(
   // TODO notary_tls_socket needs to implement futures::AsyncRead/Write, find a better wrapper here
   let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
 
-  let (client_tls_conn, tls_fut) = crate::tls_client_async2::bind_client(notary_tls_socket.compat(), client);
+  let (client_tls_conn, tls_fut) =
+    crate::tls_client_async2::bind_client(notary_tls_socket.compat(), client);
 
   // TODO: What do with tls_fut? what do with tls_receiver?
   let (tls_sender, _tls_receiver) = oneshot::channel();
@@ -131,7 +131,7 @@ async fn handle_generic_mode(
   let client_tls_conn = hyper_util::rt::TokioIo::new(client_tls_conn.compat());
 
   let (mut request_sender, connection) =
-      hyper::client::conn::http1::handshake(client_tls_conn).await?;
+    hyper::client::conn::http1::handshake(client_tls_conn).await?;
 
   let (connection_sender, connection_receiver) = oneshot::channel();
   let connection_fut = connection.without_shutdown();
@@ -162,12 +162,12 @@ async fn handle_tee_mode(
   session_id: String,
 ) -> Result<OrigoConnection, ClientErrors> {
   let root_store =
-      crate::tls::tls_client2_default_root_store(config.notary_ca_cert.clone().map(|c| vec![c]));
+    crate::tls::tls_client2_default_root_store(config.notary_ca_cert.clone().map(|c| vec![c]));
 
   let client_config = tls_client2::ClientConfig::builder()
-      .with_safe_defaults()
-      .with_root_certificates(root_store)
-      .with_no_client_auth();
+    .with_safe_defaults()
+    .with_root_certificates(root_store)
+    .with_no_client_auth();
 
   let origo_conn = Arc::new(std::sync::Mutex::new(OrigoConnection::new()));
   let client = tls_client2::ClientConnection::new(
@@ -181,48 +181,48 @@ async fn handle_tee_mode(
     // if feature `unsafe_skip_cert_verification` is active, build a TLS client
     // which does not verify the certificate
     rustls::ClientConfig::builder()
-        .dangerous()
-        .with_custom_certificate_verifier(crate::tls::unsafe_tls::SkipServerVerification::new())
-        .with_no_client_auth()
+      .dangerous()
+      .with_custom_certificate_verifier(crate::tls::unsafe_tls::SkipServerVerification::new())
+      .with_no_client_auth()
   } else {
     rustls::ClientConfig::builder()
-        .with_root_certificates(crate::tls::rustls_default_root_store(
-          config.notary_ca_cert.clone().map(|c| vec![c]),
-        ))
-        .with_no_client_auth()
+      .with_root_certificates(crate::tls::rustls_default_root_store(
+        config.notary_ca_cert.clone().map(|c| vec![c]),
+      ))
+      .with_no_client_auth()
   };
 
   let notary_connector =
-      tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));
+    tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));
 
   let notary_socket =
-      tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port)).await?;
+    tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port)).await?;
 
   let notary_tls_socket = notary_connector
-      .connect(rustls::pki_types::ServerName::try_from(config.notary_host.clone())?, notary_socket)
-      .await?;
+    .connect(rustls::pki_types::ServerName::try_from(config.notary_host.clone())?, notary_socket)
+    .await?;
 
   let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
   let (mut request_sender, connection) =
-      hyper::client::conn::http1::handshake(notary_tls_socket).await?;
+    hyper::client::conn::http1::handshake(notary_tls_socket).await?;
   let connection_task = tokio::spawn(connection.without_shutdown());
 
   // TODO build sanitized query
   let request: Request<Full<Bytes>> = hyper::Request::builder()
-      .uri(format!(
-        "https://{}:{}/v1/{}?session_id={}&target_host={}&target_port={}",
-        config.notary_host.clone(),
-        config.notary_port.clone(),
-        if config.mode == NotaryMode::TEE { "tee" } else { "origo" },
-        session_id.clone(),
-        config.target_host()?,
-        config.target_port()?,
-      ))
-      .method("GET")
-      .header("Host", config.notary_host.clone())
-      .header("Connection", "Upgrade")
-      .header("Upgrade", "TCP")
-      .body(http_body_util::Full::default())?;
+    .uri(format!(
+      "https://{}:{}/v1/{}?session_id={}&target_host={}&target_port={}",
+      config.notary_host.clone(),
+      config.notary_port.clone(),
+      if config.mode == NotaryMode::TEE { "tee" } else { "origo" },
+      session_id.clone(),
+      config.target_host()?,
+      config.target_port()?,
+    ))
+    .method("GET")
+    .header("Host", config.notary_host.clone())
+    .header("Connection", "Upgrade")
+    .header("Upgrade", "TCP")
+    .body(http_body_util::Full::default())?;
 
   let response = request_sender.send_request(request).await?;
   assert_eq!(response.status(), hyper::StatusCode::SWITCHING_PROTOCOLS);
@@ -265,10 +265,13 @@ async fn handle_tee_mode(
 }
 
 /// Perform an HTTP handshake on client TLS connection and sends request
-async fn client_handshake(config: &Config, client_tls_conn: TlsConnection) -> Result<(), ClientErrors> {
+async fn client_handshake(
+  config: &Config,
+  client_tls_conn: TlsConnection,
+) -> Result<(), ClientErrors> {
   let client_tls_conn = hyper_util::rt::TokioIo::new(client_tls_conn.compat());
   let (mut request_sender, connection) =
-      hyper::client::conn::http1::handshake(client_tls_conn).await?;
+    hyper::client::conn::http1::handshake(client_tls_conn).await?;
   let connection_task = tokio::spawn(connection.without_shutdown());
   let response = request_sender.send_request(config.to_request()?).await?;
 
