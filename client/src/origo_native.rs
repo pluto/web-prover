@@ -24,6 +24,9 @@ use crate::{
   errors::ClientErrors,
   origo::OrigoSecrets,
 };
+use crate::tls_client_async2::TlsConnection;
+
+// TODO: Can be refactored further with shared logic from origo_wasm32.rs
 
 /// We want to be able to specify somewhere in here what cipher suite to use.
 /// Perhaps the config object should have this information.
@@ -107,7 +110,7 @@ pub(crate) async fn proxy(
   let origo_conn = if config.mode == NotaryMode::TEE {
     handle_tee_mode(config, notary_tls_socket, client, origo_conn).await?
   } else {
-    handle_generic_mode(config, notary_tls_socket, client, origo_conn, client_notary_config).await?
+    handle_generic_mode(config, notary_tls_socket, client, origo_conn).await?
   };
   Ok(origo_conn)
 }
@@ -117,34 +120,11 @@ async fn handle_generic_mode(
   notary_tls_socket: TokioIo<TokioIo<TlsStream<TcpStream>>>,
   client: ClientConnection,
   origo_conn: Arc<Mutex<OrigoConnection>>,
-  client_notary_config: ClientConfig,
 ) -> Result<OrigoConnection, ClientErrors> {
-  let notary_connector = tokio_rustls::TlsConnector::from(Arc::new(client_notary_config));
-  let notary_tls_stream = notary_connector
-    .connect(
-      rustls::pki_types::ServerName::try_from(config.notary_host.clone())?,
-      notary_tls_socket,
-    )
-    .await?;
-  let (client_tls_conn, client_tls_fut) =
-    crate::tls_client_async2::bind_client(notary_tls_stream.compat(), client);
+  let (client_tls_conn, _) =
+    crate::tls_client_async2::bind_client(notary_tls_socket.compat(), client);
 
-  // start client tls connection
-  let tls_fut_task = tokio::spawn(client_tls_fut);
-
-  // perform http handshake on client tls connection and send request
-  let client_tls_conn = hyper_util::rt::TokioIo::new(client_tls_conn.compat());
-  let (mut request_sender, connection) =
-    hyper::client::conn::http1::handshake(client_tls_conn).await?;
-  let connection_task = tokio::spawn(connection.without_shutdown());
-  let response = request_sender.send_request(config.to_request()?).await?;
-
-  assert_eq!(response.status(), StatusCode::OK);
-
-  let payload = response.into_body().collect().await?.to_bytes();
-  debug!("Response: {:?}", payload);
-
-  let hyper::client::conn::http1::Parts { io: _client_tls_conn, .. } = connection_task.await??;
+  client_handshake(&config, client_tls_conn).await?;
 
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
 
@@ -172,19 +152,7 @@ async fn handle_tee_mode(
   // start client tls connection
   let tls_fut_task = tokio::spawn(client_tls_fut);
 
-  // perform http handshake on client tls connection and send request
-  let client_tls_conn = hyper_util::rt::TokioIo::new(client_tls_conn.compat());
-  let (mut request_sender, connection) =
-    hyper::client::conn::http1::handshake(client_tls_conn).await?;
-  let connection_task = tokio::spawn(connection.without_shutdown());
-  let response = request_sender.send_request(config.to_request()?).await?;
-
-  assert_eq!(response.status(), StatusCode::OK);
-
-  let payload = response.into_body().collect().await?.to_bytes();
-  debug!("Response: {:?}", payload);
-
-  let hyper::client::conn::http1::Parts { io: _client_tls_conn, .. } = connection_task.await??;
+  client_handshake(&config, client_tls_conn).await?;
 
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
 
@@ -199,4 +167,21 @@ async fn handle_tee_mode(
 
   // TODO: read web proof (a bit awkward but proxy will have to return the it)
   Ok(origo_conn)
+}
+
+/// Perform an HTTP handshake on client TLS connection and sends request
+async fn client_handshake(config: &Config, client_tls_conn: TlsConnection) -> Result<(), ClientErrors> {
+  let client_tls_conn = hyper_util::rt::TokioIo::new(client_tls_conn.compat());
+  let (mut request_sender, connection) =
+      hyper::client::conn::http1::handshake(client_tls_conn).await?;
+  let connection_task = tokio::spawn(connection.without_shutdown());
+  let response = request_sender.send_request(config.to_request()?).await?;
+
+  assert_eq!(response.status(), StatusCode::OK);
+
+  let payload = response.into_body().collect().await?.to_bytes();
+  debug!("Response: {:?}", payload);
+
+  let hyper::client::conn::http1::Parts { io: _client_tls_conn, .. } = connection_task.await??;
+  Ok(())
 }
