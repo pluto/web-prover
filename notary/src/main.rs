@@ -49,6 +49,7 @@ struct SharedState {
   tlsn_max_recv_data: usize,
   origo_sessions:     Arc<Mutex<HashMap<String, tls_parser::Transcript<tls_parser::Raw>>>>,
   verifier_sessions:  Arc<Mutex<HashMap<String, origo::VerifierInputs>>>,
+  verifier:  verifier::Verifier,
   manifest:           Manifest,
 }
 
@@ -107,6 +108,7 @@ async fn main() -> Result<(), NotaryServerError> {
     tlsn_max_recv_data: c.tlsn_max_recv_data,
     origo_sessions: Default::default(),
     verifier_sessions: Default::default(),
+    verifier: verifier::initialize_verifier().unwrap(),
     // TODO: This is obviously not sufficient, we need richer logic
     // for informing the notary of a valid manifest.
     manifest,

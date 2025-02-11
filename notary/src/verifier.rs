@@ -17,16 +17,34 @@ use crate::errors::ProxyError;
 
 pub struct Verifier {
   pub setup_params: SetupParams<Online>,
-  pub proof_params: ProofParams,
   pub verifier_key: VerifierKey<E1, S1, S2>,
 }
 
-pub fn initialize_verifier(
-  rom_data: HashMap<String, CircuitData>,
-  rom: Vec<String>,
-) -> Result<Verifier, ProxyError> {
+pub fn flatten_rom(rom: Vec<String>) -> Vec<String> {
+    rom
+      .iter()
+      .map(|s| {
+          s.rfind('_')
+              .and_then(|i| if s[i+1..].chars().all(|c| c.is_ascii_digit()) {
+                  Some(&s[..i])
+              } else {
+                  None
+              })
+              .unwrap_or(s)
+              .to_string()
+      })
+      .collect()
+}
+
+pub fn initialize_verifier() -> Result<Verifier, ProxyError> {
   let bytes = std::fs::read(PROVING_PARAMS_512)?;
   let setup_data = construct_setup_data::<{ proofs::circuits::CIRCUIT_SIZE_512 }>()?;
+  let rom_data = HashMap::from([
+    (String::from("PLAINTEXT_AUTHENTICATION"), CircuitData { opcode: 0 }),
+    (String::from("HTTP_VERIFICATION"), CircuitData { opcode: 1 }),
+    (String::from("JSON_EXTRACTION"), CircuitData { opcode: 2 }),
+  ]);
+
   let setup_params = SetupParams::<Offline> {
     public_params: bytes,
     // TODO: These are incorrect, but we don't know them until the internal parser completes.
@@ -37,7 +55,6 @@ pub fn initialize_verifier(
     rom_data,
   }
   .into_online()?;
-  let proof_params = ProofParams { rom };
 
   let (pk, verifier_key) = CompressedSNARK::<E1, S1, S2>::setup(&setup_params.public_params)?;
   debug!(
@@ -47,5 +64,5 @@ pub fn initialize_verifier(
     pk.pk_secondary.vk_digest,
   );
 
-  Ok(Verifier { setup_params, proof_params, verifier_key })
+  Ok(Verifier { setup_params, verifier_key })
 }

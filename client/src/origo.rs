@@ -62,7 +62,7 @@ pub async fn sign(
     .build()?;
 
   let response = client.post(url).json(&sb).send().await?;
-  assert!(response.status() == hyper::StatusCode::OK);
+  assert!(response.status() == hyper::StatusCode::OK, "response={:?}", response);
 
   // TODO: Actually use this input in the proofs.
   let sign_response = response.bytes().await?.to_vec();
@@ -93,7 +93,7 @@ pub async fn verify(
     .build()?;
 
   let response = client.post(url).json(&verify_body).send().await?;
-  assert!(response.status() == hyper::StatusCode::OK);
+  assert!(response.status() == hyper::StatusCode::OK, "response={:?}", response);
   let verify_response = response.json::<VerifyReply>().await?;
 
   debug!("\n{:?}\n\n", verify_response.clone());

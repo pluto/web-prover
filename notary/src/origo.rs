@@ -30,7 +30,7 @@ use crate::{
   errors::{NotaryServerError, ProxyError},
   tls_parser::{Direction, Transcript, UnparsedMessage},
   tlsn::ProtocolUpgrade,
-  verifier::initialize_verifier,
+  verifier,
   SharedState,
 };
 
@@ -223,13 +223,9 @@ pub async fn verify(
   //   "66ab857c95c11767913c36e9341dbe4d46915616a67a5f47379e06848411b32b"
   // ).unwrap().try_into().unwrap()).unwrap();
 
-  // verification
-  // debug!("request_messages {:?}", verifier_inputs.request_messages);
-
   debug!("circuits {:?}", payload.origo_proof.rom.circuit_data);
   debug!("rom {:?}", payload.origo_proof.rom.rom);
-  let verifier =
-    initialize_verifier(payload.origo_proof.rom.circuit_data, payload.origo_proof.rom.rom)?;
+  let verifier = &state.verifier;
 
   let InitialNIVCInputs { initial_nivc_input, .. } =
     state.manifest.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE_512>(
@@ -238,7 +234,7 @@ pub async fn verify(
     )?;
   let (z0_primary, _) = verifier
     .setup_params
-    .extend_public_inputs(&verifier.proof_params.rom, &initial_nivc_input.to_vec())?;
+    .extend_public_inputs(&verifier::flatten_rom(payload.origo_proof.rom.rom), &initial_nivc_input.to_vec())?;
   let z0_secondary = vec![F::<G2>::from(0)];
 
   let valid = match proof.proof.verify(

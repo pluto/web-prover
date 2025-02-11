@@ -4,6 +4,7 @@ use axum::{
 };
 use eyre::Report;
 use thiserror::Error;
+use tracing::error;
 use tlsn_verifier::tls::{VerifierConfigBuilderError, VerifierError};
 
 #[derive(Debug, Error)]
@@ -44,11 +45,13 @@ pub enum ProxyError {
 
 impl IntoResponse for ProxyError {
   fn into_response(self) -> Response {
+    error!("proxy error: {}", self);
+
     match self {
       sign @ ProxyError::Sign(_) =>
         (StatusCode::INTERNAL_SERVER_ERROR, sign.to_string()).into_response(),
       ProxyError::TlsHandshakeExtract(e) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
-      _ => (StatusCode::INTERNAL_SERVER_ERROR, "Something wrong happened.").into_response(),
+      _ => (StatusCode::INTERNAL_SERVER_ERROR, "Something wrong happened.").into_response()
     }
   }
 }
@@ -91,10 +94,12 @@ impl From<VerifierConfigBuilderError> for NotaryServerError {
 /// Trait implementation to convert this error into an axum http response
 impl IntoResponse for NotaryServerError {
   fn into_response(self) -> Response {
+    error!("notary error: {:?}", self);
+
     match self {
       bad_request_error @ NotaryServerError::BadProverRequest(_) =>
         (StatusCode::BAD_REQUEST, bad_request_error.to_string()).into_response(),
-      _ => (StatusCode::INTERNAL_SERVER_ERROR, "Something wrong happened.").into_response(),
+      _ => (StatusCode::INTERNAL_SERVER_ERROR, "Something wrong happened.").into_response()
     }
   }
 }
