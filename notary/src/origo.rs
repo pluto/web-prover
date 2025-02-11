@@ -225,7 +225,7 @@ pub async fn verify(
     initialize_verifier(payload.origo_proof.rom.circuit_data, payload.origo_proof.rom.rom);
 
   let InitialNIVCInputs { initial_nivc_input, .. } =
-    state.manifest.initial_inputs::<MAX_STACK_HEIGHT>(
+    payload.manifest.initial_inputs::<MAX_STACK_HEIGHT>(
       &verifier_inputs.request_messages,
       &verifier_inputs.response_messages,
     )?;

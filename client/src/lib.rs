@@ -93,8 +93,12 @@ pub async fn prover_inner_origo(
   let proof = origo::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
 
   debug!("sending proof to proxy for verification");
-  let verify_response =
-    origo::verify(config, origo::VerifyBody { session_id, origo_proof: proof.clone() }).await?;
+  let verify_response = origo::verify(config, origo::VerifyBody {
+    session_id,
+    origo_proof: proof.clone(),
+    manifest: config.proving.manifest.ok_or(Err(errors::ClientErrors::ManifestMissingError))?,
+  })
+  .await?;
 
   if !verify_response.valid {
     Err(ProofError::VerifyFailed().into())

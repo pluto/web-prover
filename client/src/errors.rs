@@ -98,6 +98,9 @@ pub enum ClientErrors {
 
   #[error(transparent)]
   Canceled(#[from] futures::channel::oneshot::Canceled),
+
+  #[error("Manifest missing")]
+  ManifestMissingError,
 }
 
 #[cfg(target_arch = "wasm32")]
