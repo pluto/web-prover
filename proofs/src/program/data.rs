@@ -80,7 +80,12 @@ impl UninitializedSetup {
     let r1cs_types = r1cs_types.iter().map(|r1cs| R1CSType::Raw(r1cs.clone())).collect();
     let witness_generator_types =
       witness_generator_types.iter().map(|wgt| WitnessGeneratorType::Raw(wgt.clone())).collect();
-    Self { r1cs_types, witness_generator_types, max_rom_length: MAX_ROM_LENGTH }
+    Self {
+      r1cs_types,
+      witness_generator_types,
+      // TODO: Should this be hardcoded or a parameter?
+      max_rom_length: MAX_ROM_LENGTH,
+    }
   }
 }
 
