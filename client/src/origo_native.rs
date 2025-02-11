@@ -12,6 +12,7 @@ use futures::AsyncWriteExt;
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use hyper_util::rt::TokioIo;
+use rustls::ClientConfig;
 use tls_client2::{origo::OrigoConnection, ClientConnection};
 use tokio::net::TcpStream;
 use tokio_rustls::client::TlsStream;
@@ -62,7 +63,7 @@ pub(crate) async fn proxy(
   };
 
   let notary_connector =
-    tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));
+    tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config.clone()));
 
   let notary_socket =
     tokio::net::TcpStream::connect((config.notary_host.clone(), config.notary_port)).await?;
@@ -102,10 +103,11 @@ pub(crate) async fn proxy(
   // TODO notary_tls_socket needs to implement futures::AsyncRead/Write, find a better wrapper here
   let notary_tls_socket = hyper_util::rt::TokioIo::new(notary_tls_socket);
 
+  // Either bind client to TEE TLS connection or plain TLS connection
   let origo_conn = if config.mode == NotaryMode::TEE {
     handle_tee_mode(config, notary_tls_socket, client, origo_conn).await?
   } else {
-     handle_generic_mode(config, notary_tls_socket, client, origo_conn).await?
+    handle_generic_mode(config, notary_tls_socket, client, origo_conn, client_notary_config).await?
   };
   Ok(origo_conn)
 }
@@ -115,43 +117,15 @@ async fn handle_generic_mode(
   notary_tls_socket: TokioIo<TokioIo<TlsStream<TcpStream>>>,
   client: ClientConnection,
   origo_conn: Arc<Mutex<OrigoConnection>>,
+  client_notary_config: ClientConfig,
 ) -> Result<OrigoConnection, ClientErrors> {
-  // Either bind client to TEE TLS connection or plain TLS connection
-  let notary_tls_stream = if config.mode == NotaryMode::TEE {
-    #[cfg(feature = "tee-google-confidential-space-token-verifier")]
-    let token_verifier = GoogleConfidentialSpaceTokenVerifier::new("audience").await; // TODO pass in as function input
-
-    #[cfg(feature = "tee-dummy-token-verifier")]
-    let token_verifier = DummyTokenVerifier { expect_token: "dummy".to_string() };
-
-    let tee_tls_connector = TeeTlsConnector::new(token_verifier, "example.com"); // TODO example.com
-    tee_tls_connector.connect(notary_tls_socket).await?
-  } else {
-    // TODO: This is NOT WORKING, however I didn't want to deal with fixing types for `bind_client`
-    //  and transforming TLS sessions, so I just duplicated a bunch of code to satisfy the type
-    //  checker
-    // TODO: To reproduce failure, run client in Origo mode: cargo run -p client --
-    // --config ./fixture/client.origo_tcp_local.json
-    let client_notary_config = if cfg!(feature = "unsafe_skip_cert_verification") {
-      rustls::ClientConfig::builder()
-        .dangerous()
-        .with_custom_certificate_verifier(crate::tls::unsafe_tls::SkipServerVerification::new())
-        .with_no_client_auth()
-    } else {
-      rustls::ClientConfig::builder()
-        .with_root_certificates(crate::tls::rustls_default_root_store(
-          config.notary_ca_cert.clone().map(|c| vec![c]),
-        ))
-        .with_no_client_auth()
-    };
-    let notary_connector = tokio_rustls::TlsConnector::from(Arc::new(client_notary_config));
-    notary_connector
-      .connect(
-        rustls::pki_types::ServerName::try_from(config.notary_host.clone())?,
-        notary_tls_socket,
-      )
-      .await?
-  };
+  let notary_connector = tokio_rustls::TlsConnector::from(Arc::new(client_notary_config));
+  let notary_tls_stream = notary_connector
+    .connect(
+      rustls::pki_types::ServerName::try_from(config.notary_host.clone())?,
+      notary_tls_socket,
+    )
+    .await?;
   let (client_tls_conn, client_tls_fut) =
     crate::tls_client_async2::bind_client(notary_tls_stream.compat(), client);
 
@@ -174,21 +148,8 @@ async fn handle_generic_mode(
 
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
 
-  if config.mode == NotaryMode::TEE {
-    // wait for tls connection
-    let (_, mut reunited_socket) = tls_fut_task.await?.unwrap();
-
-    let manifest_bytes = config.proving.manifest.unwrap().to_wire_bytes();
-    reunited_socket.write_all(&manifest_bytes).await?;
-
-    let origo_secret_bytes = OrigoSecrets::from_origo_conn(&origo_conn).to_wire_bytes();
-    reunited_socket.write_all(&origo_secret_bytes).await?;
-
-    // TODO: read web proof (a bit awkward but proxy will have to return the it)
-  }
   Ok(origo_conn)
 }
-
 
 async fn handle_tee_mode(
   config: Config,
@@ -197,43 +158,16 @@ async fn handle_tee_mode(
   origo_conn: Arc<Mutex<OrigoConnection>>,
 ) -> Result<OrigoConnection, ClientErrors> {
   // Either bind client to TEE TLS connection or plain TLS connection
-  let notary_tls_stream = if config.mode == NotaryMode::TEE {
-    #[cfg(feature = "tee-google-confidential-space-token-verifier")]
-    let token_verifier = GoogleConfidentialSpaceTokenVerifier::new("audience").await; // TODO pass in as function input
+  #[cfg(feature = "tee-google-confidential-space-token-verifier")]
+  let token_verifier = GoogleConfidentialSpaceTokenVerifier::new("audience").await; // TODO pass in as function input
 
-    #[cfg(feature = "tee-dummy-token-verifier")]
-    let token_verifier = DummyTokenVerifier { expect_token: "dummy".to_string() };
+  #[cfg(feature = "tee-dummy-token-verifier")]
+  let token_verifier = DummyTokenVerifier { expect_token: "dummy".to_string() };
 
-    let tee_tls_connector = TeeTlsConnector::new(token_verifier, "example.com"); // TODO example.com
-    tee_tls_connector.connect(notary_tls_socket).await?
-  } else {
-    // TODO: This is NOT WORKING, however I didn't want to deal with fixing types for `bind_client`
-    //  and transforming TLS sessions, so I just duplicated a bunch of code to satisfy the type
-    //  checker
-    // TODO: To reproduce failure, run client in Origo mode: cargo run -p client --
-    // --config ./fixture/client.origo_tcp_local.json
-    let client_notary_config = if cfg!(feature = "unsafe_skip_cert_verification") {
-      rustls::ClientConfig::builder()
-          .dangerous()
-          .with_custom_certificate_verifier(crate::tls::unsafe_tls::SkipServerVerification::new())
-          .with_no_client_auth()
-    } else {
-      rustls::ClientConfig::builder()
-          .with_root_certificates(crate::tls::rustls_default_root_store(
-            config.notary_ca_cert.clone().map(|c| vec![c]),
-          ))
-          .with_no_client_auth()
-    };
-    let notary_connector = tokio_rustls::TlsConnector::from(Arc::new(client_notary_config));
-    notary_connector
-        .connect(
-          rustls::pki_types::ServerName::try_from(config.notary_host.clone())?,
-          notary_tls_socket,
-        )
-        .await?
-  };
+  let tee_tls_connector = TeeTlsConnector::new(token_verifier, "example.com"); // TODO example.com
+  let notary_tls_stream = tee_tls_connector.connect(notary_tls_socket).await?;
   let (client_tls_conn, client_tls_fut) =
-      crate::tls_client_async2::bind_client(notary_tls_stream.compat(), client);
+    crate::tls_client_async2::bind_client(notary_tls_stream.compat(), client);
 
   // start client tls connection
   let tls_fut_task = tokio::spawn(client_tls_fut);
@@ -241,7 +175,7 @@ async fn handle_tee_mode(
   // perform http handshake on client tls connection and send request
   let client_tls_conn = hyper_util::rt::TokioIo::new(client_tls_conn.compat());
   let (mut request_sender, connection) =
-      hyper::client::conn::http1::handshake(client_tls_conn).await?;
+    hyper::client::conn::http1::handshake(client_tls_conn).await?;
   let connection_task = tokio::spawn(connection.without_shutdown());
   let response = request_sender.send_request(config.to_request()?).await?;
 
@@ -254,17 +188,15 @@ async fn handle_tee_mode(
 
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
 
-  if config.mode == NotaryMode::TEE {
-    // wait for tls connection
-    let (_, mut reunited_socket) = tls_fut_task.await?.unwrap();
+  // wait for tls connection
+  let (_, mut reunited_socket) = tls_fut_task.await?.unwrap();
 
-    let manifest_bytes = config.proving.manifest.unwrap().to_wire_bytes();
-    reunited_socket.write_all(&manifest_bytes).await?;
+  let manifest_bytes = config.proving.manifest.unwrap().to_wire_bytes();
+  reunited_socket.write_all(&manifest_bytes).await?;
 
-    let origo_secret_bytes = OrigoSecrets::from_origo_conn(&origo_conn).to_wire_bytes();
-    reunited_socket.write_all(&origo_secret_bytes).await?;
+  let origo_secret_bytes = OrigoSecrets::from_origo_conn(&origo_conn).to_wire_bytes();
+  reunited_socket.write_all(&origo_secret_bytes).await?;
 
-    // TODO: read web proof (a bit awkward but proxy will have to return the it)
-  }
+  // TODO: read web proof (a bit awkward but proxy will have to return the it)
   Ok(origo_conn)
 }
