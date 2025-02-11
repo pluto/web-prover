@@ -51,7 +51,8 @@ pub async fn prover_inner(
 }
 
 pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
-  let root_store = crate::tls::tls_client_default_root_store();
+  let root_store =
+    crate::tls::tls_client_default_root_store(config.notary_ca_cert.clone().map(|c| vec![c]));
 
   let max_sent_data = config
     .max_sent_data

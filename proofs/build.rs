@@ -8,17 +8,6 @@ fn main() {
   println!("cargo:rerun-if-changed=../.git/HEAD");
   println!("cargo:rerun-if-changed=../.git/refs/heads/main");
 
-  // add custom trusted CA (useful for local debugging)
-  if let Ok(notary_ca_cert_path) = env::var("NOTARY_CA_CERT_PATH") {
-    println!("Using NOTARY_CA_CERT_PATH={}", notary_ca_cert_path);
-    println!("cargo:rustc-cfg=feature=\"notary_ca_cert\"");
-    println!("cargo:rustc-env=NOTARY_CA_CERT_PATH={}", notary_ca_cert_path);
-  }
-  // TODO rerun does not trigger if env variable changes
-  // https://github.com/rust-lang/cargo/issues/10358
-  // workaround? run `cargo clean`
-  // println!("cargo:rerun-if-env-changed=NOTARY_CA_CERT_PATH");
-
   // make workspace's Cargo.toml's web_prover_circuits_version available
   let metadata = cargo_metadata::MetadataCommand::new()
     .manifest_path("../Cargo.toml")

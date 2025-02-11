@@ -6,9 +6,6 @@ use tracing::debug;
 
 use crate::errors::ClientErrors;
 
-#[cfg(feature = "notary_ca_cert")]
-pub const NOTARY_CA_CERT: &[u8] = include_bytes!(env!("NOTARY_CA_CERT_PATH"));
-
 /// Every encrypted TLS packet includes [TYPE BYTES][AEAD BYTES] appended
 /// to the plaintext prior to encryption. The AEAD bytes are for authentication
 /// and the type byte is used to indicate the type of message (handshake, app data, etc).
@@ -34,7 +31,9 @@ pub struct DecryptedChunk {
   aad:       Vec<u8>,
 }
 
-pub fn tls_client2_default_root_store() -> tls_client2::RootCertStore {
+pub fn tls_client2_default_root_store(
+  additional_trust_anchors: Option<Vec<Vec<u8>>>,
+) -> tls_client2::RootCertStore {
   let mut root_store = tls_client2::RootCertStore::empty();
   root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
     tls_client2::OwnedTrustAnchor::from_subject_spki_name_constraints(
@@ -44,33 +43,36 @@ pub fn tls_client2_default_root_store() -> tls_client2::RootCertStore {
     )
   }));
 
-  #[cfg(feature = "notary_ca_cert")]
-  {
-    debug!("notary_ca_cert feature enabled");
-    let certificate = pki_types::CertificateDer::from(NOTARY_CA_CERT.to_vec());
-    let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
-    assert_eq!(added, 1); // TODO there is probably a better way
+  if let Some(trust_anchors) = additional_trust_anchors {
+    for (_, trust_anchor) in trust_anchors.iter().enumerate() {
+      let certificate = pki_types::CertificateDer::from(trust_anchor.clone());
+      let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
+      assert_eq!(added, 1); // TODO there is probably a better way
+    }
   }
 
   root_store
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn rustls_default_root_store() -> rustls::RootCertStore {
-  #[allow(unused_mut)]
+pub fn rustls_default_root_store(
+  additional_trust_anchors: Option<Vec<Vec<u8>>>,
+) -> rustls::RootCertStore {
   let mut root_store = rustls::RootCertStore { roots: webpki_roots::TLS_SERVER_ROOTS.into() };
 
-  #[cfg(feature = "notary_ca_cert")]
-  {
-    debug!("notary_ca_cert feature enabled");
-    let certificate = pki_types::CertificateDer::from(NOTARY_CA_CERT.to_vec());
-    root_store.add(certificate).unwrap();
+  if let Some(trust_anchors) = additional_trust_anchors {
+    for (_, trust_anchor) in trust_anchors.iter().enumerate() {
+      let certificate = pki_types::CertificateDer::from(trust_anchor.clone());
+      root_store.add(certificate).unwrap();
+    }
   }
 
   root_store
 }
 
-pub fn tls_client_default_root_store() -> tls_client::RootCertStore {
+pub fn tls_client_default_root_store(
+  additional_trust_anchors: Option<Vec<Vec<u8>>>,
+) -> tls_client::RootCertStore {
   let mut root_store = tls_client::RootCertStore::empty();
   root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
     tls_client::OwnedTrustAnchor::from_subject_spki_name_constraints(
@@ -80,12 +82,12 @@ pub fn tls_client_default_root_store() -> tls_client::RootCertStore {
     )
   }));
 
-  #[cfg(feature = "notary_ca_cert")]
-  {
-    debug!("notary_ca_cert feature enabled");
-    let certificate = pki_types::CertificateDer::from(NOTARY_CA_CERT.to_vec());
-    let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
-    assert_eq!(added, 1); // TODO there is probably a better way
+  if let Some(trust_anchors) = additional_trust_anchors {
+    for (_, trust_anchor) in trust_anchors.iter().enumerate() {
+      let certificate = pki_types::CertificateDer::from(trust_anchor.clone());
+      let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
+      assert_eq!(added, 1); // TODO there is probably a better way
+    }
   }
 
   root_store

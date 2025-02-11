@@ -27,7 +27,8 @@ pub(crate) async fn proxy(
   config: config::Config,
   session_id: String,
 ) -> Result<tls_client2::origo::OrigoConnection, ClientErrors> {
-  let root_store = crate::tls::tls_client2_default_root_store();
+  let root_store =
+    crate::tls::tls_client2_default_root_store(config.notary_ca_cert.clone().map(|c| vec![c]));
 
   let client_config = tls_client2::ClientConfig::builder()
     .with_safe_defaults()
@@ -41,6 +42,7 @@ pub(crate) async fn proxy(
     tls_client2::ServerName::try_from(config.target_host()?.as_str()).unwrap(),
   )?;
 
+  // TODO: do we actually need this feature flag?!
   let client_notary_config = if cfg!(feature = "unsafe_skip_cert_verification") {
     // if feature `unsafe_skip_cert_verification` is active, build a TLS client
     // which does not verify the certificate
@@ -50,7 +52,9 @@ pub(crate) async fn proxy(
       .with_no_client_auth()
   } else {
     rustls::ClientConfig::builder()
-      .with_root_certificates(crate::tls::rustls_default_root_store())
+      .with_root_certificates(crate::tls::rustls_default_root_store(
+        config.notary_ca_cert.clone().map(|c| vec![c]),
+      ))
       .with_no_client_auth()
   };
 

@@ -33,7 +33,6 @@ jobs:
 
       - name: Build iOS lib
         run: |
-          export NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" 
           export RUSTFLAGS="-C panic=unwind" 
 
           rm -rf target/{sim,device}

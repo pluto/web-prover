@@ -23,7 +23,7 @@ Documentation is evolving throughout the repository as the pipeline becomes more
 make wasm
 make ios
 cargo run --release -p notary -- --config ./fixture/notary-config.toml --manifest ./fixture/notary.origo_tcp_local.json
-NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" cargo run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
+cargo run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
 cargo run --release --bin mock_server
 ```
 
@@ -31,7 +31,7 @@ cargo run --release --bin mock_server
 
 ```
 cargo run --release -p notary -- --config ./fixture/notary-config.toml --manifest ./fixture/notary.origo_tcp_local.json
-NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" make wasm
+make wasm
 make wasm-demo
 open https://localhost:8090
 ```
@@ -42,10 +42,10 @@ open https://localhost:8090
 cargo run --release -p notary -- --config ./fixture/notary-config.toml --manifest ./fixture/notary.origo_tcp_local.json
 
 # TLSNotary flow
-NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" cargo run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
+cargo run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
 
 # Origo flow
-NOTARY_CA_CERT_PATH="../../fixture/certs/ca-cert.cer" cargo run --release -p client -- --config ./fixture/client.origo_tcp_local.json
+cargo run --release -p client -- --config ./fixture/client.origo_tcp_local.json
 ```
 
 ## Feature flags
