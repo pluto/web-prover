@@ -37,7 +37,7 @@ jobs:
 
       - run: |
           export RUST_LOG=DEBUG
-          ./target/release/notary --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json &
+          ./target/release/notary --config ./fixture/notary-config.toml &
           sleep 10
 
           ./target/release/client --config ./fixture/client.origo_tcp_local.json

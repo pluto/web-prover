@@ -17,7 +17,6 @@ use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use k256::ecdsa::SigningKey as Secp256k1SigningKey;
 use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
-use proofs::program::manifest::Manifest;
 use rustls::{
   pki_types::{CertificateDer, PrivateKeyDer},
   ServerConfig,
@@ -50,7 +49,6 @@ struct SharedState {
   origo_sessions:     Arc<Mutex<HashMap<String, tls_parser::Transcript<tls_parser::Raw>>>>,
   verifier_sessions:  Arc<Mutex<HashMap<String, origo::VerifierInputs>>>,
   verifier:           verifier::Verifier,
-  manifest:           Manifest,
 }
 
 /// Main entry point for the notary server application.
@@ -96,22 +94,18 @@ async fn main() -> Result<(), NotaryServerError> {
   let _ = rustls::crypto::ring::default_provider().install_default();
 
   let c = config::read_config();
-  let manifest = config::read_manifest()?;
 
   let listener = TcpListener::bind(&c.listen).await?;
   info!("Listening on https://{}", &c.listen);
 
   let shared_state = Arc::new(SharedState {
     notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
-    origo_signing_key: load_origo_signing_key(&c.origo_signing_key),
+    origo_signing_key:  load_origo_signing_key(&c.origo_signing_key),
     tlsn_max_sent_data: c.tlsn_max_sent_data,
     tlsn_max_recv_data: c.tlsn_max_recv_data,
-    origo_sessions: Default::default(),
-    verifier_sessions: Default::default(),
-    verifier: verifier::initialize_verifier().unwrap(),
-    // TODO: This is obviously not sufficient, we need richer logic
-    // for informing the notary of a valid manifest.
-    manifest,
+    origo_sessions:     Default::default(),
+    verifier_sessions:  Default::default(),
+    verifier:           verifier::initialize_verifier().unwrap(),
   });
 
   let router = Router::new()

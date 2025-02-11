@@ -13,7 +13,7 @@ check-llvm:
 		exit 1; \
 	fi
 
-wasm: check-llvm artifacts
+wasm: artifacts
 	@# NOTE: This build depends on RUSTFLAGS in the client_wasm/.cargo/config.toml
 	-cargo install wasm-pack
 	-cd client_wasm/demo/static && rm -f build && ln -s ../../../proofs/web_proof_circuits build && cd ../../..

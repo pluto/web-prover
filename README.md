@@ -22,7 +22,7 @@ Documentation is evolving throughout the repository as the pipeline becomes more
 ```
 make wasm
 make ios
-cargo run --release -p notary -- --config ./fixture/notary-config.toml --manifest ./fixture/notary.origo_tcp_local.json
+cargo run --release -p notary -- --config ./fixture/notary-config.toml
 cargo run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
 cargo run --release --bin mock_server
 ```
@@ -30,10 +30,7 @@ cargo run --release --bin mock_server
 ## WASM Demo
 
 ```
-export NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer
-export RUST_LOG=debug
-
-cargo run -p notary -- --config ./fixture/notary-config.toml --manifest ./fixture/notary.origo_tcp_local.json
+cargo run --release -p notary -- --config ./fixture/notary-config.toml
 make wasm
 make wasm-demo
 open https://localhost:8090
@@ -42,10 +39,7 @@ open https://localhost:8090
 ## Native Client Demo
 
 ```
-export NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer
-export RUST_LOG=debug
-
-cargo run -p notary -- --config ./fixture/notary-config.toml --manifest ./fixture/notary.origo_tcp_local.json
+cargo run --release -p notary -- --config ./fixture/notary-config.toml
 
 # TLSNotary flow (requires --release flag or it will be slow, try release mode for notary as well)
 cargo run --release -p client -- --config ./fixture/client.tlsn_tcp_local.json
