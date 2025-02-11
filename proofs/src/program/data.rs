@@ -1,6 +1,6 @@
 use std::{
   fs::{self, File},
-  io::Write,
+  io::{BufReader, Read, Write},
   sync::Arc,
 };
 
@@ -59,7 +59,7 @@ pub enum WitnessGeneratorType {
     wtns_path: String,
   },
   Path(PathBuf),
-  #[serde(skip)]
+  // #[serde(skip)] // TODO: Breaks serialization of UninitializedSetup, why did we skip here?
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
 }
 
@@ -73,6 +73,26 @@ pub struct UninitializedSetup {
   pub witness_generator_types: Vec<WitnessGeneratorType>,
   /// NIVC max ROM length
   pub max_rom_length:          usize,
+}
+
+impl UninitializedSetup {
+  pub fn from_bytes(buf: &[u8]) -> Result<Self, ProofError> { Ok(bincode::deserialize(buf)?) }
+
+  pub fn to_bytes(&self) -> Result<Vec<u8>, ProofError> { Ok(bincode::serialize(self)?) }
+
+  pub fn from_path(path: &PathBuf) -> Result<Self, ProofError> {
+    let mut buf_reader = BufReader::new(File::open(path)?);
+    let mut buf = Vec::new();
+    buf_reader.read_to_end(&mut buf)?;
+    Self::from_bytes(&buf)
+  }
+
+  pub fn to_path(&self, path: &PathBuf) -> Result<(), ProofError> {
+    let mut file = File::create(path)?;
+    let bytes = self.to_bytes()?;
+    file.write_all(&bytes)?;
+    Ok(())
+  }
 }
 
 /// Initialized Circuit Setup data, in this configuration the R1CS objects have been
