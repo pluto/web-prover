@@ -55,6 +55,7 @@ caratls_ekm_server                          ={ workspace=true }
 caratls_ekm_google_confidential_space_server={ workspace=true }
 
 web-proof-circuits-witness-generator={ git="https://github.com/pluto/web-prover-circuits" }
+# web-proof-circuits-witness-generator={ path="../../web-prover-circuits/witness-generator" }
 
 [dev-dependencies]
 tower="0.4.13"

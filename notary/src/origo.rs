@@ -9,7 +9,12 @@ use axum::{
 use client::origo::{SignBody, VerifyBody, VerifyReply};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
-use proofs::{program::manifest::InitialNIVCInputs, proof::FoldingProof, F, G1, G2};
+use proofs::{
+  circuits::{CIRCUIT_SIZE_512, MAX_STACK_HEIGHT},
+  program::manifest::InitialNIVCInputs,
+  proof::FoldingProof,
+  F, G1, G2,
+};
 use rs_merkle::{Hasher, MerkleTree};
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -22,11 +27,10 @@ use ws_stream_tungstenite::WsStream;
 
 use crate::{
   axum_websocket::WebSocket,
-  circuits::initialize_verifier,
   errors::{NotaryServerError, ProxyError},
-  tls_parser::{Direction, Transcript, UnparsedMessage, MAX_STACK_HEIGHT},
+  tls_parser::{Direction, Transcript, UnparsedMessage},
   tlsn::ProtocolUpgrade,
-  SharedState,
+  verifier, SharedState,
 };
 
 #[derive(Deserialize)]
@@ -205,7 +209,7 @@ pub async fn verify(
   }
   .deserialize();
 
-  debug!("request_verifier_digest: {:?}", proof.verifier_digest.clone());
+  debug!("verifier_digest: {:?}", proof.verifier_digest.clone());
 
   // Form verifier inputs
   let verifier_inputs =
@@ -218,20 +222,19 @@ pub async fn verify(
   //   "66ab857c95c11767913c36e9341dbe4d46915616a67a5f47379e06848411b32b"
   // ).unwrap().try_into().unwrap()).unwrap();
 
-  // verification
-  // debug!("request_messages {:?}", verifier_inputs.request_messages);
-
-  let verifier =
-    initialize_verifier(payload.origo_proof.rom.circuit_data, payload.origo_proof.rom.rom);
+  debug!("circuits {:?}", payload.origo_proof.rom.circuit_data);
+  debug!("rom {:?}", payload.origo_proof.rom.rom);
+  let verifier = &state.verifier;
 
   let InitialNIVCInputs { initial_nivc_input, .. } =
-    state.manifest.initial_inputs::<MAX_STACK_HEIGHT>(
+    state.manifest.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE_512>(
       &verifier_inputs.request_messages,
       &verifier_inputs.response_messages,
     )?;
-  let (z0_primary, _) = verifier
-    .setup_params
-    .extend_public_inputs(&verifier.proof_params.rom, &initial_nivc_input.to_vec())?;
+  let (z0_primary, _) = verifier.setup_params.extend_public_inputs(
+    &verifier::flatten_rom(payload.origo_proof.rom.rom),
+    &initial_nivc_input.to_vec(),
+  )?;
   let z0_secondary = vec![F::<G2>::from(0)];
 
   let valid = match proof.proof.verify(
@@ -242,7 +245,7 @@ pub async fn verify(
   ) {
     Ok(_) => true,
     Err(e) => {
-      error!("Error verifying request proof: {:?}", e);
+      error!("Error verifying proof: {:?}", e);
       false
     },
   };

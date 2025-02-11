@@ -2,7 +2,7 @@ use std::io::Cursor;
 
 use k256::elliptic_curve::Field;
 use nom::{bytes::streaming::take, IResult};
-use proofs::{F, G1};
+use proofs::{circuits::CIRCUIT_SIZE_512, F, G1};
 use tls_client2::{
   hash_hs::HandshakeHashBuffer,
   internal::msgs::hsjoiner::HandshakeJoiner,
@@ -30,10 +30,6 @@ use web_proof_circuits_witness_generator::{data_hasher, ByteOrPad};
 use crate::errors::ProxyError;
 
 const TRIMMED_BYTES: usize = 17;
-// TODO: Relocate and consolidate with circuits.rs
-pub const CIRCUIT_SIZE_SMALL: usize = 512;
-pub const CIRCUIT_SIZE_MAX: usize = 1024;
-pub const MAX_STACK_HEIGHT: usize = 10;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Direction {
@@ -320,7 +316,7 @@ impl Transcript<Parsed> {
     let mut result = Vec::new();
 
     fn get_hashes(bytes: Vec<u8>) -> Vec<F<G1>> {
-      vec![CIRCUIT_SIZE_SMALL, CIRCUIT_SIZE_MAX]
+      vec![CIRCUIT_SIZE_512]
         .into_iter()
         .filter(|&size| bytes.len() <= size)
         .map(|size| {
@@ -457,6 +453,7 @@ impl Transcript<Parsed> {
       };
     }
 
+    // TODO (sambhav): see if can remove this?
     let request_hashes = Transcript::<Parsed>::get_permutations(&request_messages);
     let response_hashes = Transcript::<Parsed>::get_permutations(&response_messages);
 

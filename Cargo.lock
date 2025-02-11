@@ -1534,6 +1534,7 @@ version = "0.2.0"
 dependencies = [
  "cargo_metadata",
  "client",
+ "proofs",
  "serde",
  "serde_json",
  "tokio",
@@ -7272,7 +7273,7 @@ dependencies = [
 [[package]]
 name = "web-proof-circuits-witness-generator"
 version = "0.1.0"
-source = "git+https://github.com/pluto/web-prover-circuits#26a200f6bd85f81e6669da6adff138dd8960b6d7"
+source = "git+https://github.com/pluto/web-prover-circuits#f911db6e578dc60e44eb79a2239fa75119439218"
 dependencies = [
  "anyhow",
  "ark-bn254",

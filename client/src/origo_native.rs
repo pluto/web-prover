@@ -5,13 +5,6 @@ use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVe
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
-use proofs::{
-  program::{
-    data::{Offline, SetupParams},
-    manifest::{EncryptionInput, Manifest},
-  },
-  F, G1, G2,
-};
 use tls_client2::origo::OrigoConnection;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;

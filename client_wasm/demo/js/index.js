@@ -21,7 +21,7 @@ function startMemoryMonitoring(instance) {
 // Create a WebAssembly.Memory object
 const shared_memory = new WebAssembly.Memory({
   initial: 16384, // 256 pages = 16MB
-  maximum: 65536, // 1024 pages = 64MB
+  maximum: 36000, // 1024 pages = 64MB
   shared: true, // Enable shared memory
 });
 
@@ -75,7 +75,7 @@ console.log(WEB_PROVER_CIRCUITS_VERSION)
 
 var proving_params = {
   aux_params: await getByteParams(
-    `circom-artifacts-1024b-v${WEB_PROVER_CIRCUITS_VERSION}/serialized_setup_1024b_rom_length_100.bin`,
+    `circom-artifacts-512b-v${WEB_PROVER_CIRCUITS_VERSION}/serialized_setup_512b_rom_length_100.bin`,
   ),
 };
 proofWorker.postMessage({

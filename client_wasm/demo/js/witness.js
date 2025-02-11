@@ -1,6 +1,7 @@
 import { WitnessOutput } from "../pkg/client_wasm";
 import { WEB_PROVER_CIRCUITS_VERSION } from "./config";
 
+const CIRCUIT_SIZE = 512;
 let snarkjs;
 try {
   const _snarkjs = await import("snarkjs");
@@ -19,7 +20,7 @@ const getWitnessGenerator = async function (circuit) {
       : window.location.origin;
 
   const wasmUrl = new URL(
-    `build/circom-artifacts-1024b-v${WEB_PROVER_CIRCUITS_VERSION}/${circuit}.wasm`,
+    `build/circom-artifacts-${CIRCUIT_SIZE}b-v${WEB_PROVER_CIRCUITS_VERSION}/${circuit}.wasm`,
     origin,
   ).toString();
   const wasm = await fetch(wasmUrl).then((r) => r.arrayBuffer());
@@ -36,9 +37,9 @@ async function generateWitness(input, wasm) {
 }
 
 const circuits_label = [
-  "plaintext_authentication_1024b",
-  "http_verification_1024b",
-  "json_extraction_1024b",
+  `plaintext_authentication_${CIRCUIT_SIZE}b`,
+  `http_verification_${CIRCUIT_SIZE}b`,
+  `json_extraction_${CIRCUIT_SIZE}b`,
 ];
 
 export const generateWitnessBytes = async function (inputs, rom) {
