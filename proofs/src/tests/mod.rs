@@ -10,10 +10,7 @@ use inputs::{
   complex_manifest, complex_request_inputs, complex_response_inputs, simple_request_inputs,
   simple_response_inputs, TEST_MANIFEST,
 };
-use web_proof_circuits_witness_generator::{
-  http::{compute_http_witness, HttpMaskType},
-  polynomial_digest,
-};
+use web_proof_circuits_witness_generator::polynomial_digest;
 
 use super::*;
 use crate::program::{
@@ -258,11 +255,6 @@ async fn test_end_to_end_proofs_post() {
 
   debug!("Creating ROM");
 
-  let request_combined = request_inputs.plaintext.iter().fold(vec![], |mut acc, x| {
-    acc.extend(x.clone());
-    acc
-  });
-
   let InitialNIVCInputs { ciphertext_digest, .. } = manifest
     .initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE>(
       &request_inputs.ciphertext,
@@ -272,12 +264,8 @@ async fn test_end_to_end_proofs_post() {
 
   let NIVCRom { circuit_data, rom } =
     manifest.build_rom::<CIRCUIT_SIZE>(&request_inputs, &response_inputs);
-  let NivcCircuitInputs { mut initial_nivc_input, fold_inputs: _, private_inputs } =
+  let NivcCircuitInputs { initial_nivc_input, fold_inputs: _, private_inputs } =
     manifest.build_inputs::<CIRCUIT_SIZE>(&request_inputs, &response_inputs).unwrap();
-
-  let request_body = compute_http_witness(&request_combined, HttpMaskType::Body);
-  let request_body_digest = polynomial_digest(&request_body, ciphertext_digest, 0);
-  initial_nivc_input[0] -= request_body_digest; // TODO: this is actually incorrect because we don't have json verification for request
 
   debug!("rom: {:?}", rom);
   debug!("inputs: {:?}", private_inputs.len());

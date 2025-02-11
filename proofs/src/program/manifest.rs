@@ -619,6 +619,7 @@ fn build_http_verification_circuit_inputs<const CIRCUIT_SIZE: usize>(
 ///
 /// # Arguments
 /// - `inputs`: valid input json bytes
+/// - `polynomial_input`: randomised input for circuit input digest
 /// - `keys`: JSON keys to mask
 /// - `private_inputs`: private inputs to be used in the circuit
 /// - `fold_inputs`: fold inputs to be used in the circuit
@@ -631,14 +632,25 @@ fn build_http_verification_circuit_inputs<const CIRCUIT_SIZE: usize>(
 fn build_json_extraction_circuit_inputs<const CIRCUIT_SIZE: usize>(
   inputs: &[u8],
   polynomial_input: F<G1>,
-  keys: &[JsonKey],
+  keys: (Option<&[JsonKey]>, Option<&[JsonKey]>),
   private_inputs: &mut Vec<HashMap<String, Value>>,
 ) -> Result<F<G1>, ProofError> {
+  assert!(keys.1.is_some());
+  let response_keys = keys.1.unwrap();
+
   let raw_response_json_machine =
-    RawJsonMachine::<MAX_STACK_HEIGHT>::from_chosen_sequence_and_input(polynomial_input, keys)?;
+    RawJsonMachine::<MAX_STACK_HEIGHT>::from_chosen_sequence_and_input(
+      polynomial_input,
+      response_keys,
+    )?;
   let sequence_digest = raw_response_json_machine.compress_tree_hash();
 
-  let value = json_value_digest::<MAX_STACK_HEIGHT>(inputs, keys)?;
+  // check request keys, if present, then return empty value
+  // else compute the value digest
+  let value = match keys.0 {
+    Some(_) => vec![],
+    None => json_value_digest::<MAX_STACK_HEIGHT>(inputs, response_keys)?,
+  };
   let value_digest = polynomial_digest(&value, polynomial_input, 0);
 
   // no need to supply padded input as state is always from valid ascii
@@ -804,11 +816,20 @@ impl Manifest {
     )?;
     // debug!("private_inputs: {:?}", private_inputs.len());
 
-    let _ = build_http_verification_circuit_inputs::<CIRCUIT_SIZE>(
+    let (_, request_body) = build_http_verification_circuit_inputs::<CIRCUIT_SIZE>(
       &request_inputs.plaintext,
       ciphertext_digest,
       &headers_digest,
       &mut private_inputs,
+    )?;
+    // debug!("private_inputs: {:?}", private_inputs.len());
+
+    let _ = build_json_extraction_circuit_inputs::<CIRCUIT_SIZE>(
+      &request_body,
+      ciphertext_digest,
+      (Some(&[]), Some(&self.response.body.json)), // WARN: sending response keys for request
+      &mut private_inputs,
+      &mut fold_inputs,
     )?;
     // debug!("private_inputs: {:?}", private_inputs.len());
 
@@ -829,7 +850,7 @@ impl Manifest {
     let _ = build_json_extraction_circuit_inputs::<CIRCUIT_SIZE>(
       &response_body,
       ciphertext_digest,
-      &self.response.body.json,
+      (None, Some(&self.response.body.json)),
       &mut private_inputs,
     )?;
 
@@ -874,6 +895,17 @@ impl Manifest {
       rom.push(http_circuit);
     });
 
+    let combined_request = request_inputs.plaintext.iter().flatten().cloned().collect::<Vec<u8>>();
+    let request_body = compute_http_witness(&combined_request, HttpMaskType::Body);
+    let request_json_circuit_count =
+      (request_body.len() as f64 / CIRCUIT_SIZE as f64).ceil() as usize;
+
+    (0..request_json_circuit_count).for_each(|i| {
+      let json_circuit = format!("{}_{}", json_extraction_label, i);
+      rom_data.insert(json_circuit.clone(), CircuitData { opcode: 2 });
+      rom.push(json_circuit);
+    });
+
     // ------------------- Response -------------------
 
     let combined_response_plaintext_length: usize =
@@ -907,7 +939,7 @@ impl Manifest {
       (response_body.len() as f64 / CIRCUIT_SIZE as f64).ceil() as usize;
 
     (0..response_json_circuit_count).for_each(|i| {
-      let json_circuit = format!("{}_{}", json_extraction_label, i);
+      let json_circuit = format!("{}_{}", json_extraction_label, i + request_json_circuit_count);
       rom_data.insert(json_circuit.clone(), CircuitData { opcode: 2 });
       rom.push(json_circuit);
     });
