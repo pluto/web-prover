@@ -40,5 +40,4 @@ jobs:
           ./target/release/notary --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json &
           sleep 10
 
-          export NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer
           ./target/release/client --config ./fixture/client.tlsn_tcp_local.json

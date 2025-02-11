@@ -52,14 +52,13 @@ pub async fn sign(
   #[allow(unused_variables)]
   let client: reqwest::Client = reqwest::ClientBuilder::new().build()?;
 
-  #[cfg(feature = "notary_ca_cert")]
   // TODO: recheck use of rustls backend
-  let client = reqwest::ClientBuilder::new()
-    .add_root_certificate(reqwest::tls::Certificate::from_der(
-      &crate::tls::NOTARY_CA_CERT.to_vec(),
-    )?)
-    .use_rustls_tls()
-    .build()?;
+  let mut client_builder = reqwest::ClientBuilder::new().use_rustls_tls();
+  if let Some(cert) = config.notary_ca_cert {
+    client_builder =
+      client_builder.add_root_certificate(reqwest::tls::Certificate::from_der(&cert)?);
+  }
+  let client = client_builder.build()?;
 
   let response = client.post(url).json(&sb).send().await?;
   assert!(response.status() == hyper::StatusCode::OK);
@@ -81,16 +80,12 @@ pub async fn verify(
     config.notary_port.clone(),
   );
 
-  #[allow(unused_variables)]
-  let client = reqwest::ClientBuilder::new().build()?;
-
-  #[cfg(feature = "notary_ca_cert")]
-  let client = reqwest::ClientBuilder::new()
-    .add_root_certificate(reqwest::tls::Certificate::from_der(
-      &crate::tls::NOTARY_CA_CERT.to_vec(),
-    )?)
-    .use_rustls_tls()
-    .build()?;
+  let mut client_builder = reqwest::ClientBuilder::new().use_rustls_tls();
+  if let Some(cert) = config.notary_ca_cert {
+    client_builder =
+      client_builder.add_root_certificate(reqwest::tls::Certificate::from_der(&cert)?);
+  }
+  let client = client_builder.build()?;
 
   let response = client.post(url).json(&verify_body).send().await?;
   assert!(response.status() == hyper::StatusCode::OK);

@@ -9,10 +9,6 @@ publish=false
 websocket=[]
 tracing  =[]
 
-# used in build.rs, activate by setting NOTARY_CA_CERT_PATH as env variable
-# used for local development
-notary_ca_cert=[]
-
 # used to disable cert verification, useful for development
 unsafe_skip_cert_verification=[]
 
@@ -65,7 +61,8 @@ p256={ version="0.13", features=["pem", "ecdsa"] }
 
 uuid={ version="1.10.0", default-features=false, features=["v4"] }
 
-clap={ workspace=true }
+clap      ={ workspace=true }
+serde_with={ version="3.12.0", features=["base64"] }
 
 ####################################################################################################
 # Target-specific configuration

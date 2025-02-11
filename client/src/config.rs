@@ -9,6 +9,11 @@ use hyper::{
 };
 use proofs::program::manifest::Manifest;
 use serde::{Deserialize, Serialize};
+use serde_with::{
+  base64::{Base64, Standard},
+  formats::Padded,
+  serde_as,
+};
 use url::Url;
 
 use crate::errors::ClientErrors;
@@ -30,11 +35,16 @@ pub struct ProvingData {
   pub manifest: Option<Manifest>,
 }
 
+#[serde_as]
 #[derive(Deserialize, Clone, Debug)]
 pub struct Config {
   pub mode:                NotaryMode,
   pub notary_host:         String,
   pub notary_port:         u16,
+  // optionally pass notary's ca cert to be trusted,
+  // this is helpful for local debugging with self-signed certs
+  #[serde_as(as = "Option<Base64<Standard, Padded>>")]
+  pub notary_ca_cert:      Option<Vec<u8>>,
   pub target_method:       String,
   pub target_url:          String,
   pub target_headers:      HashMap<String, String>,

@@ -37,7 +37,6 @@ jobs:
           key: ${{ inputs.web-prover-circuits-cache-key }}
 
       - run: |
-          export NOTARY_CA_CERT_PATH=../../fixture/certs/ca-cert.cer 
           cargo +nightly-2024-10-28 build -p client --release
 
       - uses: actions/upload-artifact@v4

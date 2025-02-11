@@ -5,6 +5,7 @@ use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVe
 use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
+use p256::elliptic_curve::ff::derive::bitvec::vec;
 use proofs::{
   program::{
     data::{Offline, SetupParams},
@@ -27,7 +28,8 @@ pub(crate) async fn proxy(
   config: config::Config,
   session_id: String,
 ) -> Result<tls_client2::origo::OrigoConnection, ClientErrors> {
-  let root_store = crate::tls::tls_client2_default_root_store();
+  let root_store =
+    crate::tls::tls_client2_default_root_store(config.notary_ca_cert.clone().map(|c| vec![c]));
 
   let client_config = tls_client2::ClientConfig::builder()
     .with_safe_defaults()
@@ -50,7 +52,9 @@ pub(crate) async fn proxy(
       .with_no_client_auth()
   } else {
     rustls::ClientConfig::builder()
-      .with_root_certificates(crate::tls::rustls_default_root_store())
+      .with_root_certificates(crate::tls::rustls_default_root_store(
+        config.notary_ca_cert.clone().map(|c| vec![c]),
+      ))
       .with_no_client_auth()
   };
 
