@@ -21,4 +21,4 @@ COPY --from=rust-builder /app/proofs /app/proofs
 EXPOSE 7443
 WORKDIR /app
 ENV RUST_LOG=info
-CMD ["./notary", "--config", "./fixture/notary-config.toml", "--manifest", "./fixture/notary.origo_tcp_local.json"]
+CMD ["./notary", "--config", "./fixture/notary-config.toml"]

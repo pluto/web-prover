@@ -40,7 +40,7 @@ To generate witness using wasm binary, just modify these keys in [setup](./setup
 
 - run notary:
 ```
-RUST_LOG=debug cargo run --release -p notary -- --config ./fixture/notary-config.toml  --manifest ./fixture/notary.origo_tcp_local.json
+RUST_LOG=debug cargo run --release -p notary -- --config ./fixture/notary-config.toml
 ```
 
 - run `make wasm` or `make wasm-debug` (for better stacktraces in wasm (really necessary to debug))

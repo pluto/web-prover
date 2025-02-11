@@ -49,7 +49,6 @@ struct SharedState {
   tlsn_max_recv_data: usize,
   origo_sessions:     Arc<Mutex<HashMap<String, tls_parser::Transcript<tls_parser::Raw>>>>,
   verifier_sessions:  Arc<Mutex<HashMap<String, origo::VerifierInputs>>>,
-  manifest:           Manifest,
 }
 
 /// Main entry point for the notary server application.
@@ -95,7 +94,6 @@ async fn main() -> Result<(), NotaryServerError> {
   let _ = rustls::crypto::ring::default_provider().install_default();
 
   let c = config::read_config();
-  let manifest = config::read_manifest()?;
 
   let listener = TcpListener::bind(&c.listen).await?;
   info!("Listening on https://{}", &c.listen);
@@ -107,9 +105,6 @@ async fn main() -> Result<(), NotaryServerError> {
     tlsn_max_recv_data: c.tlsn_max_recv_data,
     origo_sessions: Default::default(),
     verifier_sessions: Default::default(),
-    // TODO: This is obviously not sufficient, we need richer logic
-    // for informing the notary of a valid manifest.
-    manifest,
   });
 
   let router = Router::new()
