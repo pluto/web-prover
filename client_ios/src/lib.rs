@@ -4,7 +4,10 @@ use std::{
 };
 
 use client::config::Config;
-use proofs::circuits::{construct_setup_data_from_fs, load_proving_params_512};
+use proofs::{
+  circuits::{construct_setup_data_from_fs, load_proving_params_512},
+  program::data::UninitializedSetup,
+};
 use tracing::debug;
 
 #[derive(serde::Serialize)]
@@ -27,10 +30,48 @@ pub unsafe extern "C" fn setup_tracing() {
   tracing::subscriber::set_global_default(collector).map_err(|e| panic!("{e:?}")).unwrap();
 }
 
+#[repr(C)]
+pub struct UninitializedSetupFFI {
+  r1cs_types:              *const *const u8,
+  r1cs_lengths:            *const usize,
+  r1cs_count:              usize,
+  witness_generator_types: *const *const u8,
+  witness_lengths:         *const usize,
+  witness_count:           usize,
+}
+
+impl UninitializedSetupFFI {
+  pub unsafe fn to_canonical(&self) -> UninitializedSetup {
+    // Deserialize `r1cs_types`
+    let r1cs_types = (0..self.r1cs_count)
+      .map(|i| {
+        let len = *self.r1cs_lengths.add(i);
+        let ptr = *self.r1cs_types.add(i);
+        std::slice::from_raw_parts(ptr, len).to_vec()
+      })
+      .collect::<Vec<Vec<u8>>>();
+
+    // Deserialize `witness_generator_types`
+    let witness_generator_types = (0..self.witness_count)
+      .map(|i| {
+        let len = *self.witness_lengths.add(i);
+        let ptr = *self.witness_generator_types.add(i);
+        std::slice::from_raw_parts(ptr, len).to_vec()
+      })
+      .collect::<Vec<Vec<u8>>>();
+
+    UninitializedSetup::from_raw_parts(r1cs_types, witness_generator_types)
+  }
+}
+
 #[no_mangle]
 // TODO: We should probably clarify this safety doc
 #[allow(clippy::missing_safety_doc)]
-pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
+pub unsafe extern "C" fn prover(
+  config_json: *const c_char,
+  // TODO: `setup_data` parameter handling is untested
+  setup_data: *const UninitializedSetupFFI,
+) -> *const c_char {
   let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
     let config_str = unsafe {
       assert!(!config_json.is_null());
@@ -43,12 +84,20 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
     let start = Instant::now();
     debug!("starting proving");
 
+    // TODO: Remove this after updating Swift client code
+    let setup_data = if setup_data.is_null() {
+      construct_setup_data_from_fs::<512>().unwrap()
+    } else {
+      let setup_data = unsafe { &*setup_data };
+      setup_data.to_canonical()
+    };
+
     let proof = rt
       .block_on(client::prover_inner(
         config,
         // TODO: Do I pass these here from `prover` call args or just make Some(...) in-place?
         Some(load_proving_params_512().unwrap()),
-        Some(construct_setup_data_from_fs::<512>().unwrap()),
+        Some(setup_data),
       ))
       .unwrap();
     debug!("done proving: {:?}", Instant::now() - start);
