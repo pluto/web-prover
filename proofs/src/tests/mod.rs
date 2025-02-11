@@ -34,10 +34,6 @@ const MAX_STACK_HEIGHT: usize = 10;
 const CIRCUIT_SIZE: usize = 1024;
 const MAX_HTTP_HEADERS: usize = 25;
 
-// const SERIALIZED_SETUP: &[u8] = include_bytes!(
-//   "../../web_proof_circuits/circom-artifacts-1024b-v0.9.0/serialized_setup_1024b_rom_length_100.
-// bin" );
-
 // Circuit 0
 const PLAINTEXT_AUTHENTICATION_256B_R1CS: &[u8] = include_bytes!(concat!(
   "../../web_proof_circuits/circom-artifacts-256b-v",

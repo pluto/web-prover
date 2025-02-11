@@ -3,7 +3,7 @@
 # Finally run test using these files
 
 VERSION = $(shell sed -n 's/^web_prover_circuits_version *= *"\(.*\)"/\1/p' ../Cargo.toml)
-CIRCUIT_VERSIONS = circom-artifacts-512b-v$(VERSION) circom-artifacts-1024b-v$(VERSION)
+CIRCUIT_VERSIONS = circom-artifacts-256b-v$(VERSION) circom-artifacts-512b-v$(VERSION)
 
 web-prover-circuits:
 	for version in $(CIRCUIT_VERSIONS); do \
