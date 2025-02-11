@@ -2,8 +2,9 @@
 use std::collections::HashMap;
 
 use proofs::{
+  circuits::construct_setup_data,
   program::{
-    data::{NotExpanded, Offline, SetupParams},
+    data::{Offline, SetupParams},
     manifest::{EncryptionInput, Manifest, TLSEncryption},
   },
   F, G1, G2,
@@ -12,7 +13,6 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::{
-  circuits::construct_setup_data,
   config::{self},
   errors::ClientErrors,
   tls::decrypt_tls_ciphertext,
@@ -65,7 +65,7 @@ pub async fn sign(
   };
 
   let response = client.post(url).json(&sb).send().await?;
-  assert!(response.status() == hyper::StatusCode::OK);
+  assert!(response.status() == hyper::StatusCode::OK, "response={:?}", response);
 
   // TODO: Actually use this input in the proofs.
   let sign_response = response.bytes().await?.to_vec();
@@ -99,7 +99,7 @@ pub async fn verify(
   };
 
   let response = client.post(url).json(&verify_body).send().await?;
-  assert!(response.status() == hyper::StatusCode::OK);
+  assert!(response.status() == hyper::StatusCode::OK, "response={:?}", response);
   let verify_response = response.json::<VerifyReply>().await?;
 
   debug!("\n{:?}\n\n", verify_response.clone());
@@ -151,7 +151,7 @@ pub(crate) async fn generate_proof(
   request_inputs: EncryptionInput,
   response_inputs: EncryptionInput,
 ) -> Result<OrigoProof, ClientErrors> {
-  let setup_data = construct_setup_data();
+  let setup_data = construct_setup_data::<{ proofs::circuits::CIRCUIT_SIZE_512 }>()?;
   let program_data = SetupParams::<Offline> {
     public_params: proving_params,
     vk_digest_primary: F::<G1>::from(0), // These need to be right.
@@ -163,7 +163,7 @@ pub(crate) async fn generate_proof(
 
   let vk_digest_primary = program_data.vk_digest_primary;
   let vk_digest_secondary = program_data.vk_digest_secondary;
-  crate::proof::construct_program_data_and_proof(
+  crate::proof::construct_program_data_and_proof::<{ proofs::circuits::CIRCUIT_SIZE_512 }>(
     manifest,
     request_inputs,
     response_inputs,

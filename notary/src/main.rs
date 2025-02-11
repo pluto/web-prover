@@ -31,7 +31,6 @@ use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod axum_websocket;
-mod circuits;
 mod config;
 mod errors;
 mod origo;
@@ -39,6 +38,7 @@ mod tcp;
 mod tee;
 mod tls_parser;
 mod tlsn;
+mod verifier;
 mod websocket_proxy;
 
 struct SharedState {
@@ -48,6 +48,7 @@ struct SharedState {
   tlsn_max_recv_data: usize,
   origo_sessions:     Arc<Mutex<HashMap<String, tls_parser::Transcript<tls_parser::Raw>>>>,
   verifier_sessions:  Arc<Mutex<HashMap<String, origo::VerifierInputs>>>,
+  verifier:           verifier::Verifier,
 }
 
 /// Main entry point for the notary server application.
@@ -102,8 +103,9 @@ async fn main() -> Result<(), NotaryServerError> {
     origo_signing_key:  load_origo_signing_key(&c.origo_signing_key),
     tlsn_max_sent_data: c.tlsn_max_sent_data,
     tlsn_max_recv_data: c.tlsn_max_recv_data,
-    origo_sessions:     Default::default(),
-    verifier_sessions:  Default::default(),
+    origo_sessions: Default::default(),
+    verifier_sessions: Default::default(),
+    verifier: verifier::initialize_verifier().unwrap(),
   });
 
   let router = Router::new()

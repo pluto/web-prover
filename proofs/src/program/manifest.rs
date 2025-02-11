@@ -55,8 +55,6 @@ use crate::{
 /// HTTP
 const DATA_SIGNAL_NAME: &str = "data";
 
-/// ideal circuit size to used for a plaintext
-const CIRCUIT_SIZE: usize = 1024;
 const PUBLIC_IO_VARS: usize = 11;
 const MAX_HTTP_HEADERS: usize = 25;
 const MAX_STACK_HEIGHT: usize = 10;
@@ -217,7 +215,7 @@ pub fn make_nonce(iv: [u8; 12], seq: u64) -> [u8; 12] {
 /// ## Note:
 /// - MAC is ignored from the ciphertext because circuit doesn't verify auth tag.
 /// - handle different cipher suite, currently AES-GCM-128 & ChaCha20-Poly1305
-fn build_plaintext_authentication_circuit_inputs(
+fn build_plaintext_authentication_circuit_inputs<const CIRCUIT_SIZE: usize>(
   inputs: &EncryptionInput,
   polynomial_input: F<G1>,
   private_inputs: &mut Vec<HashMap<String, Value>>,
@@ -228,36 +226,51 @@ fn build_plaintext_authentication_circuit_inputs(
   let key = inputs.key.as_ref();
   assert_eq!(key.len(), 32, "Only CHACHA20POLY1305 is supported for now");
 
+  let counter_step = CIRCUIT_SIZE / 64;
+
   let mut curr_plaintext_index = 0;
   let mut prev_ciphertext_digest = F::<G1>::ZERO;
   for (plaintext_circuit_counter, (pt, ct)) in
     inputs.plaintext.iter().zip(inputs.ciphertext.iter()).enumerate()
   {
-    assert!(pt.len() <= CIRCUIT_SIZE, "Plaintext is larger than circuit size");
+    // assert!(pt.len() <= CIRCUIT_SIZE, "Plaintext is larger than circuit size");
     assert_eq!(pt.len(), ct.len(), "Plaintext and ciphertext length mismatch");
 
-    let padded_plaintext = ByteOrPad::from_bytes_with_padding(&pt, CIRCUIT_SIZE - pt.len());
+    let padded_plaintext = ByteOrPad::pad_to_nearest_multiple(pt, CIRCUIT_SIZE);
     let nonce = make_nonce(inputs.iv, inputs.seq + plaintext_circuit_counter as u64);
 
     // CHACHA rom opcode with private inputs
-    private_inputs.push(HashMap::from([
-      (String::from("key"), json!(to_chacha_input(&key))),
-      (String::from("nonce"), json!(to_chacha_input(&nonce))),
-      (String::from("counter"), json!(to_chacha_input(&[1]))),
-      (String::from("plaintext"), json!(&padded_plaintext)),
-      (
-        String::from("ciphertext_digest"),
-        json!(BigInt::from_bytes_le(num_bigint::Sign::Plus, &polynomial_input.to_bytes())
-          .to_str_radix(10)),
-      ),
-    ]));
+
+    // add fold inputs
+    // let circuit_label =
+    //   format!("PLAINTEXT_AUTHENTICATION_{}", inputs.seq + plaintext_circuit_counter as u64);
+
+    let pt_chunks = padded_plaintext.chunks(CIRCUIT_SIZE).map(|p| json!(p)).collect::<Vec<Value>>();
+    let counters = (0..pt_chunks.len())
+      .map(|i| json!(to_chacha_input(&[(1 + i * counter_step) as u8])))
+      .collect::<Vec<Value>>();
+
+    for i in 0..pt_chunks.len() {
+      let private_input = HashMap::from([
+        (String::from("key"), json!(to_chacha_input(key))),
+        (String::from("nonce"), json!(to_chacha_input(&nonce))),
+        (String::from("counter"), counters[i].clone()),
+        (String::from("plaintext"), pt_chunks[i].clone()),
+        (
+          String::from("ciphertext_digest"),
+          json!(BigInt::from_bytes_le(num_bigint::Sign::Plus, &polynomial_input.to_bytes())
+            .to_str_radix(10)),
+        ),
+      ]);
+      private_inputs.push(private_input);
+    }
 
     let plaintext_digest = polynomial_digest(pt, polynomial_input, curr_plaintext_index as u64);
 
     prev_ciphertext_digest = data_hasher(
-      &ByteOrPad::from_bytes_with_padding(
+      &ByteOrPad::pad_to_nearest_multiple(
         &inputs.ciphertext[plaintext_circuit_counter],
-        CIRCUIT_SIZE - ct.len(),
+        CIRCUIT_SIZE,
       ),
       prev_ciphertext_digest,
     );
@@ -279,7 +292,7 @@ fn build_plaintext_authentication_circuit_inputs(
 ///
 /// # Returns
 /// - `http_body`: body of the HTTP
-fn build_http_verification_circuit_inputs(
+fn build_http_verification_circuit_inputs<const CIRCUIT_SIZE: usize>(
   plaintext_chunks: &[Vec<u8>],
   polynomial_input: F<G1>,
   headers_digest: &[F<G1>],
@@ -304,18 +317,18 @@ fn build_http_verification_circuit_inputs(
     } else {
       RawHttpMachine::from(states[CIRCUIT_SIZE * i - 1])
     };
+    debug!("pt: {:?}", pt.len());
+    let padded_pt = ByteOrPad::pad_to_nearest_multiple(pt, CIRCUIT_SIZE);
+    debug!("padded_pt: {:?}", padded_pt.len());
     private_inputs.push(HashMap::from([
-      (
-        String::from(DATA_SIGNAL_NAME),
-        json!(ByteOrPad::from_bytes_with_padding(&pt, CIRCUIT_SIZE - pt.len())),
-      ),
+      (String::from(DATA_SIGNAL_NAME), json!(padded_pt)),
       (
         String::from("ciphertext_digest"),
         json!([BigInt::from_bytes_le(num_bigint::Sign::Plus, &polynomial_input.to_bytes())
           .to_str_radix(10)]),
       ),
       (String::from("main_digests"), json!(main_digests)),
-      (String::from("machine_state"), json!(RawHttpMachine::from(state))),
+      (String::from("machine_state"), json!(state)),
     ]));
   }
   let plaintext_digest = polynomial_digest(&plaintext, polynomial_input, 0);
@@ -344,7 +357,7 @@ fn build_http_verification_circuit_inputs(
 ///
 /// # Notes
 /// Pads `inputs` to `CIRCUIT_SIZE` and computes the digest of the JSON key sequence.
-fn build_json_extraction_circuit_inputs(
+fn build_json_extraction_circuit_inputs<const CIRCUIT_SIZE: usize>(
   inputs: &[u8],
   polynomial_input: F<G1>,
   keys: &[JsonKey],
@@ -352,15 +365,14 @@ fn build_json_extraction_circuit_inputs(
   _fold_inputs: &mut HashMap<String, FoldInput>,
 ) -> Result<F<G1>, ProofError> {
   let raw_response_json_machine =
-    RawJsonMachine::<MAX_STACK_HEIGHT>::from_chosen_sequence_and_input(polynomial_input, &keys)?;
+    RawJsonMachine::<MAX_STACK_HEIGHT>::from_chosen_sequence_and_input(polynomial_input, keys)?;
   let sequence_digest = raw_response_json_machine.compress_tree_hash();
 
-  let value = json_value_digest::<MAX_STACK_HEIGHT>(&inputs, keys)?;
+  let value = json_value_digest::<MAX_STACK_HEIGHT>(inputs, keys)?;
   let value_digest = polynomial_digest(&value, polynomial_input, 0);
 
   // no need to supply padded input as state is always from valid ascii
   let states = parse::<MAX_STACK_HEIGHT>(inputs, polynomial_input)?;
-
   for (i, pt) in inputs.chunks(CIRCUIT_SIZE).enumerate() {
     let state = if i == 0 {
       RawJsonMachine::initial_state()
@@ -370,11 +382,11 @@ fn build_json_extraction_circuit_inputs(
 
     let state =
       state.flatten().iter().map(|f| field_element_to_base10_string(*f)).collect::<Vec<String>>();
-    // debug!("state: {:?}", state);
+    debug!("state: {:?}", state);
     private_inputs.push(HashMap::from([
       (
         String::from(DATA_SIGNAL_NAME),
-        json!(&ByteOrPad::from_bytes_with_padding(&pt, CIRCUIT_SIZE - pt.len())),
+        json!(&ByteOrPad::pad_to_nearest_multiple(pt, CIRCUIT_SIZE)),
       ),
       (
         String::from("ciphertext_digest"),
@@ -402,7 +414,7 @@ fn build_json_extraction_circuit_inputs(
 }
 
 impl Manifest {
-  pub fn initial_inputs<const MAX_STACK_HEIGHT: usize>(
+  pub fn initial_inputs<const MAX_STACK_HEIGHT: usize, const CIRCUIT_SIZE: usize>(
     &self,
     // TODO (Sambhav): can remove copying
     request_ciphertext: &[Vec<u8>],
@@ -410,11 +422,11 @@ impl Manifest {
   ) -> Result<InitialNIVCInputs, ProofError> {
     let padded_request_ciphertext = request_ciphertext
       .iter()
-      .map(|c| ByteOrPad::from_bytes_with_padding(c, CIRCUIT_SIZE - c.len()))
+      .map(|c| ByteOrPad::pad_to_nearest_multiple(c, CIRCUIT_SIZE))
       .collect::<Vec<Vec<ByteOrPad>>>();
     let padded_response_ciphertext = response_ciphertext
       .iter()
-      .map(|c| ByteOrPad::from_bytes_with_padding(c, CIRCUIT_SIZE - c.len()))
+      .map(|c| ByteOrPad::pad_to_nearest_multiple(c, CIRCUIT_SIZE))
       .collect::<Vec<Vec<ByteOrPad>>>();
 
     let mut ciphertext_digest = F::<G1>::ZERO;
@@ -497,7 +509,7 @@ impl Manifest {
     })
   }
 
-  pub fn build_inputs(
+  pub fn build_inputs<const CIRCUIT_SIZE: usize>(
     &self,
     request_inputs: &EncryptionInput,
     response_inputs: &EncryptionInput,
@@ -509,12 +521,12 @@ impl Manifest {
     let mut fold_inputs: HashMap<String, FoldInput> = HashMap::new();
 
     let InitialNIVCInputs { ciphertext_digest, initial_nivc_input, headers_digest } =
-      self.initial_inputs::<MAX_STACK_HEIGHT>(
+      self.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE>(
         &request_inputs.ciphertext,
         &response_inputs.ciphertext,
       )?;
 
-    let _ = build_plaintext_authentication_circuit_inputs(
+    let _ = build_plaintext_authentication_circuit_inputs::<CIRCUIT_SIZE>(
       request_inputs,
       ciphertext_digest,
       &mut private_inputs,
@@ -522,7 +534,7 @@ impl Manifest {
     )?;
     // debug!("private_inputs: {:?}", private_inputs.len());
 
-    let _ = build_http_verification_circuit_inputs(
+    let _ = build_http_verification_circuit_inputs::<CIRCUIT_SIZE>(
       &request_inputs.plaintext,
       ciphertext_digest,
       &headers_digest,
@@ -531,7 +543,7 @@ impl Manifest {
     )?;
     // debug!("private_inputs: {:?}", private_inputs.len());
 
-    let _ = build_plaintext_authentication_circuit_inputs(
+    let _ = build_plaintext_authentication_circuit_inputs::<CIRCUIT_SIZE>(
       response_inputs,
       ciphertext_digest,
       &mut private_inputs,
@@ -539,7 +551,7 @@ impl Manifest {
     )?;
 
     // debug!("private_inputs: {:?}", private_inputs.len());
-    let (_, response_body) = build_http_verification_circuit_inputs(
+    let (_, response_body) = build_http_verification_circuit_inputs::<CIRCUIT_SIZE>(
       &response_inputs.plaintext,
       ciphertext_digest,
       &headers_digest,
@@ -547,7 +559,7 @@ impl Manifest {
       &mut fold_inputs,
     )?;
 
-    let _ = build_json_extraction_circuit_inputs(
+    let _ = build_json_extraction_circuit_inputs::<CIRCUIT_SIZE>(
       &response_body,
       ciphertext_digest,
       &self.response.body.json,
@@ -559,7 +571,7 @@ impl Manifest {
   }
 
   /// Builds ROM for [`Manifest`] request and response.
-  pub fn build_rom(
+  pub fn build_rom<const CIRCUIT_SIZE: usize>(
     &self,
     request_inputs: &EncryptionInput,
     response_inputs: &EncryptionInput,
@@ -576,11 +588,17 @@ impl Manifest {
 
     // plaintext_authentication_label is duplicated `response_packets` times
     let mut rom_data = HashMap::new();
-    (0..request_inputs.ciphertext.len()).for_each(|i| {
-      let plaintext_circuit = format!("{}_{}", plaintext_authentication_label, i);
-      rom_data.insert(plaintext_circuit.clone(), CircuitData { opcode: 0 });
-      rom.push(plaintext_circuit);
-    });
+    let mut plaintext_circuit_counter = 0;
+    for c in request_inputs.ciphertext.iter() {
+      let circuit_count = (c.len() as f64 / CIRCUIT_SIZE as f64).ceil() as usize;
+      for _ in 0..circuit_count {
+        let plaintext_circuit =
+          format!("{}_{}", plaintext_authentication_label, plaintext_circuit_counter);
+        rom_data.insert(plaintext_circuit.clone(), CircuitData { opcode: 0 });
+        rom.push(plaintext_circuit);
+        plaintext_circuit_counter += 1;
+      }
+    }
     // calculate number of circuits required for request, i.e. ceil(length/CIRCUIT_SIZE)
     let request_circuit_count =
       (combined_request_plaintext_length as f64 / CIRCUIT_SIZE as f64).ceil() as usize;
@@ -596,12 +614,16 @@ impl Manifest {
       response_inputs.plaintext.iter().map(|x| x.len()).sum();
 
     // plaintext_authentication_label is duplicated `response_packets` times
-    (0..response_inputs.ciphertext.len()).for_each(|i| {
-      let plaintext_circuit =
-        format!("{}_{}", plaintext_authentication_label, i + request_inputs.ciphertext.len());
-      rom_data.insert(plaintext_circuit.clone(), CircuitData { opcode: 0 });
-      rom.push(plaintext_circuit);
-    });
+    for c in response_inputs.ciphertext.iter() {
+      let circuit_count = (c.len() as f64 / CIRCUIT_SIZE as f64).ceil() as usize;
+      for _ in 0..circuit_count {
+        let plaintext_circuit =
+          format!("{}_{}", plaintext_authentication_label, plaintext_circuit_counter);
+        rom_data.insert(plaintext_circuit.clone(), CircuitData { opcode: 0 });
+        rom.push(plaintext_circuit);
+        plaintext_circuit_counter += 1;
+      }
+    }
 
     // calculate number of circuits required for response, i.e. ceil(length/CIRCUIT_SIZE)
     let response_circuit_count =
@@ -631,12 +653,9 @@ impl Manifest {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::tests::{
-    inputs::{
-      complex_manifest, complex_request_inputs, complex_response_inputs, simple_request_inputs,
-      TEST_MANIFEST,
-    },
-    CHACHA20_CIPHERTEXT, CHACHA20_KEY, CHACHA20_NONCE, HTTP_RESPONSE_PLAINTEXT,
+  use crate::tests::inputs::{
+    complex_manifest, complex_request_inputs, complex_response_inputs, simple_request_inputs,
+    simple_response_inputs, TEST_MANIFEST,
   };
 
   #[test]
@@ -651,91 +670,28 @@ mod tests {
     // verify defaults are working
     assert_eq!(manifest.response.status, "200");
     assert_eq!(manifest.response.version, "HTTP/1.1");
-    assert_eq!(manifest.response.headers.len(), 1);
-    assert_eq!(manifest.response.headers.get("Content-Type").unwrap(), "application/json");
-    assert_eq!(manifest.response.body.json.len(), 5);
+    assert_eq!(manifest.response.headers.len(), 2);
+    assert_eq!(manifest.response.headers.get("Content-Type").unwrap(), "text/plain; charset=utf-8");
+    assert_eq!(manifest.response.body.json.len(), 1);
   }
 
   fn simple_inputs() -> (EncryptionInput, EncryptionInput) {
-    (simple_request_inputs(), EncryptionInput {
-      key:        tls_client2::CipherSuiteKey::CHACHA20POLY1305(CHACHA20_KEY.1),
-      iv:         CHACHA20_NONCE.1,
-      aad:        [0; 12].to_vec(),
-      plaintext:  vec![HTTP_RESPONSE_PLAINTEXT.1.to_vec()],
-      ciphertext: vec![CHACHA20_CIPHERTEXT.1.to_vec()],
-      seq:        1,
-    })
+    (simple_request_inputs(), simple_response_inputs())
   }
 
   fn complex_inputs() -> (EncryptionInput, EncryptionInput) {
     (complex_request_inputs(), complex_response_inputs())
   }
 
-  #[test]
-  fn generate_rom_from_simple_inputs() {
-    let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
-
-    let (request_inputs, response_inputs) = simple_inputs();
-
+  fn assert_rom_from_inputs<const CIRCUIT_SIZE: usize>(
+    manifest: Manifest,
+    request_inputs: EncryptionInput,
+    response_inputs: EncryptionInput,
+  ) {
     let NivcCircuitInputs { fold_inputs, private_inputs, .. } =
-      manifest.build_inputs(&request_inputs, &response_inputs).unwrap();
+      manifest.build_inputs::<CIRCUIT_SIZE>(&request_inputs, &response_inputs).unwrap();
     let NIVCRom { circuit_data: rom_data, rom } =
-      manifest.build_rom(&request_inputs, &response_inputs);
-
-    // request: plaintext_authentication + http verification
-    // response: plaintext_authentication + http verification + json extraction
-    assert_eq!(
-      rom_data.len(),
-      request_inputs.ciphertext.len() + 1 + response_inputs.ciphertext.len() + 1 + 1
-    );
-    assert_eq!(rom_data.get(&String::from("HTTP_VERIFICATION_0")).unwrap().opcode, 1);
-    assert_eq!(rom_data.get(&String::from("PLAINTEXT_AUTHENTICATION_0")).unwrap().opcode, 0);
-    assert_eq!(rom_data.get(&String::from("PLAINTEXT_AUTHENTICATION_1")).unwrap().opcode, 0);
-    assert_eq!(rom_data.get(&String::from("HTTP_VERIFICATION_1")).unwrap().opcode, 1);
-    assert_eq!(rom_data.get(&String::from("JSON_EXTRACTION_0")).unwrap().opcode, 2);
-
-    // should be same length as rom_data
-    assert_eq!(rom.len(), rom_data.len());
-
-    // assert plaintext authentication inputs
-    let plaintext_authentication_len = 0;
-    assert_eq!(rom[plaintext_authentication_len], "PLAINTEXT_AUTHENTICATION_0");
-    assert!(private_inputs[plaintext_authentication_len].contains_key("counter"));
-    assert!(private_inputs[plaintext_authentication_len].contains_key("nonce"));
-    assert!(private_inputs[plaintext_authentication_len].contains_key("key"));
-    assert!(private_inputs[plaintext_authentication_len].contains_key("plaintext"));
-    assert!(private_inputs[plaintext_authentication_len].contains_key("ciphertext_digest"));
-
-    // assert http verification inputs
-    let http_instruction_len = 1;
-    assert_eq!(rom[http_instruction_len], "HTTP_VERIFICATION_0");
-    assert!(private_inputs[http_instruction_len].contains_key("main_digests"));
-    assert!(private_inputs[http_instruction_len].contains_key("ciphertext_digest"));
-    assert!(private_inputs[http_instruction_len].contains_key("data"));
-    assert!(private_inputs[http_instruction_len].contains_key("machine_state"));
-
-    // check final circuit is extract
-    let json_instruction_len = 4;
-    assert_eq!(rom[json_instruction_len], "JSON_EXTRACTION_0");
-    assert!(private_inputs[json_instruction_len].contains_key("ciphertext_digest"));
-    assert!(private_inputs[json_instruction_len].contains_key("data"));
-    assert!(private_inputs[json_instruction_len].contains_key("sequence_digest"));
-    assert!(private_inputs[json_instruction_len].contains_key("value_digest"));
-    assert!(private_inputs[json_instruction_len].contains_key("state"));
-
-    // fold inputs is empty
-    assert!(fold_inputs.is_empty());
-  }
-
-  #[test]
-  fn generate_rom_from_complex_inputs() {
-    let manifest: Manifest = complex_manifest();
-    let (request_inputs, response_inputs) = complex_inputs();
-
-    let NivcCircuitInputs { fold_inputs, private_inputs, .. } =
-      manifest.build_inputs(&request_inputs, &response_inputs).unwrap();
-    let NIVCRom { circuit_data: rom_data, rom } =
-      manifest.build_rom(&request_inputs, &response_inputs);
+      manifest.build_rom::<CIRCUIT_SIZE>(&request_inputs, &response_inputs);
 
     // request:
     // plaintext_authentication (multiple chunks)
@@ -746,6 +702,21 @@ mod tests {
     // + json extraction (body divide into CIRCUIT_SIZE)
     assert_eq!(rom.len(), rom_data.len());
 
+    let plaintext_combined =
+      request_inputs.plaintext.iter().flatten().cloned().collect::<Vec<u8>>();
+    let mut plaintext_circuit_count = 0;
+    for c in request_inputs.ciphertext.iter() {
+      let circuit_count = (c.len() as f64 / CIRCUIT_SIZE as f64).ceil() as usize;
+      for _ in 0..circuit_count {
+        let plaintext_circuit = format!("PLAINTEXT_AUTHENTICATION_{}", plaintext_circuit_count);
+        assert_eq!(rom_data.get(&plaintext_circuit).unwrap().opcode, 0);
+        plaintext_circuit_count += 1;
+      }
+    }
+
+    let http_circuit_count =
+      (plaintext_combined.len() as f64 / CIRCUIT_SIZE as f64).ceil() as usize;
+
     // assert plaintext authentication inputs
     let plaintext_authentication_len = 0;
     assert_eq!(rom[plaintext_authentication_len], String::from("PLAINTEXT_AUTHENTICATION_0"));
@@ -755,15 +726,37 @@ mod tests {
     assert!(private_inputs[plaintext_authentication_len].contains_key("plaintext"));
 
     // assert http parse inputs
-    let http_instruction_len = 2;
+    let http_instruction_len = plaintext_circuit_count;
     assert_eq!(rom[http_instruction_len], String::from("HTTP_VERIFICATION_0"));
     assert!(private_inputs[http_instruction_len].contains_key("main_digests"));
     assert!(private_inputs[http_instruction_len].contains_key("ciphertext_digest"));
     assert!(private_inputs[http_instruction_len].contains_key("data"));
 
+    // assert plaintext authentication inputs
+    let plaintext_authentication_len = plaintext_circuit_count + http_circuit_count;
+    assert_eq!(
+      rom[plaintext_authentication_len],
+      format!("PLAINTEXT_AUTHENTICATION_{}", plaintext_circuit_count)
+    );
+
+    let response_combined =
+      response_inputs.plaintext.iter().flatten().cloned().collect::<Vec<u8>>();
+    let mut response_plaintext_circuit_count = plaintext_circuit_count;
+    for c in response_inputs.ciphertext.iter() {
+      let circuit_count = (c.len() as f64 / CIRCUIT_SIZE as f64).ceil() as usize;
+      for _ in 0..circuit_count {
+        let plaintext_circuit =
+          format!("PLAINTEXT_AUTHENTICATION_{}", response_plaintext_circuit_count);
+        assert_eq!(rom_data.get(&plaintext_circuit).unwrap().opcode, 0);
+        response_plaintext_circuit_count += 1;
+      }
+    }
+    let response_http_circuit_count =
+      (response_combined.len() as f64 / CIRCUIT_SIZE as f64).ceil() as usize + http_circuit_count;
+
     // check final circuit is extract
-    let json_instruction_len = 11;
-    assert_eq!(rom[json_instruction_len], String::from("JSON_EXTRACTION_1"));
+    let json_instruction_len = response_plaintext_circuit_count + response_http_circuit_count;
+    assert_eq!(rom[json_instruction_len], String::from("JSON_EXTRACTION_0"));
     assert!(private_inputs[json_instruction_len].contains_key("ciphertext_digest"));
     assert!(private_inputs[json_instruction_len].contains_key("data"));
     assert!(private_inputs[json_instruction_len].contains_key("sequence_digest"));
@@ -771,6 +764,16 @@ mod tests {
     assert!(private_inputs[json_instruction_len].contains_key("state"));
 
     assert!(fold_inputs.is_empty());
+  }
+
+  #[test]
+  fn test_rom_from_inputs() {
+    let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
+    let (request_inputs, response_inputs) = simple_inputs();
+    assert_rom_from_inputs::<32>(manifest, request_inputs, response_inputs);
+
+    let (request_inputs, response_inputs) = complex_inputs();
+    assert_rom_from_inputs::<32>(complex_manifest(), request_inputs, response_inputs);
   }
 
   #[test]

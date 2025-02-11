@@ -5,9 +5,13 @@ use axum::{
 use eyre::Report;
 use thiserror::Error;
 use tlsn_verifier::tls::{VerifierConfigBuilderError, VerifierError};
+use tracing::error;
 
 #[derive(Debug, Error)]
 pub enum ProxyError {
+  #[error(transparent)]
+  Io(#[from] std::io::Error),
+
   #[error(transparent)]
   TryIntoError(#[from] std::array::TryFromSliceError),
 
@@ -29,6 +33,9 @@ pub enum ProxyError {
   #[error("Error occurred during Sign: {0}")]
   Sign(Box<dyn std::error::Error + Send + 'static>),
 
+  #[error("transparent")]
+  SuperNovaError(#[from] client_side_prover::supernova::error::SuperNovaError),
+
   #[error("Session ID Error: {0}")]
   InvalidSessionId(String),
 
@@ -38,6 +45,8 @@ pub enum ProxyError {
 
 impl IntoResponse for ProxyError {
   fn into_response(self) -> Response {
+    error!("proxy error: {}", self);
+
     match self {
       sign @ ProxyError::Sign(_) =>
         (StatusCode::INTERNAL_SERVER_ERROR, sign.to_string()).into_response(),
@@ -85,6 +94,8 @@ impl From<VerifierConfigBuilderError> for NotaryServerError {
 /// Trait implementation to convert this error into an axum http response
 impl IntoResponse for NotaryServerError {
   fn into_response(self) -> Response {
+    error!("notary error: {:?}", self);
+
     match self {
       bad_request_error @ NotaryServerError::BadProverRequest(_) =>
         (StatusCode::BAD_REQUEST, bad_request_error.to_string()).into_response(),

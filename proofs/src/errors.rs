@@ -62,6 +62,9 @@ pub enum ProofError {
   #[error(transparent)]
   WitnessGenerator(#[from] web_proof_circuits_witness_generator::WitnessGeneratorError),
 
+  #[error("Invalid circuit size")]
+  InvalidCircuitSize,
+
   #[cfg(target_arch = "wasm32")]
   #[error("transparent")]
   SerdeWasmBindgen(#[from] serde_wasm_bindgen::Error),

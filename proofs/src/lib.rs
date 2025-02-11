@@ -19,6 +19,7 @@ use crate::{
 };
 
 pub mod circom;
+pub mod circuits;
 pub mod errors;
 pub mod program;
 pub mod proof;

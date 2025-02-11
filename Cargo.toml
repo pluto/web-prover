@@ -6,7 +6,7 @@ resolver="2"
 
 [workspace.metadata]
 # https://github.com/pluto/web-prover-circuits/releases
-web_prover_circuits_version="0.9.1"
+web_prover_circuits_version="0.9.3"
 
 [workspace.dependencies]
 # Local re-exporting
