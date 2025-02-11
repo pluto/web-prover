@@ -17,7 +17,7 @@ use client_side_prover::{fast_serde::FastSerde, supernova::get_circuit_shapes};
 use serde_json::json;
 
 use super::*;
-use crate::setup::ProvingParams;
+use crate::{circuits::MAX_ROM_LENGTH, setup::ProvingParams};
 
 /// Fold input for any circuit containing signals name and vector of values. Inputs are distributed
 /// evenly across folds after the ROM is finalised by the prover.
@@ -92,22 +92,11 @@ pub struct UninitializedSetup {
 }
 
 impl UninitializedSetup {
-  pub fn from_bytes(buf: &[u8]) -> Result<Self, ProofError> { Ok(bincode::deserialize(buf)?) }
-
-  pub fn to_bytes(&self) -> Result<Vec<u8>, ProofError> { Ok(bincode::serialize(self)?) }
-
-  pub fn from_path(path: &PathBuf) -> Result<Self, ProofError> {
-    let mut buf_reader = BufReader::new(File::open(path)?);
-    let mut buf = Vec::new();
-    buf_reader.read_to_end(&mut buf)?;
-    Self::from_bytes(&buf)
-  }
-
-  pub fn to_path(&self, path: &PathBuf) -> Result<(), ProofError> {
-    let mut file = File::create(path)?;
-    let bytes = self.to_bytes()?;
-    file.write_all(&bytes)?;
-    Ok(())
+  pub fn from_raw_parts(r1cs_types: Vec<Vec<u8>>, witness_generator_types: Vec<Vec<u8>>) -> Self {
+    let r1cs_types = r1cs_types.iter().map(|r1cs| R1CSType::Raw(r1cs.clone())).collect();
+    let witness_generator_types =
+      witness_generator_types.iter().map(|wgt| WitnessGeneratorType::Raw(wgt.clone())).collect();
+    Self { r1cs_types, witness_generator_types, max_rom_length: MAX_ROM_LENGTH }
   }
 }
 

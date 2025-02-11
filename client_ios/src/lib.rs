@@ -4,7 +4,7 @@ use std::{
 };
 
 use client::config::Config;
-use proofs::circuits::load_proving_params_512;
+use proofs::circuits::{construct_setup_data_from_fs, load_proving_params_512};
 use tracing::debug;
 
 #[derive(serde::Serialize)]
@@ -43,8 +43,14 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
     let start = Instant::now();
     debug!("starting proving");
 
-    let proof =
-      rt.block_on(client::prover_inner(config, Some(load_proving_params_512().unwrap()))).unwrap();
+    let proof = rt
+      .block_on(client::prover_inner(
+        config,
+        // TODO: Do I pass these here from `prover` call args or just make Some(...) in-place?
+        Some(load_proving_params_512().unwrap()),
+        Some(construct_setup_data_from_fs::<512>().unwrap()),
+      ))
+      .unwrap();
     debug!("done proving: {:?}", Instant::now() - start);
     serde_json::to_string_pretty(&proof).unwrap()
   }));
