@@ -17,7 +17,6 @@ use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use k256::ecdsa::SigningKey as Secp256k1SigningKey;
 use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
-use proofs::program::manifest::Manifest;
 use rustls::{
   pki_types::{CertificateDer, PrivateKeyDer},
   ServerConfig,
@@ -100,11 +99,11 @@ async fn main() -> Result<(), NotaryServerError> {
 
   let shared_state = Arc::new(SharedState {
     notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
-    origo_signing_key: load_origo_signing_key(&c.origo_signing_key),
+    origo_signing_key:  load_origo_signing_key(&c.origo_signing_key),
     tlsn_max_sent_data: c.tlsn_max_sent_data,
     tlsn_max_recv_data: c.tlsn_max_recv_data,
-    origo_sessions: Default::default(),
-    verifier_sessions: Default::default(),
+    origo_sessions:     Default::default(),
+    verifier_sessions:  Default::default(),
   });
 
   let router = Router::new()
