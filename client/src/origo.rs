@@ -49,13 +49,8 @@ pub async fn sign(
     session_id.clone(),
   );
 
-  // TODO: recheck use of rustls backend
-  let mut client_builder = reqwest::ClientBuilder::new().use_rustls_tls();
-  if let Some(cert) = config.notary_ca_cert {
-    client_builder =
-      client_builder.add_root_certificate(reqwest::tls::Certificate::from_der(&cert)?);
-  }
-  let client = client_builder.build()?;
+  // TODO use config.notary_ca_cert
+  let client = reqwest::ClientBuilder::new().build()?;
 
   let response = client.post(url).json(&sb).send().await?;
   assert!(response.status() == hyper::StatusCode::OK);
@@ -77,12 +72,8 @@ pub async fn verify(
     config.notary_port.clone(),
   );
 
-  let mut client_builder = reqwest::ClientBuilder::new().use_rustls_tls();
-  if let Some(cert) = config.notary_ca_cert {
-    client_builder =
-      client_builder.add_root_certificate(reqwest::tls::Certificate::from_der(&cert)?);
-  }
-  let client = client_builder.build()?;
+  // TODO use config.notary_ca_cert
+  let client = reqwest::ClientBuilder::new().build()?;
 
   let response = client.post(url).json(&verify_body).send().await?;
   assert!(response.status() == hyper::StatusCode::OK);
