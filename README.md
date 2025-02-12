@@ -1,42 +1,34 @@
 # Web Prover
 
-The web-prover repository contains build pipelines for two types of Web Proofs: [TLSNotary proofs](https://tlsnotary.org/) and [Origo proofs](https://eprint.iacr.org/2024/447.pdf). Most of this work centers around the Origo proofs as we built it from the ground up, while the TLSNotary team has done most of the lifting for their work.
+[![web-prover workflow](https://github.com/pluto/web-prover/actions/workflows/web-prover.yaml/badge.svg)](https://github.com/pluto/web-prover/actions/workflows/web-prover.yaml)
+[![docs](https://img.shields.io/badge/docs-e28f00)](https://docs.pluto.xyz)
 
-The Origo pipeline of the web-prover repository is to test and build a collection of circom generated artificts used for Web Proofs and compile them to two primary targets with a Nova folding backend to be used in a developer SDK. The two compilation targets we compile to are iOS mobile and Web Assembly and are referenced as the client.
+Pluto's Web Prover repo contains the source code for three types of [Web Proofs](https://pluto.xyz/blog/introducing-pluto#1927a922ef2980748958f9f1fa514320):
 
-The repository is laid out as follows:
+- [Origo proofs](https://pluto.xyz/blog/web-proof-techniques-origo-mode),
+- [Trusted Execution Environment (TEE) proofs](https://pluto.xyz/blog/web-proof-techniques-tee-mode) and
+- [MPC proofs](https://pluto.xyz/blog/web-proof-techniques-mpc-mode) via TLSNotary
+
+## How to get started
+
+Visit the [Pluto documentation](https://docs.pluto.xyz) for integration guides, conceptual overviews, and reference materials.
+
+If you have any questions, please reach out to any of Pluto's [team members](https://pluto.xyz/team) or join our [Telegram](https://t.me/pluto_xyz) to ask questions. We'd love to hear from you!
+
+
+## Development
+
+### Repo layout
 
 - `bin/`: a mock server for testing.
 - `client/`: contains components for the client that are shared across both WASM and iOS targets.
 - `client_ios/`: contains client components specific to the iOS target.
 - `client_wasm/`: contains client components specific to the WASM target.
-- `fixture`: contains transport layer artifacts for testing such as TLS certificates and configuration files for both Origo and TLSNotary.
-- `notary`: contains binaries for our notary server which can notarize with both the TLSNotary and the Origo flow.
+- `fixture`: contains testing artifacts such as TLS certificates and configuration files.
+- `notary`: notary server which can notarize MPC/ Origo/ TEE proofs.
 - `proofs`: contains all of our circom artifacts for the Origo proofs as well as a set of extractor proofs for selective disclosure over response data.
-- `tls`: contains a fork of rustls with a custom cryptography backend.
 
-Documentation is evolving throughout the repository as the pipeline becomes more stable.
-
-## Usage
-
-```
-make wasm
-make ios
-cargo run -p notary -- --config ./fixture/notary-config.toml
-cargo run -p client -- --config ./fixture/client.tlsn_tcp_local.json
-cargo run --bin mock_server
-```
-
-## WASM Demo
-
-```
-cargo run -p notary -- --config ./fixture/notary-config.toml
-make wasm
-make wasm-demo
-open https://localhost:8090
-```
-
-## Native Client Demo
+### Native Client Development
 
 ```
 cargo run -p notary -- --config ./fixture/notary-config.toml
@@ -51,15 +43,41 @@ cargo run -p client -- --config ./fixture/client.origo_tcp_local.json
 cargo run -p client -- --config ./fixture/client.tee_tcp_local.json
 ```
 
-## Feature flags
+### WASM Development in Browser
 
-TODO: target_arch explainer (for wasm)  
-TODO: target_os explainer (for ios)  
-TODO: explain all feature flags
+```
+cargo run -p notary -- --config ./fixture/notary-config.toml
+make wasm
+make wasm-demo
+open https://localhost:8090
+```
 
-## Development
+## Security Status
 
-### Configuring rust-analyzer for wasm32
+As of February 2025, the code in this repository is operational on Ethereum testnets, and we have begun the security auditing process.
+
+While we are actively developing towards a production release in Q2 2025, the system is not yet recommended for production use.
+
+Following completion of audits, we plan to launch with protective guardrails in place, which will be gradually adjusted and removed as the system demonstrates stability in real-world conditions.
+
+## Release
+
+1. Update the `version` field in the appropriate `Cargo.toml` file.
+2. Create a pull request with the version update.
+3. Merge the pull request.
+
+Once merged, the package will be automatically released.
+**Note:** Releases are immutable.
+
+The following crates are checked for version changes:
+
+- `notary/Cargo.toml`
+- `client_wasm/Cargo.toml`
+- `client_ios/Cargo.toml`
+
+## rust-analyzer configuration
+
+### wasm32 target
 
 ```
 # .vscode/settings.json
@@ -73,7 +91,7 @@ TODO: explain all feature flags
 members =["client", "client_wasm"]
 ```
 
-### Configuring rust-analyzer for ios
+### ios target
 
 Note that this only works on Mac. The iOS target cannot be built on Linux.
 
@@ -88,44 +106,3 @@ Note that this only works on Mac. The iOS target cannot be built on Linux.
 # set members to:
 members =["client", "client_ios"]
 ```
-
-## Known Issues
-
-#### `error: failed to run custom build command for ring v0.17.8`
-
-You'll have to install LLVM, ie. `brew install llvm`, and then update your
-`export PATH="$(brew --prefix)/opt/llvm/bin:$PATH"`.
-
-rust-analyzer might not pick up on the llvm path, you can manually let it know via:
-
-```
-# .vscode/settings.json
-{
-  "rust-analyzer.cargo.extraEnv": {
-    "PATH": "<paste your $PATH here>" // note, $PATH env substitutions don't work
-  }
-}
-```
-
-#### `Error: LLVM version must be 18 or higher. Found xxxxxx.`
-
-- Follow instruction at https://apt.llvm.org/
-
-#### `[wasm-validator error in function xxxx] unexpected false: all used features should be allowed, on yyyy`
-
-- Your existing `wasm-opt` installation may conflict with the one in `wasm-pack`. Check for local installation: `$ which wasm-opt && wasm-opt --version`
-- Consider updating `wasm-pack`:  `$ cargo install --force wasm-pack`
-
-## Release
-
-1. Update the `version` field in the appropriate `Cargo.toml` file.
-2. Create a pull request with the version update.
-3. Merge the pull request.
-
-Once merged, the package will be automatically released. **Note:** Releases are immutable.
-
-The following crates are checked for version changes:
-
-- `notary/Cargo.toml`
-- `client_wasm/Cargo.toml`
-- `client_ios/Cargo.toml`
