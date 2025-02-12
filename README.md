@@ -10,7 +10,8 @@ Pluto's Web Prover repo contains the source code for three types of [Web Proofs]
 
 Visit the [Pluto documentation](https://docs.pluto.xyz) for integration guides, conceptual overviews, and reference materials.
 
-If you have any questions, feel free to reach out to any of Pluto's engineers. We'd love to hear from you!
+If you have any questions, feel free to reach out to any of [Pluto's engineers](https://pluto.xyz/team) or ask questions in our [Telegram](https://t.me/pluto_xyz). We'd love to hear from you!
+
 
 ## Development
 
