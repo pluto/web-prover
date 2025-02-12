@@ -13,6 +13,15 @@ use proofs::{
 use serde::{Deserialize, Serialize};
 use tls_client2::origo::OrigoConnection;
 use tracing::debug;
+use web_proof_circuits_witness_generator::{
+  data_hasher, field_element_to_base10_string,
+  http::{
+    compute_http_witness, headers_to_bytes, parser::parse as http_parse, HttpMaskType,
+    RawHttpMachine,
+  },
+  json::{json_value_digest, parser::parse, JsonKey, RawJsonMachine},
+  polynomial_digest, poseidon, ByteOrPad,
+};
 
 use crate::{
   config::{self},
@@ -34,10 +43,17 @@ pub struct VerifyBody {
   pub manifest:    Manifest,
 }
 
+// TODO: need a signature over these two values at least, from there someone can show they had the
+// right value
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VerifyReply {
-  pub value_hash: F<G1>,
-  // TODO: need a signature
+  // TODO: manifest in here?
+  pub value_hash:        F<G1>,
+  pub ciphertext_digest: F<G1>,
+  // value = b"Taylor Swift";
+  // [84,97,121,108,111,114,32,83,119,105,102,116]
+  // bn254 scalar field prime
+  // value[0] * 1 + value[1] * ciphertext_digest + value[2] * ciphertext_digest.pow(2) + ...
 }
 
 pub async fn sign(
@@ -141,8 +157,22 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
   // generate NIVC proofs for request and response
   let manifest = config.proving.manifest.unwrap();
 
-  let proof =
-    generate_proof(manifest, proving_params.unwrap(), request_inputs, response_inputs).await?;
+  let mut proof = generate_proof(
+    manifest.clone(),
+    proving_params.unwrap(),
+    request_inputs,
+    response_inputs.clone(),
+  )
+  .await?;
+  let flattened_plaintext: Vec<u8> =
+    response_inputs.plaintext.into_iter().flat_map(|x| x).collect();
+  let http_body = compute_http_witness(&flattened_plaintext, HttpMaskType::Body);
+  let value = json_value_digest::<{ proofs::program::manifest::MAX_STACK_HEIGHT }>(
+    &http_body,
+    &manifest.response.body.json,
+  )?;
+
+  proof.value = Some(String::from_utf8_lossy(&value).into_owned());
 
   Ok(proof)
 }

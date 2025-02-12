@@ -26,6 +26,19 @@ use tracing::{debug, info};
 
 use crate::errors::ClientErrors;
 
+// TODO: We should put the following in here:
+// - Value that was to be found in the JSON
+// - Hash of manifest, maybe?
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct OrigoProof {
+  pub proof:             FoldingProof<Vec<u8>, String>,
+  pub rom:               NIVCRom,
+  pub ciphertext_digest: [u8; 32],
+  // TODO: This likely doesn't need to be an option, but this makes it so I can set it later.
+  pub verify_reply:      Option<VerifyReply>,
+  pub value:             Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 pub enum Proof {
   TLSN(Box<TlsProof>),
@@ -91,7 +104,7 @@ pub async fn prover_inner_origo(
 ) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id.clone();
 
-  let proof = origo::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
+  let mut proof = origo::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
 
   let manifest =
     config.proving.manifest.clone().ok_or(errors::ClientErrors::ManifestMissingError)?;
@@ -103,8 +116,11 @@ pub async fn prover_inner_origo(
   // Note: The above `?` will push out the `ProofError::VerifyFailed` from the `origo::verify`
   // method now. We no longer return an inner bool here, we just use the Result enum itself
 
+  proof.verify_reply = Some(verify_response);
+
   // TODO: This is where we should output richer proof data, the verikfy response has the hash of
-  // the target value now
+  // the target value now. Since this is in the client, we can use the private variables here. We
+  // just need to get out the value.
   Ok(Proof::Origo(proof))
 }
 

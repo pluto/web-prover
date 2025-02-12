@@ -64,7 +64,9 @@ pub async fn construct_program_data_and_proof<const CIRCUIT_SIZE: usize>(
   let proof = setup_params.generate_proof(&proof_params, &instance_params).await?;
   Ok(OrigoProof {
     proof,
-    ciphertext_digest: initial_nivc_input[0].to_bytes(),
     rom: NIVCRom { circuit_data, rom },
+    ciphertext_digest: initial_nivc_input[0].to_bytes(),
+    verify_reply: None,
+    value: None,
   })
 }

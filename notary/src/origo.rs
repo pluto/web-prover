@@ -56,6 +56,7 @@ pub struct VerifierInputs {
   response_messages: Vec<Vec<u8>>,
 }
 
+// TODO: Don't need this method? But can use the logic to do the signature.
 pub async fn sign(
   query: Query<SignQuery>,
   State(state): State<Arc<SharedState>>,
@@ -286,7 +287,7 @@ pub async fn verify(
   debug!("rom {:?}", payload.origo_proof.rom.rom);
   let verifier = &state.verifier;
 
-  let InitialNIVCInputs { initial_nivc_input, .. } =
+  let InitialNIVCInputs { initial_nivc_input, ciphertext_digest, .. } =
     payload.manifest.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE_512>(
       &verifier_inputs.request_messages,
       &response_messages,
@@ -297,17 +298,17 @@ pub async fn verify(
   )?;
   let z0_secondary = vec![F::<G2>::from(0)];
 
-  let valid = match proof.proof.verify(
+  // TODO: Need to fix this setup
+  match proof.proof.verify(
     &verifier.setup_params.public_params,
     &verifier.verifier_key,
     &z0_primary,
     &z0_secondary,
   ) {
     Ok((output, _)) => {
-      // TODO: This should also check the hash of the target value probably, unless we want to have
-      // this revealed on the contract side: `output[0] == F::<G1>::from(val)`
       if output[1..].iter().all(|&x| x == F::<G1>::from(0)) {
-        return Ok(Json(VerifyReply { value_hash: output[0] }));
+        // TODO: add the manifest digest
+        return Ok(Json(VerifyReply { value_hash: output[0], ciphertext_digest }));
       } else {
         // TODO (autoparallel): May want richer error content here to say what was wrong.
         return Err(ProofError::VerifyFailed().into());

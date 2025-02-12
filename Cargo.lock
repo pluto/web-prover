@@ -1479,6 +1479,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-bindgen-rayon",
  "wasm-bindgen-test",
+ "web-proof-circuits-witness-generator",
  "web-sys",
  "web-time 1.1.0",
  "webpki-roots 0.26.7",

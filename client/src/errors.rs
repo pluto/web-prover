@@ -101,6 +101,9 @@ pub enum ClientErrors {
 
   #[error("Manifest missing")]
   ManifestMissingError,
+
+  #[error(transparent)]
+  WitnessGeneratorError(#[from] web_proof_circuits_witness_generator::WitnessGeneratorError),
 }
 
 #[cfg(target_arch = "wasm32")]

@@ -54,7 +54,7 @@ use crate::{
 };
 
 /// HTTP
-const DATA_SIGNAL_NAME: &str = "data";
+pub const DATA_SIGNAL_NAME: &str = "data";
 
 const PUBLIC_IO_VARS: usize = 11;
 const MAX_HTTP_HEADERS: usize = 25;
