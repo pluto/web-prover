@@ -1,34 +1,29 @@
 # Web Prover
 
-The web-prover repository contains build pipelines for two types of Web Proofs: [TLSNotary proofs](https://tlsnotary.org/) and [Origo proofs](https://eprint.iacr.org/2024/447.pdf). Most of this work centers around the Origo proofs as we built it from the ground up, while the TLSNotary team has done most of the lifting for their work.
+Pluto's Web Prover repo contains the source code for three types of [Web Proofs](https://pluto.xyz/blog/introducing-pluto#1927a922ef2980748958f9f1fa514320):
+* [MPC proofs](https://pluto.xyz/blog/web-proof-techniques-mpc-mode) via TLSNotary,
+* [Origo proofs](https://pluto.xyz/blog/web-proof-techniques-origo-mode) and
+* [Trusted Execution Environment (TEE) proofs](https://pluto.xyz/blog/web-proof-techniques-tee-mode)
 
-The Origo pipeline of the web-prover repository is to test and build a collection of circom generated artificts used for Web Proofs and compile them to two primary targets with a Nova folding backend to be used in a developer SDK. The two compilation targets we compile to are iOS mobile and Web Assembly and are referenced as the client.
+## How to get started
+Visit the [Pluto documentation](https://docs.pluto.xyz) for integration guides, conceptual overviews, and reference materials.  
 
-The repository is laid out as follows:
+If you have any questions, feel free to reach out to any of Pluto's engineers. We'd love to hear from you!
+
+## Development
+
+### Repo layout
 
 - `bin/`: a mock server for testing.
 - `client/`: contains components for the client that are shared across both WASM and iOS targets.
 - `client_ios/`: contains client components specific to the iOS target.
 - `client_wasm/`: contains client components specific to the WASM target.
-- `fixture`: contains transport layer artifacts for testing such as TLS certificates and configuration files for both Origo and TLSNotary.
-- `notary`: contains binaries for our notary server which can notarize with both the TLSNotary and the Origo flow.
+- `fixture`: contains testing artifacts such as TLS certificates and configuration files.
+- `notary`: notary server which can notarize MPC/ Origo/ TEE proofs.
 - `proofs`: contains all of our circom artifacts for the Origo proofs as well as a set of extractor proofs for selective disclosure over response data.
 - `tls`: contains a fork of rustls with a custom cryptography backend.
 
-Documentation is evolving throughout the repository as the pipeline becomes more stable.
-
-## Usage
-
-```
-make wasm
-make ios
-cargo run -p notary -- --config ./fixture/notary-config.toml
-cargo run -p client -- --config ./fixture/client.tlsn_tcp_local.json
-cargo run --bin mock_server
-```
-
-## WASM Demo
-
+### WASM Development in Browser
 ```
 cargo run -p notary -- --config ./fixture/notary-config.toml
 make wasm
@@ -36,7 +31,7 @@ make wasm-demo
 open https://localhost:8090
 ```
 
-## Native Client Demo
+### Native Client Development
 
 ```
 cargo run -p notary -- --config ./fixture/notary-config.toml
@@ -50,14 +45,6 @@ cargo run -p client -- --config ./fixture/client.origo_tcp_local.json
 # TEE flow (uses DummyToken so it can run outside of TEE)
 cargo run -p client -- --config ./fixture/client.tee_tcp_local.json
 ```
-
-## Feature flags
-
-TODO: target_arch explainer (for wasm)  
-TODO: target_os explainer (for ios)  
-TODO: explain all feature flags
-
-## Development
 
 ### Configuring rust-analyzer for wasm32
 
