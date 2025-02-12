@@ -106,6 +106,32 @@ const JSON_EXTRACTION_256B_GRAPH: &[u8] = include_bytes!(concat!(
   "/json_extraction_256b.bin"
 ));
 
+#[allow(dead_code)]
+fn wasm_witness_generator_type_512b() -> [WitnessGeneratorType; 3] {
+  [
+    WitnessGeneratorType::Wasm {
+      path:      format!(
+        "proofs/web_proof_circuits/circom-artifacts-512b-v{}/plaintext_authentication_512b.wasm",
+        env!("WEB_PROVER_CIRCUITS_VERSION")
+      ),
+      wtns_path: String::from("pa.wtns"),
+    },
+    WitnessGeneratorType::Wasm {
+      path:      format!(
+        "proofs/web_proof_circuits/circom-artifacts-512b-v{}/http_verification_512b.wasm",
+        env!("WEB_PROVER_CIRCUITS_VERSION")
+      ),
+      wtns_path: String::from("hv.wtns"),
+    },
+    WitnessGeneratorType::Wasm {
+      path:      format!(
+        "proofs/web_proof_circuits/circom-artifacts-512b-v{}/json_extraction_512b.wasm",
+        env!("WEB_PROVER_CIRCUITS_VERSION")
+      ),
+      wtns_path: String::from("je.wtns"),
+    },
+  ]
+}
 pub fn construct_setup_data<const CIRCUIT_SIZE: usize>() -> Result<UninitializedSetup, ProofError> {
   let r1cs_types = match CIRCUIT_SIZE {
     CIRCUIT_SIZE_256 => vec![
@@ -129,11 +155,12 @@ pub fn construct_setup_data<const CIRCUIT_SIZE: usize>() -> Result<Uninitialized
         WitnessGeneratorType::Raw(HTTP_VERIFICATION_256B_GRAPH.to_vec()),
         WitnessGeneratorType::Raw(JSON_EXTRACTION_256B_GRAPH.to_vec()),
       ],
-      CIRCUIT_SIZE_512 => vec![
-        WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_512B_GRAPH.to_vec()),
-        WitnessGeneratorType::Raw(HTTP_VERIFICATION_512B_GRAPH.to_vec()),
-        WitnessGeneratorType::Raw(JSON_EXTRACTION_512B_GRAPH.to_vec()),
-      ],
+      CIRCUIT_SIZE_512 => wasm_witness_generator_type_512b().to_vec(),
+      // vec![
+      //   WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_512B_GRAPH.to_vec()),
+      //   WitnessGeneratorType::Raw(HTTP_VERIFICATION_512B_GRAPH.to_vec()),
+      //   WitnessGeneratorType::Raw(JSON_EXTRACTION_512B_GRAPH.to_vec()),
+      // ],
       _ => return Err(ProofError::InvalidCircuitSize),
     };
 
