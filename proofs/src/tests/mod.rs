@@ -5,6 +5,13 @@
 
 use std::sync::Arc;
 
+use circuits::{
+  HTTP_VERIFICATION_256B_GRAPH, HTTP_VERIFICATION_256B_R1CS, HTTP_VERIFICATION_512B_GRAPH,
+  HTTP_VERIFICATION_512B_R1CS, JSON_EXTRACTION_256B_GRAPH, JSON_EXTRACTION_256B_R1CS,
+  JSON_EXTRACTION_512B_GRAPH, JSON_EXTRACTION_512B_R1CS, PLAINTEXT_AUTHENTICATION_256B_GRAPH,
+  PLAINTEXT_AUTHENTICATION_256B_R1CS, PLAINTEXT_AUTHENTICATION_512B_GRAPH,
+  PLAINTEXT_AUTHENTICATION_512B_R1CS,
+};
 use client_side_prover::supernova::RecursiveSNARK;
 use inputs::{
   complex_manifest, complex_request_inputs, complex_response_inputs, simple_request_inputs,
@@ -23,77 +30,6 @@ mod witnesscalc;
 
 const MAX_ROM_LENGTH: usize = 100;
 const MAX_STACK_HEIGHT: usize = 10;
-
-// Circuit 0
-const PLAINTEXT_AUTHENTICATION_256B_R1CS: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-256b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/plaintext_authentication_256b.r1cs"
-));
-const PLAINTEXT_AUTHENTICATION_256B_GRAPH: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-256b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/plaintext_authentication_256b.bin"
-));
-
-// Circuit 1
-const HTTP_VERIFICATION_256B_R1CS: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-256b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/http_verification_256b.r1cs"
-));
-const HTTP_VERIFICATION_256B_GRAPH: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-256b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/http_verification_256b.bin"
-));
-
-// Circuit 2
-const JSON_EXTRACTION_256B_R1CS: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-256b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/json_extraction_256b.r1cs"
-));
-const JSON_EXTRACTION_256B_GRAPH: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-256b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/json_extraction_256b.bin"
-));
-
-const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-512b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/plaintext_authentication_512b.r1cs"
-));
-const PLAINTEXT_AUTHENTICATION_512B_GRAPH: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-512b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/plaintext_authentication_512b.bin"
-));
-
-// Circuit 1
-const HTTP_VERIFICATION_512B_R1CS: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-512b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/http_verification_512b.r1cs"
-));
-const HTTP_VERIFICATION_512B_GRAPH: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-512b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/http_verification_512b.bin"
-));
-
-// Circuit 2
-const JSON_EXTRACTION_512B_R1CS: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-512b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/json_extraction_512b.r1cs"
-));
-const JSON_EXTRACTION_512B_GRAPH: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-512b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/json_extraction_512b.bin"
-));
 
 #[allow(dead_code)]
 fn wasm_witness_generator_type_512b() -> [WitnessGeneratorType; 3] {

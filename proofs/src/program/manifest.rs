@@ -586,7 +586,7 @@ fn build_http_verification_circuit_inputs<const CIRCUIT_SIZE: usize>(
   main_digests
     .extend(std::iter::repeat_n("0".to_string(), MAX_HTTP_HEADERS + 1 - headers_digest.len()));
 
-  debug!("main_digests: {:?}", main_digests);
+  // debug!("main_digests: {:?}", main_digests);
 
   let states = http_parse(&plaintext, polynomial_input)?;
 
@@ -674,7 +674,7 @@ fn build_json_extraction_circuit_inputs<const CIRCUIT_SIZE: usize>(
 
     let state =
       state.flatten().iter().map(|f| field_element_to_base10_string(*f)).collect::<Vec<String>>();
-    debug!("state: {:?}", state);
+    // debug!("state: {:?}", state);
     private_inputs.push(HashMap::from([
       (
         String::from(DATA_SIGNAL_NAME),
@@ -1011,6 +1011,7 @@ mod tests {
     // plaintext_authentication (multiple chunks)
     // + http verification (divide into CIRCUIT_SIZE)
     // + json extraction (body divide into CIRCUIT_SIZE)
+    println!("rom: {:?}", rom);
     assert_eq!(rom.len(), rom_data.len());
 
     let plaintext_combined =
@@ -1043,8 +1044,23 @@ mod tests {
     assert!(private_inputs[http_instruction_len].contains_key("ciphertext_digest"));
     assert!(private_inputs[http_instruction_len].contains_key("data"));
 
+    let request_body = compute_http_witness(&plaintext_combined, HttpMaskType::Body);
+
+    let json_circuit_count = (request_body.len() as f64 / CIRCUIT_SIZE as f64).ceil() as usize;
+    if !request_body.is_empty() {
+      // assert json extraction inputs
+      let json_instruction_len = plaintext_circuit_count + http_circuit_count;
+      assert_eq!(rom[json_instruction_len], String::from("JSON_EXTRACTION_0"));
+      assert!(private_inputs[json_instruction_len].contains_key("ciphertext_digest"));
+      assert!(private_inputs[json_instruction_len].contains_key("data"));
+      assert!(private_inputs[json_instruction_len].contains_key("sequence_digest"));
+      assert!(private_inputs[json_instruction_len].contains_key("value_digest"));
+      assert!(private_inputs[json_instruction_len].contains_key("state"));
+    }
+
     // assert plaintext authentication inputs
-    let plaintext_authentication_len = plaintext_circuit_count + http_circuit_count;
+    let plaintext_authentication_len =
+      plaintext_circuit_count + http_circuit_count + json_circuit_count;
     assert_eq!(
       rom[plaintext_authentication_len],
       format!("PLAINTEXT_AUTHENTICATION_{}", plaintext_circuit_count)
@@ -1066,8 +1082,9 @@ mod tests {
       (response_combined.len() as f64 / CIRCUIT_SIZE as f64).ceil() as usize + http_circuit_count;
 
     // check final circuit is extract
-    let json_instruction_len = response_plaintext_circuit_count + response_http_circuit_count;
-    assert_eq!(rom[json_instruction_len], String::from("JSON_EXTRACTION_0"));
+    let json_instruction_len =
+      response_plaintext_circuit_count + response_http_circuit_count + json_circuit_count;
+    assert_eq!(rom[json_instruction_len], format!("JSON_EXTRACTION_{}", json_circuit_count));
     assert!(private_inputs[json_instruction_len].contains_key("ciphertext_digest"));
     assert!(private_inputs[json_instruction_len].contains_key("data"));
     assert!(private_inputs[json_instruction_len].contains_key("sequence_digest"));
@@ -1081,10 +1098,10 @@ mod tests {
   fn test_rom_from_inputs() {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
     let (request_inputs, response_inputs) = simple_inputs();
-    assert_rom_from_inputs::<32>(manifest, request_inputs, response_inputs);
+    assert_rom_from_inputs::<512>(manifest, request_inputs, response_inputs);
 
     let (request_inputs, response_inputs) = complex_inputs();
-    assert_rom_from_inputs::<32>(complex_manifest(), request_inputs, response_inputs);
+    assert_rom_from_inputs::<512>(complex_manifest(), request_inputs, response_inputs);
   }
 
   #[test]
