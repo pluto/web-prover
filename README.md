@@ -1,6 +1,7 @@
 # Web Prover
 
-![web-prover workflow](https://github.com/pluto/web-prover/actions/workflows/web-prover.yaml/badge.svg)
+[![web-prover workflow](https://github.com/pluto/web-prover/actions/workflows/web-prover.yaml/badge.svg)](https://github.com/pluto/web-prover/actions/workflows/web-prover.yaml)
+[![docs](https://img.shields.io/badge/docs-e28f00)](https://docs.pluto.xyz)
 
 Pluto's Web Prover repo contains the source code for three types of [Web Proofs](https://pluto.xyz/blog/introducing-pluto#1927a922ef2980748958f9f1fa514320):
 
