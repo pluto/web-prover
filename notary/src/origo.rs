@@ -298,7 +298,7 @@ pub async fn verify(
   )?;
   let z0_secondary = vec![F::<G2>::from(0)];
 
-  // TODO: Need to fix this setup
+  // TODO: Think we're failing here due to invalid z0_primary
   match proof.proof.verify(
     &verifier.setup_params.public_params,
     &verifier.verifier_key,
@@ -308,9 +308,12 @@ pub async fn verify(
     Ok((output, _)) => {
       if output[1..].iter().all(|&x| x == F::<G1>::from(0)) {
         // TODO: add the manifest digest
+        debug!("all the output matched baby, lfg");
         return Ok(Json(VerifyReply { value_hash: output[0], ciphertext_digest }));
       } else {
         // TODO (autoparallel): May want richer error content here to say what was wrong.
+        debug!("the output did not match, fml");
+        debug!("output from verifier: {output:?}");
         return Err(ProofError::VerifyFailed().into());
       }
     },
