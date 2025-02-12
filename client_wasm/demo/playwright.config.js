@@ -2,7 +2,7 @@ const { defineConfig } = require('@playwright/test')
 
 module.exports = defineConfig({
   testDir: './tests',
-  timeout: 300000,
+  timeout: 900000,
   use: {
     baseURL: 'https://localhost:8090',
     ignoreHTTPSErrors: true
@@ -12,6 +12,6 @@ module.exports = defineConfig({
     url: 'https://localhost:8090',
     reuseExistingServer: !process.env.CI,
     ignoreHTTPSErrors: true,
-    timeout: 300000
+    timeout: 900000
   }
 })

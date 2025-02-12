@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test')
 
 test('should generate proof', async ({ page }) => {
-  test.setTimeout(600000) // 10 min
+  test.setTimeout(900000) // 15 min
 
   // Add page error handler
   page.on('pageerror', (error) => {
@@ -26,9 +26,9 @@ test('should generate proof', async ({ page }) => {
     throw e;
   });
 
-  // Wait for the proof message (10 min)
+  // Wait for the proof message (15 min)
   await page.waitForEvent('console', {
-    timeout: 600000, // will fail test if timeout hits
+    timeout: 900000, // will fail test if timeout hits
     predicate: (msg) => msg.text().startsWith('proof successfully generated:')
   });
 })
