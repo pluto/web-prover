@@ -25,8 +25,8 @@ cargo +nightly run --release -- -i setup/fold_batch.json -vvvv
 which will show logs to the trace level.
 
 ## Wasm witnessgen
-
-To generate witness using wasm binary, just modify these keys in [setup](./setup/) configs.
+<!-- TODO (autoparllel): What the fuck was this about -->
+To generate witness using wasm binary, just modify these keys in setup configs.
 
 ```
 "wgen_type": "node",

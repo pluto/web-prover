@@ -3,6 +3,7 @@ webproof.json
 .vscode/*
 debug/
 target/
+docs/
 
 .DS_Store
 
