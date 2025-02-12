@@ -28,7 +28,7 @@ which will show logs to the trace level.
 <!-- TODO (autoparllel): What the fuck was this about -->
 To generate witness using wasm binary, just modify these keys in setup configs.
 
-```ignore
+```
 "wgen_type": "node",
 "wgen": "build/parse_fold/parse_fold_js/parse_fold.wasm",
 ```
