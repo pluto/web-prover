@@ -15,7 +15,7 @@ pub use wasm_bindgen_rayon::init_thread_pool;
 #[wasm_bindgen]
 pub fn get_web_prover_circuits_version() -> String { client::get_web_prover_circuits_version() }
 
-/// ProvingParamsWasm interface is for efficiently moving data between
+/// `ProvingParamsWasm` interface is for efficiently moving data between
 /// the javascript and wasm runtime. Using wasm_bindgen creates a
 /// mirrored representation in javascript.
 ///
@@ -34,50 +34,42 @@ impl ProvingParamsWasm {
 
 #[wasm_bindgen]
 pub struct UninitializedSetupWasm {
-  pub(crate) r1cs_types:              Vec<js_sys::Uint8Array>,
-  pub(crate) witness_generator_types: Vec<js_sys::Uint8Array>,
+  pub(crate) r1cs_types: Vec<js_sys::Uint8Array>,
 }
 
 #[wasm_bindgen]
 impl UninitializedSetupWasm {
   #[wasm_bindgen(constructor)]
-  pub fn new(
-    r1cs_types: Vec<js_sys::Uint8Array>,
-    witness_generator_types: Vec<js_sys::Uint8Array>,
-  ) -> Self {
-    Self { r1cs_types, witness_generator_types }
-  }
+  pub fn new(r1cs_types: Vec<js_sys::Uint8Array>) -> Self { Self { r1cs_types } }
 }
 
 impl UninitializedSetupWasm {
   pub fn to_canonical(&self) -> UninitializedSetup {
     let r1cs_types = self.r1cs_types.iter().map(|r1cs| r1cs.to_vec()).collect();
-    let witness_generator_types =
-      self.witness_generator_types.iter().map(|wgt| wgt.to_vec()).collect();
-    UninitializedSetup::from_raw_parts(r1cs_types, witness_generator_types)
+    UninitializedSetup::from_raw_r1cs_types_with_browser_witness(r1cs_types)
   }
 }
 
 #[wasm_bindgen]
 pub async fn prover(
-  config: JsValue,
-  proving_params: ProvingParamsWasm,
-  setup_data: UninitializedSetupWasm,
+  config: &JsValue,
+  proving_params: &ProvingParamsWasm,
+  setup_data: &UninitializedSetupWasm,
 ) -> Result<String, JsValue> {
   panic::set_hook(Box::new(console_error_panic_hook::hook));
 
   debug!("start config serde");
-  let mut config: Config = serde_wasm_bindgen::from_value(config)?;
+  let mut config: Config = serde_wasm_bindgen::from_value(config.clone())?;
   config.set_session_id();
   debug!("end config serde");
 
-  let proof = client::prover_inner(
-    config,
-    Some(proving_params.aux_params.to_vec()),
-    Some(setup_data.to_canonical()),
-  )
-  .await
-  .map_err(|e| JsValue::from_str(&format!("Could not produce proof: {:?}", e)))?;
+  let setup_data = setup_data.to_canonical();
+
+  debug!("start prover");
+  let proof =
+    client::prover_inner(config, Some(proving_params.aux_params.to_vec()), Some(setup_data))
+      .await
+      .map_err(|e| JsValue::from_str(&format!("Could not produce proof: {:?}", e)))?;
 
   serde_json::to_string_pretty(&proof)
     .map_err(|e| JsValue::from_str(&format!("Could not serialize proof: {:?}", e)))
