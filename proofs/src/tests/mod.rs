@@ -8,9 +8,9 @@ use std::sync::Arc;
 use circuits::{
   HTTP_VERIFICATION_256B_GRAPH, HTTP_VERIFICATION_256B_R1CS, HTTP_VERIFICATION_512B_GRAPH,
   HTTP_VERIFICATION_512B_R1CS, JSON_EXTRACTION_256B_GRAPH, JSON_EXTRACTION_256B_R1CS,
-  JSON_EXTRACTION_512B_GRAPH, JSON_EXTRACTION_512B_R1CS, PLAINTEXT_AUTHENTICATION_256B_GRAPH,
-  PLAINTEXT_AUTHENTICATION_256B_R1CS, PLAINTEXT_AUTHENTICATION_512B_GRAPH,
-  PLAINTEXT_AUTHENTICATION_512B_R1CS,
+  JSON_EXTRACTION_512B_GRAPH, JSON_EXTRACTION_512B_R1CS, MAX_STACK_HEIGHT,
+  PLAINTEXT_AUTHENTICATION_256B_GRAPH, PLAINTEXT_AUTHENTICATION_256B_R1CS,
+  PLAINTEXT_AUTHENTICATION_512B_GRAPH, PLAINTEXT_AUTHENTICATION_512B_R1CS,
 };
 use client_side_prover::supernova::RecursiveSNARK;
 use inputs::{
@@ -29,7 +29,6 @@ pub(crate) mod inputs;
 mod witnesscalc;
 
 const MAX_ROM_LENGTH: usize = 100;
-const MAX_STACK_HEIGHT: usize = 10;
 
 #[allow(dead_code)]
 fn wasm_witness_generator_type_512b() -> [WitnessGeneratorType; 3] {
@@ -87,18 +86,19 @@ fn wasm_witness_generator_type_256b() -> [WitnessGeneratorType; 3] {
 #[tokio::test]
 #[tracing_test::traced_test]
 async fn test_end_to_end_proofs_get() {
-  const CIRCUIT_SIZE: usize = 256;
+  const CIRCUIT_SIZE: usize = 512;
   let setup_data = UninitializedSetup {
     r1cs_types:              vec![
-      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_256B_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_VERIFICATION_256B_R1CS.to_vec()),
-      R1CSType::Raw(JSON_EXTRACTION_256B_R1CS.to_vec()),
+      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
+      R1CSType::Raw(JSON_EXTRACTION_512B_R1CS.to_vec()),
     ],
-    witness_generator_types: vec![
-      WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_256B_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_VERIFICATION_256B_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_EXTRACTION_256B_GRAPH.to_vec()),
-    ],
+    witness_generator_types: wasm_witness_generator_type_512b().to_vec(),
+    // vec![
+    //   WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_512B_GRAPH.to_vec()),
+    //   WitnessGeneratorType::Raw(HTTP_VERIFICATION_512B_GRAPH.to_vec()),
+    //   WitnessGeneratorType::Raw(JSON_EXTRACTION_512B_GRAPH.to_vec()),
+    // ],
     max_rom_length:          MAX_ROM_LENGTH,
   };
   debug!("Setting up `Memory`...");

@@ -13,7 +13,7 @@ pub const MAX_ROM_LENGTH: usize = 100;
 pub const CIRCUIT_SIZE_512: usize = 512;
 pub const CIRCUIT_SIZE_256: usize = 256;
 pub const PUBLIC_IO_VARS: usize = 11;
-pub const MAX_STACK_HEIGHT: usize = 10;
+pub const MAX_STACK_HEIGHT: usize = 12;
 
 pub const PROVING_PARAMS_512: &str = concat!(
   "proofs/web_proof_circuits/circom-artifacts-512b-v",

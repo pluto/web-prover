@@ -45,6 +45,7 @@ use web_proof_circuits_witness_generator::{
 };
 
 use crate::{
+  circuits::MAX_STACK_HEIGHT,
   program::{
     data::{CircuitData, FoldInput},
     F, G1,
@@ -57,7 +58,6 @@ const DATA_SIGNAL_NAME: &str = "data";
 
 const PUBLIC_IO_VARS: usize = 11;
 const MAX_HTTP_HEADERS: usize = 25;
-const MAX_STACK_HEIGHT: usize = 10;
 
 /// Manifest containing [`Request`] and [`Response`]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
