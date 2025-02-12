@@ -8,10 +8,47 @@
 import SwiftUI
 
 @_silgen_name("prover")
-func c_prover(_ config: UnsafePointer<Int8>?) -> UnsafePointer<Int8>?
+func c_prover(
+    _ config: UnsafePointer<Int8>?,
+    _ setupData: UnsafePointer<UninitializedSetupFFI>?
+) -> UnsafePointer<Int8>?
 
 @_silgen_name("setup_tracing")
 func c_setup_tracing()
+
+struct UninitializedSetupFFI {
+    let r1cs_types: UnsafePointer<UnsafePointer<UInt8>?>?
+    let r1cs_lengths: UnsafePointer<Int>?
+    let r1cs_count: Int
+    let witness_generator_types: UnsafePointer<UnsafePointer<UInt8>?>?
+    let witness_lengths: UnsafePointer<Int>?
+    let witness_count: Int
+}
+
+func createUninitializedSetupFFI(
+    r1cs: [Data],
+    witnessGenerators: [Data]
+) -> UninitializedSetupFFI {
+    let r1csPointers = r1cs.map { r1csData in
+        r1csData.withUnsafeBytes { $0.baseAddress!.assumingMemoryBound(to: UInt8.self) }
+    }
+
+    let witnessPointers = witnessGenerators.map { witnessData in
+        witnessData.withUnsafeBytes { $0.baseAddress!.assumingMemoryBound(to: UInt8.self) }
+    }
+
+    let r1csLengths = r1cs.map { $0.count }
+    let witnessLengths = witnessGenerators.map { $0.count }
+
+    return UninitializedSetupFFI(
+        r1cs_types: UnsafePointer(r1csPointers),
+        r1cs_lengths: UnsafePointer(r1csLengths),
+        r1cs_count: r1cs.count,
+        witness_generator_types: UnsafePointer(witnessPointers),
+        witness_lengths: UnsafePointer(witnessLengths),
+        witness_count: witnessGenerators.count
+    )
+}
 
 class CustomURLSessionDelegate: NSObject, URLSessionDelegate {
     func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
@@ -110,6 +147,11 @@ struct ContentView: View {
                        return
                    }
 
+                   guard let r1csData = r1csData else {
+                       print("Failed to fetch R1CS data")
+                       return
+                   }
+
                    if let data = r1cs_data {
                        print("data: \(data)")
                        let arrayString = data.map { String($0) }.joined(separator: ",")
@@ -175,9 +217,16 @@ struct ContentView: View {
                         }
                         """
 
+                       // Dummy witness generators (replace with real data later)
+                       let witnessGenerators: [Data] = [Data([0x01, 0x02]), Data([0x03, 0x04])]
+
+                       var setupData = createUninitializedSetupFFI(
+                           r1cs: r1cs_data,
+                       )
+
                        // NOTE: Witness generation happen in the library for ios
                        jsonString.withCString { (cString) in
-                           c_prover(cString)
+                           c_prover(cString, &setupData)
                        }
                        let timeElapsed = CFAbsoluteTimeGetCurrent() - start
                        print("Time elapsed: \(timeElapsed) seconds")
