@@ -71,8 +71,13 @@ pub struct Manifest {
 impl Manifest {
   /// Validates `Manifest` fields
   pub fn validate(&self) -> Result<(), ProofError> {
+    // TODO: Validate manifest version, id, title, description, prepareUrl
     self.request.validate()?;
     self.response.validate()?;
+
+    // TODO: Do we want to run this here instead of in Request::validate in order to cross-examine
+    //  Request and Response template vars?
+    self.request.validate_vars()?;
     Ok(())
   }
 
@@ -149,8 +154,9 @@ pub struct Response {
 impl Response {
   pub fn validate(&self) -> Result<(), ProofError> {
     // TODO: What are legal statuses?
-    if self.status != "200" {
-      return Err(ProofError::InvalidManifest("Invalid status: ".to_string() + &self.status));
+    const VALID_STATUSES: [&str; 2] = ["200", "201"];
+    if !VALID_STATUSES.contains(&self.status.as_str()) {
+      return Err(ProofError::InvalidManifest("Unsupported HTTP status".to_string()));
     }
 
     // TODO: What HTTP versions are supported?
@@ -161,46 +167,84 @@ impl Response {
     }
 
     // TODO: What is the max supported message length?
-    if self.message.len() > 1024 {
-      return Err(ProofError::InvalidManifest(
-        "Invalid message length: ".to_string() + &self.message,
-      ));
-    }
     // TODO: Not covered by serde's #default annotation. Is '""' a valid message?
-    if self.message.len() == 0 {
+    if self.message.len() > 1024 || self.message.is_empty() {
       return Err(ProofError::InvalidManifest(
         "Invalid message length: ".to_string() + &self.message,
       ));
     }
 
-    if self.headers.len() > MAX_HTTP_HEADERS {
-      return Err(ProofError::InvalidManifest(
-        "Invalid headers length: ".to_string() + &self.headers.len().to_string(),
-      ));
-    }
     // We always expect at least one header, "Content-Type"
-    if self.headers.len() == 0 {
+    if self.headers.len() > MAX_HTTP_HEADERS || self.headers.is_empty() {
       return Err(ProofError::InvalidManifest(
         "Invalid headers length: ".to_string() + &self.headers.len().to_string(),
       ));
     }
-    if self.headers.get("Content-Type").is_none() {
+
+    let content_type = self.headers.get("Content-Type");
+    if content_type.is_none() {
       return Err(ProofError::InvalidManifest("Missing 'Content-Type' header".to_string()));
     }
+    let content_type = content_type.unwrap();
 
-    // TODO: Is this the only supported Content-Type?
-    if self.headers.get("Content-Type").unwrap() != "application/json" {
+    const VALID_CONTENT_TYPES: [&str; 2] = ["application/json", "text/plain"];
+    let is_valid_content_type = VALID_CONTENT_TYPES.iter().any(|&legal_type| {
+      content_type == legal_type || content_type.starts_with(&format!("{};", legal_type))
+    });
+    if !is_valid_content_type {
       return Err(ProofError::InvalidManifest(
-        "Invalid Content-Type header: ".to_string() + &self.headers.get("Content-Type").unwrap(),
+        "Invalid Content-Type header: ".to_string() + content_type,
       ));
     }
+
     // When Content-Type is application/json, we expect at least one JSON item
-    if self.body.json.is_empty() {
+    if content_type == "application/json" && self.body.json.is_empty() {
       return Err(ProofError::InvalidManifest("Expected at least one JSON item".to_string()));
     }
 
     Ok(())
   }
+}
+
+fn extract_tokens(value: &serde_json::Value) -> Vec<String> {
+  let mut tokens = vec![];
+
+  match value {
+    serde_json::Value::String(s) => {
+      let token_regex = regex::Regex::new(r"<%\s*(\w+)\s*%>").unwrap();
+      for capture in token_regex.captures_iter(s) {
+        if let Some(token) = capture.get(1) {
+          // Extract token name
+          tokens.push(token.as_str().to_string());
+        }
+      }
+    },
+    serde_json::Value::Object(map) => {
+      // Recursively parse nested objects
+      for (_, v) in map {
+        tokens.extend(extract_tokens(v));
+      }
+    },
+    serde_json::Value::Array(arr) => {
+      // Recursively parse arrays
+      for v in arr {
+        tokens.extend(extract_tokens(v));
+      }
+    },
+    _ => {},
+  }
+
+  tokens
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TemplateVar {
+  /// Regex for validation (if applicable)
+  pub regex:  Option<String>,
+  /// Length constraint (if applicable)
+  pub length: Option<usize>,
+  // Type constraint (e.g., base64, hex)
+  pub r#type: Option<String>,
 }
 
 /// HTTP Request items required for circuits
@@ -215,19 +259,27 @@ pub struct Request {
   pub version: String,
   /// Request headers to lock
   pub headers: HashMap<String, String>,
-  // TODO: Should we support `vars` here
+  /// Request JSON body
+  pub body:    Option<serde_json::Value>,
+  /// Request JSON vars to be used in templates
+  pub vars:    HashMap<String, TemplateVar>,
 }
 
 impl Request {
   pub fn validate(&self) -> Result<(), ProofError> {
     // TODO: What HTTP methods are supported?
-    if self.method != "GET" && self.method != "POST" {
-      return Err(ProofError::InvalidManifest("Invalid method: ".to_string() + &self.method));
+    const ALLOWED_METHODS: [&str; 2] = ["GET", "POST"];
+    if !ALLOWED_METHODS.contains(&self.method.as_str()) {
+      return Err(ProofError::InvalidManifest("Invalid HTTP method".to_string()));
     }
 
     // Not a valid URL
     if url::Url::parse(&self.url).is_err() {
       return Err(ProofError::InvalidManifest("Invalid URL: ".to_string() + &self.url));
+    }
+
+    if !self.url.starts_with("https://") {
+      return Err(ProofError::InvalidManifest("Only HTTPS URLs are allowed".to_string()));
     }
 
     // TODO: What HTTP versions are supported?
@@ -237,10 +289,82 @@ impl Request {
       ));
     }
 
-    // TODO: What are the legal request headers?
+    Ok(())
+  }
 
-    // TODO: Validate request header templates against `vars`
+  fn validate_vars(&self) -> Result<(), ProofError> {
+    let mut all_tokens = vec![];
 
+    // Parse and validate tokens in the body
+    if let Some(body_tokens) = self.body.as_ref().map(|body| extract_tokens(body)) {
+      for token in &body_tokens {
+        if !self.vars.contains_key(token) {
+          return Err(ProofError::InvalidManifest(format!(
+            "Token `<% {} %>` not declared in `vars`",
+            token
+          )));
+        }
+      }
+      all_tokens.extend(body_tokens);
+    }
+
+    // Parse and validate tokens in headers
+    for (_, value) in &self.headers {
+      let header_tokens = extract_tokens(&serde_json::Value::String(value.clone()));
+      for token in &header_tokens {
+        if !self.vars.contains_key(token) {
+          return Err(ProofError::InvalidManifest(format!(
+            "Token `<% {} %>` not declared in `vars`",
+            token
+          )));
+        }
+      }
+      all_tokens.extend(header_tokens);
+    }
+
+    for var_key in self.vars.keys() {
+      if !all_tokens.contains(var_key) {
+        return Err(ProofError::InvalidManifest(format!(
+          "Token `<% {} %>` not declared in `body` or `headers`",
+          var_key
+        )));
+      }
+    }
+
+    // Validate each `vars` entry
+    for (key, var_def) in &self.vars {
+      // Validate regex (if defined)
+      if let Some(regex_pattern) = var_def.regex.as_ref() {
+        // Using `regress` crate for compatibility with ECMAScript regular expressions
+        let _regex = regress::Regex::new(regex_pattern).map_err(|_| {
+          ProofError::InvalidManifest(format!("Invalid regex pattern for `{}`", key))
+        })?;
+        // TODO: It will definitely not match it here because it's a template variable, not an
+        // actual variable TODO: How does the Manifest receiver (notary) verifies this?
+        // if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
+        //   if regex.find(value.as_str().unwrap_or("")).is_none() {
+        //     return Err(ProofError::InvalidManifest(format!(
+        //       "Value for token `<% {} %>` does not match regex",
+        //       key
+        //     )));
+        //   }
+        // }
+      }
+
+      // Validate length (if applicable)
+      if let Some(length) = var_def.length {
+        if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
+          if value.as_str().unwrap_or("").len() != length {
+            return Err(ProofError::InvalidManifest(format!(
+              "Value for token `<% {} %>` does not meet length constraint",
+              key
+            )));
+          }
+        }
+      }
+
+      // TODO: Validate the token "type" constraint
+    }
     Ok(())
   }
 }
@@ -651,7 +775,8 @@ impl Manifest {
     assert_eq!(response_inputs.plaintext.len(), response_inputs.ciphertext.len());
 
     let mut private_inputs = vec![];
-    let mut fold_inputs: HashMap<String, FoldInput> = HashMap::new();
+    // TODO: Fold inputs are actually not modified, ever - We return en empty HashMap
+    let fold_inputs: HashMap<String, FoldInput> = HashMap::new();
 
     let InitialNIVCInputs { ciphertext_digest, initial_nivc_input, headers_digest } =
       self.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE>(
@@ -792,7 +917,7 @@ mod tests {
     // verify defaults are working
     assert_eq!(manifest.request.version, "HTTP/1.1");
     assert_eq!(manifest.request.method, "GET");
-    assert_eq!(manifest.request.headers.len(), 2);
+    assert_eq!(manifest.request.headers.len(), 3);
     assert_eq!(manifest.request.headers.get("host").unwrap(), "gist.githubusercontent.com");
 
     // verify defaults are working
@@ -1026,5 +1151,150 @@ mod tests {
     let wire_serialized = manifest.to_wire_bytes();
     let wire_deserialized: Manifest = Manifest::from_wire_bytes(&wire_serialized);
     assert_eq!(manifest, wire_deserialized);
+  }
+
+  #[macro_export]
+  macro_rules! create_request {
+    // Match with optional parameters
+    ($($key:ident: $value:expr),* $(,)?) => {{
+        let mut request = Request {
+            method: "GET".to_string(),
+            url: "https://example.com".to_string(),
+            version: "HTTP/1.1".to_string(),
+            headers: std::collections::HashMap::from([
+                ("Authorization".to_string(), "Bearer <TOKEN>".to_string()),
+                ("User-Agent".to_string(), "test-agent".to_string()),
+            ]),
+            body: None,
+            vars: std::collections::HashMap::from([(
+                "TOKEN".to_string(),
+                TemplateVar {
+                    regex: Some("^[A-Za-z0-9]+$".to_string()),
+                    length: Some(20),
+                    r#type: Some("base64".to_string()),
+                },
+            )]),
+        };
+
+        // Override default fields with provided arguments
+        $(
+            request.$key = $value;
+        )*
+
+        request
+    }};
+}
+
+  #[macro_export]
+  macro_rules! create_response {
+    // Match with optional parameters
+    ($($key:ident: $value:expr),* $(,)?) => {{
+        let mut response = Response {
+            status: "200".to_string(),
+            version: "HTTP/1.1".to_string(),
+            message: "OK".to_string(),
+            headers: std::collections::HashMap::from([
+                ("Content-Type".to_string(), "application/json".to_string())
+            ]),
+            body: ResponseBody {
+                json: vec![JsonKey::String("key1".to_string()), JsonKey::String("key2".to_string())],
+            },
+        };
+
+        // Override default fields with provided arguments
+        $(
+            response.$key = $value;
+        )*
+
+        response
+    }};
+}
+
+  #[test]
+  fn test_green_path_manifest_validation() {
+    let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
+    let result = manifest.validate();
+    assert!(result.is_ok());
+  }
+
+  #[test]
+  fn test_manifest_validation_invalid_method() {
+    let manifest = Manifest {
+      request:  create_request!(method: "INVALID".to_string()), // Not a valid method
+      response: create_response!(),
+    };
+    let result = manifest.validate();
+    assert!(result.is_err()); // Must fail
+    if let Err(ProofError::InvalidManifest(message)) = result {
+      assert_eq!(message, "Invalid HTTP method");
+    } else {
+      panic!("Expected ProofError::InvalidManifest");
+    }
+  }
+
+  #[test]
+  fn test_manifest_validation_invalid_url() {
+    let manifest = Manifest {
+      request:  create_request!(url: "ftp://example.com".to_string()), // Invalid URL scheme
+      response: create_response!(),
+    };
+    let result = manifest.validate();
+    assert!(result.is_err()); // Must fail
+    if let Err(ProofError::InvalidManifest(message)) = result {
+      assert_eq!(message, "Only HTTPS URLs are allowed");
+    } else {
+      panic!("Expected ProofError::InvalidManifest");
+    }
+  }
+
+  #[test]
+  fn test_manifest_validation_invalid_response_status() {
+    let manifest = Manifest {
+      request:  create_request!(),
+      response: create_response!(status: "500".to_string()), // Status not in VALID_STATUSES
+    };
+    let result = manifest.validate();
+    assert!(result.is_err()); // Must fail
+    if let Err(ProofError::InvalidManifest(message)) = result {
+      assert_eq!(message, "Unsupported HTTP status");
+    } else {
+      panic!("Expected ProofError::InvalidManifest");
+    }
+  }
+
+  #[test]
+  fn test_manifest_validation_missing_vars() {
+    let mut vars = HashMap::new();
+    vars.insert("TOKEN".to_string(), TemplateVar {
+      regex:  Some("^[A-Za-z0-9]+$".to_string()),
+      length: Some(20),
+      r#type: Some("base64".to_string()),
+    });
+    let manifest = Manifest {
+      request:  create_request!(
+          headers: HashMap::new(), // Invalid because "Authorization" makes use of `<TOKEN>`
+          vars: vars
+      ),
+      response: create_response!(),
+    };
+    let result = manifest.validate();
+    assert!(result.is_err()); // Must fail due to missing tokens in headers or body
+  }
+
+  #[test]
+  fn test_manifest_validation_invalid_content_type() {
+    let manifest = Manifest {
+      request:  create_request!(),
+      response: create_response!(headers: HashMap::from([
+          ("Content-Type".to_string(), "invalid/type".to_string())
+      ])),
+    };
+    let result = manifest.validate();
+    assert!(result.is_err()); // Must fail
+    if let Err(ProofError::InvalidManifest(message)) = result {
+      assert_eq!(message, "Invalid Content-Type header: invalid/type");
+    } else {
+      panic!("Expected ProofError::InvalidManifest");
+    }
   }
 }

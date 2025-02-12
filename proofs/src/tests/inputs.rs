@@ -16,7 +16,8 @@ pub(crate) const TEST_MANIFEST: &str = r#"
         "url": "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json",
         "headers": {
             "host": "gist.githubusercontent.com",
-            "connection": "close"
+            "connection": "close",
+            "Authentication": "Bearer <% token %>"
         },
         "body": {
             "userId": "<% userId %>"
@@ -657,6 +658,8 @@ pub(crate) fn complex_manifest() -> Manifest {
         ("Content-Type".to_string(), "application/json".to_string()),
         ("Accept-Encoding".to_string(), "gzip, deflate, br".to_string()),
       ]),
+      body:    None,
+      vars:    HashMap::new(),
     },
     response: Response {
       version: String::from("HTTP/1.1"),
