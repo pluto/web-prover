@@ -114,7 +114,6 @@ async fn main() -> Result<(), NotaryServerError> {
     .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
     .route("/v1/origo", get(origo::proxy))
     .route("/v1/tee", get(tee::proxy))
-    .route("/v1/origo/sign", post(origo::sign))
     .route("/v1/origo/verify", post(origo::verify))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);

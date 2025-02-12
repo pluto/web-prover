@@ -57,8 +57,8 @@ pub struct VerifierInputs {
   response_messages: Vec<Vec<u8>>,
 }
 
-pub async fn sign(
-  query: Query<SignQuery>,
+async fn sign(
+  // query: Query<SignQuery>,
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<SignBody>,
 ) -> Result<Json<SignReply>, ProxyError> {
@@ -121,8 +121,6 @@ pub async fn sign(
       .unwrap();
 
   assert_eq!(state.origo_signing_key.verifying_key(), &verifying_key);
-
-  // TODO is this right? we need lower form S for sure though
   let s = if signature.normalize_s().is_some() {
     hex::encode(signature.normalize_s().unwrap().to_bytes())
   } else {
@@ -251,7 +249,22 @@ pub async fn verify(
     },
   };
 
-  Ok(Json(VerifyReply { valid }))
+  let sign_reply = sign(
+    state,
+    extract::Json(SignBody {
+      handshake_server_key: verifier_inputs.request_messages[0].clone(),
+      handshake_server_iv:  verifier_inputs.request_messages[1].clone(),
+    }),
+  )
+  .await
+  .unwrap();
+
+  // TODO: We should
+  Ok(Json(VerifyReply {
+    valid,
+    json_value: verifier_inputs.response_messages,
+    signature: sign_reply,
+  }))
 }
 
 pub async fn websocket_notarize(

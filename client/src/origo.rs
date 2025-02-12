@@ -35,8 +35,9 @@ pub struct VerifyBody {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VerifyReply {
-  pub valid: bool,
-  // TODO: need a signature
+  pub valid:      bool,
+  pub json_value: JsonValue,
+  pub signature:  Json<SignReply>,
 }
 
 pub async fn sign(
