@@ -20,10 +20,10 @@ If you have any questions, please reach out to any of Pluto's [team members](htt
 
 ### Repo layout
 
-- `bin/`: a mock server for testing.
-- `client/`: contains components for the client that are shared across both WASM and iOS targets.
-- `client_ios/`: contains client components specific to the iOS target.
-- `client_wasm/`: contains client components specific to the WASM target.
+- `bin`: a mock server for testing.
+- `client`: contains components for the client that are shared across both WASM and iOS targets.
+- `client_ios`: contains client components specific to the iOS target.
+- `client_wasm`: contains client components specific to the WASM target.
 - `fixture`: contains testing artifacts such as TLS certificates and configuration files.
 - `notary`: notary server which can notarize MPC/ Origo/ TEE proofs.
 - `proofs`: contains all of our circom artifacts for the Origo proofs as well as a set of extractor proofs for selective disclosure over response data.
