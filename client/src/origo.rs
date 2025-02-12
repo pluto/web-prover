@@ -1,6 +1,7 @@
 // logic common to wasm32 and native
 use std::collections::HashMap;
 
+use futures::AsyncReadExt;
 use proofs::{
   circuits::construct_setup_data,
   program::{
@@ -115,9 +116,9 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
   let session_id = config.session_id.clone();
 
   #[cfg(not(target_arch = "wasm32"))]
-  let mut origo_conn = crate::origo_native::proxy(config.clone(), session_id.clone()).await?;
+  let (mut origo_conn, _) = crate::origo_native::proxy(config.clone(), session_id.clone()).await?;
   #[cfg(target_arch = "wasm32")]
-  let mut origo_conn = crate::origo_wasm32::proxy(config.clone(), session_id.clone()).await?;
+  let (mut origo_conn, _) = crate::origo_wasm32::proxy(config.clone(), session_id.clone()).await?;
 
   let sb = SignBody {
     handshake_server_iv:  hex::encode(
@@ -232,6 +233,29 @@ impl OrigoSecrets {
     let secrets: HashMap<String, Vec<u8>> = serde_json::from_slice(bytes)?;
     Ok(Self(secrets))
   }
+}
+
+// TODO: Refactor into struct helpers/trait
+pub(crate) async fn read_wire_struct<R: AsyncReadExt + Unpin>(stream: &mut R) -> Vec<u8> {
+  // Buffer to store the "header" (4 bytes, indicating the length of the struct)
+  let mut len_buf = [0u8; 4];
+  stream.read_exact(&mut len_buf).await.unwrap();
+  // dbg!(format!("len_buf={:?}", len_buf));
+
+  // Deserialize the length prefix (convert from little-endian to usize)
+  let body_len = u32::from_le_bytes(len_buf) as usize;
+  // dbg!(format!("body_len={body_len}"));
+
+  // Allocate a buffer to hold only the bytes needed for the struct
+  let mut body_buf = vec![0u8; body_len];
+  stream.read_exact(&mut body_buf).await.unwrap();
+  // dbg!(format!("manifest_buf={:?}", manifest_buf));
+
+  // Prepend len_buf to manifest_buf
+  let mut wire_struct_buf = len_buf.to_vec();
+  wire_struct_buf.extend(body_buf);
+
+  wire_struct_buf
 }
 
 #[cfg(test)]

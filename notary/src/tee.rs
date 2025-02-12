@@ -10,7 +10,10 @@ use caratls_ekm_google_confidential_space_server::GoogleConfidentialSpaceTokenGe
 #[cfg(feature = "tee-dummy-token-generator")]
 use caratls_ekm_server::DummyTokenGenerator;
 use caratls_ekm_server::TeeTlsAcceptor;
-use client::origo::{OrigoSecrets, SignBody};
+use client::{
+  origo::{OrigoSecrets, SignBody},
+  TeeProof, TeeProofData,
+};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use proofs::program::{manifest, manifest::Manifest};
@@ -130,7 +133,14 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   dbg!(parsed_transcript);
 
   // TODO apply manifest to parsed_transcript
-  // TODO return web proof
+
+  // send TeeProof to client
+  let tee_proof = TeeProof {
+    data:      TeeProofData { manifest_hash: "todo".to_string() },
+    signature: "sign(hash(TeeProofData))".to_string(),
+  };
+  let tee_proof_bytes = tee_proof.to_write_bytes();
+  tee_tls_stream.write_all(&tee_proof_bytes).await.unwrap();
 
   Ok(())
 }

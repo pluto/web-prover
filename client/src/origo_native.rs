@@ -8,7 +8,7 @@ use caratls_ekm_client::DummyTokenVerifier;
 use caratls_ekm_client::TeeTlsConnector;
 #[cfg(feature = "tee-google-confidential-space-token-verifier")]
 use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
-use futures::{channel::oneshot, AsyncWriteExt};
+use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use hyper_util::rt::TokioIo;
@@ -24,6 +24,7 @@ use crate::{
   errors::ClientErrors,
   origo::OrigoSecrets,
   tls_client_async2::TlsConnection,
+  TeeProof,
 };
 
 // TODO: Can be refactored further with shared logic from origo_wasm32.rs
@@ -33,11 +34,13 @@ use crate::{
 pub(crate) async fn proxy(
   config: config::Config,
   session_id: String,
-) -> Result<tls_client2::origo::OrigoConnection, ClientErrors> {
+) -> Result<(tls_client2::origo::OrigoConnection, Option<TeeProof>), ClientErrors> {
   if config.mode == NotaryMode::TEE {
-    handle_tee_mode(config, session_id).await
+    let (conn, tee_proof) = handle_tee_mode(config, session_id).await?;
+    return Ok((conn, Some(tee_proof)));
   } else {
-    handle_origo_mode(config, session_id).await
+    let conn = handle_origo_mode(config, session_id).await?;
+    return Ok((conn, None));
   }
 }
 
@@ -160,7 +163,7 @@ async fn handle_origo_mode(
 async fn handle_tee_mode(
   config: config::Config,
   session_id: String,
-) -> Result<OrigoConnection, ClientErrors> {
+) -> Result<(OrigoConnection, TeeProof), ClientErrors> {
   let root_store =
     crate::tls::tls_client2_default_root_store(config.notary_ca_cert.clone().map(|c| vec![c]));
 
@@ -260,8 +263,10 @@ async fn handle_tee_mode(
   let origo_secret_bytes = OrigoSecrets::from_origo_conn(&origo_conn).to_wire_bytes();
   reunited_socket.write_all(&origo_secret_bytes).await?;
 
-  // TODO: read web proof (a bit awkward but proxy will have to return the it)
-  Ok(origo_conn)
+  let tee_proof_bytes = crate::origo::read_wire_struct(&mut reunited_socket).await;
+  let tee_proof = TeeProof::from_wire_bytes(&tee_proof_bytes);
+
+  Ok((origo_conn, tee_proof))
 }
 
 /// Perform an HTTP handshake on client TLS connection and sends request

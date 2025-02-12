@@ -22,11 +22,13 @@ use crate::{
 pub(crate) async fn proxy(
   config: config::Config,
   session_id: String,
-) -> Result<tls_client2::origo::OrigoConnection, errors::ClientErrors> {
+) -> Result<(tls_client2::origo::OrigoConnection, Option<TeeProof>), errors::ClientErrors> {
   if config.mode == NotaryMode::TEE {
-    handle_tee_mode(config, session_id).await
+    let (conn, tee_proof) = handle_tee_mode(config, session_id).await?;
+    return Ok((conn, Some(tee_proof)));
   } else {
-    handle_origo_mode(config, session_id).await
+    let conn = handle_origo_mode(config, session_id).await?;
+    return Ok((conn, None));
   }
 }
 
@@ -96,7 +98,7 @@ async fn handle_origo_mode(
 async fn handle_tee_mode(
   config: config::Config,
   session_id: String,
-) -> Result<OrigoConnection, ClientErrors> {
+) -> Result<(OrigoConnection, TeeProof), ClientErrors> {
   // TODO build sanitized query
   let wss_url = format!(
     "wss://{}:{}/v1/{}?session_id={}&target_host={}&target_port={}",
@@ -152,11 +154,15 @@ async fn handle_tee_mode(
 
   assert_eq!(response.status(), StatusCode::OK);
 
+  // send manifest bytes
+  // send origo_secret_bytes
+  // read tee_proof
+
   let mut client_socket = connection_receiver.await.unwrap()?.io.into_inner();
   client_socket.close().await.unwrap();
 
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
-  Ok(origo_conn)
+  Ok((origo_conn, None)) // TODO
 }
 
 use pin_project_lite::pin_project;
