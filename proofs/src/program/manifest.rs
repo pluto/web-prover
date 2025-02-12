@@ -61,11 +61,20 @@ const MAX_STACK_HEIGHT: usize = 10;
 
 /// Manifest containing [`Request`] and [`Response`]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct Manifest {
+  /// Manifest version
+  pub manifest_version: String,
+  /// ID of the manifest
+  pub id:               String,
+  /// Title of the manifest
+  pub title:            String,
+  /// Description of the manifest
+  pub description:      String,
   /// HTTP request lock items
-  pub request:  Request,
+  pub request:          Request,
   /// HTTP response lock items
-  pub response: Response,
+  pub response:         Response,
 }
 
 impl Manifest {
@@ -121,7 +130,7 @@ impl Manifest {
   }
 
   /// Deserializes a `Manifest` from raw bytes without any "header".
-  fn from_bytes(bytes: &[u8]) -> Manifest { serde_json::from_slice(&bytes).unwrap() }
+  fn from_bytes(bytes: &[u8]) -> Manifest { serde_json::from_slice(bytes).unwrap() }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -296,7 +305,7 @@ impl Request {
     let mut all_tokens = vec![];
 
     // Parse and validate tokens in the body
-    if let Some(body_tokens) = self.body.as_ref().map(|body| extract_tokens(body)) {
+    if let Some(body_tokens) = self.body.as_ref().map(extract_tokens) {
       for token in &body_tokens {
         if !self.vars.contains_key(token) {
           return Err(ProofError::InvalidManifest(format!(
@@ -309,7 +318,7 @@ impl Request {
     }
 
     // Parse and validate tokens in headers
-    for (_, value) in &self.headers {
+    for value in self.headers.values() {
       let header_tokens = extract_tokens(&serde_json::Value::String(value.clone()));
       for token in &header_tokens {
         if !self.vars.contains_key(token) {
@@ -427,7 +436,7 @@ fn to_u32_array(input: &[u8]) -> Vec<u32> {
 
   // Create a new vector with padding
   let padded_input =
-    input.iter().chain(std::iter::repeat(&0).take(padding_needed)).copied().collect::<Vec<u8>>();
+    input.iter().chain(std::iter::repeat_n(&0, padding_needed)).copied().collect::<Vec<u8>>();
 
   padded_input
     .chunks(4)
@@ -1153,7 +1162,6 @@ mod tests {
     assert_eq!(manifest, wire_deserialized);
   }
 
-  #[macro_export]
   macro_rules! create_request {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
@@ -1183,9 +1191,8 @@ mod tests {
 
         request
     }};
-}
+  }
 
-  #[macro_export]
   macro_rules! create_response {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
@@ -1208,7 +1215,27 @@ mod tests {
 
         response
     }};
-}
+  }
+
+  macro_rules! create_manifest {
+    (
+        $request:expr,
+        $response:expr
+        $(, $field:ident = $value:expr)* $(,)?
+    ) => {{
+        Manifest {
+            manifest_version: "1".to_string(),
+            id: "Default Manifest ID".to_string(),
+            title: "Default Manifest Title".to_string(),
+            description: "Default description.".to_string(),
+            request: $request,
+            response: $response,
+            $(
+                $field: $value,
+            )*
+        }
+    }};
+  }
 
   #[test]
   fn test_green_path_manifest_validation() {
@@ -1219,10 +1246,10 @@ mod tests {
 
   #[test]
   fn test_manifest_validation_invalid_method() {
-    let manifest = Manifest {
-      request:  create_request!(method: "INVALID".to_string()), // Not a valid method
-      response: create_response!(),
-    };
+    let manifest = create_manifest!(
+      create_request!(method: "INVALID".to_string()), // Not a valid method
+      create_response!(),
+    );
     let result = manifest.validate();
     assert!(result.is_err()); // Must fail
     if let Err(ProofError::InvalidManifest(message)) = result {
@@ -1234,10 +1261,10 @@ mod tests {
 
   #[test]
   fn test_manifest_validation_invalid_url() {
-    let manifest = Manifest {
-      request:  create_request!(url: "ftp://example.com".to_string()), // Invalid URL scheme
-      response: create_response!(),
-    };
+    let manifest = create_manifest!(
+      create_request!(url: "ftp://example.com".to_string()), // Invalid URL scheme
+      create_response!(),
+    );
     let result = manifest.validate();
     assert!(result.is_err()); // Must fail
     if let Err(ProofError::InvalidManifest(message)) = result {
@@ -1249,10 +1276,10 @@ mod tests {
 
   #[test]
   fn test_manifest_validation_invalid_response_status() {
-    let manifest = Manifest {
-      request:  create_request!(),
-      response: create_response!(status: "500".to_string()), // Status not in VALID_STATUSES
-    };
+    let manifest = create_manifest!(
+      create_request!(),
+      create_response!(status: "500".to_string()), // Status not in VALID_STATUSES
+    );
     let result = manifest.validate();
     assert!(result.is_err()); // Must fail
     if let Err(ProofError::InvalidManifest(message)) = result {
@@ -1270,25 +1297,25 @@ mod tests {
       length: Some(20),
       r#type: Some("base64".to_string()),
     });
-    let manifest = Manifest {
-      request:  create_request!(
+    let manifest = create_manifest!(
+      create_request!(
           headers: HashMap::new(), // Invalid because "Authorization" makes use of `<TOKEN>`
           vars: vars
       ),
-      response: create_response!(),
-    };
+      create_response!(),
+    );
     let result = manifest.validate();
     assert!(result.is_err()); // Must fail due to missing tokens in headers or body
   }
 
   #[test]
   fn test_manifest_validation_invalid_content_type() {
-    let manifest = Manifest {
-      request:  create_request!(),
-      response: create_response!(headers: HashMap::from([
+    let manifest = create_manifest!(
+      create_request!(),
+      create_response!(headers: HashMap::from([
           ("Content-Type".to_string(), "invalid/type".to_string())
       ])),
-    };
+    );
     let result = manifest.validate();
     assert!(result.is_err()); // Must fail
     if let Err(ProofError::InvalidManifest(message)) = result {

@@ -61,7 +61,7 @@ pub fn rustls_default_root_store(
   let mut root_store = rustls::RootCertStore { roots: webpki_roots::TLS_SERVER_ROOTS.into() };
 
   if let Some(trust_anchors) = additional_trust_anchors {
-    for (_, trust_anchor) in trust_anchors.iter().enumerate() {
+    for trust_anchor in trust_anchors.iter() {
       let certificate = pki_types::CertificateDer::from(trust_anchor.clone());
       root_store.add(certificate).unwrap();
     }
@@ -83,7 +83,7 @@ pub fn tls_client_default_root_store(
   }));
 
   if let Some(trust_anchors) = additional_trust_anchors {
-    for (_, trust_anchor) in trust_anchors.iter().enumerate() {
+    for trust_anchor in trust_anchors.iter() {
       let certificate = pki_types::CertificateDer::from(trust_anchor.clone());
       let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
       assert_eq!(added, 1); // TODO there is probably a better way

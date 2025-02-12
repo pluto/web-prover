@@ -649,7 +649,11 @@ pub(crate) fn complex_response_inputs() -> EncryptionInput {
 
 pub(crate) fn complex_manifest() -> Manifest {
   Manifest {
-    request:  Request {
+    manifest_version: "1".to_string(),
+    id:               "complex-manifest".to_string(),
+    title:            "Complex Manifest".to_string(),
+    description:      "It's complicated".to_string(),
+    request:          Request {
       method:  "POST".to_string(),
       url:     String::from("/api/v1/data"),
       version: String::from("HTTP/1.1"),
@@ -661,7 +665,7 @@ pub(crate) fn complex_manifest() -> Manifest {
       body:    None,
       vars:    HashMap::new(),
     },
-    response: Response {
+    response:         Response {
       version: String::from("HTTP/1.1"),
       status:  200.to_string(),
       message: String::from("OK"),

@@ -1,7 +1,4 @@
-use std::{
-  ops::Deref,
-  sync::{Arc, Mutex},
-};
+use std::{ops::Deref, sync::Arc};
 
 #[cfg(feature = "tee-dummy-token-verifier")]
 use caratls_ekm_client::DummyTokenVerifier;
@@ -12,8 +9,7 @@ use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use hyper_util::rt::TokioIo;
-use rustls::ClientConfig;
-use tls_client2::{origo::OrigoConnection, ClientConnection};
+use tls_client2::origo::OrigoConnection;
 use tokio::net::TcpStream;
 use tokio_rustls::client::TlsStream;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
