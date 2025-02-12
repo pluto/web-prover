@@ -1,4 +1,5 @@
 import init, {setup_tracing, initThreadPool} from "../pkg/client_wasm.js";
+import { witness } from "./witness"; // This is not unused, this is how we initialize window.witness
 import { WEB_PROVER_CIRCUITS_VERSION } from "./config";
 
 const numConcurrency = navigator.hardwareConcurrency;
