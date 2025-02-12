@@ -150,41 +150,53 @@ impl Response {
   pub fn validate(&self) -> Result<(), ProofError> {
     // TODO: What are legal statuses?
     if self.status != "200" {
-      return Err(ProofError::InvalidManifest);
+      return Err(ProofError::InvalidManifest("Invalid status: ".to_string() + &self.status));
     }
 
     // TODO: What HTTP versions are supported?
     if self.version != "HTTP/1.1" {
-      return Err(ProofError::InvalidManifest);
+      return Err(ProofError::InvalidManifest(
+        "Invalid HTTP version: ".to_string() + &self.version,
+      ));
     }
 
     // TODO: What is the max supported message length?
     if self.message.len() > 1024 {
-      return Err(ProofError::InvalidManifest);
+      return Err(ProofError::InvalidManifest(
+        "Invalid message length: ".to_string() + &self.message,
+      ));
     }
     // TODO: Not covered by serde's #default annotation. Is '""' a valid message?
     if self.message.len() == 0 {
-      return Err(ProofError::InvalidManifest);
+      return Err(ProofError::InvalidManifest(
+        "Invalid message length: ".to_string() + &self.message,
+      ));
     }
 
     if self.headers.len() > MAX_HTTP_HEADERS {
-      return Err(ProofError::InvalidManifest);
+      return Err(ProofError::InvalidManifest(
+        "Invalid headers length: ".to_string() + &self.headers.len().to_string(),
+      ));
     }
     // We always expect at least one header, "Content-Type"
     if self.headers.len() == 0 {
-      return Err(ProofError::InvalidManifest);
+      return Err(ProofError::InvalidManifest(
+        "Invalid headers length: ".to_string() + &self.headers.len().to_string(),
+      ));
     }
     if self.headers.get("Content-Type").is_none() {
-      return Err(ProofError::InvalidManifest);
+      return Err(ProofError::InvalidManifest("Missing 'Content-Type' header".to_string()));
     }
 
     // TODO: Is this the only supported Content-Type?
     if self.headers.get("Content-Type").unwrap() != "application/json" {
-      return Err(ProofError::InvalidManifest);
+      return Err(ProofError::InvalidManifest(
+        "Invalid Content-Type header: ".to_string() + &self.headers.get("Content-Type").unwrap(),
+      ));
     }
     // When Content-Type is application/json, we expect at least one JSON item
     if self.body.json.is_empty() {
-      return Err(ProofError::InvalidManifest);
+      return Err(ProofError::InvalidManifest("Expected at least one JSON item".to_string()));
     }
 
     Ok(())
@@ -210,17 +222,19 @@ impl Request {
   pub fn validate(&self) -> Result<(), ProofError> {
     // TODO: What HTTP methods are supported?
     if self.method != "GET" && self.method != "POST" {
-      return Err(ProofError::InvalidManifest);
+      return Err(ProofError::InvalidManifest("Invalid method: ".to_string() + &self.method));
     }
 
     // Not a valid URL
     if url::Url::parse(&self.url).is_err() {
-      return Err(ProofError::InvalidManifest);
+      return Err(ProofError::InvalidManifest("Invalid URL: ".to_string() + &self.url));
     }
 
     // TODO: What HTTP versions are supported?
     if self.version != "HTTP/1.1" {
-      return Err(ProofError::InvalidManifest);
+      return Err(ProofError::InvalidManifest(
+        "Invalid HTTP version: ".to_string() + &self.version,
+      ));
     }
 
     // TODO: What are the legal request headers?
@@ -341,7 +355,6 @@ fn build_plaintext_authentication_circuit_inputs<const CIRCUIT_SIZE: usize>(
   inputs: &EncryptionInput,
   polynomial_input: F<G1>,
   private_inputs: &mut Vec<HashMap<String, Value>>,
-  _fold_inputs: &mut HashMap<String, FoldInput>,
 ) -> Result<F<G1>, ProofError> {
   let mut plaintext_step_out = F::<G1>::ZERO;
 
@@ -650,7 +663,6 @@ impl Manifest {
       request_inputs,
       ciphertext_digest,
       &mut private_inputs,
-      &mut fold_inputs,
     )?;
     // debug!("private_inputs: {:?}", private_inputs.len());
 
@@ -666,7 +678,6 @@ impl Manifest {
       response_inputs,
       ciphertext_digest,
       &mut private_inputs,
-      &mut fold_inputs,
     )?;
 
     // debug!("private_inputs: {:?}", private_inputs.len());

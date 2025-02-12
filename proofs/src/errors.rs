@@ -74,6 +74,6 @@ pub enum ProofError {
   InvalidCircuitInputs,
 
   // TODO: Add concrete cases?
-  #[error("Invalid manifest")]
-  InvalidManifest,
+  #[error("Invalid manifest: {0}")]
+  InvalidManifest(String),
 }
