@@ -118,6 +118,8 @@ pub async fn prover_inner_origo(
 
   proof.verify_reply = Some(verify_response);
 
+  debug!("proof.value: {:?}\nproof.verify_reply: {:?}", proof.value, proof.verify_reply);
+
   // TODO: This is where we should output richer proof data, the verikfy response has the hash of
   // the target value now. Since this is in the client, we can use the private variables here. We
   // just need to get out the value.

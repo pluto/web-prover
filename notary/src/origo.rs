@@ -24,6 +24,7 @@ use tokio::{
 };
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{debug, error, info};
+use web_proof_circuits_witness_generator::polynomial_digest;
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
@@ -306,14 +307,19 @@ pub async fn verify(
     &z0_secondary,
   ) {
     Ok((output, _)) => {
-      if output[1..].iter().all(|&x| x == F::<G1>::from(0)) {
-        // TODO: add the manifest digest
-        debug!("all the output matched baby, lfg");
+      // TODO: I think that `output[10] == ciphertext_digest` should also check? But I'm not 100%
+      // sure. Right now it doesn't and that's probably because we have the split up request and
+      // response.
+      if output[5] == F::<G1>::from(0) && output[8] == F::<G1>::from(0) {
+        // TODO: add the manifest digest?
+        debug!("output from verifier: {output:?}");
+        debug!(
+          "polynomial_digest of value: {:?}",
+          polynomial_digest(b"world", ciphertext_digest, 0)
+        );
         return Ok(Json(VerifyReply { value_hash: output[0], ciphertext_digest }));
       } else {
         // TODO (autoparallel): May want richer error content here to say what was wrong.
-        debug!("the output did not match, fml");
-        debug!("output from verifier: {output:?}");
         return Err(ProofError::VerifyFailed().into());
       }
     },
