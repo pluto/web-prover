@@ -69,6 +69,13 @@ pub struct Manifest {
 }
 
 impl Manifest {
+  /// Validates `Manifest` fields
+  pub fn validate(&self) -> Result<(), ProofError> {
+    self.request.validate()?;
+    self.response.validate()?;
+    Ok(())
+  }
+
   /// Serializes the `Manifest` into a length-prefixed byte array.
   pub fn to_wire_bytes(&self) -> Vec<u8> {
     let serialized = self.to_bytes();
@@ -220,28 +227,6 @@ impl Request {
 
     // TODO: Validate request header templates against `vars`
 
-    Ok(())
-  }
-}
-
-/// Default HTTP version
-fn default_version() -> String { "HTTP/1.1".to_string() }
-/// Default HTTP message
-fn default_message() -> String { "OK".to_string() }
-
-/// Manifest containing [`Request`] and [`Response`]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Manifest {
-  /// HTTP request lock items
-  pub request:  Request,
-  /// HTTP response lock items
-  pub response: Response,
-}
-
-impl Manifest {
-  pub fn validate(&self) -> Result<(), ProofError> {
-    self.request.validate()?;
-    self.response.validate()?;
     Ok(())
   }
 }
@@ -821,7 +806,7 @@ mod tests {
     response_inputs: EncryptionInput,
   ) {
     let NivcCircuitInputs { fold_inputs, private_inputs, .. } =
-      manifest.build_inputs::<CIRCUIT_SIZE>(&request_inputs, &response_inputs).unwrap().unwrap();
+      manifest.build_inputs::<CIRCUIT_SIZE>(&request_inputs, &response_inputs).unwrap();
     let NIVCRom { circuit_data: rom_data, rom } =
       manifest.build_rom::<CIRCUIT_SIZE>(&request_inputs, &response_inputs);
 
