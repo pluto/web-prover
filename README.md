@@ -21,7 +21,6 @@ If you have any questions, feel free to reach out to any of Pluto's engineers. W
 - `fixture`: contains testing artifacts such as TLS certificates and configuration files.
 - `notary`: notary server which can notarize MPC/ Origo/ TEE proofs.
 - `proofs`: contains all of our circom artifacts for the Origo proofs as well as a set of extractor proofs for selective disclosure over response data.
-- `tls`: contains a fork of rustls with a custom cryptography backend.
 
 ### WASM Development in Browser
 ```
