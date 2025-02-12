@@ -14,7 +14,7 @@ use tls_client2::{
         ClientExtension, ClientHelloPayload, HandshakeMessagePayload, HandshakePayload, Random,
         ServerExtension, ServerHelloPayload, SessionID,
       },
-      message::{Message, PlainMessage, MessagePayload, OpaqueMessage},
+      message::{Message, MessagePayload, OpaqueMessage, PlainMessage},
     },
     verify::{construct_tls13_server_verify_message, verify_tls13},
   },
