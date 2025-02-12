@@ -9,7 +9,7 @@ publish=false
 crate-type=["cdylib", "rlib"]
 
 [dependencies]
-client              ={ workspace=true, features=["websocket"] }
+client              ={ workspace=true, features=["websocket", "unsafe_skip_cert_verification"] }
 js-sys              ="0.3.64"
 serde-wasm-bindgen  ="0.6.1"
 serde_json          ={ workspace=true }

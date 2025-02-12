@@ -111,8 +111,7 @@ pub async fn prover_inner_origo(
   let proof =
     origo::proxy_and_sign_and_generate_proof(config.clone(), proving_params, setup_data).await?;
 
-  let manifest =
-    config.proving.manifest.clone().ok_or(errors::ClientErrors::ManifestMissingError)?;
+  let manifest = config.proving.manifest.clone().ok_or(ClientErrors::ManifestMissingError)?;
 
   debug!("sending proof to proxy for verification");
   let verify_response =

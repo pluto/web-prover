@@ -1,5 +1,4 @@
-import init, { setup_tracing, initThreadPool } from "../pkg/client_wasm.js";
-import { witness } from "./witness";
+import init, {setup_tracing, initThreadPool} from "../pkg/client_wasm.js";
 import { WEB_PROVER_CIRCUITS_VERSION } from "./config";
 
 const numConcurrency = navigator.hardwareConcurrency;
@@ -19,13 +18,13 @@ function startMemoryMonitoring(instance) {
   }, 5000);
 }
 // Create a WebAssembly.Memory object
-const shared_memory = new WebAssembly.Memory({
+const sharedMemory = new WebAssembly.Memory({
   initial: 16384, // 256 pages = 16MB
   maximum: 36000, // 1024 pages = 64MB
   shared: true, // Enable shared memory
 });
 
-await init(undefined, shared_memory);
+await init(undefined, sharedMemory);
 setup_tracing("debug,tlsn_extension_rs=debug");
 await initThreadPool(numConcurrency);
 console.log("initialized thread pool", numConcurrency);
@@ -33,9 +32,9 @@ console.log(`Thread pool initialized with ${numConcurrency} threads`);
 if (navigator.hardwareConcurrency) {
   console.log(`Hardware concurrency: ${navigator.hardwareConcurrency}`);
 }
-startMemoryMonitoring(shared_memory);
+startMemoryMonitoring(sharedMemory);
 
-var startTime, endTime, startPreWitgenTime;
+let startTime, endTime, startPreWitgenTime;
 
 function start() {
   startTime = performance.now();
@@ -43,24 +42,24 @@ function start() {
 
 function end() {
   endTime = performance.now();
-  var timeDiff = endTime - startTime;
+  let timeDiff = endTime - startTime;
   timeDiff /= 1000;
 
-  var timeDiffWitgen = endTime - startPreWitgenTime;
+  let timeDiffWitgen = endTime - startPreWitgenTime;
   timeDiffWitgen /= 1000;
 
   console.log(Math.round(timeDiff) + " seconds");
   console.log(Math.round(timeDiffWitgen) + " seconds (including witness)");
 }
 
-const getByteParams = async function (setupFile) {
+const getBytes = async function (file) {
   const ppUrl = new URL(
-    `build/${setupFile}`,
+    `build/${file}`,
     window.location.origin,
   ).toString();
-  const pp = await fetch(ppUrl).then((r) => r.arrayBuffer());
-  console.log("byte_params", pp);
-  return pp;
+  const buffer = await fetch(ppUrl).then((r) => r.arrayBuffer());
+  console.log("byte_params", buffer);
+  return new Uint8Array(buffer); // Cast to a js-sys (WASM) friendly type
 };
 
 start();
@@ -73,15 +72,24 @@ const proofWorker = new Worker(new URL("./proof.js", import.meta.url), {
 console.log("sending message to worker");
 console.log(WEB_PROVER_CIRCUITS_VERSION)
 
-var proving_params = {
-  aux_params: await getByteParams(
-    `circom-artifacts-512b-v${WEB_PROVER_CIRCUITS_VERSION}/serialized_setup_512b_rom_length_100.bin`,
-  ),
+function artifactPath(name) {
+  return `circom-artifacts-512b-v${WEB_PROVER_CIRCUITS_VERSION}/${name}`;
+}
+
+const provingParams = {
+  aux_params: await getBytes(artifactPath('serialized_setup_512b_rom_length_100.bin')),
 };
+const r1csTypes = [
+  await getBytes(artifactPath('plaintext_authentication_512b.r1cs')),
+  await getBytes(artifactPath('http_verification_512b.r1cs')),
+  await getBytes(artifactPath('json_extraction_512b.r1cs')),
+];
+
 proofWorker.postMessage({
   proverConfig,
-  proving_params,
-  shared_memory,
+  provingParams,
+  r1csTypes,
+  sharedMemory,
 });
 console.log("message sent to worker");
 proofWorker.onmessage = (event) => {
@@ -90,7 +98,7 @@ proofWorker.onmessage = (event) => {
   } else if (event.data.type === "log") {
     console.log(...event.data.data);
   } else {
-    if ("type" in event.data && event.data.type == "proof") {
+    if ("type" in event.data && event.data.type === "proof") {
       console.log("proof successfully generated: ", event.data);
     } else {
       console.error("Error from worker:", event.data)

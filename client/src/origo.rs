@@ -131,7 +131,6 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
 
   let _sign_data = crate::origo::sign(config.clone(), session_id.clone(), sb).await;
 
-  debug!("generating program data!");
   let witness = origo_conn.to_witness_data();
 
   // decrypt TLS ciphertext for request and response and create NIVC inputs
@@ -155,7 +154,7 @@ pub(crate) async fn generate_proof(
   request_inputs: EncryptionInput,
   response_inputs: EncryptionInput,
 ) -> Result<OrigoProof, ClientErrors> {
-  let program_data = SetupParams::<Offline> {
+  let setup_params = SetupParams::<Offline> {
     public_params: proving_params,
     vk_digest_primary: F::<G1>::from(0), // These need to be right.
     vk_digest_secondary: F::<G2>::from(0),
@@ -164,15 +163,15 @@ pub(crate) async fn generate_proof(
   }
   .into_online()?;
 
-  let vk_digest_primary = program_data.vk_digest_primary;
-  let vk_digest_secondary = program_data.vk_digest_secondary;
+  let vk_digest_primary = setup_params.vk_digest_primary;
+  let vk_digest_secondary = setup_params.vk_digest_secondary;
   crate::proof::construct_program_data_and_proof::<{ proofs::circuits::CIRCUIT_SIZE_512 }>(
     manifest,
     request_inputs,
     response_inputs,
     (vk_digest_primary, vk_digest_secondary),
-    program_data.public_params,
-    program_data.setup_data,
+    setup_params.public_params,
+    setup_params.setup_data,
   )
   .await
 

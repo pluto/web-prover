@@ -76,6 +76,17 @@ pub struct UninitializedSetup {
 }
 
 impl UninitializedSetup {
+  pub fn from_raw_r1cs_types_with_browser_witness(r1cs_types: Vec<Vec<u8>>) -> Self {
+    let r1cs_types: Vec<_> = r1cs_types.iter().map(|r1cs| R1CSType::Raw(r1cs.clone())).collect();
+    let witness_generator_types: Vec<_> = vec![WitnessGeneratorType::Browser; r1cs_types.len()];
+    Self {
+      r1cs_types,
+      witness_generator_types,
+      // TODO: Should this be hardcoded or a parameter?
+      max_rom_length: MAX_ROM_LENGTH,
+    }
+  }
+
   pub fn from_raw_parts(r1cs_types: Vec<Vec<u8>>, witness_generator_types: Vec<Vec<u8>>) -> Self {
     let r1cs_types = r1cs_types.iter().map(|r1cs| R1CSType::Raw(r1cs.clone())).collect();
     let witness_generator_types =
@@ -303,7 +314,7 @@ impl SetupParams<Offline> {
     let proving_params = ProvingParams::from_bytes(&self.public_params).unwrap();
 
     info!("init setup");
-    let initialized_setup = initialize_setup_data(&self.setup_data).unwrap();
+    let initialized_setup = initialize_setup_data(&self.setup_data)?;
 
     let circuits = initialize_circuit_list(&initialized_setup);
     let memory = Memory { circuits, rom: vec![0; self.setup_data.max_rom_length] };
