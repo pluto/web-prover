@@ -59,7 +59,7 @@ const getBytes = async function (file) {
     window.location.origin,
   ).toString();
   const buffer = await fetch(ppUrl).then((r) => r.arrayBuffer());
-  console.log("byte_params", buffer);
+  console.log("buffer.byteLength", buffer.byteLength);
   return new Uint8Array(buffer); // Cast to a js-sys (WASM) friendly type
 };
 
