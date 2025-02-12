@@ -4,6 +4,11 @@ version="0.3.0"
 edition="2021"
 build  ="build.rs"
 
+[features]
+default                                      =["tee-dummy-token-generator"]
+tee-dummy-token-generator                    =[]
+tee-google-confidential-space-token-generator=[]
+
 [dependencies]
 client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="8e7eb839e901dcee416179116bb0f9c4f7ae683c" }
 proofs={ path="../proofs", package="proofs" }

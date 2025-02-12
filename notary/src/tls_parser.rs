@@ -88,7 +88,7 @@ pub struct Transcript<T: TranscriptState> {
 
 impl Transcript<Raw> {
   /// Flatten neighboring transcript messages in the same direction
-  pub fn into_flattened(&self) -> Result<Transcript<Flattened>, ProxyError> {
+  pub fn into_flattened(self) -> Result<Transcript<Flattened>, ProxyError> {
     let (mut processed, current) = self.payload.iter().fold(
       (Vec::new(), Vec::<UnparsedMessage>::new()),
       |(mut processed, mut current), msg| {
@@ -130,14 +130,12 @@ impl Transcript<Flattened> {
   /// # Returns
   /// * `Result<Transcript<Parsed>, ProxyError>` - Vector of parsed TLS messages or error
   pub fn into_parsed(
-    &self,
-    handshake_server_key: String,
-    handshake_server_iv: String,
+    self,
+    handshake_server_key: &[u8],
+    handshake_server_iv: &[u8],
   ) -> Result<Transcript<Parsed>, ProxyError> {
-    let server_hs_key = hex::decode(handshake_server_key).unwrap();
-    let server_hs_iv = hex::decode(handshake_server_iv).unwrap();
-    info!("key_as_string: {:?}, length: {}", server_hs_key, server_hs_key.len());
-    info!("iv_as_string: {:?}, length: {}", server_hs_iv, server_hs_iv.len());
+    info!("key_as_string: {:?}, length: {}", handshake_server_key, handshake_server_key.len());
+    info!("iv_as_string: {:?}, length: {}", handshake_server_iv, handshake_server_iv.len());
 
     let mut parsed_messages: Vec<ParsedMessage> = vec![];
     let mut seq = 0u64;
@@ -175,7 +173,7 @@ impl Transcript<Flattened> {
                     });
 
                     cipher_suite_key =
-                      Some(set_key(server_hs_key.clone(), CipherSuite::from(sh.cipher.0))?);
+                      Some(set_key(handshake_server_key.to_vec(), CipherSuite::from(sh.cipher.0))?);
                   },
                   _ => {
                     info!("{:?}", parse_tls_message);
@@ -194,7 +192,7 @@ impl Transcript<Flattened> {
                 direction: m.direction,
                 payload: handle_application_data(
                   record.data.to_vec(),
-                  server_hs_iv.clone(),
+                  handshake_server_iv.to_vec(),
                   cipher_suite_key.clone(),
                   seq,
                 )?,
@@ -266,13 +264,13 @@ impl Transcript<Parsed> {
             debug!("verify_certificate_sig:CertificateVerify");
 
             // send error back to client if signature verification fails
-            match verify_tls13(
+            return match verify_tls13(
               &construct_tls13_server_verify_message(&transcript_digest.get_current_hash()),
               &server_certificate,
               digitally_signed_struct,
             ) {
-              Ok(_) => return Ok(()),
-              Err(e) => return Err(ProxyError::Sign(Box::new(e))),
+              Ok(_) => Ok(()),
+              Err(e) => Err(ProxyError::Sign(Box::new(e))),
             };
           },
           HandshakePayload::EncryptedExtensions(_) => {
@@ -515,7 +513,7 @@ fn handle_application_data(
         CipherSuiteKey::AES128GCM(key) => {
           let d = tls_client2::Decrypter::new(
             CipherSuiteKey::AES128GCM(key),
-            server_hs_iv[..12].try_into().unwrap(),
+            server_hs_iv[..12].try_into()?,
             CipherSuite::TLS13_AES_128_GCM_SHA256,
           );
 
@@ -536,7 +534,7 @@ fn handle_application_data(
         CipherSuiteKey::CHACHA20POLY1305(key) => {
           let d = tls_client2::Decrypter::new(
             CipherSuiteKey::CHACHA20POLY1305(key),
-            server_hs_iv[..12].try_into().unwrap(),
+            server_hs_iv[..12].try_into()?,
             CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
           );
 

@@ -64,9 +64,10 @@ pub async fn sign(
 ) -> Result<Json<SignReply>, ProxyError> {
   let transcript = state.origo_sessions.lock().unwrap().get(&query.session_id).cloned().unwrap();
 
-  let r = transcript
-    .into_flattened()?
-    .into_parsed(payload.handshake_server_key, payload.handshake_server_iv);
+  let handshake_server_key = hex::decode(payload.handshake_server_key).unwrap();
+  let handshake_server_iv = hex::decode(payload.handshake_server_iv).unwrap();
+
+  let r = transcript.into_flattened()?.into_parsed(&handshake_server_key, &handshake_server_iv);
   let parsed_transcript = match r {
     Ok(p) => p,
     Err(e) => {
@@ -261,8 +262,8 @@ pub async fn websocket_notarize(
   state: Arc<SharedState>,
 ) {
   debug!("Upgraded to websocket connection");
-  let stream = WsStream::new(socket.into_inner()).compat();
-  match proxy_service(stream, &session_id, &target_host, target_port, state).await {
+  let mut stream = WsStream::new(socket.into_inner()).compat();
+  match proxy_service(&mut stream, &session_id, &target_host, target_port, state).await {
     Ok(_) => {
       info!(?session_id, "Successful notarization using websocket!");
     },
@@ -273,14 +274,14 @@ pub async fn websocket_notarize(
 }
 
 pub async fn tcp_notarize(
-  stream: TokioIo<Upgraded>,
+  mut stream: TokioIo<Upgraded>,
   session_id: String,
   target_host: String,
   target_port: u16,
   state: Arc<SharedState>,
 ) {
   debug!("Upgraded to tcp connection");
-  match proxy_service(stream, &session_id, &target_host, target_port, state).await {
+  match proxy_service(&mut stream, &session_id, &target_host, target_port, state).await {
     Ok(_) => {
       info!(?session_id, "Successful notarization using tcp!");
     },
@@ -323,7 +324,9 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
         Err(e) => return Err(e),
       }
     }
-    tcp_write.shutdown().await.unwrap();
+
+    // MATT: this shutsdown the target connection, but not the socket, right?
+    tcp_write.shutdown().await?;
     Ok(())
   };
 
@@ -342,7 +345,9 @@ pub async fn proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
         Err(e) => return Err(e),
       }
     }
-    socket_write.shutdown().await.unwrap();
+
+    // MATT: this shuts down the socket connection, can't do that here
+    // socket_write.shutdown().await.unwrap();
     Ok(())
   };
 

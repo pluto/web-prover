@@ -1,15 +1,21 @@
 use std::sync::Arc;
 
 use axum::{
+  extract,
   extract::{Query, State},
   response::Response,
 };
+#[cfg(feature = "tee-google-confidential-space-token-generator")]
 use caratls_ekm_google_confidential_space_server::GoogleConfidentialSpaceTokenGenerator;
+#[cfg(feature = "tee-dummy-token-generator")]
+use caratls_ekm_server::DummyTokenGenerator;
 use caratls_ekm_server::TeeTlsAcceptor;
+use client::origo::{OrigoSecrets, SignBody};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
+use proofs::program::{manifest, manifest::Manifest};
 use serde::Deserialize;
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{debug, error, info};
 use ws_stream_tungstenite::WsStream;
@@ -89,8 +95,65 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   target_port: u16,
   state: Arc<SharedState>,
 ) -> Result<(), NotaryServerError> {
+  #[cfg(feature = "tee-google-confidential-space-token-generator")]
   let token_generator = GoogleConfidentialSpaceTokenGenerator::new("audience");
+
+  #[cfg(feature = "tee-dummy-token-generator")]
+  let token_generator = DummyTokenGenerator { token: "dummy".to_string() };
+
   let tee_tls_acceptor = TeeTlsAcceptor::new_with_ephemeral_cert(token_generator, "example.com"); // TODO example.com
-  let tee_tls_stream = tee_tls_acceptor.accept(socket).await?;
-  proxy_service(tee_tls_stream, session_id, target_host, target_port, state).await
+  let mut tee_tls_stream = tee_tls_acceptor.accept(socket).await?;
+  proxy_service(&mut tee_tls_stream, session_id, target_host, target_port, state.clone()).await?;
+
+  let manifest_bytes = read_wire_struct(&mut tee_tls_stream).await;
+  // TODO: Consider implementing from_stream instead of read_wire_struct
+  let manifest = Manifest::from_wire_bytes(&manifest_bytes);
+  // dbg!(&manifest);
+
+  let secret_bytes = read_wire_struct(&mut tee_tls_stream).await;
+  let origo_secrets = OrigoSecrets::from_wire_bytes(&secret_bytes);
+  // dbg!(&origo_secrets);
+
+  let handshake_server_key =
+    origo_secrets.handshake_server_key().expect("Handshake server key missing");
+  let handshake_server_iv =
+    origo_secrets.handshake_server_iv().expect("Handshake server IV missing");
+
+  // TODO (autoparallel): This duplicates some code we see in `notary/src/origo.rs`, so we could
+  //  maybe clean this up and share code.
+  let transcript = state.origo_sessions.lock().unwrap().get(session_id).cloned().unwrap();
+  let parsed_transcript = transcript
+    .into_flattened()
+    .unwrap()
+    .into_parsed(&handshake_server_key, &handshake_server_iv)
+    .unwrap();
+  dbg!(parsed_transcript);
+
+  // TODO apply manifest to parsed_transcript
+  // TODO return web proof
+
+  Ok(())
+}
+
+// TODO: Refactor into struct helpers/trait
+async fn read_wire_struct<R: AsyncReadExt + Unpin>(stream: &mut R) -> Vec<u8> {
+  // Buffer to store the "header" (4 bytes, indicating the length of the struct)
+  let mut len_buf = [0u8; 4];
+  stream.read_exact(&mut len_buf).await.unwrap();
+  // dbg!(format!("len_buf={:?}", len_buf));
+
+  // Deserialize the length prefix (convert from little-endian to usize)
+  let body_len = u32::from_le_bytes(len_buf) as usize;
+  // dbg!(format!("body_len={body_len}"));
+
+  // Allocate a buffer to hold only the bytes needed for the struct
+  let mut body_buf = vec![0u8; body_len];
+  stream.read_exact(&mut body_buf).await.unwrap();
+  // dbg!(format!("manifest_buf={:?}", manifest_buf));
+
+  // Prepend len_buf to manifest_buf
+  let mut wire_struct_buf = len_buf.to_vec();
+  wire_struct_buf.extend(body_buf);
+
+  wire_struct_buf
 }

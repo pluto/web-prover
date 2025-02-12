@@ -24,7 +24,7 @@ use futures::{
 use tls_client2::ClientConnection;
 #[cfg(not(feature = "tracing"))] use tracing::warn;
 #[cfg(feature = "tracing")]
-use tracing::{debug, debug_span, error, trace, warn, Instrument};
+use tracing::{debug, debug_span, error, trace, Instrument};
 
 const RX_TLS_BUF_SIZE: usize = 1 << 13; // 8 KiB
 const RX_BUF_SIZE: usize = 1 << 13; // 8 KiB
@@ -50,16 +50,24 @@ pub struct ClosedConnection {
   pub recv:   Vec<u8>,
 }
 
+/// A result type alias for a closed connection and its associated socket. Primarily returned by
+/// `bind_client` to represent the outcome of establishing a client connection.
+///
+/// This alias represents one of the following outcomes:
+/// - A successful [`ClosedConnection`] paired with a socket of type `T`.
+/// - A failure encapsulated in a [`ConnectionError`].
+pub type MaybeConnectionWithSocket<T> = Result<(ClosedConnection, T), ConnectionError>;
+
 /// A future which runs the TLS connection to completion.
 ///
 /// This future must be polled in order for the connection to make progress.
 #[must_use = "futures do nothing unless polled"]
-pub struct ConnectionFuture {
-  fut: Pin<Box<dyn Future<Output = Result<ClosedConnection, ConnectionError>> + Send>>,
+pub struct ConnectionFuture<T> {
+  fut: Pin<Box<dyn Future<Output = MaybeConnectionWithSocket<T>> + Send>>,
 }
 
-impl Future for ConnectionFuture {
-  type Output = Result<ClosedConnection, ConnectionError>;
+impl<T> Future for ConnectionFuture<T> {
+  type Output = MaybeConnectionWithSocket<T>;
 
   fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
     self.fut.poll_unpin(cx)
@@ -76,7 +84,7 @@ impl Future for ConnectionFuture {
 pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
   socket: T,
   mut client: ClientConnection,
-) -> (TlsConnection, ConnectionFuture) {
+) -> (TlsConnection, ConnectionFuture<T>) {
   let (tx_sender, mut tx_receiver) = mpsc::channel(1 << 14);
   let (mut rx_sender, rx_receiver) = mpsc::channel(1 << 14);
 
@@ -226,9 +234,12 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
     #[cfg(feature = "tracing")]
     debug!("client shutdown");
 
-    _ = server_tx.close().await;
+    // _ = server_tx.close().await; // MATT: socket can't be closed if we still need it
+
     tx_receiver.close();
     rx_sender.close_channel();
+
+    let reunited_socket = server_rx.reunite(server_tx).unwrap();
 
     #[cfg(feature = "tracing")]
     trace!(
@@ -238,7 +249,7 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
       recv.len()
     );
 
-    Ok(ClosedConnection { client, sent, recv })
+    Ok((ClosedConnection { client, sent, recv }, reunited_socket))
   };
 
   #[cfg(feature = "tracing")]

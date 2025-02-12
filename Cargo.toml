@@ -42,7 +42,7 @@ clap={ version="4.5.13", features=["derive"] }
 thiserror="1.0.61"
 
 # HTTP
-hyper         ={ version="1.4", features=["full"] }
+hyper         ={ version="1.6", features=["full"] }
 hyper-util    ={ version="0.1", features=["full"] }
 http-body-util="0.1"
 
