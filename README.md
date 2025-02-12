@@ -2,9 +2,9 @@
 
 Pluto's Web Prover repo contains the source code for three types of [Web Proofs](https://pluto.xyz/blog/introducing-pluto#1927a922ef2980748958f9f1fa514320):
 
-- [MPC proofs](https://pluto.xyz/blog/web-proof-techniques-mpc-mode) via TLSNotary,
-- [Origo proofs](https://pluto.xyz/blog/web-proof-techniques-origo-mode) and
-- [Trusted Execution Environment (TEE) proofs](https://pluto.xyz/blog/web-proof-techniques-tee-mode)
+- [Origo proofs](https://pluto.xyz/blog/web-proof-techniques-origo-mode),
+- [Trusted Execution Environment (TEE) proofs](https://pluto.xyz/blog/web-proof-techniques-tee-mode) and
+- [MPC proofs](https://pluto.xyz/blog/web-proof-techniques-mpc-mode) via TLSNotary
 
 ## How to get started
 
