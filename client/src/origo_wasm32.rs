@@ -26,11 +26,11 @@ pub(crate) async fn proxy(
   if config.mode == NotaryMode::TEE {
     handle_tee_mode(config, session_id).await
   } else {
-    handle_generic_mode(config, session_id).await
+    handle_origo_mode(config, session_id).await
   }
 }
 
-async fn handle_generic_mode(
+async fn handle_origo_mode(
   config: config::Config,
   session_id: String,
 ) -> Result<OrigoConnection, ClientErrors> {

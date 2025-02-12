@@ -110,7 +110,6 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let manifest = Manifest::from_wire_bytes(&manifest_bytes);
   // dbg!(&manifest);
 
-  // TODO wait for TLS secrets
   let secret_bytes = read_wire_struct(&mut tee_tls_stream).await;
   let origo_secrets = OrigoSecrets::from_wire_bytes(&secret_bytes);
   // dbg!(&origo_secrets);
@@ -126,12 +125,11 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let parsed_transcript = transcript
     .into_flattened()
     .unwrap()
-      // TODO: Panics with error: called `Result::unwrap()` on an `Err` value: TlsParser { position: 4142, remaining: 64, e: "Parsing requires 135 bytes/chars" }
     .into_parsed(&handshake_server_key, &handshake_server_iv)
     .unwrap();
   dbg!(parsed_transcript);
 
-  // TODO apply manifest
+  // TODO apply manifest to parsed_transcript
   // TODO return web proof
 
   Ok(())
