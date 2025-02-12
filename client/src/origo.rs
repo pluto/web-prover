@@ -36,7 +36,7 @@ pub struct VerifyBody {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VerifyReply {
-  pub valid: bool,
+  pub value_hash: F<G1>,
   // TODO: need a signature
 }
 

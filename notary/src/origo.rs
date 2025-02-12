@@ -11,6 +11,7 @@ use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use proofs::{
   circuits::{CIRCUIT_SIZE_512, MAX_STACK_HEIGHT},
+  errors::ProofError,
   program::manifest::{compute_ciphertext_digest, InitialNIVCInputs},
   proof::FoldingProof,
   F, G1, G2,
@@ -302,14 +303,21 @@ pub async fn verify(
     &z0_primary,
     &z0_secondary,
   ) {
-    Ok(_) => true,
+    Ok((output, _)) => {
+      // TODO: This should also check the hash of the target value probably, unless we want to have
+      // this revealed on the contract side: `output[0] == F::<G1>::from(val)`
+      if output[1..].iter().all(|&x| x == F::<G1>::from(0)) {
+        return Ok(Json(VerifyReply { value_hash: output[0] }));
+      } else {
+        // TODO (autoparallel): May want richer error content here to say what was wrong.
+        return Err(ProofError::VerifyFailed().into());
+      }
+    },
     Err(e) => {
-      error!("Error verifying proof: {:?}", e);
-      false
+      error!("Error verifying request proof: {:?}", e);
+      return Err(ProofError::SuperNova(e).into());
     },
   };
-
-  Ok(Json(VerifyReply { valid }))
 }
 
 pub async fn websocket_notarize(

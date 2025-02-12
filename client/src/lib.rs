@@ -100,12 +100,12 @@ pub async fn prover_inner_origo(
   let verify_response =
     origo::verify(config, origo::VerifyBody { session_id, origo_proof: proof.clone(), manifest })
       .await?;
+  // Note: The above `?` will push out the `ProofError::VerifyFailed` from the `origo::verify`
+  // method now. We no longer return an inner bool here, we just use the Result enum itself
 
-  if !verify_response.valid {
-    Err(ProofError::VerifyFailed().into())
-  } else {
-    Ok(Proof::Origo(proof))
-  }
+  // TODO: This is where we should output richer proof data, the verikfy response has the hash of
+  // the target value now
+  Ok(Proof::Origo(proof))
 }
 
 pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
