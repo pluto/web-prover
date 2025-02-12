@@ -69,11 +69,7 @@ pub enum ProofError {
   #[error("transparent")]
   SerdeWasmBindgen(#[from] serde_wasm_bindgen::Error),
 
-  // TODO: Add concrete cases?
-  #[error("Invalid circuit inputs")]
-  InvalidCircuitInputs,
-
-  // TODO: Add concrete cases?
+  // TODO: Replace with concrete cases once we finalize Manifest validation rules
   #[error("Invalid manifest: {0}")]
   InvalidManifest(String),
 }

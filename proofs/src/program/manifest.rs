@@ -61,20 +61,20 @@ const MAX_STACK_HEIGHT: usize = 10;
 
 /// Manifest containing [`Request`] and [`Response`]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
+// #[serde(rename_all = "camelCase")]
 pub struct Manifest {
-  /// Manifest version
-  pub manifest_version: String,
-  /// ID of the manifest
-  pub id:               String,
-  /// Title of the manifest
-  pub title:            String,
-  /// Description of the manifest
-  pub description:      String,
+  // /// Manifest version
+  // pub manifest_version: String,
+  // /// ID of the manifest
+  // pub id:               String,
+  // /// Title of the manifest
+  // pub title:            String,
+  // /// Description of the manifest
+  // pub description:      String,
   /// HTTP request lock items
-  pub request:          Request,
+  pub request:  Request,
   /// HTTP response lock items
-  pub response:         Response,
+  pub response: Response,
 }
 
 impl Manifest {
@@ -123,13 +123,17 @@ impl Manifest {
     Self::from_bytes(serialized_data)
   }
 
-  /// Serializes the `Manifest` without any "header".
+  /// Serializes the `Manifest` to raw bytes.
+  ///
+  /// Doesn't expect a "wire" header.
   fn to_bytes(&self) -> Vec<u8> {
-    // Serializing as JSON `untagged` in `JsonKey` break bincode
+    // Serializing as JSON because `untagged` in `JsonKey` break bincode
     serde_json::to_vec(&self).unwrap()
   }
 
-  /// Deserializes a `Manifest` from raw bytes without any "header".
+  /// Deserializes a `Manifest` from raw bytes.
+  ///
+  /// Doesn't expect a "wire" header.
   fn from_bytes(bytes: &[u8]) -> Manifest { serde_json::from_slice(bytes).unwrap() }
 }
 
@@ -926,7 +930,7 @@ mod tests {
     // verify defaults are working
     assert_eq!(manifest.request.version, "HTTP/1.1");
     assert_eq!(manifest.request.method, "GET");
-    assert_eq!(manifest.request.headers.len(), 3);
+    assert_eq!(manifest.request.headers.len(), 2);
     assert_eq!(manifest.request.headers.get("host").unwrap(), "gist.githubusercontent.com");
 
     // verify defaults are working
@@ -1224,10 +1228,10 @@ mod tests {
         $(, $field:ident = $value:expr)* $(,)?
     ) => {{
         Manifest {
-            manifest_version: "1".to_string(),
-            id: "Default Manifest ID".to_string(),
-            title: "Default Manifest Title".to_string(),
-            description: "Default description.".to_string(),
+            // manifest_version: "1".to_string(),
+            // id: "Default Manifest ID".to_string(),
+            // title: "Default Manifest Title".to_string(),
+            // description: "Default description.".to_string(),
             request: $request,
             response: $response,
             $(
@@ -1237,21 +1241,68 @@ mod tests {
     }};
   }
 
+  // TODO: Using this TEST_MANIFEST duplicate here because modifying the original one breaks
+  //  `test_end_to_end_proofs` test with error: thread 'tests::test_end_to_end_proofs_get' panicked
+  // at proofs/src/tests/mod.rs:230:84:  called `Result::unwrap()` on an `Err` value:
+  // NovaError(InvalidSumcheckProof)
+  const TEST_MANIFEST_TO_VALIDATE: &str = r#"
+{
+    "manifestVersion": "1",
+    "id": "reddit-user-karma",
+    "title": "Total Reddit Karma",
+    "description": "Generate a proof that you have a certain amount of karma",
+    "prepareUrl": "https://www.reddit.com/login/",
+    "request": {
+        "method": "GET",
+        "url": "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json",
+        "headers": {
+            "host": "gist.githubusercontent.com",
+            "connection": "close",
+            "Authorization": "Bearer <% token %>",
+            "User-Agent": "test-agent"
+        },
+        "body": {
+            "userId": "<% userId %>"
+        },
+        "vars": {
+            "userId": {
+                "regex": "[a-z]{,20}+"
+            },
+            "token": {
+                "type": "base64",
+                "length": 32
+            }
+        }
+    },
+    "response": {
+        "status": "200",
+        "headers": {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Content-Length": "22"
+        },
+        "body": {
+            "json": [
+                "hello"
+            ],
+            "contains": "this_string_exists_in_body"
+        }
+    }
+}
+"#;
+
   #[test]
   fn test_green_path_manifest_validation() {
-    let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
+    let manifest: Manifest = serde_json::from_str(TEST_MANIFEST_TO_VALIDATE).unwrap();
     let result = manifest.validate();
     assert!(result.is_ok());
   }
 
   #[test]
   fn test_manifest_validation_invalid_method() {
-    let manifest = create_manifest!(
-      create_request!(method: "INVALID".to_string()), // Not a valid method
-      create_response!(),
-    );
+    let manifest =
+      create_manifest!(create_request!(method: "INVALID".to_string()), create_response!(),);
     let result = manifest.validate();
-    assert!(result.is_err()); // Must fail
+    assert!(result.is_err());
     if let Err(ProofError::InvalidManifest(message)) = result {
       assert_eq!(message, "Invalid HTTP method");
     } else {
@@ -1261,12 +1312,10 @@ mod tests {
 
   #[test]
   fn test_manifest_validation_invalid_url() {
-    let manifest = create_manifest!(
-      create_request!(url: "ftp://example.com".to_string()), // Invalid URL scheme
-      create_response!(),
-    );
+    let manifest =
+      create_manifest!(create_request!(url: "ftp://example.com".to_string()), create_response!(),);
     let result = manifest.validate();
-    assert!(result.is_err()); // Must fail
+    assert!(result.is_err());
     if let Err(ProofError::InvalidManifest(message)) = result {
       assert_eq!(message, "Only HTTPS URLs are allowed");
     } else {
@@ -1276,12 +1325,10 @@ mod tests {
 
   #[test]
   fn test_manifest_validation_invalid_response_status() {
-    let manifest = create_manifest!(
-      create_request!(),
-      create_response!(status: "500".to_string()), // Status not in VALID_STATUSES
-    );
+    let manifest =
+      create_manifest!(create_request!(), create_response!(status: "500".to_string()),);
     let result = manifest.validate();
-    assert!(result.is_err()); // Must fail
+    assert!(result.is_err());
     if let Err(ProofError::InvalidManifest(message)) = result {
       assert_eq!(message, "Unsupported HTTP status");
     } else {
@@ -1305,7 +1352,7 @@ mod tests {
       create_response!(),
     );
     let result = manifest.validate();
-    assert!(result.is_err()); // Must fail due to missing tokens in headers or body
+    assert!(result.is_err());
   }
 
   #[test]
@@ -1317,7 +1364,7 @@ mod tests {
       ])),
     );
     let result = manifest.validate();
-    assert!(result.is_err()); // Must fail
+    assert!(result.is_err());
     if let Err(ProofError::InvalidManifest(message)) = result {
       assert_eq!(message, "Invalid Content-Type header: invalid/type");
     } else {

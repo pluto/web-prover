@@ -16,8 +16,7 @@ pub(crate) const TEST_MANIFEST: &str = r#"
         "url": "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json",
         "headers": {
             "host": "gist.githubusercontent.com",
-            "connection": "close",
-            "Authentication": "Bearer <% token %>"
+            "connection": "close"
         },
         "body": {
             "userId": "<% userId %>"
@@ -649,11 +648,11 @@ pub(crate) fn complex_response_inputs() -> EncryptionInput {
 
 pub(crate) fn complex_manifest() -> Manifest {
   Manifest {
-    manifest_version: "1".to_string(),
-    id:               "complex-manifest".to_string(),
-    title:            "Complex Manifest".to_string(),
-    description:      "It's complicated".to_string(),
-    request:          Request {
+    // manifest_version: "1".to_string(),
+    // id:               "complex-manifest".to_string(),
+    // title:            "Complex Manifest".to_string(),
+    // description:      "It's complicated".to_string(),
+    request:  Request {
       method:  "POST".to_string(),
       url:     String::from("/api/v1/data"),
       version: String::from("HTTP/1.1"),
@@ -665,7 +664,7 @@ pub(crate) fn complex_manifest() -> Manifest {
       body:    None,
       vars:    HashMap::new(),
     },
-    response:         Response {
+    response: Response {
       version: String::from("HTTP/1.1"),
       status:  200.to_string(),
       message: String::from("OK"),
