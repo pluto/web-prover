@@ -1176,4 +1176,66 @@ mod tests {
       panic!("Expected ProofError::InvalidManifest");
     }
   }
+
+  #[test]
+  fn test_parse_response() {
+    let header_bytes = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
+    let body_bytes = br#"{"key1": "value1", "key2": "value2"}"#;
+    let response = Response::from_payload(header_bytes, body_bytes).unwrap();
+    assert_eq!(response.status, "200");
+    assert_eq!(response.version, "HTTP/1.1");
+    assert_eq!(response.message, "OK");
+    assert_eq!(response.headers.len(), 1);
+    assert_eq!(response.headers.get("Content-Type").unwrap(), "application/json");
+    assert_eq!(response.body.json.len(), 2);
+    assert_eq!(response.body.json[0], JsonKey::String("key1".to_string()));
+    assert_eq!(response.body.json[1], JsonKey::String("key2".to_string()));
+  }
+
+  #[test]
+  fn test_matches_other_response() {
+    let sourced_response = Response {
+      status:  "200".to_string(),
+      version: "HTTP/1.1".to_string(),
+      message: "OK".to_string(),
+      headers: std::collections::HashMap::from([(
+        "Content-Type".to_string(),
+        "application/json".to_string(),
+      )]),
+      body:    ResponseBody {
+        json: vec![JsonKey::String("key1".to_string()), JsonKey::String("key2".to_string())],
+      },
+    };
+
+    // Matches a perfect match
+    assert!(sourced_response.is_subset_of(&sourced_response));
+
+    // Fails if it doesn't match directly
+    let mut non_matching_response = sourced_response.clone();
+    non_matching_response.status = "201".to_string();
+    assert!(!sourced_response.is_subset_of(&non_matching_response));
+
+    non_matching_response.status = "200".to_string();
+    non_matching_response.message = "Created".to_string();
+    assert!(!sourced_response.is_subset_of(&non_matching_response));
+
+    non_matching_response.message = "OK".to_string();
+    non_matching_response.headers.insert("Content-Type".to_string(), "text/plain".to_string());
+    assert!(!sourced_response.is_subset_of(&non_matching_response));
+
+    // Should pass if the response is a superset of the source response
+    let mut response_superset = sourced_response.clone();
+    response_superset.headers.insert("extra".to_string(), "header".to_string());
+    assert!(sourced_response.is_subset_of(&response_superset));
+
+    let extra_items_in_body = ResponseBody {
+      json: vec![
+        JsonKey::String("key1".to_string()),
+        JsonKey::String("key2".to_string()),
+        JsonKey::String("key3".to_string()),
+      ],
+    };
+    response_superset.body = extra_items_in_body;
+    assert!(sourced_response.is_subset_of(&response_superset));
+  }
 }
