@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::{fmt::Display, io::Cursor};
 
 use k256::elliptic_curve::Field;
 use nom::{bytes::streaming::take, IResult};
@@ -46,9 +46,9 @@ pub enum WrappedPayload {
 
 #[derive(Debug)]
 pub struct ParsedMessage {
-  direction: Direction,
-  seq:       u64,
-  payload:   WrappedPayload,
+  pub direction: Direction,
+  pub seq:       u64,
+  pub payload:   WrappedPayload,
 }
 
 #[derive(Debug, Clone)]
@@ -525,14 +525,14 @@ impl DecryptWrapper {
       SupportedSuites::AesGcm => match self.inner.decrypt_tls13_aes(&msg, self.seq) {
         Ok((plain_message, _)) => {
           self.seq += 1;
-          return Some(plain_message);
+          Some(plain_message)
         },
         Err(_) => None,
       },
       SupportedSuites::ChachaPoly => match self.inner.decrypt_tls13_chacha20(&msg, self.seq) {
         Ok((plain_message, _)) => {
           self.seq += 1;
-          return Some(plain_message);
+          Some(plain_message)
         },
         Err(_) => None,
       },

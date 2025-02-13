@@ -41,13 +41,13 @@
 				"version": "HTTP/1.1",
 				"message": "OK",
 				"headers": {
-					"Content-Type": "text/plain"
+					"Content-Type": "text/plain; charset=utf-8"
 				},
 				"body": {
 					"json": [
 						"hello"
 					],
-					"contains": "this_string_exists_in_body"
+					"contains": "world"
 				}
 			}
 		}
