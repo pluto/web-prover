@@ -18,7 +18,7 @@ FROM debian:bookworm
 COPY --from=rust-builder /app/target/release/notary /app/notary
 COPY --from=rust-builder /app/fixture /app/fixture
 COPY --from=rust-builder /app/proofs /app/proofs
-EXPOSE 443
+EXPOSE 7443
 WORKDIR /app
 ENV RUST_LOG=info
 CMD ["./notary", "--config", "./fixture/notary-config.toml"]
