@@ -139,9 +139,10 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   debug!("Sending magic byte to indicate readiness to read");
   tee_tls_stream.write_all(&[0xAA]).await?;
 
-  let manifest_bytes = read_wire_struct(&mut tee_tls_stream).await;
   // TODO: Consider implementing from_stream instead of read_wire_struct
+  let manifest_bytes = read_wire_struct(&mut tee_tls_stream).await;
   let manifest = Manifest::from_wire_bytes(&manifest_bytes);
+  // manifest.validate()?;
   // dbg!(&manifest);
   let secret_bytes = read_wire_struct(&mut tee_tls_stream).await;
   let origo_secrets = OrigoSecrets::from_wire_bytes(&secret_bytes);
@@ -174,14 +175,12 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   // dbg!(parsed_transcript);
 
   // TODO apply manifest to parsed_transcript
+  // TODO(piot-roslaniec): So, do what exactly?
 
   // send TeeProof to client
-  let tee_proof = TeeProof {
-    data:      TeeProofData { manifest_hash: "todo".to_string() },
-    signature: "sign(hash(TeeProofData))".to_string(),
-  };
+  let tee_proof = TeeProof::from_manifest(&manifest);
   let tee_proof_bytes = tee_proof.to_write_bytes();
-  tee_tls_stream.write_all(&tee_proof_bytes).await.unwrap();
+  tee_tls_stream.write_all(&tee_proof_bytes).await?;
 
   Ok(())
 }

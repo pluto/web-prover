@@ -32,6 +32,7 @@ use ff::Field;
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use tiny_keccak::{Hasher, Keccak};
 use tls_client2::CipherSuiteKey;
 use tracing::debug;
 use web_proof_circuits_witness_generator::{
@@ -135,6 +136,18 @@ impl Manifest {
   ///
   /// Doesn't expect a "wire" header.
   fn from_bytes(bytes: &[u8]) -> Manifest { serde_json::from_slice(bytes).unwrap() }
+
+  /// Compute a `Keccak256` hash of the serialized Manifest
+  pub fn to_keccak_digest(&self) -> [u8; 32] {
+    let bytes = self.to_bytes();
+    let mut hasher = Keccak::v256();
+    let mut output = [0u8; 32];
+
+    hasher.update(&bytes);
+    hasher.finalize(&mut output);
+
+    output
+  }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

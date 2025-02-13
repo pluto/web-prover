@@ -574,7 +574,7 @@ fn handle_application_data(
     payload: tls_client2::tls_core::msgs::base::Payload(record),
   };
 
-  return trial_decrypt(msg, decrypters);
+  trial_decrypt(msg, decrypters)
 }
 
 use tls_client2::Decrypter;

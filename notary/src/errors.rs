@@ -3,6 +3,7 @@ use axum::{
   response::{IntoResponse, Response},
 };
 use eyre::Report;
+use proofs::errors::ProofError;
 use thiserror::Error;
 use tlsn_verifier::tls::{VerifierConfigBuilderError, VerifierError};
 use tracing::error;
@@ -81,6 +82,9 @@ pub enum NotaryServerError {
 
   #[error("Error occurred from reasing server config: {0}")]
   ServerConfigError(String),
+
+  #[error(transparent)]
+  ProofError(#[from] ProofError),
 }
 
 impl From<VerifierError> for NotaryServerError {
