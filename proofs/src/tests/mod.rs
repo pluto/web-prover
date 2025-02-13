@@ -5,15 +5,17 @@
 
 use std::sync::Arc;
 
+use circuits::{
+  HTTP_VERIFICATION_512B_GRAPH, HTTP_VERIFICATION_512B_R1CS, JSON_EXTRACTION_512B_GRAPH,
+  JSON_EXTRACTION_512B_R1CS, MAX_STACK_HEIGHT, PLAINTEXT_AUTHENTICATION_512B_GRAPH,
+  PLAINTEXT_AUTHENTICATION_512B_R1CS,
+};
 use client_side_prover::supernova::RecursiveSNARK;
 use inputs::{
   complex_manifest, complex_request_inputs, complex_response_inputs, simple_request_inputs,
   simple_response_inputs, TEST_MANIFEST,
 };
-use web_proof_circuits_witness_generator::{
-  http::{compute_http_witness, HttpMaskType},
-  polynomial_digest,
-};
+use web_proof_circuits_witness_generator::polynomial_digest;
 
 use super::*;
 use crate::program::{
@@ -24,79 +26,51 @@ use crate::program::{
 pub(crate) mod inputs;
 mod witnesscalc;
 
-const MAX_ROM_LENGTH: usize = 100;
-const MAX_STACK_HEIGHT: usize = 10;
+#[allow(unused)]
+pub const CIRCUIT_SIZE_256: usize = 256;
 
-// Circuit 0
-const PLAINTEXT_AUTHENTICATION_256B_R1CS: &[u8] = include_bytes!(concat!(
+#[allow(unused)]
+#[cfg(not(target_arch = "wasm32"))]
+pub const PROVING_PARAMS_BYTES_256: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-256b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/serialized_setup_256b_rom_length_100.bin"
+));
+
+pub const PLAINTEXT_AUTHENTICATION_256B_R1CS: &[u8] = include_bytes!(concat!(
   "../../web_proof_circuits/circom-artifacts-256b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/plaintext_authentication_256b.r1cs"
 ));
-const PLAINTEXT_AUTHENTICATION_256B_GRAPH: &[u8] = include_bytes!(concat!(
+pub const PLAINTEXT_AUTHENTICATION_256B_GRAPH: &[u8] = include_bytes!(concat!(
   "../../web_proof_circuits/circom-artifacts-256b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/plaintext_authentication_256b.bin"
 ));
-
 // Circuit 1
-const HTTP_VERIFICATION_256B_R1CS: &[u8] = include_bytes!(concat!(
+pub const HTTP_VERIFICATION_256B_R1CS: &[u8] = include_bytes!(concat!(
   "../../web_proof_circuits/circom-artifacts-256b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/http_verification_256b.r1cs"
 ));
-const HTTP_VERIFICATION_256B_GRAPH: &[u8] = include_bytes!(concat!(
+pub const HTTP_VERIFICATION_256B_GRAPH: &[u8] = include_bytes!(concat!(
   "../../web_proof_circuits/circom-artifacts-256b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/http_verification_256b.bin"
 ));
-
 // Circuit 2
-const JSON_EXTRACTION_256B_R1CS: &[u8] = include_bytes!(concat!(
+pub const JSON_EXTRACTION_256B_R1CS: &[u8] = include_bytes!(concat!(
   "../../web_proof_circuits/circom-artifacts-256b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/json_extraction_256b.r1cs"
 ));
-const JSON_EXTRACTION_256B_GRAPH: &[u8] = include_bytes!(concat!(
+pub const JSON_EXTRACTION_256B_GRAPH: &[u8] = include_bytes!(concat!(
   "../../web_proof_circuits/circom-artifacts-256b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/json_extraction_256b.bin"
 ));
 
-const PLAINTEXT_AUTHENTICATION_512B_R1CS: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-512b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/plaintext_authentication_512b.r1cs"
-));
-const PLAINTEXT_AUTHENTICATION_512B_GRAPH: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-512b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/plaintext_authentication_512b.bin"
-));
-
-// Circuit 1
-const HTTP_VERIFICATION_512B_R1CS: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-512b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/http_verification_512b.r1cs"
-));
-const HTTP_VERIFICATION_512B_GRAPH: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-512b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/http_verification_512b.bin"
-));
-
-// Circuit 2
-const JSON_EXTRACTION_512B_R1CS: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-512b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/json_extraction_512b.r1cs"
-));
-const JSON_EXTRACTION_512B_GRAPH: &[u8] = include_bytes!(concat!(
-  "../../web_proof_circuits/circom-artifacts-512b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/json_extraction_512b.bin"
-));
+const MAX_ROM_LENGTH: usize = 100;
 
 #[allow(dead_code)]
 fn wasm_witness_generator_type_512b() -> [WitnessGeneratorType; 3] {
@@ -258,11 +232,6 @@ async fn test_end_to_end_proofs_post() {
 
   debug!("Creating ROM");
 
-  let request_combined = request_inputs.plaintext.iter().fold(vec![], |mut acc, x| {
-    acc.extend(x.clone());
-    acc
-  });
-
   let InitialNIVCInputs { ciphertext_digest, .. } = manifest
     .initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE>(
       &request_inputs.ciphertext,
@@ -272,12 +241,8 @@ async fn test_end_to_end_proofs_post() {
 
   let NIVCRom { circuit_data, rom } =
     manifest.build_rom::<CIRCUIT_SIZE>(&request_inputs, &response_inputs);
-  let NivcCircuitInputs { mut initial_nivc_input, fold_inputs: _, private_inputs } =
+  let NivcCircuitInputs { initial_nivc_input, fold_inputs: _, private_inputs } =
     manifest.build_inputs::<CIRCUIT_SIZE>(&request_inputs, &response_inputs).unwrap();
-
-  let request_body = compute_http_witness(&request_combined, HttpMaskType::Body);
-  let request_body_digest = polynomial_digest(&request_body, ciphertext_digest, 0);
-  initial_nivc_input[0] -= request_body_digest; // TODO: this is actually incorrect because we don't have json verification for request
 
   debug!("rom: {:?}", rom);
   debug!("inputs: {:?}", private_inputs.len());

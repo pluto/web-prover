@@ -3,8 +3,6 @@ use std::fs;
 use clap::Parser;
 use serde::Deserialize;
 
-use crate::errors::NotaryServerError;
-
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {

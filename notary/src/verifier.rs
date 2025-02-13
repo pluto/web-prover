@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
 use proofs::{
   circuits::{construct_setup_data, PROVING_PARAMS_512},
-  program::data::{CircuitData, Offline, Online, ProofParams, SetupParams},
+  program::data::{CircuitData, Offline, Online, SetupParams},
   E1, F, G1, G2, S1, S2,
 };
 use tracing::debug;

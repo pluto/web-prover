@@ -687,7 +687,7 @@ fn process_handshake(message: PlainMessage) -> Vec<WrappedPayload> {
     handshake_messages.push(WrappedPayload::Decrypted(msg));
   }
 
-  return handshake_messages;
+  handshake_messages
 }
 
 /// Shared helper functions for TLS message processing
