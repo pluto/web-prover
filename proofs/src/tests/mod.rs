@@ -6,11 +6,9 @@
 use std::sync::Arc;
 
 use circuits::{
-  HTTP_VERIFICATION_256B_GRAPH, HTTP_VERIFICATION_256B_R1CS, HTTP_VERIFICATION_512B_GRAPH,
-  HTTP_VERIFICATION_512B_R1CS, JSON_EXTRACTION_256B_GRAPH, JSON_EXTRACTION_256B_R1CS,
-  JSON_EXTRACTION_512B_GRAPH, JSON_EXTRACTION_512B_R1CS, MAX_STACK_HEIGHT,
-  PLAINTEXT_AUTHENTICATION_256B_GRAPH, PLAINTEXT_AUTHENTICATION_256B_R1CS,
-  PLAINTEXT_AUTHENTICATION_512B_GRAPH, PLAINTEXT_AUTHENTICATION_512B_R1CS,
+  HTTP_VERIFICATION_512B_GRAPH, HTTP_VERIFICATION_512B_R1CS, JSON_EXTRACTION_512B_GRAPH,
+  JSON_EXTRACTION_512B_R1CS, MAX_STACK_HEIGHT, PLAINTEXT_AUTHENTICATION_512B_GRAPH,
+  PLAINTEXT_AUTHENTICATION_512B_R1CS,
 };
 use client_side_prover::supernova::RecursiveSNARK;
 use inputs::{
@@ -27,6 +25,50 @@ use crate::program::{
 };
 pub(crate) mod inputs;
 mod witnesscalc;
+
+#[allow(unused)]
+pub const CIRCUIT_SIZE_256: usize = 256;
+
+#[allow(unused)]
+#[cfg(not(target_arch = "wasm32"))]
+pub const PROVING_PARAMS_BYTES_256: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-256b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/serialized_setup_256b_rom_length_100.bin"
+));
+
+pub const PLAINTEXT_AUTHENTICATION_256B_R1CS: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-256b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/plaintext_authentication_256b.r1cs"
+));
+pub const PLAINTEXT_AUTHENTICATION_256B_GRAPH: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-256b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/plaintext_authentication_256b.bin"
+));
+// Circuit 1
+pub const HTTP_VERIFICATION_256B_R1CS: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-256b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/http_verification_256b.r1cs"
+));
+pub const HTTP_VERIFICATION_256B_GRAPH: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-256b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/http_verification_256b.bin"
+));
+// Circuit 2
+pub const JSON_EXTRACTION_256B_R1CS: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-256b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/json_extraction_256b.r1cs"
+));
+pub const JSON_EXTRACTION_256B_GRAPH: &[u8] = include_bytes!(concat!(
+  "../../web_proof_circuits/circom-artifacts-256b-v",
+  env!("WEB_PROVER_CIRCUITS_VERSION"),
+  "/json_extraction_256b.bin"
+));
 
 const MAX_ROM_LENGTH: usize = 100;
 

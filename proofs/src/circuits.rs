@@ -11,7 +11,6 @@ use crate::{
 // -------------------------------------- circuits -------------------------------------- //
 pub const MAX_ROM_LENGTH: usize = 100;
 pub const CIRCUIT_SIZE_512: usize = 512;
-pub const CIRCUIT_SIZE_256: usize = 256;
 pub const PUBLIC_IO_VARS: usize = 11;
 pub const MAX_STACK_HEIGHT: usize = 12;
 
@@ -25,17 +24,6 @@ pub const PROVING_PARAMS_BYTES_512: &[u8] = include_bytes!(concat!(
   "../../proofs/web_proof_circuits/circom-artifacts-512b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/serialized_setup_512b_rom_length_100.bin"
-));
-pub const PROVING_PARAMS_256: &str = concat!(
-  "proofs/web_proof_circuits/circom-artifacts-256b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/serialized_setup_256b_rom_length_100.bin"
-);
-#[cfg(not(target_arch = "wasm32"))]
-pub const PROVING_PARAMS_BYTES_256: &[u8] = include_bytes!(concat!(
-  "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/serialized_setup_256b_rom_length_100.bin"
 ));
 
 // -------------------------------------- 512B circuits -------------------------------------- //
@@ -73,39 +61,6 @@ pub const JSON_EXTRACTION_512B_GRAPH: &[u8] = include_bytes!(concat!(
   "/json_extraction_512b.bin"
 ));
 
-pub const PLAINTEXT_AUTHENTICATION_256B_R1CS: &[u8] = include_bytes!(concat!(
-  "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/plaintext_authentication_256b.r1cs"
-));
-pub const PLAINTEXT_AUTHENTICATION_256B_GRAPH: &[u8] = include_bytes!(concat!(
-  "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/plaintext_authentication_256b.bin"
-));
-// Circuit 1
-pub const HTTP_VERIFICATION_256B_R1CS: &[u8] = include_bytes!(concat!(
-  "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/http_verification_256b.r1cs"
-));
-pub const HTTP_VERIFICATION_256B_GRAPH: &[u8] = include_bytes!(concat!(
-  "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/http_verification_256b.bin"
-));
-// Circuit 2
-pub const JSON_EXTRACTION_256B_R1CS: &[u8] = include_bytes!(concat!(
-  "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/json_extraction_256b.r1cs"
-));
-pub const JSON_EXTRACTION_256B_GRAPH: &[u8] = include_bytes!(concat!(
-  "../../proofs/web_proof_circuits/circom-artifacts-256b-v",
-  env!("WEB_PROVER_CIRCUITS_VERSION"),
-  "/json_extraction_256b.bin"
-));
-
 #[allow(dead_code)]
 fn wasm_witness_generator_type_512b() -> [WitnessGeneratorType; 3] {
   [
@@ -134,11 +89,6 @@ fn wasm_witness_generator_type_512b() -> [WitnessGeneratorType; 3] {
 }
 pub fn construct_setup_data<const CIRCUIT_SIZE: usize>() -> Result<UninitializedSetup, ProofError> {
   let r1cs_types = match CIRCUIT_SIZE {
-    CIRCUIT_SIZE_256 => vec![
-      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_256B_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_VERIFICATION_256B_R1CS.to_vec()),
-      R1CSType::Raw(JSON_EXTRACTION_256B_R1CS.to_vec()),
-    ],
     CIRCUIT_SIZE_512 => vec![
       R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
       R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
@@ -150,11 +100,6 @@ pub fn construct_setup_data<const CIRCUIT_SIZE: usize>() -> Result<Uninitialized
   #[cfg(not(target_arch = "wasm32"))]
   {
     let witness_generator_types = match CIRCUIT_SIZE {
-      CIRCUIT_SIZE_256 => vec![
-        WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_256B_GRAPH.to_vec()),
-        WitnessGeneratorType::Raw(HTTP_VERIFICATION_256B_GRAPH.to_vec()),
-        WitnessGeneratorType::Raw(JSON_EXTRACTION_256B_GRAPH.to_vec()),
-      ],
       CIRCUIT_SIZE_512 => vec![
         WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_512B_GRAPH.to_vec()),
         WitnessGeneratorType::Raw(HTTP_VERIFICATION_512B_GRAPH.to_vec()),
