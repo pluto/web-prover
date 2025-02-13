@@ -167,9 +167,6 @@ async fn handle_tee_mode(
 
   let (_, mut reunited_socket) = tls_receiver.await.unwrap().unwrap();
 
-  // let mut client_socket = connection_receiver.await.unwrap()?.io.into_inner();
-  // client_socket.close().await.unwrap();
-
   let manifest_bytes = config.proving.manifest.unwrap().to_wire_bytes();
   reunited_socket.write_all(&manifest_bytes).await?;
 
@@ -178,6 +175,10 @@ async fn handle_tee_mode(
 
   let tee_proof_bytes = crate::origo::read_wire_struct(&mut reunited_socket).await;
   let tee_proof = TeeProof::from_wire_bytes(&tee_proof_bytes);
+
+  // TODO something will be dropped here. if it's dropped, it closes ...
+  // let mut client_socket = connection_receiver.await.unwrap()?.io.into_inner();
+  // client_socket.close().await.unwrap();
 
   Ok((origo_conn, tee_proof))
 }
