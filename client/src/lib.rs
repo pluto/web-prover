@@ -14,11 +14,8 @@ mod tls;
 pub mod tls_client_async2;
 use std::collections::HashMap;
 
-use proofs::{
-  errors::ProofError,
-  program::manifest::{Manifest, NIVCRom},
-  proof::FoldingProof,
-};
+use origo::{SignedVerificationReply, VerifyReply};
+use proofs::{errors::ProofError, program::manifest::NIVCRom, proof::FoldingProof};
 use serde::{Deserialize, Serialize};
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
@@ -31,7 +28,7 @@ pub struct OrigoProof {
   pub proof:             FoldingProof<Vec<u8>, String>,
   pub rom:               NIVCRom,
   pub ciphertext_digest: [u8; 32],
-  pub sign_reply:        Option<SignReply>,
+  pub sign_reply:        Option<SignedVerificationReply>,
   pub value:             Option<String>,
 }
 

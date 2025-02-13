@@ -37,7 +37,7 @@ pub struct SignBody {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SignReply {
+pub struct SignedVerificationReply {
   pub digest:      String,
   pub signature:   String,
   pub signature_r: String,
@@ -100,7 +100,7 @@ pub async fn sign(
 pub async fn verify(
   config: crate::config::Config,
   verify_body: VerifyBody,
-) -> Result<SignReply, crate::errors::ClientErrors> {
+) -> Result<SignedVerificationReply, crate::errors::ClientErrors> {
   let url = format!(
     "https://{}:{}/v1/origo/verify",
     config.notary_host.clone(),
@@ -123,7 +123,7 @@ pub async fn verify(
 
   let response = client.post(url).json(&verify_body).send().await?;
   assert!(response.status() == hyper::StatusCode::OK, "response={:?}", response);
-  let verify_response = response.json::<SignReply>().await?;
+  let verify_response = response.json::<SignedVerificationReply>().await?;
 
   debug!("\n{:?}\n\n", verify_response.clone());
 

@@ -6,7 +6,7 @@ use axum::{
   response::Response,
   Json,
 };
-use client::origo::{SignBody, SignReply, VerifyBody, VerifyReply};
+use client::origo::{SignBody, SignedVerificationReply, VerifyBody, VerifyReply};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use proofs::{
@@ -151,6 +151,49 @@ pub async fn sign(
   Ok(Json(response))
 }
 
+pub fn sign_verification(
+  query: VerifyReply,
+  State(state): State<Arc<SharedState>>,
+) -> Result<Json<SignedVerificationReply>, ProxyError> {
+  // TODO check OSCP and CT (maybe)
+  // TODO check target_name matches SNI and/or cert name (let's discuss)
+  let bytes = [query.value.as_bytes(), serde_json::to_string(&query.manifest)?.as_bytes()].concat();
+
+  // need secp256k1 here for Solidity
+  let (signature, recover_id) =
+    state.origo_signing_key.clone().sign_prehash_recoverable(&bytes).unwrap();
+
+  let signer_address =
+    alloy_primitives::Address::from_public_key(state.origo_signing_key.verifying_key());
+
+  let verifying_key =
+    k256::ecdsa::VerifyingKey::recover_from_prehash(&bytes.clone(), &signature, recover_id)
+      .unwrap();
+
+  assert_eq!(state.origo_signing_key.verifying_key(), &verifying_key);
+
+  // TODO is this right? we need lower form S for sure though
+  let s = if signature.normalize_s().is_some() {
+    hex::encode(signature.normalize_s().unwrap().to_bytes())
+  } else {
+    hex::encode(signature.s().to_bytes())
+  };
+
+  let response = SignedVerificationReply {
+    digest:      "0x".to_string() + &hex::encode(bytes),
+    signature:   "0x".to_string() + &hex::encode(signature.to_der().as_bytes()),
+    signature_r: "0x".to_string() + &hex::encode(signature.r().to_bytes()),
+    signature_s: "0x".to_string() + &s,
+
+    // the good old +27
+    // https://docs.openzeppelin.com/contracts/4.x/api/utils#ECDSA-tryRecover-bytes32-bytes-
+    signature_v: recover_id.to_byte() + 27,
+    signer:      "0x".to_string() + &hex::encode(signer_address),
+  };
+
+  Ok(Json(response))
+}
+
 #[derive(Clone)]
 struct KeccakHasher;
 
@@ -254,7 +297,7 @@ fn find_ciphertext_permutation<const CIRCUIT_SIZE: usize>(
 pub async fn verify(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<VerifyBody>,
-) -> Result<Json<SignReply>, ProxyError> {
+) -> Result<Json<SignedVerificationReply>, ProxyError> {
   let proof = FoldingProof {
     proof:           payload.origo_proof.proof.proof.clone(),
     verifier_digest: payload.origo_proof.proof.verifier_digest.clone(),
@@ -336,7 +379,7 @@ pub async fn verify(
     },
   };
 
-  sign(verify_output, State(state))
+  sign_verification(verify_output, State(state))
 }
 
 pub async fn websocket_notarize(
