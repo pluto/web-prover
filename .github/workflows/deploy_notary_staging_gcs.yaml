@@ -23,10 +23,6 @@ jobs:
           name: "notary.linux.amd64"
           path: .github/workflows/staging-deploy-gcs
 
-      - name: debug
-        run: | 
-          ls -la .github/workflows/staging-deploy-gcs
-
       - name: Fetch web-prover-circuits cache
         uses: actions/cache/restore@v4
         with:
