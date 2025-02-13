@@ -56,7 +56,7 @@ jobs:
         run: |
           INSTANCE=notary-${{ github.sha }}
           PROJECT=web-prover-staging-65d502
-          SERVICE_ACCOUNT=900397190789-compute@developer.gserviceaccount.com
+          SERVICE_ACCOUNT=683425918315-compute@developer.gserviceaccount.com
           MACHINE=c3-standard-4
           DOCKER_IMAGE=us-central1-docker.pkg.dev/$PROJECT/notary/notary:${{ github.sha }}
 
