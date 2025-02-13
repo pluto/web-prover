@@ -3,6 +3,7 @@ use std::io::Cursor;
 use k256::elliptic_curve::Field;
 use nom::{bytes::streaming::take, IResult};
 use proofs::{circuits::CIRCUIT_SIZE_512, F, G1};
+use rustls::crypto::cipher;
 use tls_client2::{
   hash_hs::HandshakeHashBuffer,
   internal::msgs::hsjoiner::HandshakeJoiner,
