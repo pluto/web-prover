@@ -88,5 +88,5 @@ panic        ="abort"
 strip        =true
 debug        =true    # Propagate more information up through FFI
 
-[patch."https://github.com/pluto/web-prover-circuits"]
-web-proof-circuits-witness-generator={ path="../web-prover-circuits/witness-generator" }
+# [patch."https://github.com/pluto/web-prover-circuits"]
+# web-proof-circuits-witness-generator={ path="../web-prover-circuits/witness-generator" }
