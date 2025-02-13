@@ -310,14 +310,23 @@ pub async fn verify(
       // TODO: I think that `output[10] == ciphertext_digest` should also check? But I'm not 100%
       // sure. Right now it doesn't and that's probably because we have the split up request and
       // response.
-      if output[5] == F::<G1>::from(0) && output[8] == F::<G1>::from(0) {
+      if output[5] == F::<G1>::from(0)
+        && output[8] == F::<G1>::from(0)
+        && output[0]
+          == polynomial_digest(
+            &payload.origo_proof.value.clone().unwrap().as_bytes(),
+            ciphertext_digest,
+            0,
+          )
+      {
         // TODO: add the manifest digest?
         debug!("output from verifier: {output:?}");
-        debug!(
-          "polynomial_digest of value: {:?}",
-          polynomial_digest(b"world", ciphertext_digest, 0)
-        );
-        return Ok(Json(VerifyReply { value_hash: output[0], ciphertext_digest }));
+        // TODO: This unwrap should be safe for now as the value will always be present at this
+        // point
+        return Ok(Json(VerifyReply {
+          value:    payload.origo_proof.value.unwrap(),
+          manifest: payload.manifest,
+        }));
       } else {
         // TODO (autoparallel): May want richer error content here to say what was wrong.
         return Err(ProofError::VerifyFailed().into());

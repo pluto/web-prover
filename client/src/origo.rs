@@ -43,17 +43,12 @@ pub struct VerifyBody {
   pub manifest:    Manifest,
 }
 
-// TODO: need a signature over these two values at least, from there someone can show they had the
-// right value
+// TODO: Okay, right now we just want to take what's in here and actually just produce a signature
+// as the reply instead. So pretend this is signed content for now and not actual raw values.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VerifyReply {
-  // TODO: manifest in here?
-  pub value_hash:        F<G1>,
-  pub ciphertext_digest: F<G1>,
-  // value = b"Taylor Swift";
-  // [84,97,121,108,111,114,32,83,119,105,102,116]
-  // bn254 scalar field prime
-  // value[0] * 1 + value[1] * ciphertext_digest + value[2] * ciphertext_digest.pow(2) + ...
+  pub value:    String,
+  pub manifest: Manifest,
 }
 
 pub async fn sign(
