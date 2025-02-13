@@ -6,7 +6,7 @@ use axum::{
   response::Response,
   Json,
 };
-use client::origo::{SignBody, VerifyBody, VerifyReply};
+use client::origo::{SignBody, SignReply, VerifyBody, VerifyReply};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use proofs::{
@@ -254,7 +254,7 @@ fn find_ciphertext_permutation<const CIRCUIT_SIZE: usize>(
 pub async fn verify(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<VerifyBody>,
-) -> Result<Json<VerifyReply>, ProxyError> {
+) -> Result<Json<SignReply>, ProxyError> {
   let proof = FoldingProof {
     proof:           payload.origo_proof.proof.proof.clone(),
     verifier_digest: payload.origo_proof.proof.verifier_digest.clone(),
@@ -299,8 +299,7 @@ pub async fn verify(
   )?;
   let z0_secondary = vec![F::<G2>::from(0)];
 
-  // TODO: Think we're failing here due to invalid z0_primary
-  match proof.proof.verify(
+  let verify_output = match proof.proof.verify(
     &verifier.setup_params.public_params,
     &verifier.verifier_key,
     &z0_primary,
@@ -310,6 +309,8 @@ pub async fn verify(
       // TODO: I think that `output[10] == ciphertext_digest` should also check? But I'm not 100%
       // sure. Right now it doesn't and that's probably because we have the split up request and
       // response.
+      // TODO: We should also check that the full extended ROM was correct? Although maybe that's
+      // implicit in this.
       if output[5] == F::<G1>::from(0)
         && output[8] == F::<G1>::from(0)
         && output[0]
@@ -323,10 +324,7 @@ pub async fn verify(
         debug!("output from verifier: {output:?}");
         // TODO: This unwrap should be safe for now as the value will always be present at this
         // point
-        return Ok(Json(VerifyReply {
-          value:    payload.origo_proof.value.unwrap(),
-          manifest: payload.manifest,
-        }));
+        VerifyReply { value: payload.origo_proof.value.unwrap(), manifest: payload.manifest }
       } else {
         // TODO (autoparallel): May want richer error content here to say what was wrong.
         return Err(ProofError::VerifyFailed().into());
@@ -337,6 +335,8 @@ pub async fn verify(
       return Err(ProofError::SuperNova(e).into());
     },
   };
+
+  sign(verify_output, State(state))
 }
 
 pub async fn websocket_notarize(

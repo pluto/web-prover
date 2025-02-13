@@ -36,6 +36,16 @@ pub struct SignBody {
   pub handshake_server_key: String,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct SignReply {
+  pub digest:      String,
+  pub signature:   String,
+  pub signature_r: String,
+  pub signature_s: String,
+  pub signature_v: u8,
+  pub signer:      String,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VerifyBody {
   pub session_id:  String,
@@ -90,7 +100,7 @@ pub async fn sign(
 pub async fn verify(
   config: crate::config::Config,
   verify_body: VerifyBody,
-) -> Result<VerifyReply, crate::errors::ClientErrors> {
+) -> Result<SignReply, crate::errors::ClientErrors> {
   let url = format!(
     "https://{}:{}/v1/origo/verify",
     config.notary_host.clone(),
@@ -113,13 +123,14 @@ pub async fn verify(
 
   let response = client.post(url).json(&verify_body).send().await?;
   assert!(response.status() == hyper::StatusCode::OK, "response={:?}", response);
-  let verify_response = response.json::<VerifyReply>().await?;
+  let verify_response = response.json::<SignReply>().await?;
 
   debug!("\n{:?}\n\n", verify_response.clone());
 
   Ok(verify_response)
 }
 
+// TODO: We probably don't need to call this "proxy_and_sign" since we don't sign in here
 pub(crate) async fn proxy_and_sign_and_generate_proof(
   config: config::Config,
   proving_params: Option<Vec<u8>>,

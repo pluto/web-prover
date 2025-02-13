@@ -41,6 +41,9 @@ pub enum ProxyError {
 
   #[error(transparent)]
   ProofError(#[from] proofs::errors::ProofError),
+
+  #[error(transparent)]
+  SerdeJsonError(#[from] serde_json::Error),
 }
 
 impl IntoResponse for ProxyError {

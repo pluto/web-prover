@@ -66,7 +66,7 @@ pub async fn construct_program_data_and_proof<const CIRCUIT_SIZE: usize>(
     proof,
     rom: NIVCRom { circuit_data, rom },
     ciphertext_digest: initial_nivc_input[0].to_bytes(),
-    verify_reply: None,
+    sign_reply: None,
     value: None,
   })
 }

@@ -26,16 +26,12 @@ use tracing::{debug, info};
 
 use crate::errors::ClientErrors;
 
-// TODO: We should put the following in here:
-// - Value that was to be found in the JSON
-// - Hash of manifest, maybe?
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct OrigoProof {
   pub proof:             FoldingProof<Vec<u8>, String>,
   pub rom:               NIVCRom,
   pub ciphertext_digest: [u8; 32],
-  // TODO: This likely doesn't need to be an option, but this makes it so I can set it later.
-  pub verify_reply:      Option<VerifyReply>,
+  pub sign_reply:        Option<SignReply>,
   pub value:             Option<String>,
 }
 
@@ -116,9 +112,9 @@ pub async fn prover_inner_origo(
   // Note: The above `?` will push out the `ProofError::VerifyFailed` from the `origo::verify`
   // method now. We no longer return an inner bool here, we just use the Result enum itself
 
-  proof.verify_reply = Some(verify_response);
+  proof.sign_reply = Some(verify_response);
 
-  debug!("proof.value: {:?}\nproof.verify_reply: {:?}", proof.value, proof.verify_reply);
+  debug!("proof.value: {:?}\nproof.verify_reply: {:?}", proof.value, proof.sign_reply);
 
   // TODO: This is where we should output richer proof data, the verikfy response has the hash of
   // the target value now. Since this is in the client, we can use the private variables here. We
