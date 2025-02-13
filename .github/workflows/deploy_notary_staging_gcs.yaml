@@ -52,7 +52,7 @@ jobs:
         run: |
           PROJECT=web-prover-staging-65d502
           gcloud auth configure-docker us-central1-docker.pkg.dev
-          gcloud push us-central1-docker.pkg.dev/$PROJECT/notary/notary:${{ github.sha }}
+          docker push us-central1-docker.pkg.dev/$PROJECT/notary/notary:${{ github.sha }}
 
       - name: Boot Notary TEE instance
         run: |
