@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use axum::{
   extract,
@@ -91,6 +91,29 @@ pub async fn tcp_notarize(
   }
 }
 
+#[cfg(feature = "tee-dummy-token-generator")]
+static TEE_TLS_ACCEPTOR_LOCK: OnceLock<TeeTlsAcceptor<DummyTokenGenerator>> = OnceLock::new();
+
+#[cfg(feature = "tee-dummy-token-generator")]
+fn tee_tls_acceptor() -> &'static TeeTlsAcceptor<DummyTokenGenerator> {
+  TEE_TLS_ACCEPTOR_LOCK.get_or_init(|| {
+    let token_generator = DummyTokenGenerator { token: "dummy".to_string() };
+    TeeTlsAcceptor::new_with_ephemeral_cert(token_generator, "example.com") // TODO example.com
+  })
+}
+
+#[cfg(feature = "tee-google-confidential-space-token-generator")]
+static TEE_TLS_ACCEPTOR_LOCK: OnceLock<TeeTlsAcceptor<GoogleConfidentialSpaceTokenGenerator>> =
+  OnceLock::new();
+
+#[cfg(feature = "tee-google-confidential-space-token-generator")]
+fn tee_tls_acceptor() -> &'static TeeTlsAcceptor<GoogleConfidentialSpaceTokenGenerator> {
+  TEE_TLS_ACCEPTOR_LOCK.get_or_init(|| {
+    let token_generator = GoogleConfidentialSpaceTokenGenerator { token: "dummy".to_string() };
+    TeeTlsAcceptor::new_with_ephemeral_cert(token_generator, "example.com") // TODO example.com
+  })
+}
+
 pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   socket: S,
   session_id: &str,
@@ -98,13 +121,7 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   target_port: u16,
   state: Arc<SharedState>,
 ) -> Result<(), NotaryServerError> {
-  #[cfg(feature = "tee-google-confidential-space-token-generator")]
-  let token_generator = GoogleConfidentialSpaceTokenGenerator::new("audience");
-
-  #[cfg(feature = "tee-dummy-token-generator")]
-  let token_generator = DummyTokenGenerator { token: "dummy".to_string() };
-
-  let tee_tls_acceptor = TeeTlsAcceptor::new_with_ephemeral_cert(token_generator, "example.com"); // TODO example.com
+  let tee_tls_acceptor = tee_tls_acceptor();
   let mut tee_tls_stream = tee_tls_acceptor.accept(socket).await?;
   proxy_service(&mut tee_tls_stream, session_id, target_host, target_port, state.clone()).await?;
 
