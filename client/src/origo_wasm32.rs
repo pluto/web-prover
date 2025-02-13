@@ -6,7 +6,10 @@ use std::{
   task::{Context, Poll},
 };
 
+#[cfg(feature = "tee-dummy-token-verifier")]
+use caratls_ekm_client::DummyTokenVerifier;
 use caratls_ekm_client::TeeTlsConnector;
+#[cfg(feature = "tee-google-confidential-space-token-verifier")]
 use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
 use futures::{channel::oneshot, AsyncWriteExt};
 use hyper::StatusCode;
@@ -16,17 +19,20 @@ use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
 
 use crate::{
-  config, config::NotaryMode, errors, errors::ClientErrors, tls_client_async2::bind_client,
+  config, config::NotaryMode, errors, errors::ClientErrors, origo::OrigoSecrets,
+  tls_client_async2::bind_client, TeeProof,
 };
 
 pub(crate) async fn proxy(
   config: config::Config,
   session_id: String,
-) -> Result<tls_client2::origo::OrigoConnection, errors::ClientErrors> {
+) -> Result<(tls_client2::origo::OrigoConnection, Option<TeeProof>), errors::ClientErrors> {
   if config.mode == NotaryMode::TEE {
-    handle_tee_mode(config, session_id).await
+    let (conn, tee_proof) = handle_tee_mode(config, session_id).await?;
+    return Ok((conn, Some(tee_proof)));
   } else {
-    handle_origo_mode(config, session_id).await
+    let conn = handle_origo_mode(config, session_id).await?;
+    return Ok((conn, None));
   }
 }
 
@@ -96,7 +102,7 @@ async fn handle_origo_mode(
 async fn handle_tee_mode(
   config: config::Config,
   session_id: String,
-) -> Result<OrigoConnection, ClientErrors> {
+) -> Result<(OrigoConnection, TeeProof), ClientErrors> {
   // TODO build sanitized query
   let wss_url = format!(
     "wss://{}:{}/v1/{}?session_id={}&target_host={}&target_port={}",
@@ -125,16 +131,21 @@ async fn handle_tee_mode(
 
   let (_, ws_stream) = WsMeta::connect(wss_url.to_string(), None).await?;
 
+  #[cfg(feature = "tee-google-confidential-space-token-verifier")]
   let token_verifier = GoogleConfidentialSpaceTokenVerifier::new("audience").await; // TODO pass in as function input
+
+  #[cfg(feature = "tee-dummy-token-verifier")]
+  let token_verifier = DummyTokenVerifier { expect_token: "dummy".to_string() };
+
   let tee_tls_connector = TeeTlsConnector::new(token_verifier, "example.com"); // TODO example.com
   let tee_tls_stream = tee_tls_connector.connect(ws_stream.into_io()).await?;
-  let (mut client_tls_conn, tls_fut) = bind_client(tee_tls_stream.compat(), client);
+  let (mut client_tls_conn, client_tls_fut) = bind_client(tee_tls_stream.compat(), client);
 
   let client_tls_conn = unsafe { FuturesIo::new(client_tls_conn) };
 
-  let (tls_sender, _tls_receiver) = oneshot::channel();
+  let (tls_sender, tls_receiver) = oneshot::channel();
   spawn_local(async {
-    let result = tls_fut.await;
+    let result = client_tls_fut.await;
     let _ = tls_sender.send(result);
   });
 
@@ -152,11 +163,24 @@ async fn handle_tee_mode(
 
   assert_eq!(response.status(), StatusCode::OK);
 
-  let mut client_socket = connection_receiver.await.unwrap()?.io.into_inner();
-  client_socket.close().await.unwrap();
-
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
-  Ok(origo_conn)
+
+  let (_, mut reunited_socket) = tls_receiver.await.unwrap().unwrap();
+
+  let manifest_bytes = config.proving.manifest.unwrap().to_wire_bytes();
+  reunited_socket.write_all(&manifest_bytes).await?;
+
+  let origo_secret_bytes = OrigoSecrets::from_origo_conn(&origo_conn).to_wire_bytes();
+  reunited_socket.write_all(&origo_secret_bytes).await?;
+
+  let tee_proof_bytes = crate::origo::read_wire_struct(&mut reunited_socket).await;
+  let tee_proof = TeeProof::from_wire_bytes(&tee_proof_bytes);
+
+  // TODO something will be dropped here. if it's dropped, it closes ...
+  // let mut client_socket = connection_receiver.await.unwrap()?.io.into_inner();
+  // client_socket.close().await.unwrap();
+
+  Ok((origo_conn, tee_proof))
 }
 
 use pin_project_lite::pin_project;

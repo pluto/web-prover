@@ -20,17 +20,11 @@ use tracing::{debug, info};
 
 use crate::errors::ClientErrors;
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct OrigoProof {
-  pub proof: FoldingProof<Vec<u8>, String>,
-  pub rom:   NIVCRom,
-}
-
 #[derive(Debug, Serialize)]
 pub enum Proof {
   TLSN(Box<TlsProof>),
   Origo(OrigoProof),
-  TEE(), // TODO
+  TEE(TeeProof),
 }
 
 pub fn get_web_prover_circuits_version() -> String {
@@ -112,11 +106,61 @@ pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, error
   // TEE mode uses Origo networking stack with minimal changes
 
   #[cfg(target_arch = "wasm32")]
-  let _origo_conn = origo_wasm32::proxy(config, session_id).await?;
+  let (_origo_conn, tee_proof) = origo_wasm32::proxy(config, session_id).await?;
 
   #[cfg(not(target_arch = "wasm32"))]
-  let _origo_conn = origo_native::proxy(config, session_id).await?;
+  let (_origo_conn, tee_proof) = origo_native::proxy(config, session_id).await?;
 
-  // TODO proof
-  Ok(Proof::TEE())
+  Ok(Proof::TEE(tee_proof.unwrap()))
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct OrigoProof {
+  pub proof: FoldingProof<Vec<u8>, String>,
+  pub rom:   NIVCRom,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct TeeProof {
+  pub data:      TeeProofData,
+  pub signature: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct TeeProofData {
+  pub manifest_hash: String,
+}
+
+impl TeeProof {
+  pub fn to_write_bytes(&self) -> Vec<u8> {
+    let serialized = self.to_bytes();
+    let length = serialized.len() as u32;
+    let mut wire_data = length.to_le_bytes().to_vec();
+    wire_data.extend(serialized);
+    wire_data
+  }
+
+  pub fn from_wire_bytes(buffer: &[u8]) -> Self {
+    // Confirm the buffer is at least large enough to contain the "header"
+    if buffer.len() < 4 {
+      panic!("Unexpected buffer length: {} < 4", buffer.len());
+    }
+
+    // Extract the first 4 bytes as the length prefix
+    let length_bytes = &buffer[..4];
+    let length = u32::from_le_bytes(length_bytes.try_into().unwrap()) as usize;
+
+    // Ensure the buffer contains enough data for the length specified
+    if buffer.len() < 4 + length {
+      panic!("Unexpected buffer length: {} < {} + 4", buffer.len(), length);
+    }
+
+    // Extract the serialized data from the buffer
+    let serialized_data = &buffer[4..4 + length];
+    Self::from_bytes(serialized_data)
+  }
+
+  fn to_bytes(&self) -> Vec<u8> { serde_json::to_vec(&self).unwrap() }
+
+  fn from_bytes(bytes: &[u8]) -> TeeProof { serde_json::from_slice(&bytes).unwrap() }
 }
