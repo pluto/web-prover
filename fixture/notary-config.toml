@@ -1,4 +1,4 @@
-listen            ="0.0.0.0:7443"
+listen            ="0.0.0.0:443"
 server_cert       ="./fixture/certs/server-cert.pem"
 server_key        ="./fixture/certs/server-key.pem"
 notary_signing_key="./fixture/certs/tlsn.key"
