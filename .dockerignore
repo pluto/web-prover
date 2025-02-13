@@ -1,6 +1,2 @@
-target
-.github
 .git
-proofs/web_proof_circuits
-proofs/examples
 node_modules
