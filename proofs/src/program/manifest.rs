@@ -842,7 +842,6 @@ impl Manifest {
       ciphertext_digest,
       (Some(&[]), Some(&self.response.body.json)), // WARN: sending response keys for request
       &mut private_inputs,
-      &mut fold_inputs,
     )?;
     // debug!("private_inputs: {:?}", private_inputs.len());
 

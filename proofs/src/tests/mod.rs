@@ -86,19 +86,18 @@ fn wasm_witness_generator_type_256b() -> [WitnessGeneratorType; 3] {
 #[tokio::test]
 #[tracing_test::traced_test]
 async fn test_end_to_end_proofs_get() {
-  const CIRCUIT_SIZE: usize = 512;
+  const CIRCUIT_SIZE: usize = 256;
   let setup_data = UninitializedSetup {
     r1cs_types:              vec![
-      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
-      R1CSType::Raw(JSON_EXTRACTION_512B_R1CS.to_vec()),
+      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_256B_R1CS.to_vec()),
+      R1CSType::Raw(HTTP_VERIFICATION_256B_R1CS.to_vec()),
+      R1CSType::Raw(JSON_EXTRACTION_256B_R1CS.to_vec()),
     ],
-    witness_generator_types: wasm_witness_generator_type_512b().to_vec(),
-    // vec![
-    //   WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_512B_GRAPH.to_vec()),
-    //   WitnessGeneratorType::Raw(HTTP_VERIFICATION_512B_GRAPH.to_vec()),
-    //   WitnessGeneratorType::Raw(JSON_EXTRACTION_512B_GRAPH.to_vec()),
-    // ],
+    witness_generator_types: vec![
+      WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_256B_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(HTTP_VERIFICATION_256B_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(JSON_EXTRACTION_256B_GRAPH.to_vec()),
+    ],
     max_rom_length:          MAX_ROM_LENGTH,
   };
   debug!("Setting up `Memory`...");
