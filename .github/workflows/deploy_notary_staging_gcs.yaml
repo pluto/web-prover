@@ -1,0 +1,108 @@
+name: Deploy Notary (Staging) - Google Confidential Space
+
+on:
+  workflow_call:
+    inputs:
+      web-prover-circuits-cache-key:
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: "read"
+      id-token: "write"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download notary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: "notary.linux.amd64"
+          path: .github/workflows/staging-deploy-gcs
+
+      - name: Fetch web-prover-circuits cache
+        uses: actions/cache/restore@v4
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ inputs.web-prover-circuits-cache-key }}
+
+      - uses: "google-github-actions/auth@v2"
+        with:
+          project_id: "web-prover-staging-65d502"
+          workload_identity_provider: "projects/683425918315/locations/global/workloadIdentityPools/github/providers/web-prover-deploy-test"
+
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v2"
+        with:
+          version: ">= 506.0.0"
+
+      - name: Build Dockerfile
+        run: |
+          PROJECT=web-prover-staging-65d502
+          GIT_SHORT_HASH=$(git rev-parse --short HEAD) # is there a better way?
+          echo -e "\nacme_domain=\"${GIT_SHORT_HASH}.tee.notary.pluto.dev\"\n" >> .github/workflows/staging-deploy-gcs/notary-config.toml
+          docker build -t us-central1-docker.pkg.dev/$PROJECT/notary/notary:${{ github.sha }} -f .github/workflows/staging-deploy-gcs/Dockerfile .
+          IMAGE_ID=`docker inspect --format='{{.Id}}' us-central1-docker.pkg.dev/$PROJECT/notary/notary:${{ github.sha }}`
+          echo "::notice title=TEE_DOCKER_IMAGE_ID::$IMAGE_ID"
+
+      - name: Push Docker image
+        run: |
+          PROJECT=web-prover-staging-65d502
+          gcloud auth configure-docker us-central1-docker.pkg.dev
+          docker push us-central1-docker.pkg.dev/$PROJECT/notary/notary:${{ github.sha }}
+
+      - name: Boot Notary TEE instance
+        run: |
+          INSTANCE=tee-notary-${{ github.sha }}
+          PROJECT=web-prover-staging-65d502
+          SERVICE_ACCOUNT=683425918315-compute@developer.gserviceaccount.com
+          MACHINE=c3-standard-4
+          DOCKER_IMAGE=us-central1-docker.pkg.dev/$PROJECT/notary/notary:${{ github.sha }}
+
+          echo "Delete $INSTANCE if it exists ... (ignore errors)"
+          gcloud compute instances delete "$INSTANCE" --zone=us-central1-b --quiet --verbosity=info || true
+
+          OUT=`gcloud compute instances create --format=json \
+            $INSTANCE \
+            --machine-type $MACHINE --zone us-central1-b \
+            --confidential-compute-type=TDX \
+            --shielded-secure-boot \
+            --maintenance-policy=TERMINATE \
+            --image-family=confidential-space-debug-preview-tdx \
+            --image-project=confidential-space-images \
+            --scopes=https://www.googleapis.com/auth/cloud-platform \
+            --project=$PROJECT \
+            --service-account=$SERVICE_ACCOUNT \
+            --metadata="^~^tee-image-reference=${DOCKER_IMAGE}~tee-container-log-redirect=cloud_logging"`
+
+          EXTERNAL_IP=$(echo $OUT | jq -r '.[0].networkInterfaces[0].accessConfigs[0].natIP')
+          echo $EXTERNAL_IP
+
+          GIT_SHORT_HASH=$(git rev-parse --short HEAD) # is there a better way?
+
+          ZONE_ID=1d20e7dd6bf74aa550038d25bd4ac8b8
+          OUT=`curl -s --request POST \
+            --url https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records \
+            --header 'Content-Type: application/json' \
+            --header "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            --data "{ \
+              \"comment\": \"Staging TEE Notary $GIT_SHORT_HASH\", \
+              \"name\": \"$GIT_SHORT_HASH.tee.notary\", \
+              \"proxied\": false, \
+              \"settings\": {}, \
+              \"tags\": [], \
+              \"ttl\": 3600, \
+              \"content\": \"$EXTERNAL_IP\", \
+              \"type\": \"A\" \
+            }"`
+
+          echo $OUT
+          if [ "$(echo $OUT | jq -r .success)" != "true" ]; then
+            echo "Error: Cloudflare API call failed."
+            exit 1
+          fi
+
+          echo "::notice title=Notary_TEE_URL::https://$GIT_SHORT_HASH.tee.notary.pluto.dev/health"
