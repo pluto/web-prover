@@ -83,6 +83,7 @@ jobs:
       - test_client_wasm_origo
       - test_client_native_origo
       - test_client_native_tlsn
+      - test_client_native_tee
       - test_proofs
     uses: ./.github/workflows/release.yaml
 
@@ -94,6 +95,7 @@ jobs:
       - test_client_wasm_origo
       - test_client_native_origo
       - test_client_native_tlsn
+      - test_client_native_tee
       - test_proofs
     uses: ./.github/workflows/deploy_notary_staging.yaml
     with:
@@ -101,14 +103,15 @@ jobs:
     secrets: inherit
 
   deploy_notary_staging_gcs:
-    # if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     needs:
       - web-prover-circuits
       - build_notary
-      # - test_client_wasm_origo
-      # - test_client_native_origo
-      # - test_client_native_tlsn
-      # - test_proofs
+      - test_client_wasm_origo
+      - test_client_native_origo
+      - test_client_native_tlsn
+      - test_client_native_tee
+      - test_proofs
     uses: ./.github/workflows/deploy_notary_staging_gcs.yaml
     with:
       web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
