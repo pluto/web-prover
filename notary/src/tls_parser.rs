@@ -216,7 +216,8 @@ impl Transcript<Flattened> {
             // Encrypted handshake data immediately proceeds ServerHello, but
             // for backwards compatability with TLS 1.2 is labeled as AppData.
             if record.hdr.record_type == tls_parser::TlsRecordType::ApplicationData {
-              let decrypted_messages = handle_application_data(record.data.to_vec(), &mut decrypters)?;
+              let decrypted_messages =
+                handle_application_data(record.data.to_vec(), &mut decrypters)?;
 
               parsed_messages.extend(decrypted_messages.into_iter().map(|decrypted_message| {
                 ParsedMessage { seq, direction: m.direction, payload: decrypted_message }
@@ -616,11 +617,10 @@ fn trial_decrypt(
     .into_iter()
     .map(|(plain_message, mode)| {
       match mode {
-        KeyMode::Handshake => {
-          Some(process_handshake(plain_message))
-        },
+        KeyMode::Handshake => Some(process_handshake(plain_message)),
         KeyMode::Application => {
-          Some(vec![WrappedPayload::Decrypted(plain_message.try_into().unwrap())]) // todo: handle error
+          Some(vec![WrappedPayload::Decrypted(plain_message.try_into().unwrap())]) // todo: handle
+                                                                                   // error
         },
       }
     })
