@@ -61,7 +61,16 @@ const MAX_STACK_HEIGHT: usize = 10;
 
 /// Manifest containing [`Request`] and [`Response`]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+// #[serde(rename_all = "camelCase")]
 pub struct Manifest {
+  // /// Manifest version
+  // pub manifest_version: String,
+  // /// ID of the manifest
+  // pub id:               String,
+  // /// Title of the manifest
+  // pub title:            String,
+  // /// Description of the manifest
+  // pub description:      String,
   /// HTTP request lock items
   pub request:  Request,
   /// HTTP response lock items
@@ -69,6 +78,18 @@ pub struct Manifest {
 }
 
 impl Manifest {
+  /// Validates `Manifest` fields
+  pub fn validate(&self) -> Result<(), ProofError> {
+    // TODO: Validate manifest version, id, title, description, prepareUrl
+    self.request.validate()?;
+    self.response.validate()?;
+
+    // TODO: Do we want to run this here instead of in Request::validate in order to cross-examine
+    //  Request and Response template vars?
+    self.request.validate_vars()?;
+    Ok(())
+  }
+
   /// Serializes the `Manifest` into a length-prefixed byte array.
   pub fn to_wire_bytes(&self) -> Vec<u8> {
     let serialized = self.to_bytes();
@@ -102,14 +123,18 @@ impl Manifest {
     Self::from_bytes(serialized_data)
   }
 
-  /// Serializes the `Manifest` without any "header".
+  /// Serializes the `Manifest` to raw bytes.
+  ///
+  /// Doesn't expect a "wire" header.
   fn to_bytes(&self) -> Vec<u8> {
-    // Serializing as JSON `untagged` in `JsonKey` break bincode
+    // Serializing as JSON because `untagged` in `JsonKey` break bincode
     serde_json::to_vec(&self).unwrap()
   }
 
-  /// Deserializes a `Manifest` from raw bytes without any "header".
-  fn from_bytes(bytes: &[u8]) -> Manifest { serde_json::from_slice(&bytes).unwrap() }
+  /// Deserializes a `Manifest` from raw bytes.
+  ///
+  /// Doesn't expect a "wire" header.
+  fn from_bytes(bytes: &[u8]) -> Manifest { serde_json::from_slice(bytes).unwrap() }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -139,6 +164,102 @@ pub struct Response {
   pub body:    ResponseBody,
 }
 
+impl Response {
+  pub fn validate(&self) -> Result<(), ProofError> {
+    // TODO: What are legal statuses?
+    const VALID_STATUSES: [&str; 2] = ["200", "201"];
+    if !VALID_STATUSES.contains(&self.status.as_str()) {
+      return Err(ProofError::InvalidManifest("Unsupported HTTP status".to_string()));
+    }
+
+    // TODO: What HTTP versions are supported?
+    if self.version != "HTTP/1.1" {
+      return Err(ProofError::InvalidManifest(
+        "Invalid HTTP version: ".to_string() + &self.version,
+      ));
+    }
+
+    // TODO: What is the max supported message length?
+    // TODO: Not covered by serde's #default annotation. Is '""' a valid message?
+    if self.message.len() > 1024 || self.message.is_empty() {
+      return Err(ProofError::InvalidManifest(
+        "Invalid message length: ".to_string() + &self.message,
+      ));
+    }
+
+    // We always expect at least one header, "Content-Type"
+    if self.headers.len() > MAX_HTTP_HEADERS || self.headers.is_empty() {
+      return Err(ProofError::InvalidManifest(
+        "Invalid headers length: ".to_string() + &self.headers.len().to_string(),
+      ));
+    }
+
+    let content_type = self.headers.get("Content-Type");
+    if content_type.is_none() {
+      return Err(ProofError::InvalidManifest("Missing 'Content-Type' header".to_string()));
+    }
+    let content_type = content_type.unwrap();
+
+    const VALID_CONTENT_TYPES: [&str; 2] = ["application/json", "text/plain"];
+    let is_valid_content_type = VALID_CONTENT_TYPES.iter().any(|&legal_type| {
+      content_type == legal_type || content_type.starts_with(&format!("{};", legal_type))
+    });
+    if !is_valid_content_type {
+      return Err(ProofError::InvalidManifest(
+        "Invalid Content-Type header: ".to_string() + content_type,
+      ));
+    }
+
+    // When Content-Type is application/json, we expect at least one JSON item
+    if content_type == "application/json" && self.body.json.is_empty() {
+      return Err(ProofError::InvalidManifest("Expected at least one JSON item".to_string()));
+    }
+
+    Ok(())
+  }
+}
+
+fn extract_tokens(value: &serde_json::Value) -> Vec<String> {
+  let mut tokens = vec![];
+
+  match value {
+    serde_json::Value::String(s) => {
+      let token_regex = regex::Regex::new(r"<%\s*(\w+)\s*%>").unwrap();
+      for capture in token_regex.captures_iter(s) {
+        if let Some(token) = capture.get(1) {
+          // Extract token name
+          tokens.push(token.as_str().to_string());
+        }
+      }
+    },
+    serde_json::Value::Object(map) => {
+      // Recursively parse nested objects
+      for (_, v) in map {
+        tokens.extend(extract_tokens(v));
+      }
+    },
+    serde_json::Value::Array(arr) => {
+      // Recursively parse arrays
+      for v in arr {
+        tokens.extend(extract_tokens(v));
+      }
+    },
+    _ => {},
+  }
+
+  tokens
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TemplateVar {
+  /// Regex for validation (if applicable)
+  pub regex:  Option<String>,
+  /// Length constraint (if applicable)
+  pub length: Option<usize>,
+  // Type constraint (e.g., base64, hex)
+  pub r#type: Option<String>,
+}
+
 /// HTTP Request items required for circuits
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Request {
@@ -151,6 +272,114 @@ pub struct Request {
   pub version: String,
   /// Request headers to lock
   pub headers: HashMap<String, String>,
+  /// Request JSON body
+  pub body:    Option<serde_json::Value>,
+  /// Request JSON vars to be used in templates
+  pub vars:    HashMap<String, TemplateVar>,
+}
+
+impl Request {
+  pub fn validate(&self) -> Result<(), ProofError> {
+    // TODO: What HTTP methods are supported?
+    const ALLOWED_METHODS: [&str; 2] = ["GET", "POST"];
+    if !ALLOWED_METHODS.contains(&self.method.as_str()) {
+      return Err(ProofError::InvalidManifest("Invalid HTTP method".to_string()));
+    }
+
+    // Not a valid URL
+    if url::Url::parse(&self.url).is_err() {
+      return Err(ProofError::InvalidManifest("Invalid URL: ".to_string() + &self.url));
+    }
+
+    if !self.url.starts_with("https://") {
+      return Err(ProofError::InvalidManifest("Only HTTPS URLs are allowed".to_string()));
+    }
+
+    // TODO: What HTTP versions are supported?
+    if self.version != "HTTP/1.1" {
+      return Err(ProofError::InvalidManifest(
+        "Invalid HTTP version: ".to_string() + &self.version,
+      ));
+    }
+
+    Ok(())
+  }
+
+  fn validate_vars(&self) -> Result<(), ProofError> {
+    let mut all_tokens = vec![];
+
+    // Parse and validate tokens in the body
+    if let Some(body_tokens) = self.body.as_ref().map(extract_tokens) {
+      for token in &body_tokens {
+        if !self.vars.contains_key(token) {
+          return Err(ProofError::InvalidManifest(format!(
+            "Token `<% {} %>` not declared in `vars`",
+            token
+          )));
+        }
+      }
+      all_tokens.extend(body_tokens);
+    }
+
+    // Parse and validate tokens in headers
+    for value in self.headers.values() {
+      let header_tokens = extract_tokens(&serde_json::Value::String(value.clone()));
+      for token in &header_tokens {
+        if !self.vars.contains_key(token) {
+          return Err(ProofError::InvalidManifest(format!(
+            "Token `<% {} %>` not declared in `vars`",
+            token
+          )));
+        }
+      }
+      all_tokens.extend(header_tokens);
+    }
+
+    for var_key in self.vars.keys() {
+      if !all_tokens.contains(var_key) {
+        return Err(ProofError::InvalidManifest(format!(
+          "Token `<% {} %>` not declared in `body` or `headers`",
+          var_key
+        )));
+      }
+    }
+
+    // Validate each `vars` entry
+    for (key, var_def) in &self.vars {
+      // Validate regex (if defined)
+      if let Some(regex_pattern) = var_def.regex.as_ref() {
+        // Using `regress` crate for compatibility with ECMAScript regular expressions
+        let _regex = regress::Regex::new(regex_pattern).map_err(|_| {
+          ProofError::InvalidManifest(format!("Invalid regex pattern for `{}`", key))
+        })?;
+        // TODO: It will definitely not match it here because it's a template variable, not an
+        // actual variable TODO: How does the Manifest receiver (notary) verifies this?
+        // if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
+        //   if regex.find(value.as_str().unwrap_or("")).is_none() {
+        //     return Err(ProofError::InvalidManifest(format!(
+        //       "Value for token `<% {} %>` does not match regex",
+        //       key
+        //     )));
+        //   }
+        // }
+      }
+
+      // Validate length (if applicable)
+      if let Some(length) = var_def.length {
+        if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
+          if value.as_str().unwrap_or("").len() != length {
+            return Err(ProofError::InvalidManifest(format!(
+              "Value for token `<% {} %>` does not meet length constraint",
+              key
+            )));
+          }
+        }
+      }
+
+      // TODO: Validate the token "type" constraint
+    }
+    Ok(())
+  }
 }
 
 // TODO(Sambhav): can we remove usage of vec here?
@@ -211,7 +440,7 @@ fn to_u32_array(input: &[u8]) -> Vec<u32> {
 
   // Create a new vector with padding
   let padded_input =
-    input.iter().chain(std::iter::repeat(&0).take(padding_needed)).copied().collect::<Vec<u8>>();
+    input.iter().chain(std::iter::repeat_n(&0, padding_needed)).copied().collect::<Vec<u8>>();
 
   padded_input
     .chunks(4)
@@ -263,7 +492,6 @@ fn build_plaintext_authentication_circuit_inputs<const CIRCUIT_SIZE: usize>(
   inputs: &EncryptionInput,
   polynomial_input: F<G1>,
   private_inputs: &mut Vec<HashMap<String, Value>>,
-  _fold_inputs: &mut HashMap<String, FoldInput>,
 ) -> Result<F<G1>, ProofError> {
   let mut plaintext_step_out = F::<G1>::ZERO;
 
@@ -341,7 +569,6 @@ fn build_http_verification_circuit_inputs<const CIRCUIT_SIZE: usize>(
   polynomial_input: F<G1>,
   headers_digest: &[F<G1>],
   private_inputs: &mut Vec<HashMap<String, Value>>,
-  _fold_inputs: &mut HashMap<String, FoldInput>,
 ) -> Result<(F<G1>, Vec<u8>), ProofError> {
   // pad request plaintext and ciphertext to circuit size
   let plaintext = plaintext_chunks.iter().flatten().cloned().collect::<Vec<u8>>();
@@ -406,7 +633,6 @@ fn build_json_extraction_circuit_inputs<const CIRCUIT_SIZE: usize>(
   polynomial_input: F<G1>,
   keys: &[JsonKey],
   private_inputs: &mut Vec<HashMap<String, Value>>,
-  _fold_inputs: &mut HashMap<String, FoldInput>,
 ) -> Result<F<G1>, ProofError> {
   let raw_response_json_machine =
     RawJsonMachine::<MAX_STACK_HEIGHT>::from_chosen_sequence_and_input(polynomial_input, keys)?;
@@ -562,7 +788,8 @@ impl Manifest {
     assert_eq!(response_inputs.plaintext.len(), response_inputs.ciphertext.len());
 
     let mut private_inputs = vec![];
-    let mut fold_inputs: HashMap<String, FoldInput> = HashMap::new();
+    // TODO: Fold inputs are actually not modified, ever - We return en empty HashMap
+    let fold_inputs: HashMap<String, FoldInput> = HashMap::new();
 
     let InitialNIVCInputs { ciphertext_digest, initial_nivc_input, headers_digest } =
       self.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE>(
@@ -574,7 +801,6 @@ impl Manifest {
       request_inputs,
       ciphertext_digest,
       &mut private_inputs,
-      &mut fold_inputs,
     )?;
     // debug!("private_inputs: {:?}", private_inputs.len());
 
@@ -583,7 +809,6 @@ impl Manifest {
       ciphertext_digest,
       &headers_digest,
       &mut private_inputs,
-      &mut fold_inputs,
     )?;
     // debug!("private_inputs: {:?}", private_inputs.len());
 
@@ -591,7 +816,6 @@ impl Manifest {
       response_inputs,
       ciphertext_digest,
       &mut private_inputs,
-      &mut fold_inputs,
     )?;
 
     // debug!("private_inputs: {:?}", private_inputs.len());
@@ -600,7 +824,6 @@ impl Manifest {
       ciphertext_digest,
       &headers_digest,
       &mut private_inputs,
-      &mut fold_inputs,
     )?;
 
     let _ = build_json_extraction_circuit_inputs::<CIRCUIT_SIZE>(
@@ -608,7 +831,6 @@ impl Manifest {
       ciphertext_digest,
       &self.response.body.json,
       &mut private_inputs,
-      &mut fold_inputs,
     )?;
 
     Ok(NivcCircuitInputs { private_inputs, fold_inputs, initial_nivc_input })
@@ -942,5 +1164,211 @@ mod tests {
     let wire_serialized = manifest.to_wire_bytes();
     let wire_deserialized: Manifest = Manifest::from_wire_bytes(&wire_serialized);
     assert_eq!(manifest, wire_deserialized);
+  }
+
+  macro_rules! create_request {
+    // Match with optional parameters
+    ($($key:ident: $value:expr),* $(,)?) => {{
+        let mut request = Request {
+            method: "GET".to_string(),
+            url: "https://example.com".to_string(),
+            version: "HTTP/1.1".to_string(),
+            headers: std::collections::HashMap::from([
+                ("Authorization".to_string(), "Bearer <TOKEN>".to_string()),
+                ("User-Agent".to_string(), "test-agent".to_string()),
+            ]),
+            body: None,
+            vars: std::collections::HashMap::from([(
+                "TOKEN".to_string(),
+                TemplateVar {
+                    regex: Some("^[A-Za-z0-9]+$".to_string()),
+                    length: Some(20),
+                    r#type: Some("base64".to_string()),
+                },
+            )]),
+        };
+
+        // Override default fields with provided arguments
+        $(
+            request.$key = $value;
+        )*
+
+        request
+    }};
+  }
+
+  macro_rules! create_response {
+    // Match with optional parameters
+    ($($key:ident: $value:expr),* $(,)?) => {{
+        let mut response = Response {
+            status: "200".to_string(),
+            version: "HTTP/1.1".to_string(),
+            message: "OK".to_string(),
+            headers: std::collections::HashMap::from([
+                ("Content-Type".to_string(), "application/json".to_string())
+            ]),
+            body: ResponseBody {
+                json: vec![JsonKey::String("key1".to_string()), JsonKey::String("key2".to_string())],
+            },
+        };
+
+        // Override default fields with provided arguments
+        $(
+            response.$key = $value;
+        )*
+
+        response
+    }};
+  }
+
+  macro_rules! create_manifest {
+    (
+        $request:expr,
+        $response:expr
+        $(, $field:ident = $value:expr)* $(,)?
+    ) => {{
+        Manifest {
+            // manifest_version: "1".to_string(),
+            // id: "Default Manifest ID".to_string(),
+            // title: "Default Manifest Title".to_string(),
+            // description: "Default description.".to_string(),
+            request: $request,
+            response: $response,
+            $(
+                $field: $value,
+            )*
+        }
+    }};
+  }
+
+  // TODO: Using this TEST_MANIFEST duplicate here because modifying the original one breaks
+  //  `test_end_to_end_proofs` test with error: thread 'tests::test_end_to_end_proofs_get' panicked
+  // at proofs/src/tests/mod.rs:230:84:  called `Result::unwrap()` on an `Err` value:
+  // NovaError(InvalidSumcheckProof)
+  const TEST_MANIFEST_TO_VALIDATE: &str = r#"
+{
+    "manifestVersion": "1",
+    "id": "reddit-user-karma",
+    "title": "Total Reddit Karma",
+    "description": "Generate a proof that you have a certain amount of karma",
+    "prepareUrl": "https://www.reddit.com/login/",
+    "request": {
+        "method": "GET",
+        "url": "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json",
+        "headers": {
+            "host": "gist.githubusercontent.com",
+            "connection": "close",
+            "Authorization": "Bearer <% token %>",
+            "User-Agent": "test-agent"
+        },
+        "body": {
+            "userId": "<% userId %>"
+        },
+        "vars": {
+            "userId": {
+                "regex": "[a-z]{,20}+"
+            },
+            "token": {
+                "type": "base64",
+                "length": 32
+            }
+        }
+    },
+    "response": {
+        "status": "200",
+        "headers": {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Content-Length": "22"
+        },
+        "body": {
+            "json": [
+                "hello"
+            ],
+            "contains": "this_string_exists_in_body"
+        }
+    }
+}
+"#;
+
+  #[test]
+  fn test_green_path_manifest_validation() {
+    let manifest: Manifest = serde_json::from_str(TEST_MANIFEST_TO_VALIDATE).unwrap();
+    let result = manifest.validate();
+    assert!(result.is_ok());
+  }
+
+  #[test]
+  fn test_manifest_validation_invalid_method() {
+    let manifest =
+      create_manifest!(create_request!(method: "INVALID".to_string()), create_response!(),);
+    let result = manifest.validate();
+    assert!(result.is_err());
+    if let Err(ProofError::InvalidManifest(message)) = result {
+      assert_eq!(message, "Invalid HTTP method");
+    } else {
+      panic!("Expected ProofError::InvalidManifest");
+    }
+  }
+
+  #[test]
+  fn test_manifest_validation_invalid_url() {
+    let manifest =
+      create_manifest!(create_request!(url: "ftp://example.com".to_string()), create_response!(),);
+    let result = manifest.validate();
+    assert!(result.is_err());
+    if let Err(ProofError::InvalidManifest(message)) = result {
+      assert_eq!(message, "Only HTTPS URLs are allowed");
+    } else {
+      panic!("Expected ProofError::InvalidManifest");
+    }
+  }
+
+  #[test]
+  fn test_manifest_validation_invalid_response_status() {
+    let manifest =
+      create_manifest!(create_request!(), create_response!(status: "500".to_string()),);
+    let result = manifest.validate();
+    assert!(result.is_err());
+    if let Err(ProofError::InvalidManifest(message)) = result {
+      assert_eq!(message, "Unsupported HTTP status");
+    } else {
+      panic!("Expected ProofError::InvalidManifest");
+    }
+  }
+
+  #[test]
+  fn test_manifest_validation_missing_vars() {
+    let mut vars = HashMap::new();
+    vars.insert("TOKEN".to_string(), TemplateVar {
+      regex:  Some("^[A-Za-z0-9]+$".to_string()),
+      length: Some(20),
+      r#type: Some("base64".to_string()),
+    });
+    let manifest = create_manifest!(
+      create_request!(
+          headers: HashMap::new(), // Invalid because "Authorization" makes use of `<TOKEN>`
+          vars: vars
+      ),
+      create_response!(),
+    );
+    let result = manifest.validate();
+    assert!(result.is_err());
+  }
+
+  #[test]
+  fn test_manifest_validation_invalid_content_type() {
+    let manifest = create_manifest!(
+      create_request!(),
+      create_response!(headers: HashMap::from([
+          ("Content-Type".to_string(), "invalid/type".to_string())
+      ])),
+    );
+    let result = manifest.validate();
+    assert!(result.is_err());
+    if let Err(ProofError::InvalidManifest(message)) = result {
+      assert_eq!(message, "Invalid Content-Type header: invalid/type");
+    } else {
+      panic!("Expected ProofError::InvalidManifest");
+    }
   }
 }

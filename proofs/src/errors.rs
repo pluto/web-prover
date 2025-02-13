@@ -68,4 +68,8 @@ pub enum ProofError {
   #[cfg(target_arch = "wasm32")]
   #[error("transparent")]
   SerdeWasmBindgen(#[from] serde_wasm_bindgen::Error),
+
+  // TODO: Replace with concrete cases once we finalize Manifest validation rules
+  #[error("Invalid manifest: {0}")]
+  InvalidManifest(String),
 }
