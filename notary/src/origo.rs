@@ -157,17 +157,23 @@ pub fn sign_verification(
 ) -> Result<Json<SignedVerificationReply>, ProxyError> {
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
-  let bytes = [query.value.as_bytes(), serde_json::to_string(&query.manifest)?.as_bytes()].concat();
+
+  let leaf_hashes = vec![
+    KeccakHasher::hash(query.value.as_bytes()),
+    KeccakHasher::hash(serde_json::to_string(&query.manifest)?.as_bytes()),
+  ];
+  let merkle_tree = MerkleTree::<KeccakHasher>::from_leaves(&leaf_hashes);
+  let merkle_root = merkle_tree.root().unwrap();
 
   // need secp256k1 here for Solidity
   let (signature, recover_id) =
-    state.origo_signing_key.clone().sign_prehash_recoverable(&bytes).unwrap();
+    state.origo_signing_key.clone().sign_prehash_recoverable(&merkle_root).unwrap();
 
   let signer_address =
     alloy_primitives::Address::from_public_key(state.origo_signing_key.verifying_key());
 
   let verifying_key =
-    k256::ecdsa::VerifyingKey::recover_from_prehash(&bytes.clone(), &signature, recover_id)
+    k256::ecdsa::VerifyingKey::recover_from_prehash(&merkle_root.clone(), &signature, recover_id)
       .unwrap();
 
   assert_eq!(state.origo_signing_key.verifying_key(), &verifying_key);
@@ -180,7 +186,7 @@ pub fn sign_verification(
   };
 
   let response = SignedVerificationReply {
-    digest:      "0x".to_string() + &hex::encode(bytes),
+    digest:      "0x".to_string() + &hex::encode(merkle_root),
     signature:   "0x".to_string() + &hex::encode(signature.to_der().as_bytes()),
     signature_r: "0x".to_string() + &hex::encode(signature.r().to_bytes()),
     signature_s: "0x".to_string() + &s,
