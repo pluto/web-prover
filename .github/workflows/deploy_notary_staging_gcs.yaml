@@ -45,8 +45,8 @@ jobs:
           GIT_SHORT_HASH=$(git rev-parse --short HEAD) # is there a better way?
           echo -e "\nacme_domain=\"${GIT_SHORT_HASH}.tee.notary.pluto.dev\"\n" >> .github/workflows/staging-deploy-gcs/notary-config.toml
           docker build -t us-central1-docker.pkg.dev/$PROJECT/notary/notary:${{ github.sha }} -f .github/workflows/staging-deploy-gcs/Dockerfile .
-          IMAGE_HASH=`docker inspect --format='{{.Id}}' us-central1-docker.pkg.dev/$PROJECT/notary/notary:${{ github.sha }}`
-          echo "::notice title=TEE_DOCKER_IMAGE_HASH::$IMAGE_HASH"
+          IMAGE_ID=`docker inspect --format='{{.Id}}' us-central1-docker.pkg.dev/$PROJECT/notary/notary:${{ github.sha }}`
+          echo "::notice title=TEE_DOCKER_IMAGE_ID::$IMAGE_ID"
 
       - name: Push Docker image
         run: |
