@@ -103,4 +103,4 @@ jobs:
             exit 1
           fi
 
-          echo "::notice title=Notary_URL::https://$GIT_SHORT_HASH.tee.notary.pluto.dev/health"
+          echo "::notice title=Notary_TEE_URL::https://$GIT_SHORT_HASH.tee.notary.pluto.dev/health"
