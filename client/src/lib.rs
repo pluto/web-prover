@@ -162,5 +162,5 @@ impl TeeProof {
 
   fn to_bytes(&self) -> Vec<u8> { serde_json::to_vec(&self).unwrap() }
 
-  fn from_bytes(bytes: &[u8]) -> TeeProof { serde_json::from_slice(&bytes).unwrap() }
+  fn from_bytes(bytes: &[u8]) -> TeeProof { serde_json::from_slice(bytes).unwrap() }
 }

@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use axum::{
-  extract,
   extract::{Query, State},
   response::Response,
 };
@@ -10,13 +9,10 @@ use caratls_ekm_google_confidential_space_server::GoogleConfidentialSpaceTokenGe
 #[cfg(feature = "tee-dummy-token-generator")]
 use caratls_ekm_server::DummyTokenGenerator;
 use caratls_ekm_server::TeeTlsAcceptor;
-use client::{
-  origo::{OrigoSecrets, SignBody},
-  TeeProof, TeeProofData,
-};
+use client::{origo::OrigoSecrets, TeeProof, TeeProofData};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
-use proofs::program::{manifest, manifest::Manifest};
+use proofs::program::manifest::Manifest;
 use serde::Deserialize;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_util::compat::FuturesAsyncReadCompatExt;

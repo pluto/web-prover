@@ -5,13 +5,10 @@ use caratls_ekm_client::DummyTokenVerifier;
 use caratls_ekm_client::TeeTlsConnector;
 #[cfg(feature = "tee-google-confidential-space-token-verifier")]
 use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
-use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt};
+use futures::{channel::oneshot, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
-use hyper_util::rt::TokioIo;
 use tls_client2::origo::OrigoConnection;
-use tokio::net::TcpStream;
-use tokio_rustls::client::TlsStream;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
@@ -33,10 +30,10 @@ pub(crate) async fn proxy(
 ) -> Result<(tls_client2::origo::OrigoConnection, Option<TeeProof>), ClientErrors> {
   if config.mode == NotaryMode::TEE {
     let (conn, tee_proof) = handle_tee_mode(config, session_id).await?;
-    return Ok((conn, Some(tee_proof)));
+    Ok((conn, Some(tee_proof)))
   } else {
     let conn = handle_origo_mode(config, session_id).await?;
-    return Ok((conn, None));
+    Ok((conn, None))
   }
 }
 
