@@ -186,10 +186,14 @@ pub fn sign_verification(
   };
 
   let response = SignedVerificationReply {
-    digest:      "0x".to_string() + &hex::encode(merkle_root),
-    signature:   "0x".to_string() + &hex::encode(signature.to_der().as_bytes()),
-    signature_r: "0x".to_string() + &hex::encode(signature.r().to_bytes()),
-    signature_s: "0x".to_string() + &s,
+    merkle_leaves: vec![
+      "0x".to_string() + &hex::encode(leaf_hashes[0]),
+      "0x".to_string() + &hex::encode(leaf_hashes[1]),
+    ],
+    digest:        "0x".to_string() + &hex::encode(merkle_root),
+    signature:     "0x".to_string() + &hex::encode(signature.to_der().as_bytes()),
+    signature_r:   "0x".to_string() + &hex::encode(signature.r().to_bytes()),
+    signature_s:   "0x".to_string() + &s,
 
     // the good old +27
     // https://docs.openzeppelin.com/contracts/4.x/api/utils#ECDSA-tryRecover-bytes32-bytes-

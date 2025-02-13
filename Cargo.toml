@@ -81,8 +81,8 @@ overflow-checks=false
 split-debuginfo="unpacked"
 
 [profile.release]
-opt-level    =3
-lto          ="fat"
+opt-level    =0
+lto          =false
 codegen-units=1
 panic        ="abort"
 strip        =true

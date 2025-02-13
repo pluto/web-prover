@@ -38,12 +38,13 @@ pub struct SignBody {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SignedVerificationReply {
-  pub digest:      String,
-  pub signature:   String,
-  pub signature_r: String,
-  pub signature_s: String,
-  pub signature_v: u8,
-  pub signer:      String,
+  pub merkle_leaves: Vec<String>,
+  pub digest:        String,
+  pub signature:     String,
+  pub signature_r:   String,
+  pub signature_s:   String,
+  pub signature_v:   u8,
+  pub signer:        String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
