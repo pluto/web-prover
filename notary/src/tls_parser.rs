@@ -3,6 +3,7 @@ use std::io::Cursor;
 use k256::elliptic_curve::Field;
 use nom::{bytes::streaming::take, IResult};
 use proofs::{circuits::CIRCUIT_SIZE_512, F, G1};
+use rustls::crypto::cipher;
 use tls_client2::{
   hash_hs::HandshakeHashBuffer,
   internal::msgs::hsjoiner::HandshakeJoiner,
@@ -133,13 +134,17 @@ impl Transcript<Flattened> {
     self,
     handshake_server_key: &[u8],
     handshake_server_iv: &[u8],
+    app_server_key: Option<Vec<u8>>,
+    app_server_iv: Option<Vec<u8>>,
   ) -> Result<Transcript<Parsed>, ProxyError> {
     info!("key_as_string: {:?}, length: {}", handshake_server_key, handshake_server_key.len());
     info!("iv_as_string: {:?}, length: {}", handshake_server_iv, handshake_server_iv.len());
 
     let mut parsed_messages: Vec<ParsedMessage> = vec![];
     let mut seq = 0u64;
-    let mut cipher_suite_key: Option<CipherSuiteKey> = None;
+    let mut handshake_cipher_key: Option<CipherSuiteKey> = None;
+    let mut app_cipher_key: Option<CipherSuiteKey> = None;
+    let mut decrypters: Vec<DecryptWrapper> = vec![];
 
     for m in &self.payload {
       let mut cursor = Cursor::new(m.payload.clone());
@@ -174,8 +179,29 @@ impl Transcript<Flattened> {
                       payload: WrappedPayload::Decrypted(handle_server_hello(sh.clone())?),
                     });
 
-                    cipher_suite_key =
+                    handshake_cipher_key =
                       Some(set_key(handshake_server_key.to_vec(), CipherSuite::from(sh.cipher.0))?);
+                    app_cipher_key = match app_server_key {
+                      Some(ref k) => Some(set_key(k.clone(), CipherSuite::from(sh.cipher.0))?),
+                      None => None,
+                    };
+
+                    // TODO: Move decrypters initialized out of here into top of parse
+                    // and cleanup sequence number handling.
+                    decrypters = vec![
+                      (handshake_cipher_key, Some(handshake_server_iv), KeyMode::Handshake, seq),
+                      (app_cipher_key, app_server_iv.as_deref(), KeyMode::Application, 0),
+                    ]
+                    .into_iter()
+                    .flat_map(|(key, iv, mode, seq)| match iv {
+                      Some(inner_iv) => match make_decrypter(key, inner_iv.to_vec()) {
+                        Ok((dec, suite)) =>
+                          Some(Ok(DecryptWrapper { inner: dec, seq, mode, ciphersuite: suite })),
+                        Err(e) => Some(Err(e)),
+                      },
+                      None => None,
+                    })
+                    .collect::<Result<Vec<DecryptWrapper>, ProxyError>>()?;
                   },
                   _ => {
                     info!("{:?}", parse_tls_message);
@@ -187,17 +213,13 @@ impl Transcript<Flattened> {
               }
             }
 
-            // this is encrypted handshake data.
+            // Encrypted handshake data immediately proceeds ServerHello, but
+            // for backwards compatability with TLS 1.2 is labeled as AppData.
             if record.hdr.record_type == tls_parser::TlsRecordType::ApplicationData {
-              let handshake_messages = handle_application_data(
-                record.data.to_vec(),
-                handshake_server_iv.to_vec().clone(),
-                cipher_suite_key.clone(),
-                seq,
-              )?;
+              let decrypted_messages = handle_application_data(record.data.to_vec(), &mut decrypters)?;
 
-              parsed_messages.extend(handshake_messages.into_iter().map(|handshake_message| {
-                ParsedMessage { seq, direction: m.direction, payload: handshake_message }
+              parsed_messages.extend(decrypted_messages.into_iter().map(|decrypted_message| {
+                ParsedMessage { seq, direction: m.direction, payload: decrypted_message }
               }));
 
               seq += 1;
@@ -472,6 +494,43 @@ fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
   Ok((i, tls_parser::TlsRawRecord { hdr, data }))
 }
 
+#[derive(Debug, Clone)]
+enum KeyMode {
+  Handshake,
+  Application,
+}
+enum SupportedSuites {
+  AesGcm,
+  ChachaPoly,
+}
+struct DecryptWrapper {
+  inner:       Decrypter,
+  seq:         u64,
+  mode:        KeyMode,
+  ciphersuite: SupportedSuites,
+}
+
+impl DecryptWrapper {
+  fn decrypt(&mut self, msg: &OpaqueMessage) -> Option<PlainMessage> {
+    match self.ciphersuite {
+      SupportedSuites::AesGcm => match self.inner.decrypt_tls13_aes(&msg, self.seq) {
+        Ok((plain_message, _)) => {
+          self.seq += 1;
+          return Some(plain_message);
+        },
+        Err(_) => None,
+      },
+      SupportedSuites::ChachaPoly => match self.inner.decrypt_tls13_chacha20(&msg, self.seq) {
+        Ok((plain_message, _)) => {
+          self.seq += 1;
+          return Some(plain_message);
+        },
+        Err(_) => None,
+      },
+    }
+  }
+}
+
 /// Handles encrypted TLS 1.3 application data by decrypting it and processing any contained
 /// handshake messages.
 ///
@@ -498,9 +557,7 @@ fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
 /// * `TLS13_CHACHA20_POLY1305_SHA256` - Uses ChaCha20-Poly1305 decryption
 fn handle_application_data(
   record: Vec<u8>,
-  server_hs_iv: Vec<u8>,
-  cipher_suite_key: Option<CipherSuiteKey>,
-  seq: u64,
+  decrypters: &mut Vec<DecryptWrapper>,
 ) -> Result<Vec<WrappedPayload>, ProxyError> {
   let msg = OpaqueMessage {
     typ:     tls_client2::tls_core::msgs::enums::ContentType::ApplicationData,
@@ -508,52 +565,77 @@ fn handle_application_data(
     payload: tls_client2::tls_core::msgs::base::Payload(record),
   };
 
-  match cipher_suite_key {
-    Some(key) => {
-      match key {
-        CipherSuiteKey::AES128GCM(key) => {
-          let d = tls_client2::Decrypter::new(
+  return trial_decrypt(msg, decrypters);
+}
+
+use tls_client2::Decrypter;
+fn make_decrypter(
+  key: Option<CipherSuiteKey>,
+  iv: Vec<u8>,
+) -> Result<(Decrypter, SupportedSuites), ProxyError> {
+  match key {
+    Some(key) => match key {
+      CipherSuiteKey::AES128GCM(key) => {
+        return Ok((
+          tls_client2::Decrypter::new(
             CipherSuiteKey::AES128GCM(key),
-            server_hs_iv[..12].try_into()?,
+            iv[..12].try_into()?,
             CipherSuite::TLS13_AES_128_GCM_SHA256,
-          );
-
-          match d.decrypt_tls13_aes(&msg, seq) {
-            Ok((plain_message, _meta)) => {
-              return Ok(process_handshake(plain_message));
-            },
-            Err(_) => {
-              trace!("reached non-decryptable message");
-              return Ok(vec![WrappedPayload::Encrypted(msg)]);
-            },
-          };
-        },
-        CipherSuiteKey::CHACHA20POLY1305(key) => {
-          let d = tls_client2::Decrypter::new(
+          ),
+          SupportedSuites::AesGcm,
+        ));
+      },
+      CipherSuiteKey::CHACHA20POLY1305(key) => {
+        return Ok((
+          tls_client2::Decrypter::new(
             CipherSuiteKey::CHACHA20POLY1305(key),
-            server_hs_iv[..12].try_into()?,
+            iv[..12].try_into()?,
             CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
-          );
+          ),
+          SupportedSuites::ChachaPoly,
+        ));
+      },
+    },
+    None => panic!("unexpected key type"),
+  }
+}
 
-          match d.decrypt_tls13_chacha20(&msg, seq) {
-            Ok((plain_message, _meta)) => {
-              return Ok(process_handshake(plain_message));
-            },
-            Err(_) => {
-              // This occurs once we pass the handshake records, we will no longer
-              // have the correct keys to decrypt. We want to continue logging the
-              // ciphertext.
-              trace!("reached non-decryptable message");
-              return Ok(vec![WrappedPayload::Encrypted(msg)]);
-            },
-          };
+fn trial_decrypt(
+  msg: OpaqueMessage,
+  decrypters: &mut Vec<DecryptWrapper>,
+) -> Result<Vec<WrappedPayload>, ProxyError> {
+  let plain_pairs = decrypters
+    .iter_mut()
+    .flat_map(|pair| match pair.decrypt(&msg) {
+      Some(pt) => Some((pt, pair.mode.clone())),
+      None => None,
+    })
+    .collect::<Vec<(PlainMessage, KeyMode)>>();
+
+  let possible_decryption = plain_pairs
+    .into_iter()
+    .map(|(plain_message, mode)| {
+      match mode {
+        KeyMode::Handshake => {
+          Some(process_handshake(plain_message))
+        },
+        KeyMode::Application => {
+          Some(vec![WrappedPayload::Decrypted(plain_message.try_into().unwrap())]) // todo: handle error
         },
       }
-    },
+    })
+    .collect::<Vec<Option<Vec<WrappedPayload>>>>()
+    .pop()
+    .unwrap_or(None);
+
+  // If we fail to decrypt, log the error and hand back encrypted data.
+  match possible_decryption {
+    Some(p) => Ok(p),
     None => {
-      panic!("should not happen");
+      debug!("reached non-decryptable message");
+      Ok(vec![WrappedPayload::Encrypted(msg)])
     },
-  };
+  }
 }
 
 /// Processes a TLS ClientHello message and converts it into the internal message format.
