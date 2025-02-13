@@ -24,8 +24,11 @@ use tracing::{debug, error, info};
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
-  axum_websocket::WebSocket, errors::NotaryServerError, origo::proxy_service,
-  tlsn::ProtocolUpgrade, SharedState,
+  axum_websocket::WebSocket,
+  errors::{NotaryServerError, ProxyError},
+  origo::proxy_service,
+  tlsn::ProtocolUpgrade,
+  SharedState,
 };
 
 #[derive(Deserialize)]
@@ -104,15 +107,23 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   #[cfg(feature = "tee-dummy-token-generator")]
   let token_generator = DummyTokenGenerator { token: "dummy".to_string() };
 
+  debug!("Create TLS acceptor");
   let tee_tls_acceptor = TeeTlsAcceptor::new_with_ephemeral_cert(token_generator, "example.com"); // TODO example.com
   let mut tee_tls_stream = tee_tls_acceptor.accept(socket).await?;
+  debug!("Proxying");
   proxy_service(&mut tee_tls_stream, session_id, target_host, target_port, state.clone()).await?;
 
+  // Send a magic byte to the client, indicating readiness to read
+  debug!("Sending magic byte to indicate readiness to read");
+  tee_tls_stream.write_all(&[0xAA]).await?;
+
+  debug!("Reading manifest");
   let manifest_bytes = read_wire_struct(&mut tee_tls_stream).await;
   // TODO: Consider implementing from_stream instead of read_wire_struct
   let manifest = Manifest::from_wire_bytes(&manifest_bytes);
   // dbg!(&manifest);
 
+  debug!("Reading secret");
   let secret_bytes = read_wire_struct(&mut tee_tls_stream).await;
   let origo_secrets = OrigoSecrets::from_wire_bytes(&secret_bytes);
   // dbg!(&origo_secrets);
@@ -124,24 +135,33 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
 
   // TODO (autoparallel): This duplicates some code we see in `notary/src/origo.rs`, so we could
   //  maybe clean this up and share code.
-  let transcript = state.origo_sessions.lock().unwrap().get(session_id).cloned().unwrap();
+  debug!("Parsing transcript");
+  let transcript = state
+    .origo_sessions
+    .lock()
+    .unwrap()
+    .get(session_id)
+    .cloned()
+    .ok_or(NotaryServerError::SessionNotFound(session_id.to_string()))?;
   let parsed_transcript = transcript
     .into_flattened()
     .unwrap()
     .into_parsed(&handshake_server_key, &handshake_server_iv)
-    .unwrap();
-  dbg!(parsed_transcript);
-
+    .map_err(NotaryServerError::from)?;
+  // dbg!(parsed_transcript);
+  debug!("Parsing transcript done");
   // TODO apply manifest to parsed_transcript
 
+  debug!("Sending TEE proof");
   // send TeeProof to client
   let tee_proof = TeeProof {
     data:      TeeProofData { manifest_hash: "todo".to_string() },
     signature: "sign(hash(TeeProofData))".to_string(),
   };
   let tee_proof_bytes = tee_proof.to_write_bytes();
-  tee_tls_stream.write_all(&tee_proof_bytes).await.unwrap();
+  tee_tls_stream.write_all(&tee_proof_bytes).await?;
 
+  debug!("Done");
   Ok(())
 }
 

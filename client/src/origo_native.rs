@@ -246,6 +246,9 @@ async fn handle_tee_mode(
   // start client tls connection
   let tls_fut_task = tokio::spawn(client_tls_fut);
 
+  debug!("Waiting for TLS connection");
+
+  debug!("Performing client handshake");
   client_handshake(&config, client_tls_conn).await?;
 
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
@@ -253,15 +256,35 @@ async fn handle_tee_mode(
   // wait for tls connection
   let (_, mut reunited_socket) = tls_fut_task.await?.unwrap();
 
+  debug!("Reunited socket");
+
+  // Wait until we can read a magic byte `0xAA` from the reunited socket,
+  // indicating that the server is ready and waiting for further communication.
+  debug!("Waiting to write to notary");
+  let mut buffer = [0u8; 1];
+  loop {
+    reunited_socket.read_exact(&mut buffer).await?;
+    if buffer.len() == 1 && buffer[0] == 0xAA {
+      debug!("Magic byte 0xAA received, server is ready");
+      break;
+    }
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    debug!("Waiting for magic byte, received: {:?}", buffer[0]);
+  }
+
+  debug!("Sending manifest");
   let manifest_bytes = config.proving.manifest.unwrap().to_wire_bytes();
   reunited_socket.write_all(&manifest_bytes).await?;
 
+  debug!("Sending origo secret");
   let origo_secret_bytes = OrigoSecrets::from_origo_conn(&origo_conn).to_wire_bytes();
   reunited_socket.write_all(&origo_secret_bytes).await?;
 
+  debug!("Reading TEE proof");
   let tee_proof_bytes = crate::origo::read_wire_struct(&mut reunited_socket).await;
   let tee_proof = TeeProof::from_wire_bytes(&tee_proof_bytes);
 
+  debug!("Done");
   Ok((origo_conn, tee_proof))
 }
 

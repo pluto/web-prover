@@ -81,6 +81,12 @@ pub enum NotaryServerError {
 
   #[error("Error occurred from reasing server config: {0}")]
   ServerConfigError(String),
+
+  #[error(transparent)]
+  ProxyError(#[from] ProxyError),
+
+  #[error("Session not found for id: {0}")]
+  SessionNotFound(String),
 }
 
 impl From<VerifierError> for NotaryServerError {
