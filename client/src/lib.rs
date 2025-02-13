@@ -111,8 +111,6 @@ pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, error
   #[cfg(not(target_arch = "wasm32"))]
   let (_origo_conn, tee_proof) = origo_native::proxy(config, session_id).await?;
 
-  dbg!(tee_proof.clone());
-
   Ok(Proof::TEE(tee_proof.unwrap()))
 }
 
