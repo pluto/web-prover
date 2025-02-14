@@ -9,19 +9,27 @@ use caratls_ekm_google_confidential_space_server::GoogleConfidentialSpaceTokenGe
 #[cfg(feature = "tee-dummy-token-generator")]
 use caratls_ekm_server::DummyTokenGenerator;
 use caratls_ekm_server::TeeTlsAcceptor;
-use client::{origo::OrigoSecrets, TeeProof, TeeProofData};
+use client::{errors::ClientErrors, origo::OrigoSecrets, TeeProof, TeeProofData};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
-use proofs::program::manifest::Manifest;
+use proofs::program::{
+  http::{Request as ManifestRequest, Response as ManifestResponse},
+  manifest::Manifest,
+};
 use serde::Deserialize;
+use tls_client2::tls_core::msgs::message::MessagePayload;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tracing::{debug, error, info};
+use tracing::{debug, error, field::debug, info};
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
-  axum_websocket::WebSocket, errors::NotaryServerError, origo::proxy_service,
-  tlsn::ProtocolUpgrade, SharedState,
+  axum_websocket::WebSocket,
+  errors::NotaryServerError,
+  origo::proxy_service,
+  tls_parser::{Direction, ParsedMessage, WrappedPayload},
+  tlsn::ProtocolUpgrade,
+  verifier, SharedState,
 };
 
 #[derive(Deserialize)]
@@ -105,7 +113,7 @@ static TEE_TLS_ACCEPTOR_LOCK: OnceLock<TeeTlsAcceptor<GoogleConfidentialSpaceTok
 #[cfg(feature = "tee-google-confidential-space-token-generator")]
 fn tee_tls_acceptor() -> &'static TeeTlsAcceptor<GoogleConfidentialSpaceTokenGenerator> {
   TEE_TLS_ACCEPTOR_LOCK.get_or_init(|| {
-    let token_generator = GoogleConfidentialSpaceTokenGenerator { token: "dummy".to_string() };
+    let token_generator = GoogleConfidentialSpaceTokenGenerator::new("dummy".to_string());
     TeeTlsAcceptor::new_with_ephemeral_cert(token_generator, "example.com") // TODO example.com
   })
 }
@@ -139,10 +147,13 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   debug!("Sending magic byte to indicate readiness to read");
   tee_tls_stream.write_all(&[0xAA]).await?;
 
-  let manifest_bytes = read_wire_struct(&mut tee_tls_stream).await;
   // TODO: Consider implementing from_stream instead of read_wire_struct
+  let manifest_bytes = read_wire_struct(&mut tee_tls_stream).await;
   let manifest = Manifest::from_wire_bytes(&manifest_bytes);
+  // Checking if manifest is valid
+  manifest.validate()?;
   // dbg!(&manifest);
+
   let secret_bytes = read_wire_struct(&mut tee_tls_stream).await;
   let origo_secrets = OrigoSecrets::from_wire_bytes(&secret_bytes);
   // dbg!(&origo_secrets);
@@ -173,17 +184,57 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
     .unwrap();
   // dbg!(parsed_transcript);
 
-  // TODO apply manifest to parsed_transcript
+  let mut app_data_vec = Vec::new();
+  for message in &parsed_transcript.payload {
+    if let ParsedMessage { payload, direction, .. } = message {
+      if let Some(app_data) = get_app_data(payload) {
+        // if let Ok(readable_data) = String::from_utf8(app_data.clone()) {
+        //   debug!("{:?} app_data: {}", direction, readable_data);
+        // }
+        app_data_vec.push(app_data);
+      }
+    }
+  }
+
+  if app_data_vec.len() != 3 {
+    return Err(NotaryServerError::MissingAppDataMessages(3, app_data_vec.len()));
+  }
+
+  let request_header = app_data_vec[0].clone();
+  // TODO: Do we expect to get request_body as well part of app_data?
+  let response_header = app_data_vec[1].clone();
+  let response_body = app_data_vec[2].clone();
+
+  let request = ManifestRequest::from_payload(&request_header, None)?;
+  debug!("{:?}", request);
+
+  let response = ManifestResponse::from_payload(&response_header, &response_body)?;
+  debug!("{:?}", response);
+
+  if !manifest.request.is_subset_of(&request) {
+    return Err(NotaryServerError::ManifestRequestMismatch);
+  }
+
+  if !manifest.response.is_subset_of(&response) {
+    return Err(NotaryServerError::ManifestResponseMismatch);
+  }
 
   // send TeeProof to client
-  let tee_proof = TeeProof {
-    data:      TeeProofData { manifest_hash: "todo".to_string() },
-    signature: "sign(hash(TeeProofData))".to_string(),
-  };
+  let tee_proof = TeeProof::from_manifest(&manifest);
   let tee_proof_bytes = tee_proof.to_write_bytes();
-  tee_tls_stream.write_all(&tee_proof_bytes).await.unwrap();
+  tee_tls_stream.write_all(&tee_proof_bytes).await?;
 
   Ok(())
+}
+
+fn get_app_data(payload: &WrappedPayload) -> Option<Vec<u8>> {
+  match payload {
+    WrappedPayload::Decrypted(decrypted) => match &decrypted.payload {
+      MessagePayload::ApplicationData(app_data) => Some(app_data.clone().0),
+      _ => None,
+    },
+    _ => None,
+  }
 }
 
 // TODO: Refactor into struct helpers/trait

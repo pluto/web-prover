@@ -21,7 +21,10 @@
 				"version": "HTTP/1.1",
 				"url": "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json",
 				"headers": {
-					"accept-encoding": "identity"
+					"accept-encoding": "identity",
+                    "host": "gist.githubusercontent.com",
+                    "connection": "close",
+                    "accept": "*/*"
 				},
 				"body": {
 					"userId": "<% userId %>"
@@ -41,13 +44,13 @@
 				"version": "HTTP/1.1",
 				"message": "OK",
 				"headers": {
-					"Content-Type": "text/plain"
+					"Content-Type": "text/plain; charset=utf-8"
 				},
 				"body": {
 					"json": [
 						"hello"
 					],
-					"contains": "this_string_exists_in_body"
+					"contains": "world"
 				}
 			}
 		}
