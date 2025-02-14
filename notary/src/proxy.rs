@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use axum::{
   extract::{self, Query, State},
-  response::Response,
+  // response::Response,
   Json,
 };
 use client::{TeeProof, TeeProofData};

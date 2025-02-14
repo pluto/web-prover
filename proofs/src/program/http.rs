@@ -548,9 +548,11 @@ pub(crate) mod tests {
 
   #[test]
   fn test_response_with_missing_body() {
-    let response =
-      ManifestResponse::from_payload(b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n", br#""#)
-        .unwrap();
+    let response = ManifestResponse::from_payload(
+      b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n",
+      br#""#,
+    )
+    .unwrap();
     let expected_response = create_response!(
         headers: HashMap::from([("Content-Type".to_string(), "text/plain".to_string())]),
         body: ResponseBody { json: vec![] }
