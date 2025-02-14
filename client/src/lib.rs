@@ -23,7 +23,8 @@ use serde::{Deserialize, Serialize};
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
 use tracing::{debug, info};
-
+use proofs::program::http::ManifestRequest;
+use proofs::program::manifest::HTTP_1_1;
 use crate::errors::ClientErrors;
 
 #[derive(Debug, Serialize)]

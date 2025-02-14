@@ -19,7 +19,7 @@ pub fn default_message() -> String { "OK".to_string() }
 
 /// HTTP Response items required for circuits
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Response {
+pub struct ManifestResponse {
   /// HTTP response status
   pub status:  String,
   /// HTTP version
@@ -34,7 +34,7 @@ pub struct Response {
   pub body:    ResponseBody,
 }
 
-impl Response {
+impl ManifestResponse {
   pub fn validate(&self) -> Result<(), ProofError> {
     // TODO: What are legal statuses?
     const VALID_STATUSES: [&str; 2] = ["200", "201"];
@@ -154,7 +154,7 @@ impl Response {
 
   /// Performs a test between two response structures. Returns true if `other` contains
   /// at least all the values also present in `self`.
-  pub fn is_subset_of(&self, other: &Response) -> bool {
+  pub fn is_subset_of(&self, other: &ManifestResponse) -> bool {
     if self.status != other.status || self.version != other.version || self.message != other.message
     {
       debug!("Exact matches don't match");
@@ -239,7 +239,7 @@ pub struct TemplateVar {
 
 /// HTTP Request items required for circuits
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Request {
+pub struct ManifestRequest {
   /// HTTP method (GET or POST)
   pub method:  String,
   /// HTTP request URL
@@ -255,7 +255,7 @@ pub struct Request {
   pub vars:    HashMap<String, TemplateVar>,
 }
 
-impl Request {
+impl ManifestRequest {
   pub fn validate(&self) -> Result<(), ProofError> {
     // TODO: What HTTP methods are supported?
     const ALLOWED_METHODS: [&str; 2] = ["GET", "POST"];
@@ -415,7 +415,7 @@ impl Request {
   /// - All headers in `self` must exist in `other` with matching values.
   /// - All vars in `self` must exist in `other` with matching constraints.
   /// - All remaining fields like `method`, `url`, and `body` must also match.
-  pub fn is_subset_of(&self, other: &Request) -> bool {
+  pub fn is_subset_of(&self, other: &ManifestRequest) -> bool {
     // Check if all headers in `self` exist in `other` with the same value
     for (key, value) in &self.headers {
       if other.headers.get(key) != Some(value) {
@@ -452,7 +452,7 @@ pub(crate) mod tests {
   macro_rules! create_request {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
-        let mut request = Request {
+        let mut request = ManifestRequest {
             method: "GET".to_string(),
             url: "https://example.com".to_string(),
             version: "HTTP/1.1".to_string(),
@@ -484,7 +484,7 @@ pub(crate) mod tests {
   macro_rules! create_response {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
-        let mut response = Response {
+        let mut response = ManifestResponse {
             status: "200".to_string(),
             version: "HTTP/1.1".to_string(),
             message: "OK".to_string(),
@@ -509,7 +509,7 @@ pub(crate) mod tests {
   fn test_parse_response() {
     let header_bytes = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
     let body_bytes = br#"{"key1": "value1", "key2": "value2"}"#;
-    let response = Response::from_payload(header_bytes, body_bytes).unwrap();
+    let response = ManifestResponse::from_payload(header_bytes, body_bytes).unwrap();
     assert_eq!(response.status, "200");
     assert_eq!(response.version, "HTTP/1.1");
     assert_eq!(response.message, "OK");
@@ -549,7 +549,7 @@ pub(crate) mod tests {
   #[test]
   fn test_response_with_missing_body() {
     let response =
-      Response::from_payload(b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n", br#""#)
+      ManifestResponse::from_payload(b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n", br#""#)
         .unwrap();
     let expected_response = create_response!(
         headers: HashMap::from([("Content-Type".to_string(), "text/plain".to_string())]),
@@ -563,7 +563,7 @@ pub(crate) mod tests {
     let header_bytes = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
     let invalid_body_bytes = br#"This is not JSON"#;
 
-    let result = Response::from_payload(header_bytes, invalid_body_bytes);
+    let result = ManifestResponse::from_payload(header_bytes, invalid_body_bytes);
     assert!(result.is_err());
 
     match result {
@@ -610,7 +610,7 @@ pub(crate) mod tests {
 
   #[test]
   fn test_valid_response_with_optional_body() {
-    let response = Response::from_payload(
+    let response = ManifestResponse::from_payload(
       b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n",
       br#"{"key1": "value1"}"#,
     )
@@ -629,7 +629,7 @@ pub(crate) mod tests {
     let header_bytes = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
     let empty_body_bytes = br#"{}"#;
 
-    let result = Response::from_payload(header_bytes, empty_body_bytes);
+    let result = ManifestResponse::from_payload(header_bytes, empty_body_bytes);
     assert!(result.is_ok());
 
     let response = result.unwrap();
@@ -664,7 +664,7 @@ pub(crate) mod tests {
     let header_bytes = b"POST /path HTTP/1.1\r\nContent-Type: application/json\r\n\r\n";
     let body_bytes = br#"{"key1": "value1"}"#;
 
-    let request = Request::from_payload(header_bytes, Some(body_bytes)).unwrap();
+    let request = ManifestRequest::from_payload(header_bytes, Some(body_bytes)).unwrap();
     assert_eq!(request.method, "POST");
     assert_eq!(request.url, "/path");
     assert_eq!(request.version, "HTTP/1.1");
@@ -677,7 +677,7 @@ pub(crate) mod tests {
   fn test_parse_request_valid_without_body() {
     let header_bytes = b"GET /path HTTP/1.1\r\nContent-Type: text/plain\r\n\r\n";
 
-    let request = Request::from_payload(header_bytes, None).unwrap();
+    let request = ManifestRequest::from_payload(header_bytes, None).unwrap();
     assert_eq!(request.method, "GET");
     assert_eq!(request.url, "/path");
     assert_eq!(request.version, "HTTP/1.1");
@@ -690,7 +690,7 @@ pub(crate) mod tests {
     let header_bytes = b"\xFF\xFEInvalid UTF-8 Header";
     let body_bytes = br#"{}"#;
 
-    let result = Request::from_payload(header_bytes, Some(body_bytes));
+    let result = ManifestRequest::from_payload(header_bytes, Some(body_bytes));
     assert!(result.is_err());
 
     match result {
@@ -706,7 +706,7 @@ pub(crate) mod tests {
     let header_bytes = b"INVALID_START_LINE\r\nContent-Type: application/json\r\n\r\n";
     let body_bytes = br#"{}"#;
 
-    let result = Request::from_payload(header_bytes, Some(body_bytes));
+    let result = ManifestRequest::from_payload(header_bytes, Some(body_bytes));
     assert!(result.is_err());
 
     match result {
@@ -721,7 +721,7 @@ pub(crate) mod tests {
   fn test_https_url_validation() {
     let header_bytes = b"GET /path HTTP/1.1\r\n\r\n";
 
-    let mut request = Request::from_payload(header_bytes, None).unwrap();
+    let mut request = ManifestRequest::from_payload(header_bytes, None).unwrap();
     request.url = "http://example.com".to_string(); // Invalid (HTTP instead of HTTPS)
 
     let result = request.validate();
@@ -739,7 +739,7 @@ pub(crate) mod tests {
     let header_bytes = b"POST /path HTTP/1.1\r\nContent-Type: application/json\r\nAuthorization: Bearer token\r\n\r\n";
     let body_bytes = br#"{"key": "value"}"#;
 
-    let request = Request::from_payload(header_bytes, Some(body_bytes)).unwrap();
+    let request = ManifestRequest::from_payload(header_bytes, Some(body_bytes)).unwrap();
     assert_eq!(request.method, "POST");
     assert_eq!(request.headers.len(), 2);
     assert_eq!(request.headers.get("Authorization").unwrap(), "Bearer token");
@@ -750,7 +750,7 @@ pub(crate) mod tests {
     let header_bytes = b"POST /path HTTP/1.1\r\nContent-Type: application/json\r\n\r\n";
     let invalid_body_bytes = b"This is not a valid JSON body";
 
-    let result = Request::from_payload(header_bytes, Some(invalid_body_bytes));
+    let result = ManifestRequest::from_payload(header_bytes, Some(invalid_body_bytes));
     assert!(result.is_err());
 
     match result {
@@ -766,7 +766,7 @@ pub(crate) mod tests {
     let header_bytes = b"POST /path HTTP/1.1\r\nX-Custom-Header: <% missing_token %>\r\n\r\n";
     let body_bytes = br#"{"key": "value"}"#;
 
-    let mut request = Request::from_payload(header_bytes, Some(body_bytes)).unwrap();
+    let mut request = ManifestRequest::from_payload(header_bytes, Some(body_bytes)).unwrap();
     request.vars = HashMap::new(); // No vars provided, but the template references a token
 
     let result = request.validate_vars();

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use web_proof_circuits_witness_generator::json::JsonKey;
 
 use crate::program::{
-  http::{Request, Response, ResponseBody},
+  http::{ManifestRequest, ManifestResponse, ResponseBody},
   manifest::{EncryptionInput, Manifest},
 };
 
@@ -655,7 +655,7 @@ pub(crate) fn complex_manifest() -> Manifest {
     // id:               "complex-manifest".to_string(),
     // title:            "Complex Manifest".to_string(),
     // description:      "It's complicated".to_string(),
-    request:  Request {
+    request:  ManifestRequest {
       method:  "POST".to_string(),
       url:     String::from("/api/v1/data"),
       version: String::from("HTTP/1.1"),
@@ -667,7 +667,7 @@ pub(crate) fn complex_manifest() -> Manifest {
       body:    None,
       vars:    HashMap::new(),
     },
-    response: Response {
+    response: ManifestResponse {
       version: String::from("HTTP/1.1"),
       status:  200.to_string(),
       message: String::from("OK"),

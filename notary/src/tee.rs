@@ -13,7 +13,7 @@ use client::{errors::ClientErrors, origo::OrigoSecrets, TeeProof, TeeProofData};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use proofs::program::{
-  http::{Request as ManifestRequest, Response as ManifestResponse},
+  http::{ManifestRequest, ManifestResponse},
   manifest::Manifest,
 };
 use serde::Deserialize;
