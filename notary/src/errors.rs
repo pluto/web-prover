@@ -3,6 +3,7 @@ use axum::{
   response::{IntoResponse, Response},
 };
 use eyre::Report;
+use proofs::errors::ProofError;
 use thiserror::Error;
 use tlsn_verifier::tls::{VerifierConfigBuilderError, VerifierError};
 use tracing::error;
@@ -81,6 +82,20 @@ pub enum NotaryServerError {
 
   #[error("Error occurred from reasing server config: {0}")]
   ServerConfigError(String),
+
+  #[error(transparent)]
+  ProofError(#[from] ProofError),
+
+  #[error("Missing application-level data messages. Expected: {0}, Actual: {1}")]
+  MissingAppDataMessages(usize, usize),
+
+  // TODO: Update to contain feedback
+  #[error("Manifest-request mismatch")]
+  ManifestRequestMismatch,
+
+  // TODO: Update to contain feedback
+  #[error("Manifest-response mismatch")]
+  ManifestResponseMismatch,
 }
 
 impl From<VerifierError> for NotaryServerError {

@@ -15,6 +15,7 @@ use super::*;
 use crate::program::data::{ProofParams, SetupParams};
 
 pub mod data;
+pub mod http;
 pub mod manifest;
 pub mod utils;
 

@@ -4627,6 +4627,7 @@ dependencies = [
  "serde_json",
  "tempdir",
  "thiserror 1.0.69",
+ "tiny-keccak",
  "tls-client",
  "tokio",
  "tracing",

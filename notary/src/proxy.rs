@@ -44,7 +44,7 @@ pub async fn proxy(
   // apply manifest to request/ response
 
   let tee_proof = TeeProof {
-    data:      TeeProofData { manifest_hash: "todo".to_string() },
+    data:      TeeProofData { manifest_hash: "todo".to_string().into_bytes() },
     signature: "sign(hash(ProxyProofData))".to_string(),
   };
 
