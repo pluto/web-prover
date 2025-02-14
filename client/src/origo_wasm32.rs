@@ -4,6 +4,7 @@ use std::{
   pin::Pin,
   sync::Arc,
   task::{Context, Poll},
+  time::Duration,
 };
 
 #[cfg(feature = "tee-dummy-token-verifier")]
@@ -11,17 +12,34 @@ use caratls_ekm_client::DummyTokenVerifier;
 use caratls_ekm_client::TeeTlsConnector;
 #[cfg(feature = "tee-google-confidential-space-token-verifier")]
 use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
-use futures::{channel::oneshot, AsyncWriteExt};
+use futures::{channel::oneshot, AsyncWriteExt, AsyncReadExt};
 use hyper::StatusCode;
 use tls_client2::origo::OrigoConnection;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use wasm_bindgen_futures::spawn_local;
 use ws_stream_wasm::WsMeta;
+use tracing::debug;
 
 use crate::{
   config, config::NotaryMode, errors, errors::ClientErrors, origo::OrigoSecrets,
   tls_client_async2::bind_client, TeeProof,
 };
+
+use wasm_bindgen_futures::JsFuture;
+use web_sys::window;
+
+async fn sleep(ms: u64) {
+    let promise = js_sys::Promise::new(&mut |resolve, _| {
+        window()
+            .unwrap()
+            .set_timeout_with_callback_and_timeout_and_arguments_0(
+                &resolve,
+                ms as i32,
+            )
+            .unwrap();
+    });
+    JsFuture::from(promise).await.unwrap();
+}
 
 pub(crate) async fn proxy(
   config: config::Config,
@@ -166,6 +184,17 @@ async fn handle_tee_mode(
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
 
   let (_, mut reunited_socket) = tls_receiver.await.unwrap().unwrap();
+  
+  let mut buffer = [0u8; 1];
+  loop {
+    reunited_socket.read_exact(&mut buffer).await?;
+    if buffer.len() == 1 && buffer[0] == 0xAA {
+      debug!("Magic byte 0xAA received, server is ready");
+      break;
+    }
+    sleep(100).await;
+    debug!("Waiting for magic byte, received: {:?}", buffer[0]);
+  }
 
   let manifest_bytes = config.proving.manifest.unwrap().to_wire_bytes();
   reunited_socket.write_all(&manifest_bytes).await?;
