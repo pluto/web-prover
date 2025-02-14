@@ -8,14 +8,14 @@ use std::{
 use axum::{
   extract::{Path, Request, State},
   http::StatusCode,
-  response::{IntoResponse, Response},
+  response::IntoResponse,
   routing::{get, post},
   Router,
 };
 use errors::NotaryServerError;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
-use k256::ecdsa::{SigningKey as Secp256k1SigningKey, VerifyingKey};
+use k256::ecdsa::SigningKey as Secp256k1SigningKey;
 use p256::{ecdsa::SigningKey, elliptic_curve::rand_core, pkcs8::DecodePrivateKey};
 use rustls::{
   pki_types::{CertificateDer, PrivateKeyDer},
