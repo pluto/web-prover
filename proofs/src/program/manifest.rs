@@ -57,8 +57,7 @@ use crate::{
 
 /// HTTP
 pub const DATA_SIGNAL_NAME: &str = "data";
-const DATA_SIGNAL_NAME: &str = "data";
-const PUBLIC_IO_VARS: usize = 11;
+pub const PUBLIC_IO_VARS: usize = 11;
 pub(crate) const MAX_HTTP_HEADERS: usize = 25;
 
 /// Manifest containing [`Request`] and [`Response`]
