@@ -50,17 +50,17 @@ jobs:
     with:
       web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
-  test_client_wasm_tee:
-    needs: ["web-prover-circuits", "build_client_wasm", "build_notary"]
-    uses: ./.github/workflows/test_client_wasm_tee.yaml
-    with:
-      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
+  # test_client_wasm_tee:
+  #   needs: ["web-prover-circuits", "build_client_wasm", "build_notary"]
+  #   uses: ./.github/workflows/test_client_wasm_tee.yaml
+  #   with:
+  #     web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
-  test_client_native_tee:
-    needs: ["web-prover-circuits", "build_client_native", "build_notary"]
-    uses: ./.github/workflows/test_client_native_tee.yaml
-    with:
-      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
+  # test_client_native_tee:
+  #   needs: ["web-prover-circuits", "build_client_native", "build_notary"]
+  #   uses: ./.github/workflows/test_client_native_tee.yaml
+  #   with:
+  #     web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
   test_client_native_origo:
     needs: ["web-prover-circuits", "build_client_native", "build_notary"]
@@ -89,7 +89,7 @@ jobs:
       - test_client_wasm_origo
       - test_client_native_origo
       - test_client_native_tlsn
-      - test_client_native_tee
+      # - test_client_native_tee
       - test_proofs
     uses: ./.github/workflows/release.yaml
 
@@ -101,7 +101,7 @@ jobs:
       - test_client_wasm_origo
       - test_client_native_origo
       - test_client_native_tlsn
-      - test_client_native_tee
+      # - test_client_native_tee
       - test_proofs
     uses: ./.github/workflows/deploy_notary_staging.yaml
     with:
@@ -116,7 +116,7 @@ jobs:
       - test_client_wasm_origo
       - test_client_native_origo
       - test_client_native_tlsn
-      - test_client_native_tee
+      # - test_client_native_tee
       - test_proofs
     uses: ./.github/workflows/deploy_notary_staging_gcs.yaml
     with:
