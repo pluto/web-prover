@@ -205,8 +205,7 @@ async fn test_end_to_end_proofs_get() {
   let (zn_primary, _) =
     proof.proof.verify(&setup_params.public_params, &vk, &z0_primary, &z0_secondary).unwrap();
 
-  dbg!(zn_primary);
-  assert_eq!(zn_primary[0], value_digest);
+  assert_eq!(zn_primary[0], *value_digest);
   assert_eq!(zn_primary[5], F::<G1>::ZERO);
   assert_eq!(zn_primary[8], F::<G1>::ZERO);
 }
