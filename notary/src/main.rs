@@ -34,6 +34,7 @@ mod axum_websocket;
 mod config;
 mod errors;
 mod origo;
+mod proxy;
 mod tcp;
 mod tee;
 mod tls_parser;
@@ -116,6 +117,7 @@ async fn main() -> Result<(), NotaryServerError> {
     .route("/v1/tee", get(tee::proxy))
     .route("/v1/origo/sign", post(origo::sign))
     .route("/v1/origo/verify", post(origo::verify))
+    .route("/v1/proxy", post(proxy::proxy))
     .route("/v1/meta/keys/:key", get(meta_keys))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
