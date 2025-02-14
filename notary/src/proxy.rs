@@ -5,14 +5,11 @@ use axum::{
   Json,
 };
 use client::TeeProof;
-use proofs::program::{
-  http::{JsonKey, ManifestRequest, ManifestResponse, ResponseBody},
-  manifest::HTTP_1_1,
-};
+use proofs::program::http::{JsonKey, ManifestRequest, ManifestResponse, ResponseBody};
 use reqwest::{Request, Response};
 use serde::Deserialize;
 use serde_json::Value;
-use tracing::{debug, info};
+use tracing::info;
 use uuid::Uuid;
 
 use crate::{errors::NotaryServerError, SharedState};

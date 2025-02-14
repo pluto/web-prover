@@ -9,7 +9,7 @@ use caratls_ekm_google_confidential_space_server::GoogleConfidentialSpaceTokenGe
 #[cfg(feature = "tee-dummy-token-generator")]
 use caratls_ekm_server::DummyTokenGenerator;
 use caratls_ekm_server::TeeTlsAcceptor;
-use client::{errors::ClientErrors, origo::OrigoSecrets, TeeProof, TeeProofData};
+use client::{origo::OrigoSecrets, TeeProof};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use proofs::program::{
@@ -20,7 +20,7 @@ use serde::Deserialize;
 use tls_client2::tls_core::msgs::message::MessagePayload;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tracing::{debug, error, field::debug, info};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 use ws_stream_tungstenite::WsStream;
 

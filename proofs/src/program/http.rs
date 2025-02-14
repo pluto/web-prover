@@ -735,6 +735,7 @@ pub(crate) mod tests {
     // Create a superset of the base request with an additional header
     let mut other_request = base_request.clone();
     other_request.headers.insert("Extra-Header".to_string(), "Extra-Value".to_string());
+
     assert!(base_request.is_subset_of(&other_request));
 
     // Modify the method in the other request, making it not a subset
