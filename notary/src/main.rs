@@ -6,17 +6,17 @@ use std::{
 };
 
 use axum::{
-  extract::Request,
+  extract::{Path, Request, State},
   http::StatusCode,
-  response::IntoResponse,
+  response::{IntoResponse, Response},
   routing::{get, post},
   Router,
 };
 use errors::NotaryServerError;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
-use k256::ecdsa::SigningKey as Secp256k1SigningKey;
-use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
+use k256::ecdsa::{SigningKey as Secp256k1SigningKey, VerifyingKey};
+use p256::{ecdsa::SigningKey, elliptic_curve::rand_core, pkcs8::DecodePrivateKey};
 use rustls::{
   pki_types::{CertificateDer, PrivateKeyDer},
   ServerConfig,
@@ -116,6 +116,7 @@ async fn main() -> Result<(), NotaryServerError> {
     .route("/v1/tee", get(tee::proxy))
     .route("/v1/origo/sign", post(origo::sign))
     .route("/v1/origo/verify", post(origo::verify))
+    .route("/v1/meta/keys/:key", get(meta_keys))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
 
@@ -363,10 +364,50 @@ fn load_private_key(filename: &str) -> io::Result<PrivateKeyDer<'static>> {
 fn error(err: String) -> io::Error { io::Error::new(io::ErrorKind::Other, err) }
 
 pub fn load_notary_signing_key(private_key_pem_path: &str) -> SigningKey {
-  SigningKey::read_pkcs8_pem_file(private_key_pem_path).unwrap()
+  if private_key_pem_path.is_empty() {
+    info!("Using ephemeral notary signing key");
+    ephemeral_notary_signing_key()
+  } else {
+    info!("Using notary signing key: {}", private_key_pem_path);
+    SigningKey::read_pkcs8_pem_file(private_key_pem_path).unwrap()
+  }
 }
 
+pub fn ephemeral_notary_signing_key() -> SigningKey { SigningKey::random(&mut rand_core::OsRng) }
+
 pub fn load_origo_signing_key(private_key_pem_path: &str) -> Secp256k1SigningKey {
-  let raw = fs::read_to_string(private_key_pem_path).unwrap();
-  Secp256k1SigningKey::from_pkcs8_pem(&raw).unwrap()
+  if private_key_pem_path.is_empty() {
+    info!("Using ephemeral origo signing key");
+    ephemeral_origo_signing_key()
+  } else {
+    info!("Using origo signing key: {}", private_key_pem_path);
+    let raw = fs::read_to_string(private_key_pem_path).unwrap();
+    Secp256k1SigningKey::from_pkcs8_pem(&raw).unwrap()
+  }
+}
+
+pub fn ephemeral_origo_signing_key() -> Secp256k1SigningKey {
+  Secp256k1SigningKey::random(&mut rand_core::OsRng)
+}
+
+async fn meta_keys(
+  Path(key): Path<String>,
+  State(state): State<Arc<SharedState>>,
+) -> (StatusCode, String) {
+  match key.as_str() {
+    "tlsn.pub" => {
+      let vkey = state.notary_signing_key.verifying_key();
+      let hex = hex::encode(vkey.to_sec1_bytes());
+      (StatusCode::OK, hex)
+    },
+
+    "origo.pub" => {
+      let vkey = state.origo_signing_key.verifying_key();
+
+      let hex = hex::encode(vkey.to_sec1_bytes());
+      (StatusCode::OK, hex)
+    },
+
+    _ => (StatusCode::NOT_FOUND, "".to_string()),
+  }
 }
