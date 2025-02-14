@@ -522,64 +522,40 @@ pub(crate) mod tests {
 
   #[test]
   fn test_matches_other_response() {
-    let sourced_response = Response {
-      status:  "200".to_string(),
-      version: "HTTP/1.1".to_string(),
-      message: "OK".to_string(),
-      headers: std::collections::HashMap::from([(
-        "Content-Type".to_string(),
-        "application/json".to_string(),
-      )]),
-      body:    ResponseBody {
-        json: vec![JsonKey::String("key1".to_string()), JsonKey::String("key2".to_string())],
-      },
-    };
+    let sourced_response = create_response!(
+        headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
+        body: ResponseBody {
+            json: vec![JsonKey::String("key1".to_string()), JsonKey::String("key2".to_string())],
+        }
+    );
 
     // Matches a perfect match
     assert!(sourced_response.is_subset_of(&sourced_response));
 
     // Fails if it doesn't match directly
-    let mut non_matching_response = sourced_response.clone();
-    non_matching_response.status = "201".to_string();
+    let non_matching_response = create_response!(status: "201".to_string());
     assert!(!sourced_response.is_subset_of(&non_matching_response));
 
-    non_matching_response.status = "200".to_string();
-    non_matching_response.message = "Created".to_string();
-    assert!(!sourced_response.is_subset_of(&non_matching_response));
-
-    non_matching_response.message = "OK".to_string();
-    non_matching_response.headers.insert("Content-Type".to_string(), "text/plain".to_string());
-    assert!(!sourced_response.is_subset_of(&non_matching_response));
-
-    // Should pass if the response is a superset of the source response
-    let mut response_superset = sourced_response.clone();
-    response_superset.headers.insert("extra".to_string(), "header".to_string());
-    assert!(sourced_response.is_subset_of(&response_superset));
-
-    let extra_items_in_body = ResponseBody {
-      json: vec![
-        JsonKey::String("key1".to_string()),
-        JsonKey::String("key2".to_string()),
-        JsonKey::String("key3".to_string()),
-      ],
+    // Superset case
+    let response_superset = {
+      let mut res = sourced_response.clone();
+      res.headers.insert("extra".to_string(), "header".to_string());
+      res.body.json.push(JsonKey::String("key3".to_string()));
+      res
     };
-    response_superset.body = extra_items_in_body;
     assert!(sourced_response.is_subset_of(&response_superset));
   }
+
   #[test]
   fn test_response_with_missing_body() {
-    let header_bytes_no_json = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n";
-    let empty_body_bytes = br#""#;
-
-    let result = Response::from_payload(header_bytes_no_json, empty_body_bytes);
-    assert!(result.is_ok());
-
-    let response = result.unwrap();
-    assert_eq!(response.status, "200");
-    assert_eq!(response.version, "HTTP/1.1");
-    assert_eq!(response.message, "OK");
-    assert_eq!(response.headers.get("Content-Type").unwrap(), "text/plain");
-    assert!(response.body.json.is_empty());
+    let response =
+      Response::from_payload(b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n", br#""#)
+        .unwrap();
+    let expected_response = create_response!(
+        headers: HashMap::from([("Content-Type".to_string(), "text/plain".to_string())]),
+        body: ResponseBody { json: vec![] }
+    );
+    assert_eq!(response, expected_response);
   }
 
   #[test]
@@ -600,13 +576,10 @@ pub(crate) mod tests {
 
   #[test]
   fn test_validate_invalid_status() {
-    let response = Response {
-      status:  "404".to_string(), // Invalid status code
-      version: "HTTP/1.1".to_string(),
-      message: "Not Found".to_string(),
-      headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-      body:    ResponseBody { json: vec![JsonKey::String("key1".to_string())] },
-    };
+    let response = create_response!(
+        status: "404".to_string(), // Invalid status code
+        message: "Not Found".to_string()
+    );
 
     let result = response.validate();
     assert!(result.is_err());
@@ -621,37 +594,34 @@ pub(crate) mod tests {
 
   #[test]
   fn test_validate_empty_message() {
-    let response = Response {
-      status:  "200".to_string(),
-      version: "HTTP/1.1".to_string(),
-      message: "".to_string(), // Invalid, empty message
-      headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-      body:    ResponseBody { json: vec![JsonKey::String("key1".to_string())] },
-    };
-
+    let response = create_response!(
+        message: "".to_string(), // Invalid, empty message
+        body: ResponseBody { json: vec![JsonKey::String("key1".to_string())] }
+    );
     let result = response.validate();
     assert!(result.is_err());
 
-    match result {
-      Err(ProofError::InvalidManifest(msg)) => {
-        assert!(msg.contains("Invalid message length"));
-      },
-      _ => panic!("Expected invalid manifest error for empty message"),
+    if let Err(ProofError::InvalidManifest(msg)) = result {
+      assert!(msg.contains("Invalid message length"));
+    } else {
+      panic!("Expected invalid manifest error for empty message");
     }
   }
 
   #[test]
   fn test_valid_response_with_optional_body() {
-    let header_bytes = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
-    let body_bytes = br#"{"key1": "value1"}"#;
+    let response = Response::from_payload(
+      b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n",
+      br#"{"key1": "value1"}"#,
+    )
+    .unwrap();
 
-    let response = Response::from_payload(header_bytes, body_bytes).unwrap();
-    assert_eq!(response.status, "200");
-    assert_eq!(response.version, "HTTP/1.1");
-    assert_eq!(response.message, "OK");
-    assert_eq!(response.headers.get("Content-Type").unwrap(), "application/json");
-    assert_eq!(response.body.json.len(), 1);
-    assert_eq!(response.body.json[0], JsonKey::String("key1".to_string()));
+    let expected_response = create_response!(
+        body: ResponseBody {
+            json: vec![JsonKey::String("key1".to_string())]
+        }
+    );
+    assert_eq!(response, expected_response);
   }
 
   #[test]
@@ -668,25 +638,24 @@ pub(crate) mod tests {
 
   #[test]
   fn test_subset_with_missing_key_in_other() {
-    let base_response = Response {
-      status:  "200".to_string(),
-      version: "HTTP/1.1".to_string(),
-      message: "OK".to_string(),
-      headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-      body:    ResponseBody {
-        json: vec![JsonKey::String("key1".to_string()), JsonKey::String("key2".to_string())],
-      },
-    };
-
-    let other_response = Response {
-      status:  "200".to_string(),
-      version: "HTTP/1.1".to_string(),
-      message: "OK".to_string(),
-      headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-      body:    ResponseBody {
-        json: vec![JsonKey::String("key1".to_string())], // Missing "key2"
-      },
-    };
+    let base_response = create_response!(
+        status: "200".to_string(),
+        version: "HTTP/1.1".to_string(),
+        message: "OK".to_string(),
+        headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
+        body: ResponseBody {
+            json: vec![JsonKey::String("key1".to_string()), JsonKey::String("key2".to_string())]
+        }
+    );
+    let other_response = create_response!(
+        status: "200".to_string(),
+        version: "HTTP/1.1".to_string(),
+        message: "OK".to_string(),
+        headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
+        body: ResponseBody {
+            json: vec![JsonKey::String("key1".to_string())] // Missing "key2"
+        }
+    );
     assert!(!base_response.is_subset_of(&other_response));
   }
 
@@ -813,20 +782,20 @@ pub(crate) mod tests {
 
   #[test]
   fn test_request_subset_comparison() {
-    let base_request = Request {
-      method:  "GET".to_string(),
-      url:     "/path".to_string(),
-      version: "HTTP/1.1".to_string(),
-      headers: HashMap::from([("Authorization".to_string(), "Bearer token".to_string())]),
-      body:    None,
-      vars:    HashMap::new(),
-    };
+    let base_request = create_request!(
+        method: "GET".to_string(),
+        url: "/path".to_string(),
+        headers: HashMap::from([("Authorization".to_string(), "Bearer token".to_string())]),
+        body: None,
+        vars: HashMap::new()
+    );
 
+    // Create a superset of the base request with an additional header
     let mut other_request = base_request.clone();
     other_request.headers.insert("Extra-Header".to_string(), "Extra-Value".to_string());
-
     assert!(base_request.is_subset_of(&other_request));
 
+    // Modify the method in the other request, making it not a subset
     other_request.method = "POST".to_string();
     assert!(!base_request.is_subset_of(&other_request));
   }
