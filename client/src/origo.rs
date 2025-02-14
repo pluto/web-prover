@@ -14,13 +14,8 @@ use serde::{Deserialize, Serialize};
 use tls_client2::origo::OrigoConnection;
 use tracing::debug;
 use web_proof_circuits_witness_generator::{
-  data_hasher, field_element_to_base10_string,
-  http::{
-    compute_http_witness, headers_to_bytes, parser::parse as http_parse, HttpMaskType,
-    RawHttpMachine,
-  },
-  json::{json_value_digest, parser::parse, JsonKey, RawJsonMachine},
-  polynomial_digest, poseidon, ByteOrPad,
+  http::{compute_http_witness, HttpMaskType},
+  json::json_value_digest,
 };
 
 use crate::{
@@ -174,7 +169,7 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
   let flattened_plaintext: Vec<u8> =
     response_inputs.plaintext.into_iter().flat_map(|x| x).collect();
   let http_body = compute_http_witness(&flattened_plaintext, HttpMaskType::Body);
-  let value = json_value_digest::<{ proofs::program::manifest::MAX_STACK_HEIGHT }>(
+  let value = json_value_digest::<{ proofs::circuits::MAX_STACK_HEIGHT }>(
     &http_body,
     &manifest.response.body.json,
   )?;
