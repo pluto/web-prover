@@ -9,7 +9,7 @@ use client::{TeeProof, TeeProofData};
 use serde::Deserialize;
 use tracing::info;
 
-use crate::SharedState;
+use crate::{errors::NotaryServerError, SharedState};
 
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
@@ -20,7 +20,7 @@ pub async fn proxy(
   query: Query<NotarizeQuery>,
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<client::ProxyConfig>,
-) -> Json<TeeProof> {
+) -> Result<Json<TeeProof>, NotaryServerError> {
   let session_id = query.session_id.clone();
 
   info!("Starting proxy with ID: {}", session_id);
@@ -43,10 +43,10 @@ pub async fn proxy(
   // TODO
   // apply manifest to request/ response
 
-  let tee_proof = TeeProof {
-    data:      TeeProofData { manifest_hash: "todo".to_string().into_bytes() },
-    signature: "sign(hash(ProxyProofData))".to_string(),
-  };
+  // TODO: Maybe move that to `TeeProof::from_manifest`?
+  payload.manifest.validate()?;
 
-  Json(tee_proof)
+  let tee_proof = TeeProof::from_manifest(&payload.manifest);
+
+  Ok(Json(tee_proof))
 }
