@@ -22,7 +22,7 @@ use futures::{
   AsyncWriteExt, Future, FutureExt, SinkExt, StreamExt,
 };
 use tls_client2::ClientConnection;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, trace, warn};
 
 const RX_TLS_BUF_SIZE: usize = 1 << 13; // 8 KiB
 const RX_BUF_SIZE: usize = 1 << 13; // 8 KiB
@@ -115,10 +115,10 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
     'conn: loop {
       // Write all pending TLS data to the server.
       if client.wants_write() && !client_closed {
-        debug!("client wants to write");
+        trace!("client wants to write");
         while client.wants_write() {
           let _sent = client.write_tls_async(&mut server_tx).await?;
-          debug!("sent {} tls bytes to server", _sent);
+          trace!("sent {} tls bytes to server", _sent);
         }
         server_tx.flush().await?;
       }
@@ -129,7 +129,7 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
         recv.extend(&rx_buf[..read]);
         // Ignore if the receiver has hung up.
         _ = rx_sender.send(Ok(Bytes::copy_from_slice(&rx_buf[..read]))).await;
-        debug!("forwarded {} plaintext bytes to conn", read);
+        trace!("forwarded {} plaintext bytes to conn", read);
       }
 
       if !client.is_handshaking() && !handshake_done {
@@ -147,7 +147,7 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
           // Reads TLS data from the server and writes it into the client.
           received = &mut rx_tls_fut => {
               let received = received?;
-              debug!("received {} tls bytes from server", received);
+              trace!("received {} tls bytes from server", received);
 
               // Loop until we've processed all the data we received in this read.
               // Note that we must make one iteration even if `received == 0`.
@@ -163,7 +163,7 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
                   }
               }
 
-              debug!("processed {} tls bytes from server", processed);
+              trace!("processed {} tls bytes from server", processed);
 
               // By convention if `AsyncRead::read` returns 0, it means EOF, i.e. the peer
               // has closed the socket.  Also close on received_close_notify, else we hang.
@@ -203,28 +203,25 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
                   tx_recv_fut = tx_receiver.next().fuse();
               } else {
                   if !server_closed {
-                      // todo: basically we never want to do this.
-                      // what's tricky is we may receive close notify from the target server
-                      // but the proxy still wants to keep this open.
                       if let Err(e) = send_close_notify(&mut client, &mut server_tx).await {
                           warn!("failed to send close_notify to server: {}", e);
                       }
                   }
 
-                  debug!("closing client and terminating receieving end.");
+                  trace!("closing client and terminating receiving end.");
                   client_closed = true;
                   tx_recv_fut = Fuse::terminated();
               }
           }
           // Waits for a notification from the backend that it is ready to decrypt data.
           _ = &mut notify => {
-              debug!("backend is ready to decrypt");
+              trace!("backend is ready to decrypt");
 
               client.process_new_packets().await?;
           }
       }
     }
-    debug!("client shutdown");
+    trace!("client shutdown");
 
     // _ = server_tx.close().await; // MATT: socket can't be closed if we still need it
 
@@ -255,7 +252,7 @@ async fn send_close_notify(
   client: &mut ClientConnection,
   server_tx: &mut (impl AsyncWrite + Unpin),
 ) -> Result<(), ConnectionError> {
-  debug!("sending close_notify to server");
+  trace!("sending close_notify to server");
   client.send_close_notify().await?;
 
   // Flush all remaining plaintext
