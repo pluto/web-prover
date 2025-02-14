@@ -1,4 +1,7 @@
-FROM debian:bookworm-slim
+FROM debian:bookworm
+RUN apt-get update && \
+    apt-get install -y libssl-dev && \
+    rm -rf /var/lib/apt/lists/*
 RUN mkdir /app
 COPY proofs /app/proofs
 COPY .github/workflows/staging-deploy-gcs/notary /app/notary

@@ -15,6 +15,9 @@ RUN cd /app/proofs && make web-prover-circuits
 RUN cargo build --release -p notary
 
 FROM debian:bookworm
+RUN apt-get update && \
+    apt-get install -y libssl-dev && \
+    rm -rf /var/lib/apt/lists/*
 COPY --from=rust-builder /app/target/release/notary /app/notary
 COPY --from=rust-builder /app/fixture /app/fixture
 COPY --from=rust-builder /app/proofs /app/proofs
