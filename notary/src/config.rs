@@ -30,16 +30,14 @@ pub fn read_config() -> Config {
   let args = Args::parse();
 
   let builder = config::Config::builder()
-    .set_default("listen", "0.0.0.0:443")
-    .unwrap()
-    .set_default("server_cert", "") // TODO is this the right way to make server_cert optional?
-    .unwrap()
-    .set_default("server_key", "") // TODO is this the right way to make server_key optional?
-    .unwrap()
-    .set_default("acme_email", "") // TODO is this the right way to make acme_email optional?
-    .unwrap()
-    .set_default("acme_domain", "") // TODO is this the right way to make acme_domain optional?
-    .unwrap();
+    // TODO is this the right way to make server_cert optional?
+    .set_default("listen", "0.0.0.0:443").unwrap()
+    .set_default("server_cert", "").unwrap()
+    .set_default("server_key", "").unwrap()
+    .set_default("notary_signing_key", "").unwrap()
+    .set_default("origo_signing_key", "").unwrap()
+    .set_default("acme_email", "").unwrap()
+    .set_default("acme_domain", "").unwrap();
 
   // does config file exist?
   let config_file = args.config;
