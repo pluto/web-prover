@@ -16,7 +16,10 @@ use std::collections::HashMap;
 
 use origo::SignedVerificationReply;
 use proofs::{
-  program::manifest::{Manifest, NIVCRom},
+  program::{
+    http::ManifestRequest,
+    manifest::{Manifest, NIVCRom, HTTP_1_1},
+  },
   proof::FoldingProof,
 };
 use serde::{Deserialize, Serialize};
