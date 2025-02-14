@@ -194,6 +194,10 @@ impl OrigoSecrets {
 
   pub fn app_server_key(&self) -> Option<Vec<u8>> { self.0.get("Application:server_key").cloned() }
 
+  pub fn app_client_iv(&self) -> Option<Vec<u8>> { self.0.get("Application:client_iv").cloned() }
+
+  pub fn app_client_key(&self) -> Option<Vec<u8>> { self.0.get("Application:client_key").cloned() }
+
   pub fn from_origo_conn(origo_conn: &OrigoConnection) -> Self {
     Self(origo_conn.secret_map.clone())
   }

@@ -72,6 +72,8 @@ pub async fn sign(
     &handshake_server_iv,
     None,
     None,
+    None,
+    None,
   );
   let parsed_transcript = match r {
     Ok(p) => p,

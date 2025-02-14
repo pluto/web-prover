@@ -3,7 +3,6 @@ use std::io::Cursor;
 use k256::elliptic_curve::Field;
 use nom::{bytes::streaming::take, IResult};
 use proofs::{circuits::CIRCUIT_SIZE_512, F, G1};
-use rustls::crypto::cipher;
 use tls_client2::{
   hash_hs::HandshakeHashBuffer,
   internal::msgs::hsjoiner::HandshakeJoiner,
@@ -136,6 +135,8 @@ impl Transcript<Flattened> {
     handshake_server_iv: &[u8],
     app_server_key: Option<Vec<u8>>,
     app_server_iv: Option<Vec<u8>>,
+    app_client_key: Option<Vec<u8>>,
+    app_client_iv: Option<Vec<u8>>,
   ) -> Result<Transcript<Parsed>, ProxyError> {
     info!("key_as_string: {:?}, length: {}", handshake_server_key, handshake_server_key.len());
     info!("iv_as_string: {:?}, length: {}", handshake_server_iv, handshake_server_iv.len());
@@ -143,7 +144,8 @@ impl Transcript<Flattened> {
     let mut parsed_messages: Vec<ParsedMessage> = vec![];
     let mut seq = 0u64;
     let mut handshake_cipher_key: Option<CipherSuiteKey> = None;
-    let mut app_cipher_key: Option<CipherSuiteKey> = None;
+    let mut app_server_cipher_key: Option<CipherSuiteKey> = None;
+    let mut app_client_cipher_key: Option<CipherSuiteKey> = None;
     let mut decrypters: Vec<DecryptWrapper> = vec![];
 
     for m in &self.payload {
@@ -181,7 +183,11 @@ impl Transcript<Flattened> {
 
                     handshake_cipher_key =
                       Some(set_key(handshake_server_key.to_vec(), CipherSuite::from(sh.cipher.0))?);
-                    app_cipher_key = match app_server_key {
+                    app_server_cipher_key = match app_server_key {
+                      Some(ref k) => Some(set_key(k.clone(), CipherSuite::from(sh.cipher.0))?),
+                      None => None,
+                    };
+                    app_client_cipher_key = match app_client_key {
                       Some(ref k) => Some(set_key(k.clone(), CipherSuite::from(sh.cipher.0))?),
                       None => None,
                     };
@@ -190,7 +196,8 @@ impl Transcript<Flattened> {
                     // and cleanup sequence number handling.
                     decrypters = vec![
                       (handshake_cipher_key, Some(handshake_server_iv), KeyMode::Handshake, seq),
-                      (app_cipher_key, app_server_iv.as_deref(), KeyMode::Application, 0),
+                      (app_server_cipher_key, app_server_iv.as_deref(), KeyMode::Application, 0),
+                      (app_client_cipher_key, app_client_iv.as_deref(), KeyMode::Application, 0),
                     ]
                     .into_iter()
                     .flat_map(|(key, iv, mode, seq)| match iv {
@@ -605,16 +612,12 @@ fn trial_decrypt(
   msg: OpaqueMessage,
   decrypters: &mut Vec<DecryptWrapper>,
 ) -> Result<Vec<WrappedPayload>, ProxyError> {
-  let plain_pairs = decrypters
+  let possible_decryption = decrypters
     .iter_mut()
     .flat_map(|pair| match pair.decrypt(&msg) {
-      Some(pt) => Some((pt, pair.mode.clone())),
+      Some(pt) => Some((pt, &pair.mode)),
       None => None,
     })
-    .collect::<Vec<(PlainMessage, KeyMode)>>();
-
-  let possible_decryption = plain_pairs
-    .into_iter()
     .map(|(plain_message, mode)| {
       match mode {
         KeyMode::Handshake => Some(process_handshake(plain_message)),
