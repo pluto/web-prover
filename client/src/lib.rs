@@ -12,7 +12,13 @@ mod proof;
 mod tls;
 
 pub mod tls_client_async2;
-use proofs::{errors::ProofError, program::manifest::NIVCRom, proof::FoldingProof};
+use std::collections::HashMap;
+
+use proofs::{
+  errors::ProofError,
+  program::manifest::{Manifest, NIVCRom},
+  proof::FoldingProof,
+};
 use serde::{Deserialize, Serialize};
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
@@ -25,6 +31,7 @@ pub enum Proof {
   TLSN(Box<TlsProof>),
   Origo(OrigoProof),
   TEE(TeeProof),
+  Proxy(TeeProof),
 }
 
 pub fn get_web_prover_circuits_version() -> String {
@@ -40,6 +47,7 @@ pub async fn prover_inner(
     config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
     config::NotaryMode::Origo => prover_inner_origo(config, proving_params).await,
     config::NotaryMode::TEE => prover_inner_tee(config).await,
+    config::NotaryMode::Proxy => prover_inner_proxy(config).await,
   }
 }
 
@@ -112,6 +120,53 @@ pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, error
   let (_origo_conn, tee_proof) = origo_native::proxy(config, session_id).await?;
 
   Ok(Proof::TEE(tee_proof.unwrap()))
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ProxyConfig {
+  pub target_method:  String,
+  pub target_url:     String,
+  pub target_headers: HashMap<String, String>,
+  pub target_body:    String,
+  pub manifest:       Manifest,
+}
+
+pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, errors::ClientErrors> {
+  let session_id = config.session_id.clone();
+
+  let url = format!(
+    "https://{}:{}/v1/proxy?session_id={}",
+    config.notary_host.clone(),
+    config.notary_port.clone(),
+    session_id.clone(),
+  );
+
+  let proxy_config = ProxyConfig {
+    target_method:  config.target_method,
+    target_url:     config.target_url,
+    target_headers: config.target_headers,
+    target_body:    config.target_body,
+    manifest:       config.proving.manifest.unwrap(),
+  };
+
+  // TODO reqwest uses browsers fetch API for WASM target? if true, can't add trust anchors
+  #[cfg(target_arch = "wasm32")]
+  let client = reqwest::ClientBuilder::new().build()?;
+
+  #[cfg(not(target_arch = "wasm32"))]
+  let client = {
+    let mut client_builder = reqwest::ClientBuilder::new().use_rustls_tls();
+    if let Some(cert) = config.notary_ca_cert {
+      client_builder =
+        client_builder.add_root_certificate(reqwest::tls::Certificate::from_der(&cert)?);
+    }
+    client_builder.build()?
+  };
+
+  let response = client.post(url).json(&proxy_config).send().await?;
+  assert!(response.status() == hyper::StatusCode::OK);
+  let tee_proof = response.json::<TeeProof>().await?;
+  Ok(Proof::Proxy(tee_proof))
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

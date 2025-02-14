@@ -36,6 +36,7 @@ mod errors;
 mod origo;
 mod tcp;
 mod tee;
+mod proxy;
 mod tls_parser;
 mod tlsn;
 mod verifier;
@@ -116,6 +117,7 @@ async fn main() -> Result<(), NotaryServerError> {
     .route("/v1/tee", get(tee::proxy))
     .route("/v1/origo/sign", post(origo::sign))
     .route("/v1/origo/verify", post(origo::verify))
+    .route("/v1/proxy", post(proxy::proxy))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
 

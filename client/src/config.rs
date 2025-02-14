@@ -27,6 +27,8 @@ pub enum NotaryMode {
   TLSN,
   // TEE proxy mode
   TEE,
+  // Plain Proxy mode
+  Proxy
 }
 
 /// Proving data containing [`Manifest`] and serialized witnesses used for WASM
