@@ -50,17 +50,17 @@ jobs:
     with:
       web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
-  # test_client_wasm_tee:
-  #   needs: ["web-prover-circuits", "build_client_wasm", "build_notary"]
-  #   uses: ./.github/workflows/test_client_wasm_tee.yaml
-  #   with:
-  #     web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
+  test_client_wasm_tee:
+    needs: ["web-prover-circuits", "build_client_wasm", "build_notary"]
+    uses: ./.github/workflows/test_client_wasm_tee.yaml
+    with:
+      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
-  # test_client_native_tee:
-  #   needs: ["web-prover-circuits", "build_client_native", "build_notary"]
-  #   uses: ./.github/workflows/test_client_native_tee.yaml
-  #   with:
-  #     web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
+  test_client_native_tee:
+    needs: ["web-prover-circuits", "build_client_native", "build_notary"]
+    uses: ./.github/workflows/test_client_native_tee.yaml
+    with:
+      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
   test_client_native_origo:
     needs: ["web-prover-circuits", "build_client_native", "build_notary"]

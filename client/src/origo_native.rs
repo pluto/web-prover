@@ -5,10 +5,11 @@ use caratls_ekm_client::DummyTokenVerifier;
 use caratls_ekm_client::TeeTlsConnector;
 #[cfg(feature = "tee-google-confidential-space-token-verifier")]
 use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
-use futures::{channel::oneshot, AsyncWriteExt};
+use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt as FuturesWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use tls_client2::origo::OrigoConnection;
+use tokio::io::AsyncWriteExt;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::debug;
 
@@ -117,7 +118,7 @@ async fn handle_origo_mode(
     crate::tls_client_async2::bind_client(notary_tls_socket.compat(), client);
 
   // TODO: What do with tls_fut? what do with tls_receiver?
-  let (tls_sender, _tls_receiver) = oneshot::channel();
+  let (tls_sender, tls_receiver) = oneshot::channel();
   let handled_tls_fut = async {
     let result = tls_fut.await.unwrap();
     let _ = tls_sender.send(result);
@@ -145,9 +146,11 @@ async fn handle_origo_mode(
   debug!("Response: {:?}", payload);
 
   // Close the connection to the server
-  // TODO this closes the TLS Connection, do we want to maybe close the TCP stream instead?
   let mut client_socket = connection_receiver.await??.io.into_inner().into_inner();
   client_socket.close().await?;
+
+  // Close the underlying TCP stream.
+  tls_receiver.await?.1.into_inner().into_inner().into_inner().into_inner().0.shutdown().await?;
 
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
   Ok(origo_conn)
@@ -250,6 +253,17 @@ async fn handle_tee_mode(
   // wait for tls connection
   let (_, mut reunited_socket) = tls_fut_task.await?.unwrap();
 
+  let mut buffer = [0u8; 1];
+  loop {
+    reunited_socket.read_exact(&mut buffer).await?;
+    if buffer.len() == 1 && buffer[0] == 0xAA {
+      debug!("Magic byte 0xAA received, server is ready");
+      break;
+    }
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    debug!("Waiting for magic byte, received: {:?}", buffer[0]);
+  }
+
   let manifest_bytes = config.proving.manifest.unwrap().to_wire_bytes();
   reunited_socket.write_all(&manifest_bytes).await?;
 
@@ -258,6 +272,7 @@ async fn handle_tee_mode(
 
   let tee_proof_bytes = crate::origo::read_wire_struct(&mut reunited_socket).await;
   let tee_proof = TeeProof::from_wire_bytes(&tee_proof_bytes);
+  // reunited_socket.close().await?;
 
   Ok((origo_conn, tee_proof))
 }

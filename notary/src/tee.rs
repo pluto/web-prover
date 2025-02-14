@@ -121,11 +121,28 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let mut tee_tls_stream = tee_tls_acceptor.accept(socket).await?;
   proxy_service(&mut tee_tls_stream, session_id, target_host, target_port, state.clone()).await?;
 
+  use tokio::time::{timeout, Duration};
+  let mut buf = [0u8; 1024];
+  debug!("synchronizing socket");
+  match timeout(Duration::from_millis(200), tee_tls_stream.read(&mut buf)).await {
+    Ok(Ok(n)) => {
+      debug!("read bytes: n={:?}, buf={:?}", n, hex::encode(buf));
+    },
+    Ok(Err(e)) => {
+      panic!("unexpected error: {:?}", e);
+    },
+    Err(_elapsed) => {
+      debug!("no bytes to read, proceeding");
+    },
+  }
+
+  debug!("Sending magic byte to indicate readiness to read");
+  tee_tls_stream.write_all(&[0xAA]).await?;
+
   let manifest_bytes = read_wire_struct(&mut tee_tls_stream).await;
   // TODO: Consider implementing from_stream instead of read_wire_struct
   let manifest = Manifest::from_wire_bytes(&manifest_bytes);
   // dbg!(&manifest);
-
   let secret_bytes = read_wire_struct(&mut tee_tls_stream).await;
   let origo_secrets = OrigoSecrets::from_wire_bytes(&secret_bytes);
   // dbg!(&origo_secrets);
@@ -143,7 +160,7 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
     .unwrap()
     .into_parsed(&handshake_server_key, &handshake_server_iv)
     .unwrap();
-  dbg!(parsed_transcript);
+  // dbg!(parsed_transcript);
 
   // TODO apply manifest to parsed_transcript
 
@@ -172,7 +189,7 @@ async fn read_wire_struct<R: AsyncReadExt + Unpin>(stream: &mut R) -> Vec<u8> {
   // Allocate a buffer to hold only the bytes needed for the struct
   let mut body_buf = vec![0u8; body_len];
   stream.read_exact(&mut body_buf).await.unwrap();
-  // dbg!(format!("manifest_buf={:?}", manifest_buf));
+  // dbg!(format!("body_buf={:?}", body_buf));
 
   // Prepend len_buf to manifest_buf
   let mut wire_struct_buf = len_buf.to_vec();
