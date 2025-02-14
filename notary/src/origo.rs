@@ -346,6 +346,8 @@ pub async fn verify(
       &verifier_inputs.request_messages,
       &response_messages,
     )?;
+  assert_eq!(ciphertext_digest, expected_ciphertext_digest);
+
   let (z0_primary, _) = verifier.setup_params.extend_public_inputs(
     &verifier::flatten_rom(payload.origo_proof.rom.rom),
     &initial_nivc_input.to_vec(),
@@ -372,6 +374,7 @@ pub async fn verify(
             ciphertext_digest,
             0,
           )
+        && output[10] == ciphertext_digest
       {
         // TODO: add the manifest digest?
         debug!("output from verifier: {output:?}");

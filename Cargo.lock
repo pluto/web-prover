@@ -3920,6 +3920,7 @@ dependencies = [
  "tower-service",
  "tracing",
  "tracing-subscriber",
+ "web-proof-circuits-witness-generator",
  "ws_stream_tungstenite 0.13.0 (git+https://github.com/pluto/ws_stream_tungstenite.git?branch=latest)",
 ]
 
