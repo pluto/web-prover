@@ -85,6 +85,17 @@ pub enum NotaryServerError {
 
   #[error(transparent)]
   ProofError(#[from] ProofError),
+
+  #[error("Missing application-level data messages. Expected: {0}, Actual: {1}")]
+  MissingAppDataMessages(usize, usize),
+
+  // TODO: Update to contain feedback
+  #[error("Manifest-request mismatch")]
+  ManifestRequestMismatch,
+
+  // TODO: Update to contain feedback
+  #[error("Manifest-response mismatch")]
+  ManifestResponseMismatch,
 }
 
 impl From<VerifierError> for NotaryServerError {

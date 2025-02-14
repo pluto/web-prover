@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use web_proof_circuits_witness_generator::json::JsonKey;
 
-use crate::program::manifest::{EncryptionInput, Manifest, Request, Response, ResponseBody};
+use crate::program::{
+  http::{Request, Response, ResponseBody},
+  manifest::{EncryptionInput, Manifest},
+};
 
 pub(crate) const TEST_MANIFEST: &str = r#"
 {
