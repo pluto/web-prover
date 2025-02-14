@@ -67,7 +67,14 @@ pub async fn sign(
   let handshake_server_key = hex::decode(payload.handshake_server_key).unwrap();
   let handshake_server_iv = hex::decode(payload.handshake_server_iv).unwrap();
 
-  let r = transcript.into_flattened()?.into_parsed(&handshake_server_key, &handshake_server_iv);
+  let r = transcript.into_flattened()?.into_parsed(
+    &handshake_server_key,
+    &handshake_server_iv,
+    None,
+    None,
+    None,
+    None,
+  );
   let parsed_transcript = match r {
     Ok(p) => p,
     Err(e) => {

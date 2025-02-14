@@ -151,6 +151,10 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
     origo_secrets.handshake_server_key().expect("Handshake server key missing");
   let handshake_server_iv =
     origo_secrets.handshake_server_iv().expect("Handshake server IV missing");
+  let app_server_key = origo_secrets.app_server_key().expect("Application server IV missing");
+  let app_server_iv = origo_secrets.app_server_iv().expect("Application server key missing");
+  let app_client_key = origo_secrets.app_client_key().expect("Application client IV missing");
+  let app_client_iv = origo_secrets.app_client_iv().expect("Application client key missing");
 
   // TODO (autoparallel): This duplicates some code we see in `notary/src/origo.rs`, so we could
   //  maybe clean this up and share code.
@@ -158,7 +162,14 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let parsed_transcript = transcript
     .into_flattened()
     .unwrap()
-    .into_parsed(&handshake_server_key, &handshake_server_iv)
+    .into_parsed(
+      &handshake_server_key,
+      &handshake_server_iv,
+      Some(app_server_key.to_vec()),
+      Some(app_server_iv.to_vec()),
+      Some(app_client_key.to_vec()),
+      Some(app_client_iv.to_vec()),
+    )
     .unwrap();
   // dbg!(parsed_transcript);
 
