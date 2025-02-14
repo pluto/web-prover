@@ -160,7 +160,7 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
     .unwrap()
     .into_parsed(&handshake_server_key, &handshake_server_iv)
     .unwrap();
-  dbg!(parsed_transcript);
+  // dbg!(parsed_transcript);
 
   // TODO apply manifest to parsed_transcript
 
