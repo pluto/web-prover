@@ -1,9 +1,6 @@
 use std::{fmt::Display, io::Cursor};
 
-use k256::elliptic_curve::Field;
 use nom::{bytes::streaming::take, IResult};
-use proofs::{circuits::CIRCUIT_SIZE_512, F, G1};
-use rustls::crypto::cipher;
 use tls_client2::{
   hash_hs::HandshakeHashBuffer,
   internal::msgs::hsjoiner::HandshakeJoiner,
@@ -26,7 +23,6 @@ use tls_parser::{
   TlsMessageHandshake, TlsServerHelloContents,
 };
 use tracing::{debug, error, info, trace};
-use web_proof_circuits_witness_generator::{data_hasher, ByteOrPad};
 
 use crate::errors::ProxyError;
 
@@ -334,46 +330,6 @@ impl Transcript<Parsed> {
     Err(ProxyError::TlsHandshakeVerify(String::from("unable to parse verify data")))
   }
 
-  /// Given chunks of possible request or response data, compute
-  /// the valid subsequences and hash them.
-  ///
-  /// Example:
-  /// Given as input three chunks of bytes [1,2,3]
-  ///
-  /// Output:
-  /// [H([1]), H([1,2]), H([1,2,3]), H([2]), H([2,3]), H([3])]
-  fn get_permutations(input: &[Vec<u8>]) -> Vec<F<G1>> {
-    let mut result = Vec::new();
-
-    fn get_hashes(bytes: Vec<u8>) -> Vec<F<G1>> {
-      vec![CIRCUIT_SIZE_512]
-        .into_iter()
-        .filter(|&size| bytes.len() <= size)
-        .map(|size| {
-          data_hasher(
-            &ByteOrPad::from_bytes_with_padding(&bytes, size - bytes.len()),
-            F::<G1>::ZERO,
-          )
-        })
-        .collect()
-    }
-
-    for i in 0..input.len() {
-      let mut current = Vec::new();
-      result.extend(get_hashes(input[i].clone()));
-      current.extend(&input[i]);
-
-      for item in input[i + 1..].iter() {
-        let mut combined = current.clone();
-        combined.extend(item);
-        result.extend(get_hashes(combined.clone()));
-      }
-    }
-
-    result.dedup();
-    result
-  }
-
   /// Retrieve possible valid hashes of ciphertext. Unfortunately using encrypted
   /// TLS 1.3 data as input, there is not a deterministic way to extract the
   /// request and response data.  There can be a variable number of either request
@@ -385,7 +341,7 @@ impl Transcript<Parsed> {
   ///
   /// To skip redundant verification in the future, we could accept a possible target hash
   /// from the client and check if it is in the set of valid hashes.
-  pub fn get_ciphertext_hashes(&self) -> (Vec<F<G1>>, Vec<F<G1>>, Vec<Vec<u8>>, Vec<Vec<u8>>) {
+  pub fn get_ciphertext_hashes(&self) -> (Vec<Vec<u8>>, Vec<Vec<u8>>) {
     // State machine for extracting request response
     // Transcript Structure:
     // - Encrypted 1: server sends back verify data
@@ -395,6 +351,7 @@ impl Transcript<Parsed> {
     // - Encrypted j..k: server sends back real response
     // - Encrypted k: server sends close notify => drop message
     //
+    #[derive(Debug)]
     enum State {
       SeekingRequest,
       ParsingRequest,
@@ -405,8 +362,6 @@ impl Transcript<Parsed> {
       m: &ParsedMessage,
       bytes: Vec<u8>,
       s: State,
-      idx: usize,
-      last_msg_idx: usize,
       req: &mut Vec<Vec<u8>>,
       resp: &mut Vec<Vec<u8>>,
     ) -> State {
@@ -427,29 +382,25 @@ impl Transcript<Parsed> {
             req.push(trimmed_bytes);
             State::ParsingRequest
           } else {
-            // Case: first message from server after request
             resp.push(trimmed_bytes);
             State::ParsingResponse
           }
         },
-        State::ParsingResponse => {
+        State::ParsingResponse =>
           if matches!(m.direction, Direction::Received) {
-            // Case: receiving message & not the last message. Drop last message, it's close notify.
-            if idx < last_msg_idx {
-              resp.push(trimmed_bytes);
-            }
+            resp.push(trimmed_bytes);
             State::ParsingResponse
           } else {
             panic!("expected only response data");
-          }
-        },
+          },
       }
     }
 
     let mut request_messages: Vec<Vec<u8>> = Vec::new();
     let mut response_messages: Vec<Vec<u8>> = Vec::new();
     let mut current_state = State::SeekingRequest;
-    for (m_idx, m) in self.payload.iter().enumerate() {
+    debug!("Transcript length: {}", self.payload.len());
+    for m in self.payload.iter() {
       match &m.payload {
         WrappedPayload::Encrypted(e) => {
           info!(
@@ -464,8 +415,6 @@ impl Transcript<Parsed> {
             m,
             e.payload.0.clone(),
             current_state,
-            m_idx,
-            self.payload.len() - 1,
             &mut request_messages,
             &mut response_messages,
           );
@@ -483,11 +432,7 @@ impl Transcript<Parsed> {
       };
     }
 
-    // TODO (sambhav): see if can remove this?
-    let request_hashes = Transcript::<Parsed>::get_permutations(&request_messages);
-    let response_hashes = Transcript::<Parsed>::get_permutations(&response_messages);
-
-    (request_hashes, response_hashes, request_messages, response_messages)
+    (request_messages, response_messages)
   }
 }
 
