@@ -14,8 +14,8 @@ mod tls;
 pub mod tls_client_async2;
 use std::collections::HashMap;
 
+use origo::SignedVerificationReply;
 use proofs::{
-  errors::ProofError,
   program::manifest::{Manifest, NIVCRom},
   proof::FoldingProof,
 };
@@ -25,6 +25,15 @@ use tlsn_prover::tls::ProverConfig;
 use tracing::{debug, info};
 
 use crate::errors::ClientErrors;
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct OrigoProof {
+  pub proof:             FoldingProof<Vec<u8>, String>,
+  pub rom:               NIVCRom,
+  pub ciphertext_digest: [u8; 32],
+  pub sign_reply:        Option<SignedVerificationReply>,
+  pub value:             Option<String>,
+}
 
 #[derive(Debug, Serialize)]
 pub enum Proof {
@@ -91,7 +100,7 @@ pub async fn prover_inner_origo(
 ) -> Result<Proof, errors::ClientErrors> {
   let session_id = config.session_id.clone();
 
-  let proof = origo::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
+  let mut proof = origo::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
 
   let manifest =
     config.proving.manifest.clone().ok_or(errors::ClientErrors::ManifestMissingError)?;
@@ -100,12 +109,17 @@ pub async fn prover_inner_origo(
   let verify_response =
     origo::verify(config, origo::VerifyBody { session_id, origo_proof: proof.clone(), manifest })
       .await?;
+  // Note: The above `?` will push out the `ProofError::VerifyFailed` from the `origo::verify`
+  // method now. We no longer return an inner bool here, we just use the Result enum itself
 
-  if !verify_response.valid {
-    Err(ProofError::VerifyFailed().into())
-  } else {
-    Ok(Proof::Origo(proof))
-  }
+  proof.sign_reply = Some(verify_response);
+
+  debug!("proof.value: {:?}\nproof.verify_reply: {:?}", proof.value, proof.sign_reply);
+
+  // TODO: This is where we should output richer proof data, the verikfy response has the hash of
+  // the target value now. Since this is in the client, we can use the private variables here. We
+  // just need to get out the value.
+  Ok(Proof::Origo(proof))
 }
 
 pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
@@ -167,13 +181,6 @@ pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, errors:
   assert!(response.status() == hyper::StatusCode::OK);
   let tee_proof = response.json::<TeeProof>().await?;
   Ok(Proof::Proxy(tee_proof))
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct OrigoProof {
-  pub proof:             FoldingProof<Vec<u8>, String>,
-  pub ciphertext_digest: [u8; 32],
-  pub rom:               NIVCRom,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

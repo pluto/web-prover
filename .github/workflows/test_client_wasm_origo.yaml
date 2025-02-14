@@ -56,7 +56,7 @@ jobs:
       - run: |
           export RUST_LOG=DEBUG
           ./target/release/notary --config ./fixture/notary-config.toml &
-          sleep 10
+          sleep 30
 
           # symlink proofs/web_proof_circuits
           (cd client_wasm/demo/static && rm -rf build && ln -s ../../../proofs/web_proof_circuits build)

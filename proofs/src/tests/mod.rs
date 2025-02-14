@@ -126,7 +126,7 @@ fn wasm_witness_generator_type_256b() -> [WitnessGeneratorType; 3] {
 }
 
 #[tokio::test]
-#[tracing_test::traced_test]
+// #[tracing_test::traced_test]
 async fn test_end_to_end_proofs_get() {
   const CIRCUIT_SIZE: usize = 256;
   let setup_data = UninitializedSetup {
@@ -165,6 +165,7 @@ async fn test_end_to_end_proofs_get() {
 
   let val = "world".as_bytes();
   let value_digest = &polynomial_digest(val, ciphertext_digest, 0);
+  dbg!(value_digest);
 
   let (pk, vk) = CompressedSNARK::<E1, S1, S2>::setup(&public_params).unwrap();
   let vk_digest_primary = pk.pk_primary.vk_digest;
@@ -201,7 +202,12 @@ async fn test_end_to_end_proofs_get() {
     setup_params.extend_public_inputs(&proof_params.rom, &instance_params.nivc_input).unwrap();
 
   let z0_secondary = vec![F::<G2>::ZERO];
-  proof.proof.verify(&setup_params.public_params, &vk, &z0_primary, &z0_secondary).unwrap();
+  let (zn_primary, _) =
+    proof.proof.verify(&setup_params.public_params, &vk, &z0_primary, &z0_secondary).unwrap();
+
+  assert_eq!(zn_primary[0], *value_digest);
+  assert_eq!(zn_primary[5], F::<G1>::ZERO);
+  assert_eq!(zn_primary[8], F::<G1>::ZERO);
 }
 
 #[tokio::test]

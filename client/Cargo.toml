@@ -35,8 +35,9 @@ tlsn-core  ={ workspace=true }
 caratls_ekm_client                          ={ workspace=true }
 caratls_ekm_google_confidential_space_client={ workspace=true }
 
-bytes ="1"
-proofs={ workspace=true }
+bytes                               ="1"
+proofs                              ={ workspace=true }
+web-proof-circuits-witness-generator={ workspace=true }
 
 serde-wasm-bindgen="0.6.5"
 

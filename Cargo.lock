@@ -1479,6 +1479,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-bindgen-rayon",
  "wasm-bindgen-test",
+ "web-proof-circuits-witness-generator",
  "web-sys",
  "web-time 1.1.0",
  "webpki-roots 0.26.7",
@@ -3919,6 +3920,7 @@ dependencies = [
  "tower-service",
  "tracing",
  "tracing-subscriber",
+ "web-proof-circuits-witness-generator",
  "ws_stream_tungstenite 0.13.0 (git+https://github.com/pluto/ws_stream_tungstenite.git?branch=latest)",
 ]
 
@@ -7282,7 +7284,7 @@ dependencies = [
 [[package]]
 name = "web-proof-circuits-witness-generator"
 version = "0.1.0"
-source = "git+https://github.com/pluto/web-prover-circuits#0a09df087612d45fa3b0d5914d93c72417edb58b"
+source = "git+https://github.com/pluto/web-prover-circuits?rev=0a09df087612d45fa3b0d5914d93c72417edb58b#0a09df087612d45fa3b0d5914d93c72417edb58b"
 dependencies = [
  "anyhow",
  "ark-bn254",

@@ -52,7 +52,7 @@ tokio-util  ={ version="0.7" }
 tokio-rustls={ version="0.26.0", default-features=false, features=["logging", "tls12"] }
 
 # circuits witness generator
-web-proof-circuits-witness-generator={ git="https://github.com/pluto/web-prover-circuits" }
+web-proof-circuits-witness-generator={ git="https://github.com/pluto/web-prover-circuits", rev="0a09df087612d45fa3b0d5914d93c72417edb58b" }
 
 [package]
 name   ="webprover"
@@ -81,8 +81,8 @@ overflow-checks=false
 split-debuginfo="unpacked"
 
 [profile.release]
-opt-level    =3
-lto          ="fat"
+opt-level    =0
+lto          =false
 codegen-units=1
 panic        ="abort"
 strip        =true

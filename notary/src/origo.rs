@@ -6,11 +6,12 @@ use axum::{
   response::Response,
   Json,
 };
-use client::origo::{SignBody, VerifyBody, VerifyReply};
+use client::origo::{SignBody, SignedVerificationReply, VerifyBody, VerifyReply};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use proofs::{
   circuits::{CIRCUIT_SIZE_512, MAX_STACK_HEIGHT},
+  errors::ProofError,
   program::manifest::{compute_ciphertext_digest, InitialNIVCInputs},
   proof::FoldingProof,
   F, G1, G2,
@@ -23,6 +24,7 @@ use tokio::{
 };
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{debug, error, info};
+use web_proof_circuits_witness_generator::polynomial_digest;
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
@@ -55,6 +57,7 @@ pub struct VerifierInputs {
   response_messages: Vec<Vec<u8>>,
 }
 
+// TODO: Don't need this method? But can use the logic to do the signature.
 pub async fn sign(
   query: Query<SignQuery>,
   State(state): State<Arc<SharedState>>,
@@ -143,6 +146,59 @@ pub async fn sign(
     // https://docs.openzeppelin.com/contracts/4.x/api/utils#ECDSA-tryRecover-bytes32-bytes-
     signature_v: recover_id.to_byte() + 27,
     signer: "0x".to_string() + &hex::encode(signer_address),
+  };
+
+  Ok(Json(response))
+}
+
+pub fn sign_verification(
+  query: VerifyReply,
+  State(state): State<Arc<SharedState>>,
+) -> Result<Json<SignedVerificationReply>, ProxyError> {
+  // TODO check OSCP and CT (maybe)
+  // TODO check target_name matches SNI and/or cert name (let's discuss)
+
+  let leaf_hashes = vec![
+    KeccakHasher::hash(query.value.as_bytes()),
+    KeccakHasher::hash(serde_json::to_string(&query.manifest)?.as_bytes()),
+  ];
+  let merkle_tree = MerkleTree::<KeccakHasher>::from_leaves(&leaf_hashes);
+  let merkle_root = merkle_tree.root().unwrap();
+
+  // need secp256k1 here for Solidity
+  let (signature, recover_id) =
+    state.origo_signing_key.clone().sign_prehash_recoverable(&merkle_root).unwrap();
+
+  let signer_address =
+    alloy_primitives::Address::from_public_key(state.origo_signing_key.verifying_key());
+
+  let verifying_key =
+    k256::ecdsa::VerifyingKey::recover_from_prehash(&merkle_root.clone(), &signature, recover_id)
+      .unwrap();
+
+  assert_eq!(state.origo_signing_key.verifying_key(), &verifying_key);
+
+  // TODO is this right? we need lower form S for sure though
+  let s = if signature.normalize_s().is_some() {
+    hex::encode(signature.normalize_s().unwrap().to_bytes())
+  } else {
+    hex::encode(signature.s().to_bytes())
+  };
+
+  let response = SignedVerificationReply {
+    merkle_leaves: vec![
+      "0x".to_string() + &hex::encode(leaf_hashes[0]),
+      "0x".to_string() + &hex::encode(leaf_hashes[1]),
+    ],
+    digest:        "0x".to_string() + &hex::encode(merkle_root),
+    signature:     "0x".to_string() + &hex::encode(signature.to_der().as_bytes()),
+    signature_r:   "0x".to_string() + &hex::encode(signature.r().to_bytes()),
+    signature_s:   "0x".to_string() + &s,
+
+    // the good old +27
+    // https://docs.openzeppelin.com/contracts/4.x/api/utils#ECDSA-tryRecover-bytes32-bytes-
+    signature_v: recover_id.to_byte() + 27,
+    signer:      "0x".to_string() + &hex::encode(signer_address),
   };
 
   Ok(Json(response))
@@ -251,7 +307,7 @@ fn find_ciphertext_permutation<const CIRCUIT_SIZE: usize>(
 pub async fn verify(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<VerifyBody>,
-) -> Result<Json<VerifyReply>, ProxyError> {
+) -> Result<Json<SignedVerificationReply>, ProxyError> {
   let proof = FoldingProof {
     proof:           payload.origo_proof.proof.proof.clone(),
     verifier_digest: payload.origo_proof.proof.verifier_digest.clone(),
@@ -285,31 +341,58 @@ pub async fn verify(
   debug!("rom {:?}", payload.origo_proof.rom.rom);
   let verifier = &state.verifier;
 
-  let InitialNIVCInputs { initial_nivc_input, .. } =
+  let InitialNIVCInputs { initial_nivc_input, ciphertext_digest, .. } =
     payload.manifest.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE_512>(
       &verifier_inputs.request_messages,
       &response_messages,
     )?;
+  assert_eq!(ciphertext_digest, expected_ciphertext_digest);
+
   let (z0_primary, _) = verifier.setup_params.extend_public_inputs(
     &verifier::flatten_rom(payload.origo_proof.rom.rom),
     &initial_nivc_input.to_vec(),
   )?;
   let z0_secondary = vec![F::<G2>::from(0)];
 
-  let valid = match proof.proof.verify(
+  let verify_output = match proof.proof.verify(
     &verifier.setup_params.public_params,
     &verifier.verifier_key,
     &z0_primary,
     &z0_secondary,
   ) {
-    Ok(_) => true,
+    Ok((output, _)) => {
+      // TODO: I think that `output[10] == ciphertext_digest` should also check? But I'm not 100%
+      // sure. Right now it doesn't and that's probably because we have the split up request and
+      // response.
+      // TODO: We should also check that the full extended ROM was correct? Although maybe that's
+      // implicit in this.
+      if output[5] == F::<G1>::from(0)
+        && output[8] == F::<G1>::from(0)
+        && output[0]
+          == polynomial_digest(
+            &payload.origo_proof.value.clone().unwrap().as_bytes(),
+            ciphertext_digest,
+            0,
+          )
+        && output[10] == ciphertext_digest
+      {
+        // TODO: add the manifest digest?
+        debug!("output from verifier: {output:?}");
+        // TODO: This unwrap should be safe for now as the value will always be present at this
+        // point
+        VerifyReply { value: payload.origo_proof.value.unwrap(), manifest: payload.manifest }
+      } else {
+        // TODO (autoparallel): May want richer error content here to say what was wrong.
+        return Err(ProofError::VerifyFailed().into());
+      }
+    },
     Err(e) => {
-      error!("Error verifying proof: {:?}", e);
-      false
+      error!("Error verifying request proof: {:?}", e);
+      return Err(ProofError::SuperNova(e).into());
     },
   };
 
-  Ok(Json(VerifyReply { valid }))
+  sign_verification(verify_output, State(state))
 }
 
 pub async fn websocket_notarize(
