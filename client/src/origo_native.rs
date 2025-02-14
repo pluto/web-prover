@@ -272,7 +272,7 @@ async fn handle_tee_mode(
 
   let tee_proof_bytes = crate::origo::read_wire_struct(&mut reunited_socket).await;
   let tee_proof = TeeProof::from_wire_bytes(&tee_proof_bytes);
-  reunited_socket.close().await?;
+  // reunited_socket.close().await?;
 
   Ok((origo_conn, tee_proof))
 }
