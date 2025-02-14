@@ -475,6 +475,30 @@ fn build_json_extraction_circuit_inputs<const CIRCUIT_SIZE: usize>(
   Ok(value_digest - data_digest)
 }
 
+pub fn compute_ciphertext_digest<const CIRCUIT_SIZE: usize>(
+  request_ciphertext: &[Vec<u8>],
+  response_ciphertext: &[Vec<u8>],
+) -> F<G1> {
+  let padded_request_ciphertext = request_ciphertext
+    .iter()
+    .map(|c| ByteOrPad::pad_to_nearest_multiple(c, CIRCUIT_SIZE))
+    .collect::<Vec<Vec<ByteOrPad>>>();
+  let padded_response_ciphertext = response_ciphertext
+    .iter()
+    .map(|c| ByteOrPad::pad_to_nearest_multiple(c, CIRCUIT_SIZE))
+    .collect::<Vec<Vec<ByteOrPad>>>();
+
+  let mut ciphertext_digest = F::<G1>::ZERO;
+  padded_request_ciphertext
+    .iter()
+    .for_each(|c| ciphertext_digest = data_hasher(c, ciphertext_digest));
+  padded_response_ciphertext
+    .iter()
+    .for_each(|c| ciphertext_digest = data_hasher(c, ciphertext_digest));
+
+  ciphertext_digest
+}
+
 impl Manifest {
   pub fn initial_inputs<const MAX_STACK_HEIGHT: usize, const CIRCUIT_SIZE: usize>(
     &self,
@@ -482,22 +506,8 @@ impl Manifest {
     request_ciphertext: &[Vec<u8>],
     response_ciphertext: &[Vec<u8>],
   ) -> Result<InitialNIVCInputs, ProofError> {
-    let padded_request_ciphertext = request_ciphertext
-      .iter()
-      .map(|c| ByteOrPad::pad_to_nearest_multiple(c, CIRCUIT_SIZE))
-      .collect::<Vec<Vec<ByteOrPad>>>();
-    let padded_response_ciphertext = response_ciphertext
-      .iter()
-      .map(|c| ByteOrPad::pad_to_nearest_multiple(c, CIRCUIT_SIZE))
-      .collect::<Vec<Vec<ByteOrPad>>>();
-
-    let mut ciphertext_digest = F::<G1>::ZERO;
-    padded_request_ciphertext
-      .iter()
-      .for_each(|c| ciphertext_digest = data_hasher(c, ciphertext_digest));
-    padded_response_ciphertext
-      .iter()
-      .for_each(|c| ciphertext_digest = data_hasher(c, ciphertext_digest));
+    let ciphertext_digest =
+      compute_ciphertext_digest::<CIRCUIT_SIZE>(request_ciphertext, response_ciphertext);
 
     // TODO: This assumes the start line format here as well.
     // digest the start line for request/response using the ciphertext_digest as a random input

@@ -59,7 +59,6 @@ tls-client2={ workspace=true }
 
 caratls_ekm_server                          ={ workspace=true }
 caratls_ekm_google_confidential_space_server={ workspace=true }
-web-proof-circuits-witness-generator        ={ workspace=true }
 
 [dev-dependencies]
 tower="0.4.13"

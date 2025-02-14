@@ -171,8 +171,9 @@ pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, errors:
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct OrigoProof {
-  pub proof: FoldingProof<Vec<u8>, String>,
-  pub rom:   NIVCRom,
+  pub proof:             FoldingProof<Vec<u8>, String>,
+  pub ciphertext_digest: [u8; 32],
+  pub rom:               NIVCRom,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

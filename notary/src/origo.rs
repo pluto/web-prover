@@ -11,7 +11,7 @@ use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use proofs::{
   circuits::{CIRCUIT_SIZE_512, MAX_STACK_HEIGHT},
-  program::manifest::InitialNIVCInputs,
+  program::manifest::{compute_ciphertext_digest, InitialNIVCInputs},
   proof::FoldingProof,
   F, G1, G2,
 };
@@ -51,8 +51,6 @@ pub struct SignReply {
 
 #[derive(Serialize, Debug, Clone)]
 pub struct VerifierInputs {
-  request_hashes:    Vec<F<G1>>,
-  response_hashes:   Vec<F<G1>>,
   request_messages:  Vec<Vec<u8>>,
   response_messages: Vec<Vec<u8>>,
 }
@@ -93,17 +91,15 @@ pub async fn sign(
   }
 
   // Determine possible request hash and response hash
-  let (request_hashes, response_hashes, request_messages, response_messages) =
-    parsed_transcript.get_ciphertext_hashes();
+  let (request_messages, response_messages) = parsed_transcript.get_ciphertext_hashes();
 
   // Log a verifier session for public inputs
   debug!("inserting with session_id={:?}", query.session_id);
-  state.verifier_sessions.lock().unwrap().insert(query.session_id.clone(), VerifierInputs {
-    request_hashes,
-    response_hashes,
-    request_messages,
-    response_messages,
-  });
+  state
+    .verifier_sessions
+    .lock()
+    .unwrap()
+    .insert(query.session_id.clone(), VerifierInputs { request_messages, response_messages });
 
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
@@ -207,6 +203,51 @@ pub async fn proxy(
   }
 }
 
+fn find_ciphertext_permutation<const CIRCUIT_SIZE: usize>(
+  expected_ciphertext_digest: F<G1>,
+  request_messages: Vec<Vec<u8>>,
+  response_messages: Vec<Vec<u8>>,
+) -> Vec<Vec<u8>> {
+  // check ciphertext digest in all permutations of request and response messages
+  // four possible permutations
+  // 1. drop first message from response, changecipherspec from server
+  // 2. drop last message from response, close notify from server
+  // - request, response[1..]
+  // - request, response[0..-1]
+  // - request, response[1..-1]
+
+  // Case: first message from server after request
+  let actual_ciphertext_digest =
+    compute_ciphertext_digest::<CIRCUIT_SIZE>(&request_messages, &response_messages[1..]);
+  if actual_ciphertext_digest == expected_ciphertext_digest {
+    debug!("Ciphertext found in response[1..] permutation");
+    return response_messages[1..].to_vec();
+  }
+
+  // Case: receiving message & not the last message. Drop last message, it's close notify.
+  let actual_ciphertext_digest = compute_ciphertext_digest::<CIRCUIT_SIZE>(
+    &request_messages,
+    &response_messages[0..response_messages.len() - 1],
+  );
+  if actual_ciphertext_digest == expected_ciphertext_digest {
+    debug!("Ciphertext found in response[0..-1] permutation");
+    return response_messages[0..response_messages.len() - 1].to_vec();
+  }
+
+  // Case: first message from server after request
+  // Case: receiving message & not the last message. Drop last message, it's close notify.
+  let actual_ciphertext_digest = compute_ciphertext_digest::<CIRCUIT_SIZE>(
+    &request_messages,
+    &response_messages[1..response_messages.len() - 1],
+  );
+  if actual_ciphertext_digest == expected_ciphertext_digest {
+    debug!("Ciphertext found in response[1..-1] permutation");
+    return response_messages[1..response_messages.len() - 1].to_vec();
+  }
+
+  panic!("Ciphertext not found in any permutation");
+}
+
 pub async fn verify(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<VerifyBody>,
@@ -223,6 +264,16 @@ pub async fn verify(
   let verifier_inputs =
     state.verifier_sessions.lock().unwrap().get(&payload.session_id).cloned().unwrap();
 
+  // TODO: might be incorrect to check ciphertext in this manner, but for now, we play along
+  // Find the correct ciphertext from permutation of the ciphertexts
+  let expected_ciphertext_digest =
+    F::<G1>::from_bytes(&payload.origo_proof.ciphertext_digest).unwrap();
+  let response_messages = find_ciphertext_permutation::<CIRCUIT_SIZE_512>(
+    expected_ciphertext_digest,
+    verifier_inputs.request_messages.clone(),
+    verifier_inputs.response_messages.clone(),
+  );
+
   // DEBUG: Use this digest to pin the proving behavior. You must also override
   // `client/src/tls.rs#decrypt_tls_ciphertext`
   //
@@ -237,7 +288,7 @@ pub async fn verify(
   let InitialNIVCInputs { initial_nivc_input, .. } =
     payload.manifest.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE_512>(
       &verifier_inputs.request_messages,
-      &verifier_inputs.response_messages,
+      &response_messages,
     )?;
   let (z0_primary, _) = verifier.setup_params.extend_public_inputs(
     &verifier::flatten_rom(payload.origo_proof.rom.rom),
