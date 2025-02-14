@@ -5,7 +5,7 @@ use caratls_ekm_client::DummyTokenVerifier;
 use caratls_ekm_client::TeeTlsConnector;
 #[cfg(feature = "tee-google-confidential-space-token-verifier")]
 use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
-use futures::{channel::oneshot, AsyncWriteExt};
+use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use tls_client2::origo::OrigoConnection;
@@ -249,6 +249,20 @@ async fn handle_tee_mode(
 
   // wait for tls connection
   let (_, mut reunited_socket) = tls_fut_task.await?.unwrap();
+
+  // Wait until we can read a magic byte `0xAA` from the reunited socket,
+  // indicating that the server is ready and waiting for further communication.
+  debug!("Waiting to write to notary");
+  let mut buffer = [0u8; 1];
+  loop {
+    reunited_socket.read_exact(&mut buffer).await?;
+    if buffer.len() == 1 && buffer[0] == 0xAA {
+      debug!("Magic byte 0xAA received, server is ready");
+      break;
+    }
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    debug!("Waiting for magic byte, received: {:?}", buffer[0]);
+  }
 
   let manifest_bytes = config.proving.manifest.unwrap().to_wire_bytes();
   reunited_socket.write_all(&manifest_bytes).await?;

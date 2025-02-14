@@ -104,6 +104,9 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let mut tee_tls_stream = tee_tls_acceptor.accept(socket).await?;
   proxy_service(&mut tee_tls_stream, session_id, target_host, target_port, state.clone()).await?;
 
+  debug!("Sending magic byte to indicate readiness to read");
+  tee_tls_stream.write_all(&[0xAA]).await?;
+
   let manifest_bytes = read_wire_struct(&mut tee_tls_stream).await;
   // TODO: Consider implementing from_stream instead of read_wire_struct
   let manifest = Manifest::from_wire_bytes(&manifest_bytes);
