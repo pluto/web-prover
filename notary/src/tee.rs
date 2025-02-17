@@ -9,7 +9,7 @@ use caratls_ekm_google_confidential_space_server::GoogleConfidentialSpaceTokenGe
 #[cfg(feature = "tee-dummy-token-generator")]
 use caratls_ekm_server::DummyTokenGenerator;
 use caratls_ekm_server::TeeTlsAcceptor;
-use client::{origo::OrigoSecrets, TeeProof};
+use client::{origo::OrigoSecrets, TeeProof, TeeProofData};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use proofs::program::{
@@ -27,10 +27,10 @@ use ws_stream_tungstenite::WsStream;
 use crate::{
   axum_websocket::WebSocket,
   errors::NotaryServerError,
-  origo::proxy_service,
-  tls_parser::{Direction, ParsedMessage, WrappedPayload},
+  origo::{proxy_service, OrigoSigningKey},
+  tls_parser::{ParsedMessage, WrappedPayload},
   tlsn::ProtocolUpgrade,
-  verifier, SharedState,
+  SharedState,
 };
 
 #[derive(Deserialize)]
@@ -151,8 +151,6 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   // TODO: Consider implementing from_stream instead of read_wire_struct
   let manifest_bytes = read_wire_struct(&mut tee_tls_stream).await;
   let manifest = Manifest::from_wire_bytes(&manifest_bytes);
-  // Checking if manifest is valid
-  manifest.validate()?;
   // dbg!(&manifest);
 
   let secret_bytes = read_wire_struct(&mut tee_tls_stream).await;
@@ -189,9 +187,9 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   for message in &parsed_transcript.payload {
     if let ParsedMessage { payload, direction, .. } = message {
       if let Some(app_data) = get_app_data(payload) {
-        // if let Ok(readable_data) = String::from_utf8(app_data.clone()) {
-        //   debug!("{:?} app_data: {}", direction, readable_data);
-        // }
+        if let Ok(readable_data) = String::from_utf8(app_data.clone()) {
+          debug!("{:?} app_data: {}", direction, readable_data);
+        }
         app_data_vec.push(app_data);
       }
     }
@@ -212,19 +210,49 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let response = ManifestResponse::from_payload(&response_header, &response_body)?;
   debug!("{:?}", response);
 
-  if !manifest.request.is_subset_of(&request) {
-    return Err(NotaryServerError::ManifestRequestMismatch);
-  }
-
-  if !manifest.response.is_subset_of(&response) {
-    return Err(NotaryServerError::ManifestResponseMismatch);
-  }
-
   // send TeeProof to client
-  let tee_proof = TeeProof::from_manifest(&manifest);
+  let tee_proof = create_tee_proof(&manifest, &request, &response, &state.origo_signing_key)?;
   let tee_proof_bytes = tee_proof.to_write_bytes();
   tee_tls_stream.write_all(&tee_proof_bytes).await?;
 
+  Ok(())
+}
+
+// TODO: Should TeeProof and other proofs be moved to `proofs` crate?
+// Otherwise, adding TeeProof::manifest necessitates extra dependencies on the client
+// Notice that almost all inputs to this function are from `proofs` crate
+pub fn create_tee_proof(
+  manifest: &Manifest,
+  request: &ManifestRequest,
+  response: &ManifestResponse,
+  signing_key: &OrigoSigningKey,
+) -> Result<TeeProof, NotaryServerError> {
+  validate_notarization_legal(manifest, request, response)?;
+
+  let manifest_hash = manifest.to_keccak_digest();
+  let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
+  // TODO: Is this how we should be signing this?
+  // TODO: Can we substitute request_messages for [manifest.request], etc. here?
+  let origo_sig = signing_key.create_origo_signature(&[], &[]);
+  let as_bytes = origo_sig.signature.to_vec();
+  let signature = hex::encode(&as_bytes);
+  Ok(TeeProof { data, signature })
+}
+
+/// Check if `manifest`, `request`, and `response` all fulfill requirements necessary for
+/// a proof to be created
+fn validate_notarization_legal(
+  manifest: &Manifest,
+  request: &ManifestRequest,
+  response: &ManifestResponse,
+) -> Result<(), NotaryServerError> {
+  manifest.validate()?;
+  if !manifest.request.is_subset_of(&request) {
+    return Err(NotaryServerError::ManifestRequestMismatch);
+  }
+  if !manifest.response.is_subset_of(&response) {
+    return Err(NotaryServerError::ManifestResponseMismatch);
+  }
   Ok(())
 }
 

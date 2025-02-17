@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+  fs,
+  sync::{Arc, Mutex},
+};
 
 use alloy_primitives::utils::keccak256;
 use axum::{
@@ -9,6 +12,14 @@ use axum::{
 use client::origo::{SignBody, SignedVerificationReply, VerifyBody, VerifyReply};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
+use k256::{
+  ecdsa::{
+    RecoveryId, Signature as Secp256k1Signature, SigningKey as Secp256k1SigningKey,
+    VerifyingKey as Secp256k1VerifyingKey,
+  },
+  elliptic_curve::rand_core,
+  pkcs8::DecodePrivateKey,
+};
 use proofs::{
   circuits::{CIRCUIT_SIZE_512, MAX_STACK_HEIGHT},
   errors::ProofError,
@@ -37,6 +48,64 @@ use crate::{
   verifier, SharedState,
 };
 
+pub struct OrigoSigningKey(pub(crate) Secp256k1SigningKey);
+
+impl OrigoSigningKey {
+  pub fn verifying_key(&self) -> &Secp256k1VerifyingKey { self.0.verifying_key() }
+
+  pub fn load(private_key_pem_path: &str) -> Self {
+    if private_key_pem_path.is_empty() {
+      info!("Using ephemeral origo signing key");
+      Self::ephemeral()
+    } else {
+      info!("Using origo signing key: {}", private_key_pem_path);
+      let raw = fs::read_to_string(private_key_pem_path).unwrap();
+      Self(Secp256k1SigningKey::from_pkcs8_pem(&raw).unwrap())
+    }
+  }
+
+  pub fn ephemeral() -> Self { Self(Secp256k1SigningKey::random(&mut rand_core::OsRng)) }
+
+  pub fn create_origo_signature(
+    &self,
+    _request_messages: &[Vec<u8>],
+    _response_messages: &[Vec<u8>],
+  ) -> OrigoSignature {
+    // TODO: How do we turn messages into leaves? Do we sort/zip them?
+    // let leaves = request_messages
+    //   .iter()
+    //   .chain(response_messages.iter())
+    //   .map(|m| hex::encode(m))
+    //   .collect::<Vec<String>>();
+    let leafs = vec!["request".to_string(), "response".to_string()];
+    let leaf_hashes: Vec<[u8; 32]> =
+      leafs.iter().map(|leaf| KeccakHasher::hash(leaf.as_bytes())).collect();
+
+    let merkle_tree = MerkleTree::<KeccakHasher>::from_leaves(&leaf_hashes);
+    let merkle_root = merkle_tree.root().unwrap();
+
+    let (signature, recover_id) = self.0.sign_prehash_recoverable(&merkle_root).unwrap();
+
+    let signer_address = alloy_primitives::Address::from_public_key(self.verifying_key());
+
+    let recovered_vk =
+      k256::ecdsa::VerifyingKey::recover_from_prehash(&merkle_root.clone(), &signature, recover_id)
+        .unwrap();
+
+    assert_eq!(self.verifying_key(), &recovered_vk);
+
+    OrigoSignature { signature, recover_id, signer_address, merkle_root, leaves: leafs }
+  }
+}
+
+pub struct OrigoSignature {
+  pub signature:      Secp256k1Signature,
+  pub recover_id:     RecoveryId,
+  pub signer_address: alloy_primitives::Address,
+  pub merkle_root:    [u8; 32],
+  pub leaves:         Vec<String>,
+}
+
 #[derive(Deserialize)]
 pub struct SignQuery {
   session_id: Uuid,
@@ -51,6 +120,28 @@ pub struct SignReply {
   signature_s: String,
   signature_v: u8,
   signer:      String,
+}
+
+impl From<OrigoSignature> for SignReply {
+  fn from(os: OrigoSignature) -> Self {
+    // TODO is this right? we need lower form S for sure though
+    let s = if os.signature.normalize_s().is_some() {
+      hex::encode(os.signature.normalize_s().unwrap().to_bytes())
+    } else {
+      hex::encode(os.signature.s().to_bytes())
+    };
+    SignReply {
+      merkle_root: "0x".to_string() + &hex::encode(os.merkle_root),
+      leaves:      os.leaves,
+      signature:   "0x".to_string() + &hex::encode(os.signature.to_der().as_bytes()),
+      signature_r: "0x".to_string() + &hex::encode(os.signature.r().to_bytes()),
+      signature_s: "0x".to_string() + &s,
+      // the good old +27
+      // https://docs.openzeppelin.com/contracts/4.x/api/utils#ECDSA-tryRecover-bytes32-bytes-
+      signature_v: os.recover_id.to_byte() + 27,
+      signer:      "0x".to_string() + &hex::encode(os.signer_address),
+    }
+  }
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -101,55 +192,18 @@ pub async fn sign(
 
   // Log a verifier session for public inputs
   debug!("inserting with session_id={:?}", query.session_id);
-  state
-    .verifier_sessions
-    .lock()
-    .unwrap()
-    .insert(query.session_id.to_string(), VerifierInputs { request_messages, response_messages });
+  state.verifier_sessions.lock().unwrap().insert(query.session_id.to_string(), VerifierInputs {
+    request_messages:  request_messages.clone(),
+    response_messages: response_messages.clone(),
+  });
 
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
 
-  let leaves: Vec<String> = vec!["request".to_string(), "response".to_string()]; // TODO
+  let origo_sig =
+    state.origo_signing_key.create_origo_signature(&request_messages, &response_messages);
 
-  let leaf_hashes: Vec<[u8; 32]> =
-    leaves.iter().map(|leaf| KeccakHasher::hash(leaf.as_bytes())).collect();
-
-  let merkle_tree = MerkleTree::<KeccakHasher>::from_leaves(&leaf_hashes);
-  let merkle_root = merkle_tree.root().unwrap();
-
-  // need secp256k1 here for Solidity
-  let (signature, recover_id) =
-    state.origo_signing_key.clone().sign_prehash_recoverable(&merkle_root).unwrap();
-
-  let signer_address =
-    alloy_primitives::Address::from_public_key(state.origo_signing_key.verifying_key());
-
-  let verifying_key =
-    k256::ecdsa::VerifyingKey::recover_from_prehash(&merkle_root.clone(), &signature, recover_id)
-      .unwrap();
-
-  assert_eq!(state.origo_signing_key.verifying_key(), &verifying_key);
-
-  // TODO is this right? we need lower form S for sure though
-  let s = if signature.normalize_s().is_some() {
-    hex::encode(signature.normalize_s().unwrap().to_bytes())
-  } else {
-    hex::encode(signature.s().to_bytes())
-  };
-
-  let response = SignReply {
-    merkle_root: "0x".to_string() + &hex::encode(merkle_root),
-    leaves,
-    signature: "0x".to_string() + &hex::encode(signature.to_der().as_bytes()),
-    signature_r: "0x".to_string() + &hex::encode(signature.r().to_bytes()),
-    signature_s: "0x".to_string() + &s,
-
-    // the good old +27
-    // https://docs.openzeppelin.com/contracts/4.x/api/utils#ECDSA-tryRecover-bytes32-bytes-
-    signature_v: recover_id.to_byte() + 27,
-    signer: "0x".to_string() + &hex::encode(signer_address),
-  };
+  let response = SignReply::from(origo_sig);
 
   Ok(Json(response))
 }
@@ -170,7 +224,7 @@ pub fn sign_verification(
 
   // need secp256k1 here for Solidity
   let (signature, recover_id) =
-    state.origo_signing_key.clone().sign_prehash_recoverable(&merkle_root).unwrap();
+    state.origo_signing_key.0.sign_prehash_recoverable(&merkle_root).unwrap();
 
   let signer_address =
     alloy_primitives::Address::from_public_key(state.origo_signing_key.verifying_key());
@@ -390,7 +444,7 @@ pub async fn verify(
         debug!(
           "value_polynomial_digest: {:?}",
           polynomial_digest(
-            &payload.origo_proof.value.clone().unwrap().as_bytes(),
+            payload.origo_proof.value.clone().unwrap().as_bytes(),
             ciphertext_digest,
             0,
           )
