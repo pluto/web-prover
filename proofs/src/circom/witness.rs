@@ -2,6 +2,16 @@ use fs::OpenOptions;
 
 use super::*;
 
+/// Generates a witness from a browser type
+///
+/// # Arguments
+///
+/// * `circom_input` - A `CircomInput` struct.
+/// * `opcode` - A `u64` representing the opcode.
+///
+/// # Returns
+///
+/// A `Result` containing a vector of field elements.
 #[allow(unused_variables)]
 pub async fn generate_witness_from_browser_type(
   circom_input: CircomInput,
@@ -26,6 +36,16 @@ pub async fn generate_witness_from_browser_type(
   )))
 }
 
+/// Generates a witness from a generator type
+///
+/// # Arguments
+///
+/// * `input_json` - A string slice that holds the input JSON.
+/// * `witness_generator_type` - A `WitnessGeneratorType` enum.
+///
+/// # Returns
+///
+/// A `Result` containing a vector of field elements.
 pub fn generate_witness_from_generator_type(
   input_json: &str,
   witness_generator_type: &WitnessGeneratorType,
@@ -41,6 +61,16 @@ pub fn generate_witness_from_generator_type(
   }
 }
 
+/// Generates a witness from a graph
+///
+/// # Arguments
+///
+/// * `input_json` - A string slice that holds the input JSON.
+/// * `graph_data` - A reference to the graph data.
+///
+/// # Returns
+///
+/// A `Result` containing a vector of field elements.
 pub fn generate_witness_from_graph(
   input_json: &str,
   graph_data: &[u8],
@@ -61,6 +91,16 @@ pub fn generate_witness_from_graph(
   todo!("circom_witnesscalc not supported in wasm");
 }
 
+/// Generates a witness from a witnesscalc file
+///
+/// # Arguments
+///
+/// * `witness_input_json` - A string slice that holds the witness input JSON.
+/// * `graph_path` - A reference to the path of the witnesscalc file.
+///
+/// # Returns
+///
+/// A `Result` containing a vector of field elements.
 pub fn generate_witness_from_witnesscalc_file(
   witness_input_json: &str,
   graph_path: &PathBuf,
@@ -135,6 +175,15 @@ pub fn generate_witness_from_wasm_file(
   witness
 }
 
+/// Loads a witness from a bin reader
+///
+/// # Arguments
+///
+/// * `reader` - A reference to the reader.
+///
+/// # Returns
+///
+/// A `Result` containing a vector of field elements.
 pub fn load_witness_from_bin_reader<R: Read>(mut reader: R) -> Result<Vec<F<G1>>, ProofError> {
   let mut wtns_header = [0u8; 4];
   reader.read_exact(&mut wtns_header)?;
@@ -174,6 +223,15 @@ pub fn load_witness_from_bin_reader<R: Read>(mut reader: R) -> Result<Vec<F<G1>>
   Ok(result)
 }
 
+/// Reads a field from a reader
+///
+/// # Arguments
+///
+/// * `reader` - A reference to the reader.
+///
+/// # Returns
+///
+/// A `Result` containing a field element.
 pub(crate) fn read_field<R: Read>(mut reader: R) -> Result<F<G1>, ProofError> {
   let mut repr = F::<G1>::ZERO.to_repr();
   for digit in repr.as_mut().iter_mut() {

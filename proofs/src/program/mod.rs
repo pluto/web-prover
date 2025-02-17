@@ -1,3 +1,15 @@
+//! # Program Module
+//!
+//! The `program` module contains the core logic for setting up and running the proof system.
+//! It provides functionality for initializing the setup, generating proofs, and verifying proofs.
+//!
+//! ## Submodules
+//!
+//! - `data`: Contains data structures and types used in the proof system.
+//! - `http`: Provides utilities for handling HTTP-related operations in the proof system.
+//! - `manifest`: Contains the manifest structure and related utilities.
+//! - `utils`: Provides utility functions used throughout the module.
+
 use std::sync::Arc;
 
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
@@ -12,26 +24,44 @@ use proof::FoldingProof;
 use utils::into_input_json;
 
 use super::*;
-use crate::program::data::{ProofParams, SetupParams};
+use crate::{
+  circom::witness::generate_witness_from_browser_type,
+  program::{
+    data::{ProofParams, SetupParams},
+    utils::into_circom_input,
+  },
+};
 
 pub mod data;
 pub mod http;
 pub mod manifest;
 pub mod utils;
 
+/// Compressed proof type
 type CompressedProof = FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>>;
+
+/// Memory type
 pub struct Memory {
+  /// Circuits
   pub circuits: Vec<RomCircuit>,
+  /// ROM
   pub rom:      Vec<u64>,
 }
 
+/// ROM circuit type
 #[derive(Clone)]
 pub struct RomCircuit {
+  /// Circuit
   pub circuit:                CircomCircuit,
+  /// Circuit index
   pub circuit_index:          usize,
+  /// ROM size
   pub rom_size:               usize,
+  /// NIVC IO
   pub nivc_io:                Option<Vec<F<G1>>>,
+  /// Private input
   pub private_input:          Option<HashMap<String, Value>>,
+  /// Witness generator type
   pub witness_generator_type: WitnessGeneratorType,
 }
 
@@ -92,6 +122,7 @@ impl StepCircuit<F<G1>> for RomCircuit {
 
 // TODO: This is like a one-time use setup that overlaps some with `ProgramData::into_online()`.
 // Worth checking out how to make this simpler, clearer, more efficient.
+/// Setup function
 pub fn setup(setup_data: &UninitializedSetup) -> PublicParams<E1> {
   // Optionally time the setup stage for the program
   #[cfg(feature = "timing")]
@@ -109,9 +140,8 @@ pub fn setup(setup_data: &UninitializedSetup) -> PublicParams<E1> {
 
   public_params
 }
-use crate::{
-  circom::witness::generate_witness_from_browser_type, program::utils::into_circom_input,
-};
+
+/// Run function
 pub async fn run(
   setup_params: &SetupParams<Online>,
   proof_params: &ProofParams,
@@ -203,7 +233,7 @@ pub async fn run(
     #[cfg(feature = "verify-steps")]
     {
       info!("Verifying single step...");
-      recursive_snark.verify(&public_params, &z0_primary, &z0_secondary)?;
+      recursive_snark.verify(public_params, &z0_primary, &z0_secondary)?;
       info!("Single step verification done");
     }
 
@@ -221,6 +251,7 @@ pub async fn run(
   Ok(recursive_snark?)
 }
 
+/// Compress proof no setup function
 pub fn compress_proof_no_setup(
   recursive_snark: &RecursiveSNARK<E1>,
   public_params: &PublicParams<E1>,
@@ -248,6 +279,7 @@ pub fn compress_proof_no_setup(
   Ok(proof)
 }
 
+/// Compress proof function
 pub fn compress_proof(
   recursive_snark: &RecursiveSNARK<E1>,
   public_params: &PublicParams<E1>,
@@ -275,6 +307,7 @@ pub fn compress_proof(
   Ok(proof)
 }
 
+/// Initialize setup data function
 pub fn initialize_setup_data(
   setup_data: &UninitializedSetup,
 ) -> Result<InitializedSetup, ProofError> {
@@ -296,6 +329,7 @@ pub fn initialize_setup_data(
   Ok(InitializedSetup { r1cs, witness_generator_types, max_rom_length: setup_data.max_rom_length })
 }
 
+/// Initialize circuit list function
 pub fn initialize_circuit_list(setup_data: &InitializedSetup) -> Vec<RomCircuit> {
   setup_data
     .r1cs

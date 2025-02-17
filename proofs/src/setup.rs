@@ -1,3 +1,26 @@
+//! # Setup Module
+//!
+//! The `setup` module contains utilities and structures for setting up the proof system.
+//!
+//! ## Structs
+//!
+//! - `ProvingParams`: Represents the parameters needed for proving, including auxiliary parameters
+//!   and verification key digests.
+//!
+//! ## Functions
+//!
+//! - `from_bytes`: Initializes `ProvingParams` from an efficiently serializable data format.
+//! - `to_bytes`: Converts `ProvingParams` to an efficient serialization.
+//!
+//! ## Types
+//!
+//! - `AuxParams`: Represents the auxiliary parameters needed to create `PublicParams`.
+//! - `ProverKey`: Represents the prover key needed to create a `CompressedSNARK`.
+//! - `UninitializedSetup`: Represents the uninitialized setup data for circuits, including R1CS and
+//!   witness generator types.
+//! - `WitnessGeneratorType`: Represents the type of witness generator, including raw bytes and
+//!   paths to Wasm binaries.
+
 use std::io::Cursor;
 
 use client_side_prover::{
@@ -11,10 +34,14 @@ use crate::{
   WitnessGeneratorType, E1, S1, S2,
 };
 
+/// Proving parameters
 #[derive(Debug)]
 pub struct ProvingParams {
+  /// Auxiliary parameters
   pub aux_params:          AuxParams,
+  /// Primary verification key digest
   pub vk_digest_primary:   <E1 as Engine>::Scalar,
+  /// Secondary verification key digest
   pub vk_digest_secondary: <Dual<E1> as Engine>::Scalar,
 }
 
