@@ -30,6 +30,7 @@ If you have any questions, please reach out to any of Pluto's [team members](htt
 ### Setup
 - Install rust nightly: `rustup install toolchain nightly-2024-10-28`
 - Run `make artifacts` to download circuit artifacts required for Web Prover proxy mode
+- Compilation errors? Have a look at [KNOWN_ISSUES.md](KNOWN_ISSUES.md)
 
 ### Native Client Development
 
