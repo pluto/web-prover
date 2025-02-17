@@ -126,8 +126,8 @@ async fn test_run_serialized_verify() {
 
   // Create the compressed proof with the offlined `PublicParams`
   let proof = program::compress_proof(&recursive_snark, &setup_params.public_params).unwrap();
-  let serialized_compressed_proof = proof.serialize();
-  let proof = serialized_compressed_proof.deserialize();
+  let serialized_compressed_proof = proof.serialize().unwrap();
+  let proof = serialized_compressed_proof.deserialize().unwrap();
 
   // Extend the initial state input with the ROM (happens internally inside `program::run`, so
   // we do it out here just for the test)

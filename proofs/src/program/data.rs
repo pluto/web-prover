@@ -1,3 +1,12 @@
+//! # Data Module
+//!
+//! The `data` module contains data structures and types used in the proof system.
+//!
+//! ## Structs
+//!
+//! - `FoldInput`: Represents the fold input for any circuit containing signal names and values.
+//! - `R1CSType`: Represents the R1CS file type, which can be either a file path or raw bytes.
+
 use std::{
   fs::{self, File},
   io::Write,
@@ -41,24 +50,31 @@ impl FoldInput {
 /// R1CS file type
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum R1CSType {
-  /// file path
+  /// file path to the R1CS file
   #[serde(rename = "file")]
-  File { path: PathBuf },
-  /// raw bytes
+  File(PathBuf),
+  /// raw bytes of the R1CS file
   #[serde(rename = "raw")]
   Raw(Vec<u8>),
 }
 
+/// Witness generator type
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum WitnessGeneratorType {
+  /// Browser witness generator
   #[serde(rename = "browser")]
   Browser,
+  /// Wasm witness generator
   #[serde(rename = "wasm")]
   Wasm {
+    /// Path to the Wasm binary for witness generation
     path:      String,
+    /// Path where the witness files are stored
     wtns_path: String,
   },
+  /// Path to the witness generator
   Path(PathBuf),
+  /// Raw bytes of the witness generator
   #[serde(skip)]
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
 }
@@ -88,11 +104,15 @@ pub struct InitializedSetup {
 }
 
 // Note, the below are typestates that prevent misuse of our current API.
+/// Setup status trait
 pub trait SetupStatus {
+  /// Public parameters type
   type PublicParams;
+  /// Setup data type
   type SetupData;
 }
 
+/// Online setup status
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Online;
 impl SetupStatus for Online {
@@ -100,6 +120,7 @@ impl SetupStatus for Online {
   type SetupData = Arc<InitializedSetup>;
 }
 
+/// Offline setup status
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Offline;
 impl SetupStatus for Offline {
@@ -107,6 +128,7 @@ impl SetupStatus for Offline {
   type SetupData = UninitializedSetup;
 }
 
+/// Witness status trait
 pub trait WitnessStatus {
   /// Private input for a circuit containing signals name and vector of values
   /// - For [`Expanded`] status, it is a vector of private inputs for each fold of a circuit
@@ -114,11 +136,14 @@ pub trait WitnessStatus {
   type PrivateInputs;
 }
 
+/// Expanded witness status
 pub struct Expanded;
 impl WitnessStatus for Expanded {
   /// expanded input for each fold of each circuit in the ROM
   type PrivateInputs = Vec<HashMap<String, Value>>;
 }
+
+/// Not expanded witness status
 pub struct NotExpanded;
 impl WitnessStatus for NotExpanded {
   /// Private input and fold input for each circuit in the ROM
@@ -132,8 +157,11 @@ pub struct CircuitData {
   pub opcode: u64,
 }
 
+/// ROM data type
 pub type RomData = HashMap<String, CircuitData>;
+/// ROM type
 pub type Rom = Vec<String>;
+/// NIVC input type
 pub type NivcInput = Vec<F<G1>>;
 
 /// Represents configuration and circuit data required for initializing the proving system.
@@ -442,7 +470,7 @@ impl SetupParams<Online> {
       self.vk_digest_primary,
       self.vk_digest_secondary,
     )?;
-    Ok(compressed_snark_proof.serialize())
+    compressed_snark_proof.serialize()
   }
 }
 

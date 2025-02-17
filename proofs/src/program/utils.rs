@@ -1,3 +1,10 @@
+//! # Utils Module
+//!
+//! The `utils` module contains utility functions used throughout the proof system.
+//!
+//! ## Functions
+//!
+//! - `next_rom_index_and_pc`: Computes the next ROM index and program counter.
 use bellpepper_core::{
   boolean::{AllocatedBit, Boolean},
   LinearCombination,
@@ -8,6 +15,7 @@ use num_bigint::BigInt;
 use super::*;
 use crate::circom::CircomInput;
 
+/// Computes the next ROM index and program counter.
 #[allow(clippy::type_complexity)]
 pub fn next_rom_index_and_pc<CS: ConstraintSystem<F<G1>>>(
   cs: &mut CS,
@@ -67,6 +75,7 @@ pub fn next_rom_index_and_pc<CS: ConstraintSystem<F<G1>>>(
   Ok((rom_index_next, pc_next))
 }
 
+/// Computes the selector vector from the given index.
 pub fn get_selector_vec_from_index<CS: ConstraintSystem<F<G1>>>(
   mut cs: CS,
   target_index: &AllocatedNum<F<G1>>,
@@ -116,6 +125,7 @@ pub fn get_selector_vec_from_index<CS: ConstraintSystem<F<G1>>>(
   Ok(selector)
 }
 
+/// Converts the given public and private inputs into a `CircomInput` struct.
 pub fn into_circom_input(
   public_input: &[F<G1>],
   private_input: &HashMap<String, Value>,
@@ -128,6 +138,7 @@ pub fn into_circom_input(
   CircomInput { step_in: decimal_stringified_input, extra: private_input.clone() }
 }
 
+/// Converts the given public and private inputs into a JSON string.
 pub fn into_input_json(
   public_input: &[F<G1>],
   private_input: &HashMap<String, Value>,
@@ -141,6 +152,7 @@ pub fn into_input_json(
   Ok(serde_json::to_string(&input)?)
 }
 
+/// Remaps the given input JSON string into a vector of tuples containing the key and value.
 pub fn remap_inputs(input_json: &str) -> Result<Vec<(String, Vec<BigInt>)>, ProofError> {
   let circom_input: CircomInput = serde_json::from_str(input_json)?;
   let mut remapped = vec![];

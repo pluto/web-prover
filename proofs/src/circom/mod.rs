@@ -1,3 +1,26 @@
+//! # Circom Module
+//!
+//! The `circom` module provides utilities for working with Circom circuits within the `proofs`
+//! crate. It includes functionalities for handling R1CS (Rank-1 Constraint System) representations
+//! of circuits, managing circuit inputs, and generating witnesses for the circuits.
+//!
+//! ## Modules
+//!
+//! - `r1cs`: Contains the implementation and utilities for working with R1CS representations of
+//!   Circom circuits.
+//! - `wasm_witness`: Provides functionalities for generating witnesses using WebAssembly (only
+//!   available for `wasm32` target).
+//! - `witness`: Contains utilities for generating witnesses for Circom circuits.
+//!
+//! ## Structs
+//!
+//! - `CircomInput`: Represents the input structure for Circom circuits, including step inputs and
+//!   additional parameters.
+//! - `CircuitJson`: Represents the JSON structure of a Circom circuit, including constraints,
+//!   number of inputs, outputs, and variables.
+//! - `CircomCircuit`: Represents a Circom circuit, including its R1CS representation and optional
+//!   witness data.
+
 use std::{
   collections::{BTreeMap, HashMap},
   env::current_dir,
@@ -20,28 +43,38 @@ pub mod r1cs;
 #[cfg(target_arch = "wasm32")] pub mod wasm_witness;
 pub mod witness;
 
+/// Circom input
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CircomInput {
+  /// Step inputs
   pub step_in: Vec<String>,
-
+  /// Extra parameters
   #[serde(flatten)]
-  pub extra: HashMap<String, Value>,
+  pub extra:   HashMap<String, Value>,
 }
 
+/// Circuit JSON
 #[derive(Serialize, Deserialize)]
 pub struct CircuitJson {
+  /// Constraints
   pub constraints:   Vec<Vec<BTreeMap<String, String>>>,
+  /// Number of inputs
   #[serde(rename = "nPubInputs")]
   pub num_inputs:    usize,
+  /// Number of outputs
   #[serde(rename = "nOutputs")]
   pub num_outputs:   usize,
+  /// Number of variables
   #[serde(rename = "nVars")]
   pub num_variables: usize,
 }
 
+/// Circom circuit
 #[derive(Clone)]
 pub struct CircomCircuit {
+  /// R1CS
   pub r1cs:    Arc<R1CS>,
+  /// Witness
   pub witness: Option<Vec<F<G1>>>,
 }
 
@@ -52,8 +85,17 @@ impl Default for CircomCircuit {
 }
 
 impl CircomCircuit {
+  /// Return the arity of the circuit ie the number of public inputs
   pub fn arity(&self) -> usize { self.r1cs.num_public_inputs }
 
+  /// Vanilla synthesize
+  ///
+  /// This function synthesizes the circuit using the provided constraint system.
+  ///
+  /// # Arguments
+  ///
+  /// * `cs`: The constraint system to use for synthesis.
+  /// * `z`: The witness values to use for synthesis.
   pub fn vanilla_synthesize<CS: ConstraintSystem<F<G1>>>(
     &self,
     cs: &mut CS,

@@ -1,3 +1,18 @@
+//! # HTTP Module
+//!
+//! The `http` module provides utilities for handling HTTP-related operations in the proof system.
+//!
+//! ## Structs
+//!
+//! - `ResponseBody`: Represents the body of an HTTP response, containing a vector of JSON keys.
+//! - `Response`: Represents an HTTP response, including status, version, message, headers, and
+//!   body.
+//!
+//! ## Functions
+//!
+//! - `default_version`: Returns the default HTTP version string.
+//! - `default_message`: Returns the default HTTP response message string.
+
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
@@ -10,8 +25,10 @@ use crate::{
   program::manifest::{HTTP_1_1, MAX_HTTP_HEADERS},
 };
 
+/// Response body type
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ResponseBody {
+  /// JSON keys
   pub json: Vec<JsonKey>,
 }
 
@@ -38,6 +55,17 @@ pub struct ManifestResponse {
 }
 
 impl ManifestResponse {
+  /// Validates the HTTP response
+  ///
+  /// This function validates the HTTP response.
+  ///
+  /// # Arguments
+  ///
+  /// * `self`: The HTTP response to validate.
+  ///
+  /// # Returns
+  ///
+  /// The validated HTTP response.
   pub fn validate(&self) -> Result<(), ProofError> {
     // TODO: What are legal statuses?
     const VALID_STATUSES: [&str; 2] = ["200", "201"];
@@ -101,6 +129,15 @@ impl ManifestResponse {
     Ok(Self { status, version, message, headers, body })
   }
 
+  /// This function parses the HTTP response body from the given bytes.
+  ///
+  /// # Arguments
+  ///
+  /// * `body_bytes`: The bytes representing the HTTP response body.
+  ///
+  /// # Returns
+  ///
+  /// The parsed HTTP response body.
   fn parse_body(body_bytes: &[u8]) -> Result<ResponseBody, ProofError> {
     if body_bytes.is_empty() {
       return Ok(ResponseBody { json: Vec::new() });
@@ -119,6 +156,15 @@ impl ManifestResponse {
     Ok(body)
   }
 
+  /// Parses the HTTP response header from the given bytes.
+  ///
+  /// # Arguments
+  ///
+  /// * `header_bytes`: The bytes representing the HTTP response header.
+  ///
+  /// # Returns
+  ///
+  /// The parsed HTTP response header.
   fn parse_header(
     header_bytes: &[u8],
   ) -> Result<(HashMap<String, String>, String, String, String), ProofError> {
@@ -199,37 +245,7 @@ impl ManifestResponse {
   }
 }
 
-fn extract_tokens(value: &serde_json::Value) -> Vec<String> {
-  let mut tokens = vec![];
-
-  match value {
-    serde_json::Value::String(s) => {
-      let token_regex = regex::Regex::new(r"<%\s*(\w+)\s*%>").unwrap();
-      for capture in token_regex.captures_iter(s) {
-        if let Some(token) = capture.get(1) {
-          // Extract token name
-          tokens.push(token.as_str().to_string());
-        }
-      }
-    },
-    serde_json::Value::Object(map) => {
-      // Recursively parse nested objects
-      for (_, v) in map {
-        tokens.extend(extract_tokens(v));
-      }
-    },
-    serde_json::Value::Array(arr) => {
-      // Recursively parse arrays
-      for v in arr {
-        tokens.extend(extract_tokens(v));
-      }
-    },
-    _ => {},
-  }
-
-  tokens
-}
-
+/// Template variable type
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TemplateVar {
   /// Regex for validation (if applicable)
@@ -259,6 +275,15 @@ pub struct ManifestRequest {
 }
 
 impl ManifestRequest {
+  /// This function validates the HTTP request.
+  ///
+  /// # Arguments
+  ///
+  /// * `self`: The HTTP request to validate.
+  ///
+  /// # Returns
+  ///
+  /// The validated HTTP request.
   pub fn validate(&self) -> Result<(), ProofError> {
     // TODO: What HTTP methods are supported?
     const ALLOWED_METHODS: [&str; 2] = ["GET", "POST"];
@@ -285,83 +310,7 @@ impl ManifestRequest {
     Ok(())
   }
 
-  fn validate_vars(&self) -> Result<(), ProofError> {
-    let mut all_tokens = vec![];
-
-    // Parse and validate tokens in the body
-    if let Some(body_tokens) = self.body.as_ref().map(extract_tokens) {
-      for token in &body_tokens {
-        if !self.vars.contains_key(token) {
-          return Err(ProofError::InvalidManifest(format!(
-            "Token `<% {} %>` not declared in `vars`",
-            token
-          )));
-        }
-      }
-      all_tokens.extend(body_tokens);
-    }
-
-    // Parse and validate tokens in headers
-    for value in self.headers.values() {
-      let header_tokens = extract_tokens(&serde_json::Value::String(value.clone()));
-      for token in &header_tokens {
-        if !self.vars.contains_key(token) {
-          return Err(ProofError::InvalidManifest(format!(
-            "Token `<% {} %>` not declared in `vars`",
-            token
-          )));
-        }
-      }
-      all_tokens.extend(header_tokens);
-    }
-
-    for var_key in self.vars.keys() {
-      if !all_tokens.contains(var_key) {
-        return Err(ProofError::InvalidManifest(format!(
-          "Token `<% {} %>` not declared in `body` or `headers`",
-          var_key
-        )));
-      }
-    }
-
-    // Validate each `vars` entry
-    for (key, var_def) in &self.vars {
-      // Validate regex (if defined)
-      if let Some(regex_pattern) = var_def.regex.as_ref() {
-        // Using `regress` crate for compatibility with ECMAScript regular expressions
-        let _regex = regress::Regex::new(regex_pattern).map_err(|_| {
-          ProofError::InvalidManifest(format!("Invalid regex pattern for `{}`", key))
-        })?;
-        // TODO: It will definitely not match it here because it's a template variable, not an
-        // actual variable
-        // TODO: How does the Manifest receiver (notary) verifies this?
-        // if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
-        //   if regex.find(value.as_str().unwrap_or("")).is_none() {
-        //     return Err(ProofError::InvalidManifest(format!(
-        //       "Value for token `<% {} %>` does not match regex",
-        //       key
-        //     )));
-        //   }
-        // }
-      }
-
-      // Validate length (if applicable)
-      if let Some(length) = var_def.length {
-        if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
-          if value.as_str().unwrap_or("").len() != length {
-            return Err(ProofError::InvalidManifest(format!(
-              "Value for token `<% {} %>` does not meet length constraint",
-              key
-            )));
-          }
-        }
-      }
-
-      // TODO: Validate the token "type" constraint
-    }
-    Ok(())
-  }
-
+  /// Parses the HTTP request from the given bytes.
   pub fn from_payload(header_bytes: &[u8], body_bytes: Option<&[u8]>) -> Result<Self, ProofError> {
     let (method, url, version, headers) = Self::parse_header(header_bytes)?;
     // TODO: Do we expect requests to have bodies?
@@ -452,6 +401,7 @@ pub(crate) mod tests {
   use super::*;
 
   #[macro_export]
+  /// Creates a new HTTP request with optional parameters.
   macro_rules! create_request {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
@@ -484,6 +434,7 @@ pub(crate) mod tests {
   }
 
   #[macro_export]
+  /// Creates a new HTTP response with optional parameters.
   macro_rules! create_response {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
@@ -763,25 +714,6 @@ pub(crate) mod tests {
         assert!(msg.contains("Invalid body bytes"));
       },
       _ => panic!("Expected invalid body parsing error"),
-    }
-  }
-
-  #[test]
-  fn test_validate_vars_with_missing_token() {
-    let header_bytes = b"POST /path HTTP/1.1\r\nX-Custom-Header: <% missing_token %>\r\n\r\n";
-    let body_bytes = br#"{"key": "value"}"#;
-
-    let mut request = ManifestRequest::from_payload(header_bytes, Some(body_bytes)).unwrap();
-    request.vars = HashMap::new(); // No vars provided, but the template references a token
-
-    let result = request.validate_vars();
-    assert!(result.is_err());
-
-    match result {
-      Err(ProofError::InvalidManifest(msg)) => {
-        assert!(msg.contains("Token `<% missing_token %>` not declared in `vars`"));
-      },
-      _ => panic!("Expected missing token error"),
     }
   }
 

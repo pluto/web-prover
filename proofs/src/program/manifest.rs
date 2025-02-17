@@ -55,10 +55,13 @@ use crate::{
   ProofError,
 };
 
-/// HTTP
+/// HTTP data signal name
 pub const DATA_SIGNAL_NAME: &str = "data";
+/// Public IO vars
 pub const PUBLIC_IO_VARS: usize = 11;
+/// Max HTTP headers
 pub(crate) const MAX_HTTP_HEADERS: usize = 25;
+/// HTTP/1.1
 pub const HTTP_1_1: &str = "HTTP/1.1";
 
 /// Manifest containing [`ManifestRequest`] and [`ManifestResponse`]
@@ -80,7 +83,8 @@ pub struct Manifest {
 }
 
 impl Manifest {
-  /// Validates `Manifest` fields
+  /// Validates `Manifest` request and response fields. They are validated against valid statuses,
+  /// http methods, and template variables.
   pub fn validate(&self) -> Result<(), ProofError> {
     // TODO: Validate manifest version, id, title, description, prepareUrl
     self.request.validate()?;
@@ -173,7 +177,9 @@ pub struct EncryptionInput {
 
 /// TLS encryption input for request and response proving
 pub struct TLSEncryption {
+  /// Request encryption input
   pub request:  EncryptionInput,
+  /// Response encryption input
   pub response: EncryptionInput,
 }
 
@@ -198,9 +204,13 @@ pub struct NivcCircuitInputs {
   pub initial_nivc_input: [F<G1>; PUBLIC_IO_VARS],
 }
 
+/// Initial NIVC inputs
 pub struct InitialNIVCInputs {
+  /// Ciphertext digest
   pub ciphertext_digest:  F<G1>,
+  /// Initial NIVC input
   pub initial_nivc_input: [F<G1>; PUBLIC_IO_VARS],
+  /// Headers digest
   pub headers_digest:     Vec<F<G1>>,
 }
 
@@ -476,6 +486,7 @@ fn build_json_extraction_circuit_inputs<const CIRCUIT_SIZE: usize>(
   Ok(value_digest - data_digest)
 }
 
+/// Compute ciphertext digest
 pub fn compute_ciphertext_digest<const CIRCUIT_SIZE: usize>(
   request_ciphertext: &[Vec<u8>],
   response_ciphertext: &[Vec<u8>],
@@ -501,6 +512,7 @@ pub fn compute_ciphertext_digest<const CIRCUIT_SIZE: usize>(
 }
 
 impl Manifest {
+  /// Initial inputs
   pub fn initial_inputs<const MAX_STACK_HEIGHT: usize, const CIRCUIT_SIZE: usize>(
     &self,
     // TODO (Sambhav): can remove copying
@@ -585,6 +597,7 @@ impl Manifest {
     })
   }
 
+  /// Builds inputs
   pub fn build_inputs<const CIRCUIT_SIZE: usize>(
     &self,
     request_inputs: &EncryptionInput,

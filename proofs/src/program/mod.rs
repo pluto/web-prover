@@ -1,3 +1,15 @@
+//! # Program Module
+//!
+//! The `program` module contains the core logic for setting up and running the proof system.
+//! It provides functionality for initializing the setup, generating proofs, and verifying proofs.
+//!
+//! ## Submodules
+//!
+//! - `data`: Contains data structures and types used in the proof system.
+//! - `http`: Provides utilities for handling HTTP-related operations in the proof system.
+//! - `manifest`: Contains the manifest structure and related utilities.
+//! - `utils`: Provides utility functions used throughout the module.
+
 use std::sync::Arc;
 
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
@@ -12,26 +24,49 @@ use proof::FoldingProof;
 use utils::into_input_json;
 
 use super::*;
-use crate::program::data::{ProofParams, SetupParams};
+use crate::{
+  circom::witness::generate_witness_from_browser_type,
+  program::{
+    data::{ProofParams, SetupParams},
+    utils::into_circom_input,
+  },
+};
 
 pub mod data;
 pub mod http;
 pub mod manifest;
 pub mod utils;
 
+/// Compressed proof type
 type CompressedProof = FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>>;
+
+/// Represents the memory used in the proof system.
+///
+/// This struct contains the circuits and ROM data required for the proof system.
 pub struct Memory {
+  /// A vector of ROM circuits used in the proof system.
   pub circuits: Vec<RomCircuit>,
+  /// A vector of ROM data, represented as 64-bit unsigned integers.
   pub rom:      Vec<u64>,
 }
 
+/// Represents a ROM circuit used in the proof system.
+///
+/// This struct encapsulates the necessary components and metadata for a ROM circuit,
+/// including the circuit itself, its index, size, and various inputs.
 #[derive(Clone)]
 pub struct RomCircuit {
+  /// The Circom circuit associated with this ROM circuit.
   pub circuit:                CircomCircuit,
+  /// The index of this circuit within the ROM.
   pub circuit_index:          usize,
+  /// The size of the ROM.
   pub rom_size:               usize,
+  /// Optional NIVC I/O values for the circuit.
   pub nivc_io:                Option<Vec<F<G1>>>,
+  /// Optional private inputs for the circuit, mapped by their labels.
   pub private_input:          Option<HashMap<String, Value>>,
+  /// The type of witness generator used for this circuit.
   pub witness_generator_type: WitnessGeneratorType,
 }
 
@@ -92,6 +127,7 @@ impl StepCircuit<F<G1>> for RomCircuit {
 
 // TODO: This is like a one-time use setup that overlaps some with `ProgramData::into_online()`.
 // Worth checking out how to make this simpler, clearer, more efficient.
+/// Setup function
 pub fn setup(setup_data: &UninitializedSetup) -> PublicParams<E1> {
   // Optionally time the setup stage for the program
   #[cfg(feature = "timing")]
@@ -109,9 +145,27 @@ pub fn setup(setup_data: &UninitializedSetup) -> PublicParams<E1> {
 
   public_params
 }
-use crate::{
-  circom::witness::generate_witness_from_browser_type, program::utils::into_circom_input,
-};
+
+/// Executes the SuperNova program with the provided setup, proof, and instance parameters.
+///
+/// This function initializes the public inputs, resizes the ROM, and iteratively processes each
+/// step of the ROM to generate a recursive SNARK proof. It handles the private inputs, witness
+/// generation, and circuit execution for each opcode in the ROM.
+///
+/// # Arguments
+///
+/// * `setup_params` - The setup parameters containing the setup data and public parameters.
+/// * `proof_params` - The proof parameters containing the ROM and other proof-related data.
+/// * `instance_params` - The instance parameters containing the NIVC input and private inputs.
+///
+/// # Returns
+///
+/// A `Result` containing the generated `RecursiveSNARK` on success, or a `ProofError` on failure.
+///
+/// # Errors
+///
+/// This function can return a `ProofError` if there are issues with the NIVC input, private inputs,
+/// or witness generation.
 pub async fn run(
   setup_params: &SetupParams<Online>,
   proof_params: &ProofParams,
@@ -203,7 +257,7 @@ pub async fn run(
     #[cfg(feature = "verify-steps")]
     {
       info!("Verifying single step...");
-      recursive_snark.verify(&public_params, &z0_primary, &z0_secondary)?;
+      recursive_snark.verify(public_params, &z0_primary, &z0_secondary)?;
       info!("Single step verification done");
     }
 
@@ -221,6 +275,26 @@ pub async fn run(
   Ok(recursive_snark?)
 }
 
+/// Compresses a proof without performing the setup step.
+///
+/// This function takes an existing `RecursiveSNARK` and compresses it into a `CompressedProof`
+/// using pre-initialized proving keys. This is useful when the setup step has already been
+/// performed and the proving keys are available, allowing for more efficient proof generation.
+///
+/// # Arguments
+///
+/// * `recursive_snark` - A reference to the `RecursiveSNARK` that needs to be compressed.
+/// * `public_params` - The public parameters required for the proof system.
+/// * `vk_digest_primary` - The primary verification key digest.
+/// * `vk_digest_secondary` - The secondary verification key digest.
+///
+/// # Returns
+///
+/// A `Result` containing the `CompressedProof` if successful, or a `ProofError` if an error occurs.
+///
+/// # Errors
+///
+/// This function will return a `ProofError` if the compression process fails at any step.
 pub fn compress_proof_no_setup(
   recursive_snark: &RecursiveSNARK<E1>,
   public_params: &PublicParams<E1>,
@@ -248,6 +322,25 @@ pub fn compress_proof_no_setup(
   Ok(proof)
 }
 
+/// Compresses a proof by performing the setup step and generating a compressed proof.
+///
+/// This function initializes the proving keys by performing the setup step, and then uses these
+/// keys to generate a compressed proof from an existing `RecursiveSNARK`. This is useful when the
+/// setup step has not been performed yet, and the proving keys need to be initialized before
+/// generating the proof.
+///
+/// # Arguments
+///
+/// * `recursive_snark` - A reference to the `RecursiveSNARK` that needs to be compressed.
+/// * `public_params` - The public parameters required for the proof system.
+///
+/// # Returns
+///
+/// A `Result` containing the `CompressedProof` if successful, or a `ProofError` if an error occurs.
+///
+/// # Errors
+///
+/// This function will return a `ProofError` if the setup or compression process fails at any step.
 pub fn compress_proof(
   recursive_snark: &RecursiveSNARK<E1>,
   public_params: &PublicParams<E1>,
@@ -275,6 +368,21 @@ pub fn compress_proof(
   Ok(proof)
 }
 
+/// Initializes the setup data for the program.
+///
+/// This function takes an `UninitializedSetup` and converts it into an `InitializedSetup` by
+/// iterating over the R1CS types and witness generator types, creating `R1CS` instances and
+/// collecting them into vectors. It then returns an `InitializedSetup` containing the R1CS and
+/// witness generator types, along with the maximum ROM length.
+///
+/// # Arguments
+///
+/// * `setup_data` - The `UninitializedSetup` to initialize.
+///
+/// # Returns
+///
+/// A `Result` containing the `InitializedSetup` if successful, or a `ProofError` if an error
+/// occurs.
 pub fn initialize_setup_data(
   setup_data: &UninitializedSetup,
 ) -> Result<InitializedSetup, ProofError> {
@@ -296,6 +404,19 @@ pub fn initialize_setup_data(
   Ok(InitializedSetup { r1cs, witness_generator_types, max_rom_length: setup_data.max_rom_length })
 }
 
+/// Initializes a list of ROM circuits from the provided setup data.
+///
+/// This function takes an `InitializedSetup` and creates a vector of `RomCircuit` instances.
+/// Each `RomCircuit` is constructed using the R1CS and witness generator types from the setup data,
+/// and is assigned a unique circuit index and the maximum ROM length.
+///
+/// # Arguments
+///
+/// * `setup_data` - The `InitializedSetup` containing the R1CS and witness generator types.
+///
+/// # Returns
+///
+/// A vector of `RomCircuit` instances initialized with the provided setup data.
 pub fn initialize_circuit_list(setup_data: &InitializedSetup) -> Vec<RomCircuit> {
   setup_data
     .r1cs
