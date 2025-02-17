@@ -59,7 +59,7 @@ use crate::{
 const DATA_SIGNAL_NAME: &str = "data";
 const PUBLIC_IO_VARS: usize = 11;
 pub(crate) const MAX_HTTP_HEADERS: usize = 25;
-pub const HTTP_1_1: &'static str = "HTTP/1.1";
+pub const HTTP_1_1: &str = "HTTP/1.1";
 
 /// Manifest containing [`ManifestRequest`] and [`ManifestResponse`]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

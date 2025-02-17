@@ -1,16 +1,16 @@
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use axum::{
   extract::{self, Query, State},
   // response::Response,
   Json,
 };
-use client::{TeeProof, TeeProofData};
+use client::TeeProof;
 use proofs::program::{
-  http::{ManifestRequest, ManifestResponse, ResponseBody},
+  http::{JsonKey, ManifestRequest, ManifestResponse, ResponseBody},
   manifest::HTTP_1_1,
 };
-use reqwest::Request;
+use reqwest::{Request, Response};
 use serde::Deserialize;
 use serde_json::Value;
 use tracing::{debug, info};
@@ -46,10 +46,10 @@ pub async fn proxy(
   let reqwest_response = request_builder.send().await.unwrap();
 
   let request = from_reqwest_request(&reqwest_request);
-  debug!("{:?}", request);
+  // debug!("{:?}", request);
 
-  let response = from_reqwest_response(&reqwest_response);
-  debug!("{:?}", response);
+  let response = from_reqwest_response(reqwest_response).await;
+  // debug!("{:?}", response);
 
   if !payload.manifest.request.is_subset_of(&request) {
     return Err(NotaryServerError::ManifestRequestMismatch);
@@ -69,28 +69,19 @@ pub async fn proxy(
 
 // TODO: This, similarly to other from_* methods, should be a trait
 // Requires adding reqwest to proofs crate
-async fn from_reqwest_response(response: &Response) -> ManifestResponse {
+async fn from_reqwest_response(response: Response) -> ManifestResponse {
   let status = response.status().as_u16().to_string();
   let version = format!("{:?}", response.version());
   let message = response.status().canonical_reason().unwrap_or("").to_string();
   let headers = response
     .headers()
     .iter()
-    .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+    .map(|(k, v)| (capitalize_header(k.as_ref()), v.to_str().unwrap_or("").to_string()))
     .collect();
-  // TODO: How do we get rid of that async
-  // Try to parse as JSON first
-  let body = match response.text().await {
-    Ok(body_text) => {
-      if let Ok(json_body) = serde_json::from_str::<Value>(&body_text) {
-        json_body
-      } else {
-        Value::String(body_text.to_string()) // If parsing fails, store as plain text
-      }
-    },
-    Err(_) => Value::Null,
-  };
-
+  let body: HashMap<String, String> = response.json().await.unwrap_or_default();
+  // TODO: How to handle JsonKey::Num?
+  // TODO Use plain JSON in Manifest etc., and convert to JsonKey as needed
+  let body: Vec<JsonKey> = body.keys().map(|k| JsonKey::String(k.to_string())).collect();
   ManifestResponse { status, version, message, headers, body: ResponseBody { json: body } }
 }
 
@@ -101,8 +92,21 @@ fn from_reqwest_request(request: &Request) -> ManifestRequest {
   let headers = request
     .headers()
     .iter()
-    .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+    .map(|(k, v)| (capitalize_header(k.as_ref()), v.to_str().unwrap_or("").to_string()))
     .collect();
   let body: Value = request.body().map(|b| b.as_bytes().unwrap_or_default().to_vec()).into();
   ManifestRequest { method, url, version, headers, body: Some(body), vars: Default::default() }
+}
+
+// TODO: Not sure how to normalize data from different formats/protocols into a canonical
+//  `ManifestRequest` and `ManifestResponse`, so for now using this helper as a workaround
+fn capitalize_header(header: &str) -> String {
+  header
+    .split('-')
+    .map(|part| {
+      let mut chars = part.chars();
+      chars.next().map(|c| c.to_ascii_uppercase()).into_iter().chain(chars).collect::<String>()
+    })
+    .collect::<Vec<_>>()
+    .join("-")
 }

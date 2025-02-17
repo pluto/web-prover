@@ -16,10 +16,7 @@ use std::collections::HashMap;
 
 use proofs::{
   errors::ProofError,
-  program::{
-    http::ManifestRequest,
-    manifest::{Manifest, NIVCRom, HTTP_1_1},
-  },
+  program::manifest::{Manifest, NIVCRom},
   proof::FoldingProof,
 };
 use serde::{Deserialize, Serialize};

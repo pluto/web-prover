@@ -3,9 +3,12 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::debug;
-use web_proof_circuits_witness_generator::json::JsonKey;
+pub use web_proof_circuits_witness_generator::json::JsonKey;
 
-use crate::{errors::ProofError, program::manifest::MAX_HTTP_HEADERS};
+use crate::{
+  errors::ProofError,
+  program::manifest::{HTTP_1_1, MAX_HTTP_HEADERS},
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ResponseBody {
@@ -13,7 +16,7 @@ pub struct ResponseBody {
 }
 
 /// Default HTTP version
-pub fn default_version() -> String { "HTTP/1.1".to_string() }
+pub fn default_version() -> String { HTTP_1_1.to_string() }
 /// Default HTTP message
 pub fn default_message() -> String { "OK".to_string() }
 
@@ -177,7 +180,7 @@ impl ManifestResponse {
     // Check if all JSON keys in `self.body` are present in `other.body`
     for self_key in &self.body.json {
       if !other.body.json.iter().any(|other_key| self_key == other_key) {
-        debug!("missing self_key {:?}", self_key);
+        debug!("Missing JSON key {:?}", self_key);
         return false;
       }
     }
