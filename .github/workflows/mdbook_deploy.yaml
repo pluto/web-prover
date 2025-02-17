@@ -57,7 +57,7 @@ jobs:
 
       - name: Verify build directory contains index.html
         run: |
-          if [ ! -f ./docs/html/index.html ]; then
+          if [ ! -f ./book/html/index.html ]; then
             echo "index.html not found"
             exit 1
           fi
