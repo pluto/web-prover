@@ -83,7 +83,8 @@ pub struct Manifest {
 }
 
 impl Manifest {
-  /// Validates `Manifest` fields
+  /// Validates `Manifest` request and response fields. They are validated against valid statuses,
+  /// http methods, and template variables.
   pub fn validate(&self) -> Result<(), ProofError> {
     // TODO: Validate manifest version, id, title, description, prepareUrl
     self.request.validate()?;

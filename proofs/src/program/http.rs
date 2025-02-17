@@ -56,6 +56,16 @@ pub struct ManifestResponse {
 
 impl ManifestResponse {
   /// Validates the HTTP response
+  ///
+  /// This function validates the HTTP response.
+  ///
+  /// # Arguments
+  ///
+  /// * `self`: The HTTP response to validate.
+  ///
+  /// # Returns
+  ///
+  /// The validated HTTP response.
   pub fn validate(&self) -> Result<(), ProofError> {
     // TODO: What are legal statuses?
     const VALID_STATUSES: [&str; 2] = ["200", "201"];
@@ -119,7 +129,15 @@ impl ManifestResponse {
     Ok(Self { status, version, message, headers, body })
   }
 
-  /// Parses the HTTP response body from the given bytes.
+  /// This function parses the HTTP response body from the given bytes.
+  ///
+  /// # Arguments
+  ///
+  /// * `body_bytes`: The bytes representing the HTTP response body.
+  ///
+  /// # Returns
+  ///
+  /// The parsed HTTP response body.
   fn parse_body(body_bytes: &[u8]) -> Result<ResponseBody, ProofError> {
     if body_bytes.is_empty() {
       return Ok(ResponseBody { json: Vec::new() });
@@ -139,6 +157,14 @@ impl ManifestResponse {
   }
 
   /// Parses the HTTP response header from the given bytes.
+  ///
+  /// # Arguments
+  ///
+  /// * `header_bytes`: The bytes representing the HTTP response header.
+  ///
+  /// # Returns
+  ///
+  /// The parsed HTTP response header.
   fn parse_header(
     header_bytes: &[u8],
   ) -> Result<(HashMap<String, String>, String, String, String), ProofError> {
@@ -249,7 +275,15 @@ pub struct ManifestRequest {
 }
 
 impl ManifestRequest {
-  /// Validates the HTTP request
+  /// This function validates the HTTP request.
+  ///
+  /// # Arguments
+  ///
+  /// * `self`: The HTTP request to validate.
+  ///
+  /// # Returns
+  ///
+  /// The validated HTTP request.
   pub fn validate(&self) -> Result<(), ProofError> {
     // TODO: What HTTP methods are supported?
     const ALLOWED_METHODS: [&str; 2] = ["GET", "POST"];

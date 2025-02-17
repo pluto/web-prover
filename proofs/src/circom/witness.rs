@@ -1,3 +1,18 @@
+//! # Witness Module
+//!
+//! The `witness` module provides functionalities for generating and loading witnesses from various
+//! sources. It includes functions for generating witnesses from browser types, WASM files, and
+//! witnesscalc files.
+//!
+//! ## Functions
+//!
+//! - `generate_witness_from_browser_type`: Generates a witness from a browser type.
+//! - `generate_witness_from_generator_type`: Generates a witness from a generator type.
+//! - `generate_witness_from_graph`: Generates a witness from a graph.
+//! - `generate_witness_from_witnesscalc_file`: Generates a witness from a witnesscalc file.
+//! - `load_witness_from_bin_reader`: Loads a witness from a bin reader.
+//! - `read_field`: Reads a field from a reader.
+
 use fs::OpenOptions;
 
 use super::*;

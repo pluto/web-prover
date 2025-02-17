@@ -39,12 +39,8 @@ use serde::{Deserialize, Serialize};
 
 use super::*;
 
-/// R1CS module
 pub mod r1cs;
-/// WASM witness module
-#[cfg(target_arch = "wasm32")]
-pub mod wasm_witness;
-/// Witness module
+#[cfg(target_arch = "wasm32")] pub mod wasm_witness;
 pub mod witness;
 
 /// Circom input
@@ -89,10 +85,17 @@ impl Default for CircomCircuit {
 }
 
 impl CircomCircuit {
-  /// Arity
+  /// Return the arity of the circuit ie the number of public inputs
   pub fn arity(&self) -> usize { self.r1cs.num_public_inputs }
 
   /// Vanilla synthesize
+  ///
+  /// This function synthesizes the circuit using the provided constraint system.
+  ///
+  /// # Arguments
+  ///
+  /// * `cs`: The constraint system to use for synthesis.
+  /// * `z`: The witness values to use for synthesis.
   pub fn vanilla_synthesize<CS: ConstraintSystem<F<G1>>>(
     &self,
     cs: &mut CS,

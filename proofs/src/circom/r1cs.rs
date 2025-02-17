@@ -1,3 +1,26 @@
+//! # R1CS Module
+//!
+//! The `r1cs` module provides functionalities for handling Rank-1 Constraint System (R1CS)
+//! representations of Circom circuits. It includes utilities for reading, parsing, and
+//! managing R1CS data, which is essential for circuit synthesis and proof generation.
+//!
+//! ## Structs
+//!
+//! - `R1CS`: Represents the R1CS structure, including the number of inputs, outputs, variables, and
+//!   constraints.
+//! - `Header`: Represents the header of an R1CS file, including field size and various counts.
+//!
+//! ## Type Definitions
+//!
+//! - `Constraint`: A type alias for a tuple representing a constraint in the R1CS, consisting of
+//!   vectors of pairs of indices and field elements.
+//!
+//! ## Functions
+//!
+//! - `read_field`: Reads a field element from a reader.
+//! - `read_header`: Reads the header of an R1CS file from a reader.
+//! - `read_constraint_vec`: Reads a vector of constraints from a reader.
+//! - `read_constraints`: Reads all constraints from a reader based on the R1CS header.
 use fs::OpenOptions;
 
 use super::*;
@@ -168,6 +191,15 @@ fn read_field<R: Read>(mut reader: R) -> Result<F<G1>, ProofError> {
 }
 
 /// Reads a header from a reader
+///
+/// # Arguments
+///
+/// * `reader`: The reader to read the header from.
+/// * `size`: The size of the header.
+///
+/// # Returns
+///
+/// The header.
 fn read_header<R: Read>(mut reader: R, size: u64) -> Result<Header, ProofError> {
   let field_size = reader.read_u32::<LittleEndian>()?;
   let mut prime_size = vec![0u8; field_size as usize];
@@ -187,6 +219,14 @@ fn read_header<R: Read>(mut reader: R, size: u64) -> Result<Header, ProofError> 
 }
 
 /// Reads a constraint vector from a reader
+///
+/// # Arguments
+///
+/// * `reader`: The reader to read the constraint vector from.
+///
+/// # Returns
+///
+/// The constraint vector.
 fn read_constraint_vec<R: Read>(mut reader: R) -> Result<Vec<(usize, F<G1>)>, ProofError> {
   let n_vec = reader.read_u32::<LittleEndian>()? as usize;
   let mut vec = Vec::with_capacity(n_vec);
@@ -197,6 +237,15 @@ fn read_constraint_vec<R: Read>(mut reader: R) -> Result<Vec<(usize, F<G1>)>, Pr
 }
 
 /// Reads constraints from a reader
+///
+/// # Arguments
+///
+/// * `reader`: The reader to read the constraints from.
+/// * `header`: The header of the R1CS.
+///
+/// # Returns
+///
+/// The constraints.
 fn read_constraints<R: Read>(
   mut reader: R,
   header: &Header,
