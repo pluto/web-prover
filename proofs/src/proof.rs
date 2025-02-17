@@ -41,7 +41,6 @@ impl FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>> {
   }
 }
 
-
 /// Folding proof implementation
 impl FoldingProof<Vec<u8>, String> {
   /// Deserializes a `FoldingProof` from a stored or transmitted format back into its original form.
