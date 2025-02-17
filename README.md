@@ -28,6 +28,15 @@ If you have any questions, please reach out to any of Pluto's [team members](htt
 - `notary`: notary server which can notarize MPC/ Origo/ TEE proofs.
 - `proofs`: contains all of our circom artifacts for the Origo proofs as well as a set of extractor proofs for selective disclosure over response data.
 
+### Usage
+
+```
+git clone https://github.com/pluto/web-prover.git
+cd web-prover
+(cd proofs && make proof)
+# Compilation errors? Have a look at KNOWN_ISSUES.md
+```
+
 ### Native Client Development
 
 ```
