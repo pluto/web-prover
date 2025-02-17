@@ -1,0 +1,61 @@
+[book]
+authors     =["Pluto"]
+language    ="en"
+multilingual=false
+src         ="."
+title       ="Web Prover"
+description ="Backend for Web Proofs"
+
+[build]
+build-dir="."
+extra-watch-dirs=[] # Don't watch any extra directories
+create-missing=false # Don't create missing files
+use-default-preprocessors=false
+exclude=[
+    "target/**/*",
+    "**/target/**/*",
+    "**/node_modules/**/*",
+    "client_wasm/demo/**/*",              # Explicitly exclude all demo content
+    "client_wasm/demo/static/build/**/*", # Extra specific exclusion for build artifacts
+    "client_wasm/demo/pkg/**/*",          # Extra specific exclusion for pkg
+    "client_wasm/demo/node_modules/**/*", # Extra specific exclusion for node_modules
+    "build/**/*",
+    "bin/**/*",
+    "client/**/*",
+    "client_ios/**/*",
+    "fixture/**/*",
+    "notary/**/*",
+    "tls/**/*",
+    "proofs/src/**/*",
+]
+
+[preprocessor.links]
+
+[preprocessor.katex]
+after=["links"]
+
+[output.linkcheck]
+follow-web-links           =true
+traverse-parent-directories=true
+warning-policy             ="ignore"
+
+# [preprocessor.keeper]
+# command     ="mdbook-keeper"
+# manifest_dir="."
+# externs     =["ronkathon", "rand"]
+
+[output.html]
+default-theme       ="dark"
+preferred-dark-theme="ayu"
+git-repository-url  ="https://github.com/pluto/web-prover"
+
+# [output.html.playground]
+# editable=true
+# runnable=true
+
+# [rust]
+# edition="2021"
+
+# [[output.html.playground.pre-installed-crates]]
+# name   ="rand"
+# version="0.8"

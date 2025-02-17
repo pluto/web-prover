@@ -3,6 +3,10 @@ webproof.json
 .vscode/*
 debug/
 target/
+book/html
+book/*.html
+book/linkcheck
+book/**/*.html
 
 .DS_Store
 
