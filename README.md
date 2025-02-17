@@ -3,15 +3,15 @@
 [![web-prover workflow](https://github.com/pluto/web-prover/actions/workflows/web-prover.yaml/badge.svg)](https://github.com/pluto/web-prover/actions/workflows/web-prover.yaml)
 [![docs](https://img.shields.io/badge/docs-e28f00)](https://docs.pluto.xyz)
 
-The Web Prover is infrastructure for generating Web Proofs. There are 2 components of the Web Prover — (1) the Client Crates, which run inside of the app or browser; and (2) Notary Crate, which is a hosted service. The default option for generating Web Proofs is to use the Pluto-hosted service.
+The Web Prover is infrastructure for generating Web Proofs. There are 3 components of the Web Prover — (1) the Client Crates, which run inside of the app or browser; (2) Notary Crate, which is a hosted service; and (3) the Proofs Crate, which generates required circuits and artifacts. 
 
-Pluto's Web Prover repo contains the source code for three types of Web Proofs:
+The default option for generating Web Proofs is to use the Pluto-hosted service. We recommend using the Javascript SDK, which uses a Pluto-hosted notary. Learn more [here](https://docs.pluto.xyz/guides/using-the-javascript-sdk). Developers do not need to set up the prover or host it themselves, unless they explicitly want to self-host this infrastructure or build custom infrastructure.
 
+Pluto's Web Prover repo contains the source code for the three types of Web Proofs:
 - [Origo proofs](https://pluto.xyz/blog/web-proof-techniques-origo-mode),
 - [Trusted Execution Environment (TEE) proofs](https://pluto.xyz/blog/web-proof-techniques-tee-mode) and
 - [MPC proofs](https://pluto.xyz/blog/web-proof-techniques-mpc-mode) via TLSNotary
 
-We recommend using the Javascript SDK, which uses a Pluto-hosted notary. Learn more [here](https://docs.pluto.xyz/guides/using-the-javascript-sdk).Developers do not need to set up the prover or host it themselves, unless they explicitly want to self-host this infrastructure or build custom infrastructure.
 
 ## How to get started
 
