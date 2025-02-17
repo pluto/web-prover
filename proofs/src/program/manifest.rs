@@ -61,6 +61,7 @@ pub const DATA_SIGNAL_NAME: &str = "data";
 pub const PUBLIC_IO_VARS: usize = 11;
 /// Max HTTP headers
 pub(crate) const MAX_HTTP_HEADERS: usize = 25;
+/// HTTP/1.1
 pub const HTTP_1_1: &str = "HTTP/1.1";
 
 /// Manifest containing [`ManifestRequest`] and [`ManifestResponse`]

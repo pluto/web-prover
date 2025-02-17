@@ -55,6 +55,7 @@ pub struct ManifestResponse {
 }
 
 impl ManifestResponse {
+  /// Validates the HTTP response
   pub fn validate(&self) -> Result<(), ProofError> {
     // TODO: What are legal statuses?
     const VALID_STATUSES: [&str; 2] = ["200", "201"];
@@ -248,6 +249,7 @@ pub struct ManifestRequest {
 }
 
 impl ManifestRequest {
+  /// Validates the HTTP request
   pub fn validate(&self) -> Result<(), ProofError> {
     // TODO: What HTTP methods are supported?
     const ALLOWED_METHODS: [&str; 2] = ["GET", "POST"];
