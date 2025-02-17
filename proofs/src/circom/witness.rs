@@ -41,32 +41,6 @@ pub fn generate_witness_from_generator_type(
   }
 }
 
-pub fn remap_inputs(input_json: &str) -> Result<Vec<(String, Vec<BigInt>)>, ProofError> {
-  let circom_input: CircomInput = serde_json::from_str(input_json)?;
-  let mut remapped = vec![];
-  remapped.push((
-    "step_in".to_string(),
-    circom_input
-      .step_in
-      .into_iter()
-      .map(|s| BigInt::from_str(&s))
-      .collect::<Result<Vec<_>, _>>()?,
-  ));
-  for (k, v) in circom_input.extra {
-    let val = v
-      .as_array()
-      .ok_or_else(|| ProofError::Other("Expected array".to_string()))?
-      .iter()
-      .map(|x| {
-        let num_str = x.as_str().ok_or_else(|| ProofError::Other("Expected string".to_string()))?;
-        BigInt::from_str(num_str).map_err(ProofError::from)
-      })
-      .collect::<Result<Vec<BigInt>, ProofError>>()?;
-    remapped.push((k, val));
-  }
-  Ok(remapped)
-}
-
 pub fn generate_witness_from_graph(
   input_json: &str,
   graph_data: &[u8],

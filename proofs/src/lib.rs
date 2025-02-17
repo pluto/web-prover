@@ -8,7 +8,6 @@ use client_side_prover::{
   traits::{Engine, Group},
 };
 use ff::Field;
-use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, error, info};
