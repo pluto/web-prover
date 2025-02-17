@@ -166,8 +166,7 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
     response_inputs.clone(),
   )
   .await?;
-  let flattened_plaintext: Vec<u8> =
-    response_inputs.plaintext.into_iter().flat_map(|x| x).collect();
+  let flattened_plaintext: Vec<u8> = response_inputs.plaintext.into_iter().flatten().collect();
   let http_body = compute_http_witness(&flattened_plaintext, HttpMaskType::Body);
   let value = json_value_digest::<{ proofs::circuits::MAX_STACK_HEIGHT }>(
     &http_body,

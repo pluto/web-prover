@@ -195,14 +195,6 @@ pub struct TeeProofData {
 }
 
 impl TeeProof {
-  pub fn from_manifest(manifest: &Manifest) -> Self {
-    let manifest_hash = manifest.to_keccak_digest();
-    let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
-    // TODO: How do I sign this?
-    let signature = "sign(hash(TeeProofData))".to_string();
-    TeeProof { data, signature }
-  }
-
   pub fn to_write_bytes(&self) -> Vec<u8> {
     let serialized = self.to_bytes();
     let length = serialized.len() as u32;

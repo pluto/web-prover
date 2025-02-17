@@ -15,7 +15,6 @@ use axum::{
 use errors::NotaryServerError;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
-use k256::ecdsa::SigningKey as Secp256k1SigningKey;
 use p256::{ecdsa::SigningKey, elliptic_curve::rand_core, pkcs8::DecodePrivateKey};
 use rustls::{
   pki_types::{CertificateDer, PrivateKeyDer},
@@ -29,6 +28,8 @@ use tower_http::cors::CorsLayer;
 use tower_service::Service;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+use crate::origo::OrigoSigningKey;
 
 mod axum_websocket;
 mod config;
@@ -44,7 +45,7 @@ mod websocket_proxy;
 
 struct SharedState {
   notary_signing_key: SigningKey,
-  origo_signing_key:  Secp256k1SigningKey,
+  origo_signing_key:  OrigoSigningKey,
   tlsn_max_sent_data: usize,
   tlsn_max_recv_data: usize,
   origo_sessions:     Arc<Mutex<HashMap<String, tls_parser::Transcript<tls_parser::Raw>>>>,
@@ -101,7 +102,7 @@ async fn main() -> Result<(), NotaryServerError> {
 
   let shared_state = Arc::new(SharedState {
     notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
-    origo_signing_key:  load_origo_signing_key(&c.origo_signing_key),
+    origo_signing_key:  OrigoSigningKey::load(&c.origo_signing_key),
     tlsn_max_sent_data: c.tlsn_max_sent_data,
     tlsn_max_recv_data: c.tlsn_max_recv_data,
     origo_sessions:     Default::default(),
@@ -376,21 +377,6 @@ pub fn load_notary_signing_key(private_key_pem_path: &str) -> SigningKey {
 }
 
 pub fn ephemeral_notary_signing_key() -> SigningKey { SigningKey::random(&mut rand_core::OsRng) }
-
-pub fn load_origo_signing_key(private_key_pem_path: &str) -> Secp256k1SigningKey {
-  if private_key_pem_path.is_empty() {
-    info!("Using ephemeral origo signing key");
-    ephemeral_origo_signing_key()
-  } else {
-    info!("Using origo signing key: {}", private_key_pem_path);
-    let raw = fs::read_to_string(private_key_pem_path).unwrap();
-    Secp256k1SigningKey::from_pkcs8_pem(&raw).unwrap()
-  }
-}
-
-pub fn ephemeral_origo_signing_key() -> Secp256k1SigningKey {
-  Secp256k1SigningKey::random(&mut rand_core::OsRng)
-}
 
 async fn meta_keys(
   Path(key): Path<String>,
