@@ -481,7 +481,7 @@ mod tests {
   // Helper function to create test program data
   fn create_test_program_data() -> (SetupParams<Online>, ProofParams, InstanceParams<Expanded>) {
     // Load add.r1cs from examples
-    let add_r1cs = include_bytes!("../../examples/circuit_data/add_external.r1cs");
+    let add_r1cs = crate::tests::inputs::ADD_EXTERNAL_R1CS.to_vec();
     let r1cs = R1CSType::Raw(add_r1cs.to_vec());
     // Create ROM data with proper circuit data
     let mut rom_data = HashMap::new();

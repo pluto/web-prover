@@ -4633,7 +4633,6 @@ dependencies = [
  "tls-client",
  "tokio",
  "tracing",
- "tracing-subscriber",
  "tracing-test",
  "url",
  "wasm-bindgen",

@@ -196,12 +196,10 @@ fn read_constraints<R: Read>(
 mod tests {
   use super::*;
 
-  const ADD_EXTERNAL_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/add_external.r1cs");
-
   #[test]
   #[tracing_test::traced_test]
   fn test_r1cs_from_bin() {
-    let r1cs = R1CS::try_from(ADD_EXTERNAL_R1CS).unwrap();
+    let r1cs = R1CS::try_from(crate::tests::inputs::ADD_EXTERNAL_R1CS).unwrap();
     assert_eq!(r1cs.num_inputs, 5); // TODO: What is the 5th input??
     assert_eq!(r1cs.num_private_inputs, 2);
     assert_eq!(r1cs.num_public_inputs, 2);

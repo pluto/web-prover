@@ -15,7 +15,6 @@ Visit the [Pluto documentation](https://docs.pluto.xyz) for integration guides, 
 
 If you have any questions, please reach out to any of Pluto's [team members](https://pluto.xyz/team) or join our [Telegram](https://t.me/pluto_xyz) to ask questions. We'd love to hear from you!
 
-
 ## Development
 
 ### Repo layout
@@ -27,6 +26,11 @@ If you have any questions, please reach out to any of Pluto's [team members](htt
 - `fixture`: contains testing artifacts such as TLS certificates and configuration files.
 - `notary`: notary server which can notarize MPC/ Origo/ TEE proofs.
 - `proofs`: contains all of our circom artifacts for the Origo proofs as well as a set of extractor proofs for selective disclosure over response data.
+
+### Setup
+- Install rust nightly: `rustup install toolchain nightly-2024-10-28`
+- Run `make artifacts` to download circuit artifacts required for Web Prover proxy mode
+- Compilation errors? Have a look at [KNOWN_ISSUES.md](KNOWN_ISSUES.md)
 
 ### Native Client Development
 
