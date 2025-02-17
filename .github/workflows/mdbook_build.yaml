@@ -32,4 +32,3 @@ jobs:
         run: |
           cd book
           mdbook build
-          cd ..
