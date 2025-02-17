@@ -5,16 +5,12 @@ edition="2021"
 publish=false
 build  ="build.rs"
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-circom_witnesscalc={ git="https://github.com/pluto/circom-witnesscalc" } # Fork is needed apparently??
-
 [dependencies]
-serde             ={ workspace=true }
-serde_json        ={ workspace=true }
-thiserror         ={ workspace=true }
-tracing           ={ workspace=true }
-tracing-subscriber={ workspace=true }
-tls-client2       ={ workspace=true } # a bit of an odd dependency to have in here imo
+serde      ={ workspace=true }
+serde_json ={ workspace=true }
+thiserror  ={ workspace=true }
+tracing    ={ workspace=true }
+tls-client2={ workspace=true } # a bit of an odd dependency to have in here imo
 
 hex                                 ="0.4"
 client-side-prover                  ={ git="https://github.com/pluto/client-side-prover", rev="8e7eb839e901dcee416179116bb0f9c4f7ae683c" }
@@ -42,6 +38,9 @@ serde-wasm-bindgen  ="0.6.5"
 wasm-bindgen        ="0.2.87"
 js-sys              ="0.3.64"
 wasm-bindgen-futures="0.4.37"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+circom_witnesscalc={ git="https://github.com/pluto/circom-witnesscalc" } # Fork is needed apparently??
 
 [dev-dependencies]
 tracing-test="0.2.5"
