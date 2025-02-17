@@ -3,18 +3,15 @@ use std::{str::FromStr, sync::Arc};
 use serde_json::json;
 
 use super::*;
-use crate::program::data::{R1CSType, UninitializedSetup, WitnessGeneratorType};
+use crate::{
+  program::data::{R1CSType, UninitializedSetup, WitnessGeneratorType},
+  tests::inputs::{
+    ADD_EXTERNAL_GRAPH, ADD_EXTERNAL_R1CS, EXTERNAL_INPUTS, SQUARE_ZEROTH_GRAPH,
+    SQUARE_ZEROTH_R1CS, SWAP_MEMORY_GRAPH, SWAP_MEMORY_R1CS,
+  },
+};
 
-const ADD_EXTERNAL_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/add_external.r1cs");
-const SQUARE_ZEROTH_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/square_zeroth.r1cs");
-const SWAP_MEMORY_R1CS: &[u8] = include_bytes!("../../examples/circuit_data/swap_memory.r1cs");
-
-const EXTERNAL_INPUTS: [[u64; 2]; 2] = [[5, 7], [13, 1]];
-const ADD_EXTERNAL_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/add_external.bin");
-const SQUARE_ZEROTH_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/square_zeroth.bin");
-const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("../../examples/circuit_data/swap_memory.bin");
 const MAX_ROM_LENGTH: usize = 10;
-
 const TEST_OFFLINE_PATH: &str = "src/tests/test_run_serialized_verify.bytes";
 
 fn get_setup_data() -> UninitializedSetup {
