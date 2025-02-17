@@ -49,8 +49,11 @@ jobs:
         id: pages
         uses: actions/configure-pages@v5
 
-      - name: Build with mdBook
-        run: mdbook build
+      - name: Build mdBook
+        run: |
+          cd book
+          mdbook build
+          cd ..
 
       - name: Verify build directory contains index.html
         run: |
@@ -62,7 +65,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./docs/html
+          path: ./book/html
 
   # Deployment job
   deploy:

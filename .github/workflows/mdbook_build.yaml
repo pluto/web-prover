@@ -29,4 +29,7 @@ jobs:
           cargo binstall --no-confirm --version ${MDBOOK_LINKCHECK_VERSION} mdbook-linkcheck
           
       - name: Build mdBook
-        run: mdbook build
+        run: |
+          cd book
+          mdbook build
+          cd ..
