@@ -312,7 +312,7 @@ pub async fn verify(
     proof:           payload.origo_proof.proof.proof.clone(),
     verifier_digest: payload.origo_proof.proof.verifier_digest.clone(),
   }
-  .deserialize();
+  .deserialize()?;
 
   debug!("verifier_digest: {:?}", proof.verifier_digest.clone());
 

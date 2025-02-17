@@ -41,10 +41,6 @@ impl FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>> {
   }
 }
 
-/// Compressed proof type
-type CompressedProof = CompressedSNARK<E1, S1, S2>;
-/// Verifier digest type
-type VerifierDigest = F<G1>;
 
 /// Folding proof implementation
 impl FoldingProof<Vec<u8>, String> {
@@ -53,8 +49,8 @@ impl FoldingProof<Vec<u8>, String> {
   /// # Returns
   ///
   /// A `FoldingProof` with a `CompressedSNARK<E1, S1, S2>` proof and a `F<G1>` verifier digest.
-  pub fn deserialize(self) -> Result<FoldingProof<CompressedProof, VerifierDigest>, ProofError> {
-    let proof: CompressedProof = bincode::deserialize(&self.proof[..])?;
+  pub fn deserialize(self) -> Result<FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>>, ProofError> {
+    let proof = bincode::deserialize(&self.proof[..])?;
 
     Ok(FoldingProof {
       proof,
