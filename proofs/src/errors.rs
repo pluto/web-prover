@@ -61,8 +61,8 @@ pub enum ProofError {
   Other(String),
 
   /// The error is a failed proof verification
-  #[error("Failed to verify proof")]
-  VerifyFailed(),
+  #[error("Failed to verify proof: {0}")]
+  VerifyFailed(String),
 
   /// The error is a num_bigint::ParseBigIntError
   #[error(transparent)]

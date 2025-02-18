@@ -120,7 +120,7 @@ async fn handle_origo_mode(
   // TODO: What do with tls_fut? what do with tls_receiver?
   let (tls_sender, tls_receiver) = oneshot::channel();
   let handled_tls_fut = async {
-    let result = tls_fut.await.unwrap();
+    let result = tls_fut.await;
     let _ = tls_sender.send(result);
   };
   tokio::spawn(handled_tls_fut);
@@ -150,7 +150,14 @@ async fn handle_origo_mode(
   client_socket.close().await?;
 
   // Close the underlying TCP stream.
-  tls_receiver.await?.1.into_inner().into_inner().into_inner().into_inner().0.shutdown().await?;
+  match tls_receiver.await? {
+    Ok((_, compat)) => {
+      compat.into_inner().into_inner().into_inner().into_inner().0.shutdown().await?;
+    },
+    Err(e) => {
+      debug!("Error closing client TLS connection: {:?}", e);
+    },
+  }
 
   let origo_conn = origo_conn.lock().unwrap().deref().clone();
   Ok(origo_conn)
