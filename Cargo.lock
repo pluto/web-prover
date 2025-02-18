@@ -3920,6 +3920,7 @@ dependencies = [
  "tower-service",
  "tracing",
  "tracing-subscriber",
+ "uuid",
  "web-proof-circuits-witness-generator",
  "ws_stream_tungstenite 0.13.0 (git+https://github.com/pluto/ws_stream_tungstenite.git?branch=latest)",
 ]
@@ -7086,6 +7087,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8c5f0a0af699448548ad1a2fbf920fb4bee257eae39953ba95cb84891a0446a"
 dependencies = [
  "getrandom 0.2.15",
+ "serde",
 ]
 
 [[package]]

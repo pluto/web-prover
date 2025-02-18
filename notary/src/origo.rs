@@ -25,6 +25,7 @@ use tokio::{
 };
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{debug, error, info};
+use uuid::Uuid;
 use web_proof_circuits_witness_generator::polynomial_digest;
 use ws_stream_tungstenite::WsStream;
 
@@ -38,7 +39,7 @@ use crate::{
 
 #[derive(Deserialize)]
 pub struct SignQuery {
-  session_id: String,
+  session_id: Uuid,
 }
 
 #[derive(Serialize)]
@@ -64,7 +65,8 @@ pub async fn sign(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<SignBody>,
 ) -> Result<Json<SignReply>, ProxyError> {
-  let transcript = state.origo_sessions.lock().unwrap().get(&query.session_id).cloned().unwrap();
+  let transcript =
+    state.origo_sessions.lock().unwrap().get(&query.session_id.to_string()).cloned().unwrap();
 
   let handshake_server_key = hex::decode(payload.handshake_server_key).unwrap();
   let handshake_server_iv = hex::decode(payload.handshake_server_iv).unwrap();
@@ -103,7 +105,7 @@ pub async fn sign(
     .verifier_sessions
     .lock()
     .unwrap()
-    .insert(query.session_id.clone(), VerifierInputs { request_messages, response_messages });
+    .insert(query.session_id.to_string(), VerifierInputs { request_messages, response_messages });
 
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
@@ -216,7 +218,7 @@ impl Hasher for KeccakHasher {
 
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
-  session_id:  String,
+  session_id:  Uuid,
   target_host: String,
   target_port: u16,
 }
@@ -246,7 +248,7 @@ pub async fn proxy(
   query: Query<NotarizeQuery>,
   State(state): State<Arc<SharedState>>,
 ) -> Response {
-  let session_id = query.session_id.clone();
+  let session_id = query.session_id.to_string();
 
   info!("Starting notarize with ID: {}", session_id);
 

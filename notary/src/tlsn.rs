@@ -14,6 +14,7 @@ use tlsn_verifier::tls::{Verifier, VerifierConfig};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::{debug, error, info};
+use uuid::Uuid;
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
@@ -84,7 +85,7 @@ pub async fn notary_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
-  session_id: String,
+  session_id: Uuid,
 }
 
 // TODO Response or impl IntoResponse?
@@ -93,7 +94,7 @@ pub async fn notarize(
   query: Query<NotarizeQuery>,
   State(state): State<Arc<SharedState>>,
 ) -> Response {
-  let session_id = query.session_id.clone();
+  let session_id = query.session_id.to_string();
 
   debug!("Starting notarize with ID: {}", session_id);
 
