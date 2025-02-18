@@ -13,12 +13,13 @@ use reqwest::{Request, Response};
 use serde::Deserialize;
 use serde_json::Value;
 use tracing::{debug, info};
+use uuid::Uuid;
 
 use crate::{errors::NotaryServerError, SharedState};
 
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
-  session_id: String,
+  session_id: Uuid,
 }
 
 pub async fn proxy(

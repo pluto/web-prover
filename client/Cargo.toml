@@ -65,7 +65,7 @@ tokio-util={ version="0.7", features=[
 chrono="0.4"
 p256={ version="0.13", features=["pem", "ecdsa"] }
 
-uuid={ version="1.10.0", default-features=false, features=["v4"] }
+uuid={ workspace=true }
 
 clap      ={ workspace=true }
 serde_with={ version="3.12.0", features=["base64"] }
