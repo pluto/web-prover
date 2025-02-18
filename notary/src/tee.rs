@@ -212,13 +212,13 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let response = ManifestResponse::from_payload(&response_header, &response_body)?;
   debug!("{:?}", response);
 
-  // if !manifest.request.is_subset_of(&request) {
-  //   return Err(NotaryServerError::ManifestRequestMismatch);
-  // }
+  if !manifest.request.is_subset_of(&request) {
+    return Err(NotaryServerError::ManifestRequestMismatch);
+  }
 
-  // if !manifest.response.is_subset_of(&response) {
-  //   return Err(NotaryServerError::ManifestResponseMismatch);
-  // }
+  if !manifest.response.is_subset_of(&response) {
+    return Err(NotaryServerError::ManifestResponseMismatch);
+  }
 
   // send TeeProof to client
   let tee_proof = TeeProof::from_manifest(&manifest);

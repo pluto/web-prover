@@ -213,13 +213,14 @@ impl ManifestResponse {
 
     // Check if all headers in `self` are present in `other`
     for (key, value) in &self.headers {
-      if let Some(other_value) = other.headers.get(key) {
+      let expected_value = other.headers.get(key).or_else(|| other.headers.get(&key.to_lowercase()));
+      if let Some(other_value) = expected_value {
         if other_value != value {
           debug!("other_value={} doesnt match value={}", other_value, value);
           return false;
         }
       } else {
-        debug!("missing key {}", key);
+        debug!("missing key={}", key);
         return false;
       }
     }
@@ -371,7 +372,8 @@ impl ManifestRequest {
   pub fn is_subset_of(&self, other: &ManifestRequest) -> bool {
     // Check if all headers in `self` exist in `other` with the same value
     for (key, value) in &self.headers {
-      if other.headers.get(key) != Some(value) {
+      let expected_header = other.headers.get(key).or_else(|| other.headers.get(&key.to_lowercase()));
+      if expected_header != Some(value) {
         return false;
       }
     }

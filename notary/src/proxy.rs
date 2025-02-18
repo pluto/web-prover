@@ -51,13 +51,13 @@ pub async fn proxy(
   let response = from_reqwest_response(reqwest_response).await;
   // debug!("{:?}", response);
 
-  // if !payload.manifest.request.is_subset_of(&request) {
-  //   return Err(NotaryServerError::ManifestRequestMismatch);
-  // }
+  if !payload.manifest.request.is_subset_of(&request) {
+    return Err(NotaryServerError::ManifestRequestMismatch);
+  }
 
-  // if !payload.manifest.response.is_subset_of(&response) {
-  //   return Err(NotaryServerError::ManifestResponseMismatch);
-  // }
+  if !payload.manifest.response.is_subset_of(&response) {
+    return Err(NotaryServerError::ManifestResponseMismatch);
+  }
 
   // TODO: Maybe move that to `TeeProof::from_manifest`?
   payload.manifest.validate()?;
