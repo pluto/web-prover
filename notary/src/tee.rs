@@ -13,7 +13,8 @@ use client::{
   origo::{OrigoSecrets, VerifyReply},
   TeeProof, TeeProofData,
 };
-use hyper::upgrade::Upgraded;
+use futures_util::SinkExt;
+use hyper::{body::Bytes, upgrade::Upgraded};
 use hyper_util::rt::TokioIo;
 use proofs::program::{
   http::{ManifestRequest, ManifestResponse},
@@ -22,7 +23,11 @@ use proofs::program::{
 use serde::Deserialize;
 use tls_client2::tls_core::msgs::message::MessagePayload;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tokio_util::compat::FuturesAsyncReadCompatExt;
+use tokio_stream::StreamExt;
+use tokio_util::{
+  codec::{Framed, LengthDelimitedCodec},
+  compat::FuturesAsyncReadCompatExt,
+};
 use tracing::{debug, error, info};
 use uuid::Uuid;
 use ws_stream_tungstenite::WsStream;
@@ -30,7 +35,7 @@ use ws_stream_tungstenite::WsStream;
 use crate::{
   axum_websocket::WebSocket,
   errors::NotaryServerError,
-  origo::{proxy_service, sign_verification, OrigoSigningKey},
+  origo::{proxy_service, sign_verification},
   tls_parser::{Direction, ParsedMessage, WrappedPayload},
   tlsn::ProtocolUpgrade,
   SharedState,
@@ -151,13 +156,16 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   debug!("Sending magic byte to indicate readiness to read");
   tee_tls_stream.write_all(&[0xAA]).await?;
 
-  // TODO: Consider implementing from_stream instead of read_wire_struct
-  let manifest_bytes = read_wire_struct(&mut tee_tls_stream).await;
-  let manifest = Manifest::from_wire_bytes(&manifest_bytes);
+  let mut framed_stream = Framed::new(tee_tls_stream, LengthDelimitedCodec::new());
+
+  let manifest_frame =
+    framed_stream.next().await.ok_or_else(|| NotaryServerError::ManifestMissing)??;
+  let manifest = Manifest::from_bytes(&manifest_frame)?;
   // dbg!(&manifest);
 
-  let secret_bytes = read_wire_struct(&mut tee_tls_stream).await;
-  let origo_secrets = OrigoSecrets::from_wire_bytes(&secret_bytes);
+  let secret_frame =
+    framed_stream.next().await.ok_or_else(|| NotaryServerError::MissingOrigoSecrets)??;
+  let origo_secrets = OrigoSecrets::from_bytes(&secret_frame)?;
   // dbg!(&origo_secrets);
 
   let handshake_server_key =
@@ -189,9 +197,9 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let (request, response) = extract_request_and_response(&parsed_transcript.payload)?;
 
   // send TeeProof to client
-  let tee_proof_bytes =
-    create_tee_proof(&manifest, &request, &response, State(state))?.to_write_bytes();
-  tee_tls_stream.write_all(&tee_proof_bytes).await?;
+  let tee_proof = create_tee_proof(&manifest, &request, &response, State(state))?;
+  framed_stream.send(Bytes::from(tee_proof.to_bytes()?)).await?;
+  framed_stream.flush().await?;
 
   Ok(())
 }
@@ -241,7 +249,7 @@ pub fn create_tee_proof(
 ) -> Result<TeeProof, NotaryServerError> {
   validate_notarization_legal(manifest, request, response)?;
 
-  let manifest_hash = manifest.to_keccak_digest();
+  let manifest_hash = manifest.to_keccak_digest()?;
   let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
 
   // TODO: That doesn't seem right
@@ -280,27 +288,4 @@ fn get_app_data(payload: &WrappedPayload) -> Option<Vec<u8>> {
     },
     _ => None,
   }
-}
-
-// TODO: Refactor into struct helpers/trait
-async fn read_wire_struct<R: AsyncReadExt + Unpin>(stream: &mut R) -> Vec<u8> {
-  // Buffer to store the "header" (4 bytes, indicating the length of the struct)
-  let mut len_buf = [0u8; 4];
-  stream.read_exact(&mut len_buf).await.unwrap();
-  // dbg!(format!("len_buf={:?}", len_buf));
-
-  // Deserialize the length prefix (convert from little-endian to usize)
-  let body_len = u32::from_le_bytes(len_buf) as usize;
-  // dbg!(format!("body_len={body_len}"));
-
-  // Allocate a buffer to hold only the bytes needed for the struct
-  let mut body_buf = vec![0u8; body_len];
-  stream.read_exact(&mut body_buf).await.unwrap();
-  // dbg!(format!("body_buf={:?}", body_buf));
-
-  // Prepend len_buf to manifest_buf
-  let mut wire_struct_buf = len_buf.to_vec();
-  wire_struct_buf.extend(body_buf);
-
-  wire_struct_buf
 }

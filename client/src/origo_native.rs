@@ -5,12 +5,17 @@ use caratls_ekm_client::DummyTokenVerifier;
 use caratls_ekm_client::TeeTlsConnector;
 #[cfg(feature = "tee-google-confidential-space-token-verifier")]
 use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
-use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt as FuturesWriteExt};
+use futures::{
+  channel::oneshot, AsyncReadExt, AsyncWriteExt as FuturesWriteExt, SinkExt, StreamExt,
+};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
 use tls_client2::origo::OrigoConnection;
 use tokio::io::AsyncWriteExt;
-use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
+use tokio_util::{
+  codec::{Framed, LengthDelimitedCodec},
+  compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt},
+};
 use tracing::debug;
 
 use crate::{
@@ -271,15 +276,20 @@ async fn handle_tee_mode(
     debug!("Waiting for magic byte, received: {:?}", buffer[0]);
   }
 
-  let manifest_bytes = config.proving.manifest.unwrap().to_wire_bytes();
-  reunited_socket.write_all(&manifest_bytes).await?;
+  let mut framed_reunited_socket =
+    Framed::new(reunited_socket.compat(), LengthDelimitedCodec::new());
 
-  let origo_secret_bytes = OrigoSecrets::from_origo_conn(&origo_conn).to_wire_bytes();
-  reunited_socket.write_all(&origo_secret_bytes).await?;
+  let manifest_bytes = config.proving.manifest.unwrap().to_bytes()?;
+  framed_reunited_socket.send(Bytes::from(manifest_bytes)).await?;
 
-  let tee_proof_bytes = crate::origo::read_wire_struct(&mut reunited_socket).await;
-  let tee_proof = TeeProof::from_wire_bytes(&tee_proof_bytes);
-  // reunited_socket.close().await?;
+  let origo_secret_bytes = OrigoSecrets::from_origo_conn(&origo_conn).to_bytes()?;
+  framed_reunited_socket.send(Bytes::from(origo_secret_bytes)).await?;
+
+  framed_reunited_socket.flush().await?;
+
+  let tee_proof_frame =
+    framed_reunited_socket.next().await.ok_or_else(|| ClientErrors::TeeProofMissing)??;
+  let tee_proof = TeeProof::from_bytes(&tee_proof_frame)?;
 
   Ok((origo_conn, tee_proof))
 }

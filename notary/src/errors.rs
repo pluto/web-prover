@@ -101,6 +101,12 @@ pub enum NotaryServerError {
   // TODO: Update to contain feedback
   #[error("Manifest-response mismatch")]
   ManifestResponseMismatch,
+
+  #[error("Manifest is missing")]
+  ManifestMissing,
+
+  #[error("Origo secrets are missing")]
+  MissingOrigoSecrets,
 }
 
 impl From<VerifierError> for NotaryServerError {

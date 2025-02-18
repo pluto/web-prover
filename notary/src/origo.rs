@@ -13,12 +13,7 @@ use client::origo::{SignBody, SignedVerificationReply, VerifyBody, VerifyReply};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use k256::{
-  ecdsa::{
-    RecoveryId, Signature as Secp256k1Signature, SigningKey as Secp256k1SigningKey,
-    VerifyingKey as Secp256k1VerifyingKey,
-  },
-  elliptic_curve::rand_core,
-  pkcs8::DecodePrivateKey,
+  ecdsa::SigningKey as Secp256k1SigningKey, elliptic_curve::rand_core, pkcs8::DecodePrivateKey,
 };
 use proofs::{
   circuits::{CIRCUIT_SIZE_512, MAX_STACK_HEIGHT},

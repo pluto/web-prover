@@ -178,7 +178,7 @@ pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, errors:
   };
 
   let response = client.post(url).json(&proxy_config).send().await?;
-  assert!(response.status() == hyper::StatusCode::OK);
+  assert_eq!(response.status(), hyper::StatusCode::OK);
   let tee_proof = response.json::<TeeProof>().await?;
   Ok(Proof::Proxy(tee_proof))
 }
@@ -195,35 +195,7 @@ pub struct TeeProofData {
 }
 
 impl TeeProof {
-  pub fn to_write_bytes(&self) -> Vec<u8> {
-    let serialized = self.to_bytes();
-    let length = serialized.len() as u32;
-    let mut wire_data = length.to_le_bytes().to_vec();
-    wire_data.extend(serialized);
-    wire_data
-  }
+  pub fn to_bytes(&self) -> serde_json::Result<Vec<u8>> { serde_json::to_vec(&self) }
 
-  pub fn from_wire_bytes(buffer: &[u8]) -> Self {
-    // Confirm the buffer is at least large enough to contain the "header"
-    if buffer.len() < 4 {
-      panic!("Unexpected buffer length: {} < 4", buffer.len());
-    }
-
-    // Extract the first 4 bytes as the length prefix
-    let length_bytes = &buffer[..4];
-    let length = u32::from_le_bytes(length_bytes.try_into().unwrap()) as usize;
-
-    // Ensure the buffer contains enough data for the length specified
-    if buffer.len() < 4 + length {
-      panic!("Unexpected buffer length: {} < {} + 4", buffer.len(), length);
-    }
-
-    // Extract the serialized data from the buffer
-    let serialized_data = &buffer[4..4 + length];
-    Self::from_bytes(serialized_data)
-  }
-
-  fn to_bytes(&self) -> Vec<u8> { serde_json::to_vec(&self).unwrap() }
-
-  fn from_bytes(bytes: &[u8]) -> TeeProof { serde_json::from_slice(bytes).unwrap() }
+  fn from_bytes(bytes: &[u8]) -> serde_json::Result<TeeProof> { serde_json::from_slice(bytes) }
 }
