@@ -5,16 +5,13 @@ use axum::{
   Json,
 };
 use client::TeeProof;
-use proofs::program::{
-  http::{JsonKey, ManifestRequest, ManifestResponse, ResponseBody},
-  manifest::HTTP_1_1,
-};
+use proofs::program::http::{JsonKey, ManifestRequest, ManifestResponse, ResponseBody};
 use reqwest::{Request, Response};
 use serde::Deserialize;
 use serde_json::Value;
-use tracing::{debug, info};
+use tracing::info;
 
-use crate::{errors::NotaryServerError, SharedState};
+use crate::{errors::NotaryServerError, tee::create_tee_proof, SharedState};
 
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
@@ -50,18 +47,7 @@ pub async fn proxy(
   let response = from_reqwest_response(reqwest_response).await;
   // debug!("{:?}", response);
 
-  if !payload.manifest.request.is_subset_of(&request) {
-    return Err(NotaryServerError::ManifestRequestMismatch);
-  }
-
-  if !payload.manifest.response.is_subset_of(&response) {
-    return Err(NotaryServerError::ManifestResponseMismatch);
-  }
-
-  // TODO: Maybe move that to `TeeProof::from_manifest`?
-  payload.manifest.validate()?;
-
-  let tee_proof = TeeProof::from_manifest(&payload.manifest);
+  let tee_proof = create_tee_proof(&payload.manifest, &request, &response, State(state))?;
 
   Ok(Json(tee_proof))
 }

@@ -98,62 +98,25 @@ impl Manifest {
     Ok(())
   }
 
-  /// Serializes the `Manifest` into a length-prefixed byte array.
-  pub fn to_wire_bytes(&self) -> Vec<u8> {
-    let serialized = self.to_bytes();
-    let length = serialized.len() as u32;
-    // Create the "header" with the length (as little-endian bytes)
-    let mut wire_data = length.to_le_bytes().to_vec();
-    wire_data.extend(serialized);
-    wire_data
-  }
-
-  /// Deserializes a `Manifest` from a length-prefixed byte buffer.
-  ///
-  /// Expects a buffer with a 4-byte little-endian "header" followed by the serialized data.
-  pub fn from_wire_bytes(buffer: &[u8]) -> Self {
-    // Confirm the buffer is at least large enough to contain the "header"
-    if buffer.len() < 4 {
-      panic!("Unexpected buffer length: {} < 4", buffer.len());
-    }
-
-    // Extract the first 4 bytes as the length prefix
-    let length_bytes = &buffer[..4];
-    let length = u32::from_le_bytes(length_bytes.try_into().unwrap()) as usize;
-
-    // Ensure the buffer contains enough data for the length specified
-    if buffer.len() < 4 + length {
-      panic!("Unexpected buffer length: {} < {} + 4", buffer.len(), length);
-    }
-
-    // Extract the serialized data from the buffer
-    let serialized_data = &buffer[4..4 + length];
-    Self::from_bytes(serialized_data)
-  }
-
   /// Serializes the `Manifest` to raw bytes.
-  ///
-  /// Doesn't expect a "wire" header.
-  fn to_bytes(&self) -> Vec<u8> {
+  pub fn to_bytes(&self) -> serde_json::Result<Vec<u8>> {
     // Serializing as JSON because `untagged` in `JsonKey` break bincode
-    serde_json::to_vec(&self).unwrap()
+    serde_json::to_vec(&self)
   }
 
   /// Deserializes a `Manifest` from raw bytes.
-  ///
-  /// Doesn't expect a "wire" header.
-  fn from_bytes(bytes: &[u8]) -> Manifest { serde_json::from_slice(bytes).unwrap() }
+  pub fn from_bytes(bytes: &[u8]) -> serde_json::Result<Manifest> { serde_json::from_slice(bytes) }
 
   /// Compute a `Keccak256` hash of the serialized Manifest
-  pub fn to_keccak_digest(&self) -> [u8; 32] {
-    let bytes = self.to_bytes();
+  pub fn to_keccak_digest(&self) -> serde_json::Result<[u8; 32]> {
+    let bytes = self.to_bytes()?;
     let mut hasher = Keccak::v256();
     let mut output = [0u8; 32];
 
     hasher.update(&bytes);
     hasher.finalize(&mut output);
 
-    output
+    Ok(output)
   }
 }
 
@@ -1015,14 +978,9 @@ mod tests {
   #[test]
   fn test_manifest_serialization() {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
-
-    let serialized = manifest.to_bytes();
-    let deserialized: Manifest = Manifest::from_bytes(&serialized);
+    let serialized = manifest.to_bytes().unwrap();
+    let deserialized = Manifest::from_bytes(&serialized).unwrap();
     assert_eq!(manifest, deserialized);
-
-    let wire_serialized = manifest.to_wire_bytes();
-    let wire_deserialized: Manifest = Manifest::from_wire_bytes(&wire_serialized);
-    assert_eq!(manifest, wire_deserialized);
   }
 
   macro_rules! create_manifest {

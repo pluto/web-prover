@@ -4,18 +4,21 @@ use std::{
   pin::Pin,
   sync::Arc,
   task::{Context, Poll},
-  time::Duration,
 };
 
+use bytes::Bytes;
 #[cfg(feature = "tee-dummy-token-verifier")]
 use caratls_ekm_client::DummyTokenVerifier;
 use caratls_ekm_client::TeeTlsConnector;
 #[cfg(feature = "tee-google-confidential-space-token-verifier")]
 use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
-use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt};
+use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt};
 use hyper::StatusCode;
 use tls_client2::origo::OrigoConnection;
-use tokio_util::compat::TokioAsyncReadCompatExt;
+use tokio_util::{
+  codec::{Framed, LengthDelimitedCodec},
+  compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt},
+};
 use tracing::debug;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::window;
@@ -191,14 +194,20 @@ async fn handle_tee_mode(
     debug!("Waiting for magic byte, received: {:?}", buffer[0]);
   }
 
-  let manifest_bytes = config.proving.manifest.unwrap().to_wire_bytes();
-  reunited_socket.write_all(&manifest_bytes).await?;
+  let mut framed_reunited_socket =
+    Framed::new(reunited_socket.compat(), LengthDelimitedCodec::new());
 
-  let origo_secret_bytes = OrigoSecrets::from_origo_conn(&origo_conn).to_wire_bytes();
-  reunited_socket.write_all(&origo_secret_bytes).await?;
+  let manifest_bytes = config.proving.manifest.unwrap().to_bytes()?;
+  framed_reunited_socket.send(Bytes::from(manifest_bytes)).await?;
 
-  let tee_proof_bytes = crate::origo::read_wire_struct(&mut reunited_socket).await;
-  let tee_proof = TeeProof::from_wire_bytes(&tee_proof_bytes);
+  let origo_secret_bytes = OrigoSecrets::from_origo_conn(&origo_conn).to_bytes()?;
+  framed_reunited_socket.send(Bytes::from(origo_secret_bytes)).await?;
+
+  framed_reunited_socket.flush().await?;
+
+  let tee_proof_frame =
+    framed_reunited_socket.next().await.ok_or_else(|| ClientErrors::TeeProofMissing)??;
+  let tee_proof = TeeProof::from_bytes(&tee_proof_frame)?;
 
   // TODO something will be dropped here. if it's dropped, it closes ...
   // let mut client_socket = connection_receiver.await.unwrap()?.io.into_inner();
