@@ -81,7 +81,7 @@ serde_json    ={ workspace=true }
 opt-level      =1
 overflow-checks=false
 split-debuginfo="unpacked"
-# incremental    =true
+incremental    =true
 
 [profile.release]
 opt-level    =0
