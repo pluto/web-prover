@@ -18,6 +18,7 @@ use proofs::{
 };
 use rs_merkle::{Hasher, MerkleTree};
 use serde::{Deserialize, Serialize};
+use tls_parser::rusticata_macros::debug;
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
   net::TcpStream,
@@ -361,33 +362,47 @@ pub async fn verify(
     &z0_secondary,
   ) {
     Ok((output, _)) => {
-      // TODO: I think that `output[10] == ciphertext_digest` should also check? But I'm not 100%
-      // sure. Right now it doesn't and that's probably because we have the split up request and
-      // response.
       // TODO: We should also check that the full extended ROM was correct? Although maybe that's
       // implicit in this.
-      if output[5] == F::<G1>::from(0)
-        && output[8] == F::<G1>::from(0)
-        && output[0]
-          == polynomial_digest(
+      if output[5] != F::<G1>::from(0) {
+        debug!("HTTP header match: {:?}", output[5]);
+        return Err(ProofError::VerifyFailed(String::from("HTTP header match failed")).into());
+      } else if output[8] != F::<G1>::from(0) {
+        debug!("JSON final state: {:?}", output[8]);
+        return Err(ProofError::VerifyFailed(String::from("JSON final state invalid")).into());
+      } else if output[10] != ciphertext_digest {
+        debug!("expected ciphertext_digest: {:?}", ciphertext_digest);
+        debug!("calculated ciphertext digest {:?}", output[10]);
+        return Err(
+          ProofError::VerifyFailed(String::from("invalid calculated ciphertext digest")).into(),
+        );
+      } else if output[0]
+        != polynomial_digest(
+          &payload.origo_proof.value.clone().unwrap().as_bytes(),
+          ciphertext_digest,
+          0,
+        )
+      {
+        debug!("output[0]: {:?}", output[0]);
+        debug!("value: {:?}", payload.origo_proof.value.clone().unwrap());
+        debug!(
+          "value_polynomial_digest: {:?}",
+          polynomial_digest(
             &payload.origo_proof.value.clone().unwrap().as_bytes(),
             ciphertext_digest,
             0,
           )
-        && output[10] == ciphertext_digest
-      {
+        );
+        return Err(ProofError::VerifyFailed(String::from("inccorect final circuit value")).into());
+      } else {
         // TODO: add the manifest digest?
         debug!("output from verifier: {output:?}");
-        // TODO: This unwrap should be safe for now as the value will always be present at this
-        // point
+        // This unwrap should be safe for now as the value will always be present
         VerifyReply { value: payload.origo_proof.value.unwrap(), manifest: payload.manifest }
-      } else {
-        // TODO (autoparallel): May want richer error content here to say what was wrong.
-        return Err(ProofError::VerifyFailed().into());
       }
     },
     Err(e) => {
-      error!("Error verifying request proof: {:?}", e);
+      error!("Error verifying proof: {:?}", e);
       return Err(ProofError::SuperNova(e).into());
     },
   };
