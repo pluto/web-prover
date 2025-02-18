@@ -45,10 +45,10 @@ pub async fn proxy(
   let reqwest_request = request_builder.try_clone().unwrap().build().unwrap();
   let reqwest_response = request_builder.send().await.unwrap();
 
-  let request = from_reqwest_request(&reqwest_request);
+  // let request = from_reqwest_request(&reqwest_request);
   // debug!("{:?}", request);
 
-  let response = from_reqwest_response(reqwest_response).await;
+  // let response = from_reqwest_response(reqwest_response).await;
   // debug!("{:?}", response);
 
   // if !payload.manifest.request.is_subset_of(&request) {
@@ -60,7 +60,7 @@ pub async fn proxy(
   // }
 
   // TODO: Maybe move that to `TeeProof::from_manifest`?
-  payload.manifest.validate()?;
+  // payload.manifest.validate()?;
 
   let tee_proof = TeeProof::from_manifest(&payload.manifest);
 
