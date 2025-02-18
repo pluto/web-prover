@@ -104,6 +104,9 @@ pub enum ClientErrors {
 
   #[error(transparent)]
   WitnessGeneratorError(#[from] web_proof_circuits_witness_generator::WitnessGeneratorError),
+
+  #[error("TEE proof missing")]
+  TeeProofMissing,
 }
 
 #[cfg(target_arch = "wasm32")]
