@@ -43,8 +43,8 @@ wasm-bindgen-futures="0.4.37"
 circom_witnesscalc={ git="https://github.com/pluto/circom-witnesscalc" } # Fork is needed apparently??
 
 [dev-dependencies]
-tracing-test="0.2.5"
-tempdir     ="0.3.7"
+tracing-test.workspace=true
+tempdir               ="0.3.7"
 
 [build-dependencies]
 cargo_metadata="0.19.1"

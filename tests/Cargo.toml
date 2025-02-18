@@ -1,0 +1,13 @@
+[package]
+name   ="tests"
+version="0.1.0"
+edition="2021"
+
+[dependencies]
+client      ={ workspace=true }
+notary      ={ workspace=true }
+tokio       ={ workspace=true }
+tracing     ={ workspace=true }
+tracing-test={ workspace=true, features=["no-env-filter"] }
+anyhow      ={ version="1.0" }
+serde_json  ={ workspace=true }
