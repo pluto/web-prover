@@ -25,6 +25,9 @@ pub struct NoirProgram {
   )]
   pub bytecode: Program<GenericFieldElement<Fr>>,
   pub witness:  Option<Vec<F<G1>>>,
+  // TODO: To make this more efficient, we could just store an option of the `&mut CS` inside of
+  // here so we don't actually need to rebuild it always, though the enforcement for the public
+  // inputs is tougher
 }
 
 impl NoirProgram {
@@ -61,6 +64,9 @@ impl NoirProgram {
     dbg!(self.circuit().private_parameters.len());
     dbg!(self.circuit().public_parameters.0.len());
     dbg!(self.circuit().return_values.0.len());
+
+    // For folding in particular:
+    assert_eq!(self.circuit().return_values.0.len(), self.circuit().public_parameters.0.len());
 
     // TODO: we could probably avoid this but i'm lazy
     // Create a map to track allocated variables for the cs
@@ -269,8 +275,6 @@ mod tests {
 
   #[test]
   fn test_fold_noir_synthesize_empty() {
-    // Circuit definition:
-    // x_0 * w_0 + w_1 + 2 == 0
     let json_path = Path::new("./mock").join(format!("fold.json"));
     let noir_json = std::fs::read(&json_path).unwrap();
 
@@ -286,8 +290,6 @@ mod tests {
 
   #[test]
   fn test_fold_noir_synthesize_full() {
-    // Circuit definition:
-    // x_0 * w_0 + w_1 + 2 == 0
     let json_path = Path::new("./mock").join(format!("fold.json"));
     let noir_json = std::fs::read(&json_path).unwrap();
 
