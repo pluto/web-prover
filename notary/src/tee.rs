@@ -21,6 +21,7 @@ use tls_client2::tls_core::msgs::message::MessagePayload;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{debug, error, field::debug, info};
+use uuid::Uuid;
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
@@ -34,7 +35,7 @@ use crate::{
 
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
-  session_id:  String,
+  session_id:  Uuid,
   target_host: String,
   target_port: u16,
 }
@@ -44,7 +45,7 @@ pub async fn proxy(
   query: Query<NotarizeQuery>,
   State(state): State<Arc<SharedState>>,
 ) -> Response {
-  let session_id = query.session_id.clone();
+  let session_id = query.session_id.to_string();
 
   info!("Starting notarize with ID: {}", session_id);
 
