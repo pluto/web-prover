@@ -15,12 +15,10 @@ pub mod tls_client_async2;
 use std::collections::HashMap;
 
 use origo::SignedVerificationReply;
+pub use proofs::program::data::UninitializedSetup;
 use proofs::{
   circuits::{construct_setup_data_from_fs, CIRCUIT_SIZE_512},
-  program::{
-    data::UninitializedSetup,
-    manifest::{Manifest, NIVCRom},
-  },
+  program::manifest::{Manifest, NIVCRom},
   proof::FoldingProof,
 };
 use serde::{Deserialize, Serialize};

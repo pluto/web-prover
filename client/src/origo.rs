@@ -3,7 +3,6 @@ use std::collections::HashMap;
 
 use futures::AsyncReadExt;
 use proofs::{
-  circuits::construct_setup_data_from_fs,
   program::{
     data::{Offline, SetupParams, UninitializedSetup},
     manifest::{EncryptionInput, Manifest, TLSEncryption},
