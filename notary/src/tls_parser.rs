@@ -1,5 +1,4 @@
 use std::io::Cursor;
-
 use nom::{bytes::streaming::take, IResult};
 use tls_client2::{
   hash_hs::HandshakeHashBuffer,
@@ -32,6 +31,15 @@ const TRIMMED_BYTES: usize = 17;
 pub enum Direction {
   Sent,
   Received,
+}
+
+impl std::fmt::Display for Direction {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Direction::Sent => write!(f, "Sent"),
+      Direction::Received => write!(f, "Received"),
+    }
+  }
 }
 
 #[derive(Debug)]

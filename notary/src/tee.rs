@@ -28,7 +28,7 @@ use crate::{
   axum_websocket::WebSocket,
   errors::NotaryServerError,
   origo::{proxy_service, OrigoSigningKey},
-  tls_parser::{ParsedMessage, WrappedPayload},
+  tls_parser::{Direction, ParsedMessage, WrappedPayload},
   tlsn::ProtocolUpgrade,
   SharedState,
 };
@@ -183,39 +183,49 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
     .unwrap();
   // dbg!(parsed_transcript);
 
-  let mut app_data_vec = Vec::new();
-  for message in &parsed_transcript.payload {
-    if let ParsedMessage { payload, direction, .. } = message {
-      if let Some(app_data) = get_app_data(payload) {
-        if let Ok(readable_data) = String::from_utf8(app_data.clone()) {
-          debug!("{:?} app_data: {}", direction, readable_data);
-        }
-        app_data_vec.push(app_data);
+  let (request, response) = extract_request_and_response(&parsed_transcript.payload)?;
+
+  // send TeeProof to client
+  let tee_proof_bytes =
+    create_tee_proof(&manifest, &request, &response, &state.origo_signing_key)?.to_write_bytes();
+  tee_tls_stream.write_all(&tee_proof_bytes).await?;
+
+  Ok(())
+}
+
+pub fn extract_request_and_response(
+  parsed_transcript: &[ParsedMessage],
+) -> Result<(ManifestRequest, ManifestResponse), NotaryServerError> {
+  let mut request_header = None;
+  let mut request_body = None;
+  let mut response_header = None;
+  let mut response_body = None;
+
+  // Classify parsed messages into headers and bodies
+  for ParsedMessage { payload, direction, .. } in parsed_transcript {
+    if let Some(app_data) = get_app_data(payload) {
+      debug!(
+        "App data message {:?}: {:?}",
+        direction,
+        String::from_utf8_lossy(&app_data));
+      match direction {
+        Direction::Sent if request_header.is_none() => request_header = Some(app_data),
+        Direction::Sent => request_body = Some(app_data),
+        Direction::Received if response_header.is_none() => response_header = Some(app_data),
+        Direction::Received => response_body = Some(app_data),
       }
     }
   }
 
-  if app_data_vec.len() != 3 {
-    return Err(NotaryServerError::MissingAppDataMessages(3, app_data_vec.len()));
-  }
+  // Ensure mandatory headers are present
+  let request_header = request_header.ok_or(NotaryServerError::MissingAppDataMessages(Direction::Sent, 2, 0))?;
+  let response_header = response_header.ok_or(NotaryServerError::MissingAppDataMessages(Direction::Received, 2, 0))?;
 
-  let request_header = app_data_vec[0].clone();
-  // TODO: Do we expect to get request_body as well part of app_data?
-  let response_header = app_data_vec[1].clone();
-  let response_body = app_data_vec[2].clone();
+  let request = ManifestRequest::from_payload(&request_header, request_body.as_deref())?;
+  let response =
+    ManifestResponse::from_payload(&response_header, response_body.as_deref().unwrap_or_default())?;
 
-  let request = ManifestRequest::from_payload(&request_header, None)?;
-  debug!("{:?}", request);
-
-  let response = ManifestResponse::from_payload(&response_header, &response_body)?;
-  debug!("{:?}", response);
-
-  // send TeeProof to client
-  let tee_proof = create_tee_proof(&manifest, &request, &response, &state.origo_signing_key)?;
-  let tee_proof_bytes = tee_proof.to_write_bytes();
-  tee_tls_stream.write_all(&tee_proof_bytes).await?;
-
-  Ok(())
+  Ok((request, response))
 }
 
 // TODO: Should TeeProof and other proofs be moved to `proofs` crate?
