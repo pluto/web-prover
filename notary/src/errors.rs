@@ -7,6 +7,7 @@ use proofs::errors::ProofError;
 use thiserror::Error;
 use tlsn_verifier::tls::{VerifierConfigBuilderError, VerifierError};
 use tracing::error;
+use crate::tls_parser::Direction;
 
 #[derive(Debug, Error)]
 pub enum ProxyError {
@@ -89,8 +90,8 @@ pub enum NotaryServerError {
   #[error(transparent)]
   ProofError(#[from] ProofError),
 
-  #[error("Missing application-level data messages. Expected: {0}, Actual: {1}")]
-  MissingAppDataMessages(usize, usize),
+  #[error("Missing application-level data messages. Direction={0}, expected={1}, received={2}")]
+  MissingAppDataMessages(Direction, usize, usize),
 
   // TODO: Update to contain feedback
   #[error("Manifest-request mismatch")]
