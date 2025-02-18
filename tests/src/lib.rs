@@ -1,12 +1,12 @@
 use std::{
+  io::{BufRead, BufReader},
   path::PathBuf,
-  process::{Child, Command},
+  process::{Child, Command, Stdio},
   time::Duration,
 };
 
 use anyhow::{Context, Result};
 use tokio::time::sleep;
-use tracing_test::traced_test;
 
 struct TestSetup {
   notary: Child,
@@ -44,26 +44,29 @@ impl TestSetup {
     println!("Notary config exists: {}", notary_config.exists());
     println!("Client config exists: {}", client_config.exists());
 
-    // Start notary first
+    // Start notary
     let notary = Command::new("cargo")
       .args(["run", "-p", "notary", "--release", "--"])
       .arg("--config")
       .arg(&notary_config)
       .env("RUST_LOG", "DEBUG")
       .current_dir(&workspace_root)
+      .stdout(Stdio::inherit())
+      .stderr(Stdio::inherit())
       .spawn()
       .with_context(|| format!("Failed to spawn notary with config {:?}", notary_config))?;
 
-    // Give notary time to start up
     sleep(Duration::from_secs(2)).await;
 
-    // Start client
+    // Start client and capture its output
     let client = Command::new("cargo")
       .args(["run", "-p", "client", "--"])
       .arg("--config")
       .arg(&client_config)
       .env("RUST_LOG", "DEBUG")
       .current_dir(&workspace_root)
+      .stdout(Stdio::piped())
+      .stderr(Stdio::piped())
       .spawn()
       .with_context(|| format!("Failed to spawn client with config {:?}", client_config))?;
 
@@ -79,18 +82,16 @@ impl Drop for TestSetup {
 }
 
 #[tokio::test]
-#[traced_test]
 async fn test_proving_successful() -> Result<()> {
-  let _setup = TestSetup::new().await?;
+  let mut setup = TestSetup::new().await?;
 
-  // Wait for and verify the proof message appears
-  for _ in 0..60 {
-    // Wait up to 30 seconds
-    if logs_contain("Proving Successful") {
-      return Ok(());
-    }
-    sleep(Duration::from_secs(1)).await;
-  }
+  let stdout = BufReader::new(setup.client.stdout.take().unwrap());
+  let stderr = BufReader::new(setup.client.stderr.take().unwrap());
 
-  anyhow::bail!("Did not find 'Proving Successful' message in logs after 30 seconds");
+  // Check both stdout and stderr for our message
+  let found =
+    stdout.lines().chain(stderr.lines()).any(|line| line.unwrap().contains("Proving Successful"));
+
+  assert!(found, "Did not find 'Proving Successful' in output");
+  Ok(())
 }
