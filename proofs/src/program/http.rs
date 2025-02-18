@@ -95,8 +95,8 @@ impl ManifestResponse {
       ));
     }
 
-    let content_type = self.headers.get("Content-Type")
-        .or_else(|| self.headers.get("content-type"));
+    let content_type =
+      self.headers.get("Content-Type").or_else(|| self.headers.get("content-type"));
     if content_type.is_none() {
       return Err(ProofError::InvalidManifest("Missing 'Content-Type' header".to_string()));
     }
@@ -213,7 +213,8 @@ impl ManifestResponse {
 
     // Check if all headers in `self` are present in `other`
     for (key, value) in &self.headers {
-      let expected_value = other.headers.get(key).or_else(|| other.headers.get(&key.to_lowercase()));
+      let expected_value =
+        other.headers.get(key).or_else(|| other.headers.get(&key.to_lowercase()));
       if let Some(other_value) = expected_value {
         if other_value != value {
           debug!("other_value={} doesnt match value={}", other_value, value);
@@ -372,7 +373,8 @@ impl ManifestRequest {
   pub fn is_subset_of(&self, other: &ManifestRequest) -> bool {
     // Check if all headers in `self` exist in `other` with the same value
     for (key, value) in &self.headers {
-      let expected_header = other.headers.get(key).or_else(|| other.headers.get(&key.to_lowercase()));
+      let expected_header =
+        other.headers.get(key).or_else(|| other.headers.get(&key.to_lowercase()));
       if expected_header != Some(value) {
         return false;
       }
