@@ -95,7 +95,8 @@ impl ManifestResponse {
       ));
     }
 
-    let content_type = self.headers.get("Content-Type");
+    let content_type = self.headers.get("Content-Type")
+        .or_else(|| self.headers.get("content-type"));
     if content_type.is_none() {
       return Err(ProofError::InvalidManifest("Missing 'Content-Type' header".to_string()));
     }
