@@ -390,7 +390,7 @@ async fn meta_keys(
     },
 
     "origo.pub" => {
-      let vkey = state.origo_signing_key.verifying_key();
+      let vkey = state.origo_signing_key.0.verifying_key();
 
       let hex = hex::encode(vkey.to_sec1_bytes());
       (StatusCode::OK, hex)

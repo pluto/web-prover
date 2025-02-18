@@ -9,7 +9,10 @@ use caratls_ekm_google_confidential_space_server::GoogleConfidentialSpaceTokenGe
 #[cfg(feature = "tee-dummy-token-generator")]
 use caratls_ekm_server::DummyTokenGenerator;
 use caratls_ekm_server::TeeTlsAcceptor;
-use client::{origo::OrigoSecrets, TeeProof, TeeProofData};
+use client::{
+  origo::{OrigoSecrets, VerifyReply},
+  TeeProof, TeeProofData,
+};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use proofs::program::{
@@ -27,7 +30,7 @@ use ws_stream_tungstenite::WsStream;
 use crate::{
   axum_websocket::WebSocket,
   errors::NotaryServerError,
-  origo::{proxy_service, OrigoSigningKey},
+  origo::{proxy_service, sign_verification, OrigoSigningKey},
   tls_parser::{Direction, ParsedMessage, WrappedPayload},
   tlsn::ProtocolUpgrade,
   SharedState,
@@ -187,7 +190,7 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
 
   // send TeeProof to client
   let tee_proof_bytes =
-    create_tee_proof(&manifest, &request, &response, &state.origo_signing_key)?.to_write_bytes();
+    create_tee_proof(&manifest, &request, &response, State(state))?.to_write_bytes();
   tee_tls_stream.write_all(&tee_proof_bytes).await?;
 
   Ok(())
@@ -204,10 +207,7 @@ pub fn extract_request_and_response(
   // Classify parsed messages into headers and bodies
   for ParsedMessage { payload, direction, .. } in parsed_transcript {
     if let Some(app_data) = get_app_data(payload) {
-      debug!(
-        "App data message {:?}: {:?}",
-        direction,
-        String::from_utf8_lossy(&app_data));
+      debug!("App data message {:?}: {:?}", direction, String::from_utf8_lossy(&app_data));
       match direction {
         Direction::Sent if request_header.is_none() => request_header = Some(app_data),
         Direction::Sent => request_body = Some(app_data),
@@ -218,8 +218,10 @@ pub fn extract_request_and_response(
   }
 
   // Ensure mandatory headers are present
-  let request_header = request_header.ok_or(NotaryServerError::MissingAppDataMessages(Direction::Sent, 2, 0))?;
-  let response_header = response_header.ok_or(NotaryServerError::MissingAppDataMessages(Direction::Received, 2, 0))?;
+  let request_header =
+    request_header.ok_or(NotaryServerError::MissingAppDataMessages(Direction::Sent, 2, 0))?;
+  let response_header =
+    response_header.ok_or(NotaryServerError::MissingAppDataMessages(Direction::Received, 2, 0))?;
 
   let request = ManifestRequest::from_payload(&request_header, request_body.as_deref())?;
   let response =
@@ -230,21 +232,25 @@ pub fn extract_request_and_response(
 
 // TODO: Should TeeProof and other proofs be moved to `proofs` crate?
 // Otherwise, adding TeeProof::manifest necessitates extra dependencies on the client
-// Notice that almost all inputs to this function are from `proofs` crate
+// Notice that all inputs to this function are from `proofs` crate
 pub fn create_tee_proof(
   manifest: &Manifest,
   request: &ManifestRequest,
   response: &ManifestResponse,
-  signing_key: &OrigoSigningKey,
+  State(state): State<Arc<SharedState>>,
 ) -> Result<TeeProof, NotaryServerError> {
   validate_notarization_legal(manifest, request, response)?;
 
   let manifest_hash = manifest.to_keccak_digest();
   let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
-  // TODO: Is this how we should be signing this?
-  // TODO: Can we substitute request_messages for [manifest.request], etc. here?
-  let origo_sig = signing_key.create_origo_signature(&[], &[]);
-  let as_bytes = origo_sig.signature.to_vec();
+
+  // TODO: That doesn't seem right
+  let to_sign = VerifyReply {
+    value:    format!("0x{}", hex::encode(manifest_hash)),
+    manifest: manifest.clone(),
+  };
+  let origo_sig = sign_verification(to_sign, State(state)).unwrap();
+  let as_bytes = hex::decode(&origo_sig.signature[2..]).unwrap();
   let signature = hex::encode(&as_bytes);
   Ok(TeeProof { data, signature })
 }

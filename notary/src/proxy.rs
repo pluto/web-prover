@@ -48,8 +48,7 @@ pub async fn proxy(
   let response = from_reqwest_response(reqwest_response).await;
   // debug!("{:?}", response);
 
-  let tee_proof =
-    create_tee_proof(&payload.manifest, &request, &response, &state.origo_signing_key)?;
+  let tee_proof = create_tee_proof(&payload.manifest, &request, &response, State(state))?;
 
   Ok(Json(tee_proof))
 }
