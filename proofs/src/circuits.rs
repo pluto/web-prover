@@ -14,7 +14,9 @@ use crate::{
 // -------------------------------------- circuits -------------------------------------- //
 /// Maximum ROM length
 pub const MAX_ROM_LENGTH: usize = 100;
-/// Circuit size
+/// Circuit size 256
+pub const CIRCUIT_SIZE_256: usize = 256;
+/// Circuit size 512
 pub const CIRCUIT_SIZE_512: usize = 512;
 /// Public input variables
 pub const PUBLIC_IO_VARS: usize = 11;
@@ -30,7 +32,7 @@ pub const PROVING_PARAMS_512: &str = concat!(
 #[cfg(not(target_arch = "wasm32"))]
 pub fn load_proving_params_512() -> Result<Vec<u8>, std::io::Error> {
   // TODO: A stub for iOS
-  load_bytes(PROVING_PARAMS_512)
+  load_artifact_bytes(PROVING_PARAMS_512)
 }
 // pub const PROVING_PARAMS_256: &str = concat!(
 //   "proofs/web_proof_circuits/circom-artifacts-256b-v",
@@ -143,7 +145,7 @@ fn wasm_witness_generator_type_512b() -> [WitnessGeneratorType; 3] {
   ]
 }
 
-fn load_bytes(path: &str) -> Result<Vec<u8>, std::io::Error> {
+pub fn load_artifact_bytes(path: &str) -> Result<Vec<u8>, std::io::Error> {
   let workspace_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
   let artifact_path = workspace_path.join(path);
   fs::read(artifact_path)
@@ -158,28 +160,28 @@ pub fn construct_setup_data_from_fs<const CIRCUIT_SIZE: usize>(
 ) -> Result<UninitializedSetup, ProofError> {
   let r1cs_types = match CIRCUIT_SIZE {
     CIRCUIT_SIZE_256 => vec![
-      R1CSType::Raw(load_bytes(PLAINTEXT_AUTHENTICATION_256B_R1CS)?),
-      R1CSType::Raw(load_bytes(HTTP_VERIFICATION_256B_R1CS)?),
-      R1CSType::Raw(load_bytes(JSON_EXTRACTION_256B_R1CS)?),
+      R1CSType::Raw(load_artifact_bytes(PLAINTEXT_AUTHENTICATION_256B_R1CS)?),
+      R1CSType::Raw(load_artifact_bytes(HTTP_VERIFICATION_256B_R1CS)?),
+      R1CSType::Raw(load_artifact_bytes(JSON_EXTRACTION_256B_R1CS)?),
     ],
     CIRCUIT_SIZE_512 => vec![
-      R1CSType::Raw(load_bytes(PLAINTEXT_AUTHENTICATION_512B_R1CS)?),
-      R1CSType::Raw(load_bytes(HTTP_VERIFICATION_512B_R1CS)?),
-      R1CSType::Raw(load_bytes(JSON_EXTRACTION_512B_R1CS)?),
+      R1CSType::Raw(load_artifact_bytes(PLAINTEXT_AUTHENTICATION_512B_R1CS)?),
+      R1CSType::Raw(load_artifact_bytes(HTTP_VERIFICATION_512B_R1CS)?),
+      R1CSType::Raw(load_artifact_bytes(JSON_EXTRACTION_512B_R1CS)?),
     ],
     _ => return Err(ProofError::InvalidCircuitSize),
   };
 
   let witness_generator_types = match CIRCUIT_SIZE {
     CIRCUIT_SIZE_256 => vec![
-      WitnessGeneratorType::Raw(load_bytes(PLAINTEXT_AUTHENTICATION_256B_GRAPH)?),
-      WitnessGeneratorType::Raw(load_bytes(HTTP_VERIFICATION_256B_GRAPH)?),
-      WitnessGeneratorType::Raw(load_bytes(JSON_EXTRACTION_256B_GRAPH)?),
+      WitnessGeneratorType::Raw(load_artifact_bytes(PLAINTEXT_AUTHENTICATION_256B_GRAPH)?),
+      WitnessGeneratorType::Raw(load_artifact_bytes(HTTP_VERIFICATION_256B_GRAPH)?),
+      WitnessGeneratorType::Raw(load_artifact_bytes(JSON_EXTRACTION_256B_GRAPH)?),
     ],
     CIRCUIT_SIZE_512 => vec![
-      WitnessGeneratorType::Raw(load_bytes(PLAINTEXT_AUTHENTICATION_512B_GRAPH)?),
-      WitnessGeneratorType::Raw(load_bytes(HTTP_VERIFICATION_512B_GRAPH)?),
-      WitnessGeneratorType::Raw(load_bytes(JSON_EXTRACTION_512B_GRAPH)?),
+      WitnessGeneratorType::Raw(load_artifact_bytes(PLAINTEXT_AUTHENTICATION_512B_GRAPH)?),
+      WitnessGeneratorType::Raw(load_artifact_bytes(HTTP_VERIFICATION_512B_GRAPH)?),
+      WitnessGeneratorType::Raw(load_artifact_bytes(JSON_EXTRACTION_512B_GRAPH)?),
     ],
     _ => return Err(ProofError::InvalidCircuitSize),
   };

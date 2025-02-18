@@ -9,7 +9,7 @@
 
 use std::{
   fs::{self, File},
-  io::{BufReader, Read, Write},
+  io::Write,
   sync::Arc,
 };
 
@@ -92,6 +92,7 @@ pub struct UninitializedSetup {
 }
 
 impl UninitializedSetup {
+  /// Creates an `UninitializedSetup` from bytes representing `R1CSType:Raw`
   pub fn from_raw_r1cs_types_with_browser_witness(r1cs_types: Vec<Vec<u8>>) -> Self {
     let r1cs_types: Vec<_> = r1cs_types.iter().map(|r1cs| R1CSType::Raw(r1cs.clone())).collect();
     let witness_generator_types: Vec<_> = vec![WitnessGeneratorType::Browser; r1cs_types.len()];
@@ -103,6 +104,8 @@ impl UninitializedSetup {
     }
   }
 
+  /// Creates an `UninitializedSetup` from bytes representing `R1CSType:Raw` and
+  /// `WitnessGeneratorType::Raw`
   pub fn from_raw_parts(r1cs_types: Vec<Vec<u8>>, witness_generator_types: Vec<Vec<u8>>) -> Self {
     let r1cs_types = r1cs_types.iter().map(|r1cs| R1CSType::Raw(r1cs.clone())).collect();
     let witness_generator_types =
