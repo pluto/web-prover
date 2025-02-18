@@ -197,7 +197,7 @@ async fn handle_tee_mode(
   let mut framed_reunited_socket =
     Framed::new(reunited_socket.compat(), LengthDelimitedCodec::new());
 
-  let manifest_bytes = config.proving.manifest.unwrap().to_bytes()?;
+  let manifest_bytes: Vec<u8> = config.proving.manifest.unwrap().try_into()?;
   framed_reunited_socket.send(Bytes::from(manifest_bytes)).await?;
 
   let origo_secret_bytes = OrigoSecrets::from_origo_conn(&origo_conn).to_bytes()?;

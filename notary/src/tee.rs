@@ -160,7 +160,7 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
 
   let manifest_frame =
     framed_stream.next().await.ok_or_else(|| NotaryServerError::ManifestMissing)??;
-  let manifest = Manifest::from_bytes(&manifest_frame)?;
+  let manifest = Manifest::try_from(manifest_frame.as_ref())?;
   // dbg!(&manifest);
 
   let secret_frame =

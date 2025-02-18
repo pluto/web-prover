@@ -82,6 +82,24 @@ pub struct Manifest {
   pub response: ManifestResponse,
 }
 
+impl TryFrom<&[u8]> for Manifest {
+  type Error = serde_json::Error;
+
+  fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> { serde_json::from_slice(bytes) }
+}
+
+impl TryFrom<&Manifest> for Vec<u8> {
+  type Error = serde_json::Error;
+
+  fn try_from(manifest: &Manifest) -> Result<Self, Self::Error> { serde_json::to_vec(manifest) }
+}
+
+impl TryFrom<Manifest> for Vec<u8> {
+  type Error = serde_json::Error;
+
+  fn try_from(manifest: Manifest) -> Result<Self, Self::Error> { serde_json::to_vec(&manifest) }
+}
+
 impl Manifest {
   /// Validates `Manifest` request and response fields. They are validated against valid statuses,
   /// http methods, and template variables.
@@ -98,22 +116,13 @@ impl Manifest {
     Ok(())
   }
 
-  /// Serializes the `Manifest` to raw bytes.
-  pub fn to_bytes(&self) -> serde_json::Result<Vec<u8>> {
-    // Serializing as JSON because `untagged` in `JsonKey` break bincode
-    serde_json::to_vec(&self)
-  }
-
-  /// Deserializes a `Manifest` from raw bytes.
-  pub fn from_bytes(bytes: &[u8]) -> serde_json::Result<Manifest> { serde_json::from_slice(bytes) }
-
   /// Compute a `Keccak256` hash of the serialized Manifest
-  pub fn to_keccak_digest(&self) -> serde_json::Result<[u8; 32]> {
-    let bytes = self.to_bytes()?;
+  pub fn to_keccak_digest(&self) -> Result<[u8; 32], ProofError> {
+    let as_bytes: Vec<u8> = self.try_into()?;
     let mut hasher = Keccak::v256();
     let mut output = [0u8; 32];
 
-    hasher.update(&bytes);
+    hasher.update(&as_bytes);
     hasher.finalize(&mut output);
 
     Ok(output)
@@ -978,8 +987,8 @@ mod tests {
   #[test]
   fn test_manifest_serialization() {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
-    let serialized = manifest.to_bytes().unwrap();
-    let deserialized = Manifest::from_bytes(&serialized).unwrap();
+    let serialized: Vec<u8> = manifest.clone().try_into().unwrap();
+    let deserialized = Manifest::try_from(serialized.as_slice()).unwrap();
     assert_eq!(manifest, deserialized);
   }
 
