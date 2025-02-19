@@ -35,7 +35,7 @@ pub struct NoirProgram {
 impl NoirProgram {
   pub fn new(bin: &[u8]) -> Self { serde_json::from_slice(bin).unwrap() }
 
-  pub fn arity(&self) -> usize { self.circuit().public_inputs().0.len() }
+  pub fn arity(&self) -> usize { dbg!(self.circuit().public_parameters.0.len()) }
 
   pub fn circuit(&self) -> &Circuit<GenericFieldElement<Fr>> { &self.bytecode.functions[0] }
 
@@ -88,7 +88,7 @@ impl NoirProgram {
       }
       // TODO: Fix unwrap
       // Alloc 1 for now and update later as needed
-      let var = AllocatedNum::alloc_input(&mut *cs, || Ok(F::<G1>::ONE)).unwrap();
+      let var = AllocatedNum::alloc(&mut *cs, || Ok(F::<G1>::ONE)).unwrap();
       println!("AllocatedNum pub input: {var:?}");
       allocated_vars.insert(*witness, var);
     });
@@ -100,7 +100,7 @@ impl NoirProgram {
         let f = convert_to_acir_field(inputs[witness.as_usize()]);
         acvm.as_mut().unwrap().overwrite_witness(*witness, f);
       }
-      let var = AllocatedNum::alloc_input(&mut *cs, || Ok(F::<G1>::ONE)).unwrap();
+      let var = AllocatedNum::alloc(&mut *cs, || Ok(F::<G1>::ONE)).unwrap();
       allocated_vars.insert(*witness, var);
     });
 
@@ -192,14 +192,14 @@ impl NoirProgram {
     }
 
     let mut z_out = vec![];
-    if let Some(wmap) = acir_witness_map {
-      for ret in &self.circuit().return_values.0 {
-        dbg!(&ret);
-        dbg!(wmap.get(ret));
-        // let output_witness = wmap.get(ret).unwrap();
-        z_out.push(allocated_vars.get(ret).unwrap().clone());
-      }
+    // if let Some(wmap) = acir_witness_map {
+    for ret in &self.circuit().return_values.0 {
+      dbg!(&ret);
+      // dbg!(wmap.get(ret));
+      // let output_witness = wmap.get(ret).unwrap();
+      z_out.push(allocated_vars.get(ret).unwrap().clone());
     }
+    // }
 
     // TODO: We need to make a list of the range of the public inputs
     for public_input in &self.circuit().public_parameters.0 {
@@ -212,7 +212,7 @@ impl NoirProgram {
         |lc| lc + allocated_vars.get(public_input).unwrap().get_variable(),
       );
     }
-    Ok(z_out) // Return appropriate outputs if needed
+    Ok(dbg!(z_out))
   }
 }
 

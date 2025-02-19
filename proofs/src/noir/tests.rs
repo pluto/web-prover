@@ -22,8 +22,6 @@ pub struct NoirMemory {
   pub public_input: Vec<F<G1>>,
 }
 
-pub struct SimpleProgramData {}
-
 #[derive(Clone, Debug)]
 pub struct NoirRomCircuit {
   pub circuit:       NoirProgram,
@@ -48,7 +46,7 @@ impl NonUniformCircuit<E1> for NoirMemory {
 }
 
 impl StepCircuit<F<G1>> for NoirRomCircuit {
-  fn arity(&self) -> usize { self.circuit.arity() + 1 + self.rom_size }
+  fn arity(&self) -> usize { dbg!(self.circuit.arity() + 1 + self.rom_size) }
 
   fn circuit_index(&self) -> usize { self.circuit_index }
 
@@ -201,10 +199,18 @@ fn test_mock_noir_ivc() {
   let memory = NoirMemory {
     circuits:     vec![rom_circuit],
     rom:          vec![0, 0, 0],
-    public_input: vec![F::<G1>::from(1), F::<G1>::from(2)],
+    public_input: vec![
+      F::<G1>::from(1), // Actual input
+      F::<G1>::from(2), // Actual input
+      F::<G1>::from(0), // PC
+      F::<G1>::from(0), // ROM
+      F::<G1>::from(0), // ROM
+      F::<G1>::from(0), // ROM
+    ],
   };
 
   let snark = run(&memory);
+  dbg!(snark.unwrap().zi_primary());
 }
 
 #[test]
