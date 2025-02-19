@@ -144,7 +144,6 @@ async fn handle_origo_mode(
   tokio::spawn(handled_connection_fut);
 
   let response = request_sender.send_request(config.to_request()?).await?;
-
   assert_eq!(response.status(), StatusCode::OK);
 
   let payload = response.into_body().collect().await?.to_bytes();
@@ -279,17 +278,18 @@ async fn handle_tee_mode(
   let mut framed_reunited_socket =
     Framed::new(reunited_socket.compat(), LengthDelimitedCodec::new());
 
-  let manifest_bytes: Vec<u8> = config.proving.manifest.unwrap().try_into().unwrap();
+  let manifest_bytes: Vec<u8> = config.proving.manifest.unwrap().try_into()?;
   framed_reunited_socket.send(Bytes::from(manifest_bytes)).await?;
 
-  let origo_secret_bytes = OrigoSecrets::from_origo_conn(&origo_conn).to_bytes()?;
+  let origo_secret = OrigoSecrets::from_origo_conn(&origo_conn);
+  let origo_secret_bytes: Vec<u8> = (&origo_secret).try_into().unwrap();
   framed_reunited_socket.send(Bytes::from(origo_secret_bytes)).await?;
 
   framed_reunited_socket.flush().await?;
 
   let tee_proof_frame =
     framed_reunited_socket.next().await.ok_or_else(|| ClientErrors::TeeProofMissing)??;
-  let tee_proof = TeeProof::from_bytes(&tee_proof_frame)?;
+  let tee_proof = TeeProof::try_from(tee_proof_frame.as_ref())?;
   debug!("TeeProof: {:?}", tee_proof);
 
   Ok((origo_conn, tee_proof))

@@ -124,10 +124,11 @@ pub async fn sign(
 
   // Log a verifier session for public inputs
   debug!("inserting with session_id={:?}", query.session_id);
-  state.verifier_sessions.lock().unwrap().insert(query.session_id.to_string(), VerifierInputs {
-    request_messages:  request_messages.clone(),
-    response_messages: response_messages.clone(),
-  });
+  state
+    .verifier_sessions
+    .lock()
+    .unwrap()
+    .insert(query.session_id.to_string(), VerifierInputs { request_messages, response_messages });
 
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)

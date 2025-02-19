@@ -1,3 +1,5 @@
+extern crate core;
+
 pub mod tlsn;
 #[cfg(not(target_arch = "wasm32"))] mod tlsn_native;
 #[cfg(target_arch = "wasm32")] mod tlsn_wasm32;
@@ -189,13 +191,19 @@ pub struct TeeProof {
   pub signature: SignedVerificationReply,
 }
 
+impl TryFrom<&[u8]> for TeeProof {
+  type Error = serde_json::Error;
+
+  fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> { serde_json::from_slice(bytes) }
+}
+
+impl TryFrom<TeeProof> for Vec<u8> {
+  type Error = serde_json::Error;
+
+  fn try_from(proof: TeeProof) -> Result<Self, Self::Error> { serde_json::to_vec(&proof) }
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TeeProofData {
   pub manifest_hash: Vec<u8>,
-}
-
-impl TeeProof {
-  pub fn to_bytes(&self) -> serde_json::Result<Vec<u8>> { serde_json::to_vec(&self) }
-
-  fn from_bytes(bytes: &[u8]) -> serde_json::Result<TeeProof> { serde_json::from_slice(bytes) }
 }

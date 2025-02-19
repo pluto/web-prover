@@ -165,7 +165,7 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
 
   let secret_frame =
     framed_stream.next().await.ok_or_else(|| NotaryServerError::MissingOrigoSecrets)??;
-  let origo_secrets = OrigoSecrets::from_bytes(&secret_frame)?;
+  let origo_secrets = OrigoSecrets::try_from(secret_frame.as_ref())?;
   // dbg!(&origo_secrets);
 
   let handshake_server_key =
@@ -198,7 +198,8 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
 
   // send TeeProof to client
   let tee_proof = create_tee_proof(&manifest, &request, &response, State(state))?;
-  framed_stream.send(Bytes::from(tee_proof.to_bytes()?)).await?;
+  let tee_proof_bytes: Vec<u8> = tee_proof.try_into()?;
+  framed_stream.send(Bytes::from(tee_proof_bytes)).await?;
   framed_stream.flush().await?;
 
   Ok(())

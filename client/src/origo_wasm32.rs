@@ -168,7 +168,7 @@ async fn handle_tee_mode(
   let (mut request_sender, connection) =
     hyper::client::conn::http1::handshake(client_tls_conn).await?;
 
-  let (connection_sender, connection_receiver) = oneshot::channel();
+  let (connection_sender, _) = oneshot::channel();
   let connection_fut = connection.without_shutdown();
   spawn_local(async {
     let result = connection_fut.await;
@@ -197,17 +197,19 @@ async fn handle_tee_mode(
   let mut framed_reunited_socket =
     Framed::new(reunited_socket.compat(), LengthDelimitedCodec::new());
 
-  let manifest_bytes: Vec<u8> = config.proving.manifest.unwrap().try_into()?;
+  let manifest = config.proving.manifest.unwrap();
+  let manifest_bytes: Vec<u8> = (&manifest).try_into().unwrap();
   framed_reunited_socket.send(Bytes::from(manifest_bytes)).await?;
 
-  let origo_secret_bytes = OrigoSecrets::from_origo_conn(&origo_conn).to_bytes()?;
-  framed_reunited_socket.send(Bytes::from(origo_secret_bytes)).await?;
+  let origo_secrets = OrigoSecrets::from_origo_conn(&origo_conn);
+  let origo_secrets_bytes: Vec<u8> = (&origo_secrets).try_into().unwrap();
+  framed_reunited_socket.send(Bytes::from(origo_secrets_bytes)).await?;
 
   framed_reunited_socket.flush().await?;
 
   let tee_proof_frame =
     framed_reunited_socket.next().await.ok_or_else(|| ClientErrors::TeeProofMissing)??;
-  let tee_proof = TeeProof::from_bytes(&tee_proof_frame)?;
+  let tee_proof = TeeProof::try_from(tee_proof_frame.as_ref())?;
 
   // TODO something will be dropped here. if it's dropped, it closes ...
   // let mut client_socket = connection_receiver.await.unwrap()?.io.into_inner();

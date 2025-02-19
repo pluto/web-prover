@@ -211,6 +211,18 @@ pub(crate) async fn generate_proof(
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct OrigoSecrets(HashMap<String, Vec<u8>>);
 
+impl TryFrom<&OrigoSecrets> for Vec<u8> {
+  type Error = serde_json::Error;
+
+  fn try_from(secrets: &OrigoSecrets) -> Result<Self, Self::Error> { serde_json::to_vec(secrets) }
+}
+
+impl TryFrom<&[u8]> for OrigoSecrets {
+  type Error = serde_json::Error;
+
+  fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> { serde_json::from_slice(bytes) }
+}
+
 impl OrigoSecrets {
   pub fn handshake_server_iv(&self) -> Option<Vec<u8>> {
     self.0.get("Handshake:server_iv").cloned()
@@ -231,10 +243,6 @@ impl OrigoSecrets {
   pub fn from_origo_conn(origo_conn: &OrigoConnection) -> Self {
     Self(origo_conn.secret_map.clone())
   }
-
-  pub fn to_bytes(&self) -> serde_json::Result<Vec<u8>> { serde_json::to_vec(&self) }
-
-  pub fn from_bytes(bytes: &[u8]) -> serde_json::Result<Self> { serde_json::from_slice(bytes) }
 }
 
 #[cfg(test)]
@@ -246,12 +254,8 @@ mod tests {
     origo_conn.secret_map.insert("Handshake:server_iv".to_string(), vec![1, 2, 3]);
     let origo_secrets = OrigoSecrets::from_origo_conn(&origo_conn);
 
-    let serialized = origo_secrets.to_bytes().unwrap();
-    let deserialized: OrigoSecrets = OrigoSecrets::from_bytes(&serialized).unwrap();
+    let serialized: Vec<u8> = origo_secrets.try_into().unwrap();
+    let deserialized: OrigoSecrets = OrigoSecrets::try_from(&serialized).unwrap();
     assert_eq!(origo_secrets, deserialized);
-
-    let wire_serialized = origo_secrets.to_bytes().unwrap();
-    let wire_deserialized: OrigoSecrets = OrigoSecrets::from_bytes(&wire_serialized).unwrap();
-    assert_eq!(origo_secrets, wire_deserialized);
   }
 }
