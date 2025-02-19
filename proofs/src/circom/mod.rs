@@ -41,20 +41,56 @@ pub struct CircuitJson {
 
 #[derive(Clone)]
 pub struct CircomCircuit {
-  pub r1cs:    Arc<R1CS>,
-  pub witness: Option<Vec<F<G1>>>,
+  pub r1cs:              Arc<R1CS>,
+  pub witness:           Option<Vec<F<G1>>>,
+  pub witness_generator: Option<WitnessGeneratorType>,
+}
+
+/// R1CS file type
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum R1CSType {
+  /// file path
+  #[serde(rename = "file")]
+  File { path: PathBuf },
+  /// raw bytes
+  #[serde(rename = "raw")]
+  Raw(Vec<u8>),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum WitnessGeneratorType {
+  #[serde(rename = "browser")]
+  Browser,
+  #[serde(rename = "wasm")]
+  Wasm {
+    path:      String,
+    wtns_path: String,
+  },
+  Path(PathBuf),
+  #[serde(skip)]
+  Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
 }
 
 // NOTE (Colin): This is added so we can cache only the active circuits we are using.
 #[allow(clippy::derivable_impls)]
 impl Default for CircomCircuit {
-  fn default() -> Self { Self { r1cs: Arc::new(R1CS::default()), witness: None } }
+  fn default() -> Self {
+    Self {
+      r1cs:              Arc::new(R1CS::default()),
+      witness:           None,
+      witness_generator: None,
+    }
+  }
 }
 
 impl Circuit for CircomCircuit {
   type WitnessGenerator = WitnessGeneratorType;
 
   fn arity(&self) -> usize { self.r1cs.num_public_inputs }
+
+  fn witness_generator_type(&self) -> Option<&Self::WitnessGenerator> {
+    self.witness_generator.as_ref()
+  }
 
   fn vanilla_synthesize<CS: ConstraintSystem<F<G1>>>(
     &self,

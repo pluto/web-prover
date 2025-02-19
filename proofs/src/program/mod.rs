@@ -25,7 +25,7 @@ pub struct Memory<C: Circuit> {
   pub rom:      Vec<u64>,
 }
 
-impl<C: Circuit + Clone + Sync + Send> NonUniformCircuit<E1> for Memory<C> {
+impl<C: Circuit> NonUniformCircuit<E1> for Memory<C> {
   type C1 = RomCircuit<C>;
   type C2 = TrivialCircuit<F<G2>>;
 
@@ -40,7 +40,7 @@ impl<C: Circuit + Clone + Sync + Send> NonUniformCircuit<E1> for Memory<C> {
   fn initial_circuit_index(&self) -> usize { self.rom[0] as usize }
 }
 
-impl<C: Circuit + Clone + Sync + Send> StepCircuit<F<G1>> for RomCircuit<C> {
+impl<C: Circuit> StepCircuit<F<G1>> for RomCircuit<C> {
   fn arity(&self) -> usize { self.circuit.arity() + 1 + self.rom_size }
 
   fn circuit_index(&self) -> usize { self.circuit_index }
@@ -68,7 +68,7 @@ impl<C: Circuit + Clone + Sync + Send> StepCircuit<F<G1>> for RomCircuit<C> {
 
 // TODO: This is like a one-time use setup that overlaps some with `ProgramData::into_online()`.
 // Worth checking out how to make this simpler, clearer, more efficient.
-pub fn setup(setup_data: &UninitializedSetup) -> PublicParams<E1> {
+pub fn setup<C: Circuit>(setup_data: &UninitializedSetup) -> PublicParams<E1> {
   // Optionally time the setup stage for the program
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
@@ -76,7 +76,7 @@ pub fn setup(setup_data: &UninitializedSetup) -> PublicParams<E1> {
   // TODO: I don't think we want to have to call `initialize_circuit_list` more than once on setup
   // ever and it seems like it may get used more frequently.
   let initilized_setup = initialize_setup_data(setup_data).unwrap();
-  let circuits = initialize_circuit_list(&initilized_setup); // TODO, change the type signature of trait to use arbitrary error types.
+  let circuits = initialize_circuit_list::<C>(&initilized_setup); // TODO, change the type signature of trait to use arbitrary error types.
   let memory = Memory { circuits, rom: vec![0; setup_data.max_rom_length] }; // Note, `rom` here is not used in setup, only `circuits`
   let public_params = PublicParams::setup(&memory, &*default_ck_hint(), &*default_ck_hint());
 
@@ -113,7 +113,7 @@ pub fn run(program_data: &ProgramData<Online, Expanded>) -> Result<RecursiveSNAR
     // trace!("private input: {:?}", memory.circuits[op_code as usize].private_input);
     memory.circuits[op_code as usize].nivc_io = Some(next_public_input);
 
-    let wit_type = memory.circuits[op_code as usize].witness_generator_type.clone();
+    let wit_type = memory.circuits[op_code as usize].witness_generator_type().clone();
     let public_params = &program_data.public_params;
 
     memory.circuits[op_code as usize].circuit.witness =

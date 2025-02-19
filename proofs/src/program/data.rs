@@ -39,31 +39,6 @@ impl FoldInput {
   }
 }
 
-/// R1CS file type
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum R1CSType {
-  /// file path
-  #[serde(rename = "file")]
-  File { path: PathBuf },
-  /// raw bytes
-  #[serde(rename = "raw")]
-  Raw(Vec<u8>),
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub enum WitnessGeneratorType {
-  #[serde(rename = "browser")]
-  Browser,
-  #[serde(rename = "wasm")]
-  Wasm {
-    path:      String,
-    wtns_path: String,
-  },
-  Path(PathBuf),
-  #[serde(skip)]
-  Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
-}
-
 /// Uninitialized Circuit Setup data, in this configuration the R1CS objects have not
 /// been initialized and require a bulky initialize process.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -79,7 +54,7 @@ pub struct UninitializedSetup {
 /// Initialized Circuit Setup data, in this configuration the R1CS objects have been
 /// fully loaded for proving.
 #[derive(Clone, Debug)]
-pub struct InitializedSetup {
+pub struct InitializedSetup<C: Circuit> {
   /// vector of all circuits' r1cs
   pub r1cs:                    Vec<Arc<R1CS>>,
   /// vector of all circuits' witness generator
