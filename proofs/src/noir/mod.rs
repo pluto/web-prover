@@ -79,7 +79,8 @@ impl NoirProgram {
     // Set up public inputs
     self.circuit().public_parameters.0.iter().for_each(|witness| {
       println!("public instance: {witness:?}");
-      if let Some(inputs) = &self.witness {
+      if self.witness.is_some() {
+        // TODO: This is a bit hacky and assumes private inputs come first. I don't like that
         let f = z[witness.as_usize()].clone();
         acvm
           .as_mut()
