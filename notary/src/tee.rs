@@ -250,16 +250,16 @@ pub fn create_tee_proof(
   validate_notarization_legal(manifest, request, response)?;
 
   let manifest_hash = manifest.to_keccak_digest()?;
-  let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
-
-  // TODO: That doesn't seem right
   let to_sign = VerifyReply {
+    // Using manifest hash as a value here since we are not exposing any values extracted
+    // from the request or response
     value:    format!("0x{}", hex::encode(manifest_hash)),
     manifest: manifest.clone(),
   };
-  let origo_sig = sign_verification(to_sign, State(state)).unwrap();
-  let as_bytes = hex::decode(&origo_sig.signature[2..]).unwrap();
-  let signature = hex::encode(&as_bytes);
+  let signature = sign_verification(to_sign, State(state)).unwrap();
+
+  let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
+
   Ok(TeeProof { data, signature })
 }
 

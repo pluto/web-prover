@@ -179,7 +179,7 @@ pub async fn sign(
 pub fn sign_verification(
   query: VerifyReply,
   State(state): State<Arc<SharedState>>,
-) -> Result<Json<SignedVerificationReply>, ProxyError> {
+) -> Result<SignedVerificationReply, ProxyError> {
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
 
@@ -226,7 +226,7 @@ pub fn sign_verification(
     signer:      "0x".to_string() + &hex::encode(signer_address),
   };
 
-  Ok(Json(response))
+  Ok(response)
 }
 
 #[derive(Clone)]
@@ -431,7 +431,7 @@ pub async fn verify(
     },
   };
 
-  sign_verification(verify_output, State(state))
+  sign_verification(verify_output, State(state)).map(Json)
 }
 
 pub async fn websocket_notarize(

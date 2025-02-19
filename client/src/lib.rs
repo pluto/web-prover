@@ -186,7 +186,7 @@ pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, errors:
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TeeProof {
   pub data:      TeeProofData,
-  pub signature: String,
+  pub signature: SignedVerificationReply,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

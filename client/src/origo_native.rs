@@ -290,6 +290,7 @@ async fn handle_tee_mode(
   let tee_proof_frame =
     framed_reunited_socket.next().await.ok_or_else(|| ClientErrors::TeeProofMissing)??;
   let tee_proof = TeeProof::from_bytes(&tee_proof_frame)?;
+  debug!("TeeProof: {:?}", tee_proof);
 
   Ok((origo_conn, tee_proof))
 }
