@@ -80,8 +80,11 @@ impl NoirProgram {
     self.circuit().public_parameters.0.iter().for_each(|witness| {
       println!("public instance: {witness:?}");
       if let Some(inputs) = &self.witness {
-        let f = convert_to_acir_field(inputs[witness.as_usize()]);
-        acvm.as_mut().unwrap().overwrite_witness(*witness, f);
+        let f = z[witness.as_usize()].clone();
+        acvm
+          .as_mut()
+          .unwrap()
+          .overwrite_witness(*witness, convert_to_acir_field(f.get_value().unwrap()));
       }
       // TODO: Fix unwrap
       // Alloc 1 for now and update later as needed

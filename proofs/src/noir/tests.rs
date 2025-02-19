@@ -15,6 +15,7 @@ use tracing::trace;
 use super::*;
 use crate::program::utils;
 
+#[derive(Debug, Clone)]
 pub struct NoirMemory {
   pub circuits:     Vec<NoirRomCircuit>,
   pub rom:          Vec<u64>,
@@ -23,7 +24,7 @@ pub struct NoirMemory {
 
 pub struct SimpleProgramData {}
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct NoirRomCircuit {
   pub circuit:       NoirProgram,
   pub circuit_index: usize,
@@ -76,7 +77,11 @@ pub fn run(memory: &NoirMemory) -> Result<RecursiveSNARK<E1>, ProofError> {
   info!("Starting SuperNova program...");
 
   info!("Setting up PublicParams...");
-  let public_params = PublicParams::setup(memory, &*default_ck_hint(), &*default_ck_hint());
+  // TODO: This is stupid to do, but I need to get around the original setting of the witness.
+  // Having separate setup is the way (we already know this)
+  let mut memory_clone = memory.clone();
+  memory_clone.circuits[0].circuit.witness = None;
+  let public_params = PublicParams::setup(&memory_clone, &*default_ck_hint(), &*default_ck_hint());
 
   let z0_primary = &memory.public_input;
   let z0_secondary = &vec![F::<G2>::ZERO];
