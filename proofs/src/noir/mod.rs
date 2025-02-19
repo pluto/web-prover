@@ -17,6 +17,8 @@ use ff::PrimeField;
 
 use super::*;
 
+#[cfg(test)] mod tests;
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct NoirProgram {
   #[serde(
@@ -33,13 +35,15 @@ pub struct NoirProgram {
 impl NoirProgram {
   pub fn new(bin: &[u8]) -> Self { serde_json::from_slice(bin).unwrap() }
 
+  pub fn arity(&self) -> usize { self.circuit().public_inputs().0.len() }
+
   pub fn circuit(&self) -> &Circuit<GenericFieldElement<Fr>> { &self.bytecode.functions[0] }
 
   pub fn unconstrained_functions(&self) -> &Vec<BrilligBytecode<GenericFieldElement<Fr>>> {
     &self.bytecode.unconstrained_functions
   }
 
-  pub fn set_inputs(&mut self, inputs: Vec<F<G1>>) { self.witness = Some(inputs); }
+  pub fn set_private_inputs(&mut self, inputs: Vec<F<G1>>) { self.witness = Some(inputs); }
 
   // TODO: we now need to shift this to use the `z` values as the sole public inputs, the struct
   // should only hold witness
@@ -222,104 +226,4 @@ fn convert_to_acir_field(f: F<G1>) -> GenericFieldElement<Fr> {
   let mut bytes = f.to_bytes();
   bytes.reverse();
   GenericFieldElement::from_be_bytes_reduce(&bytes)
-}
-
-#[cfg(test)]
-mod tests {
-  use std::path::Path;
-
-  use client_side_prover::bellpepper::shape_cs::ShapeCS;
-
-  use super::*;
-
-  // This is fucking stupid. Why can't we all be sane. i'm not anymore
-  #[test]
-  fn test_conversions() {
-    let f = F::<G1>::from(5);
-    let acir_f = convert_to_acir_field(f);
-    assert_eq!(acir_f, GenericFieldElement::from_repr(Fr::from(5)));
-
-    let f = GenericFieldElement::from_repr(Fr::from(3));
-    let halo2_f = convert_to_halo2_field(f);
-    assert_eq!(halo2_f, F::<G1>::from(3));
-  }
-
-  // TODO: Should probably have a check here, but I believe this is correct!
-  #[test]
-  fn test_mock_noir_synthesize_empty() {
-    // Circuit definition:
-    // x_0 * w_0 + w_1 + 2 == 0
-    let json_path = Path::new("./mock").join(format!("mock.json"));
-    let noir_json = std::fs::read(&json_path).unwrap();
-    let program = NoirProgram::new(&noir_json);
-
-    let mut cs = ShapeCS::<E1>::new();
-
-    program.vanilla_synthesize(&mut cs, &[]);
-
-    dbg!(cs.num_constraints());
-
-    dbg!(&cs.constraints);
-    dbg!(cs.num_aux());
-    dbg!(cs.num_inputs());
-  }
-
-  #[test]
-  fn test_mock_noir_synthesize_full() {
-    // Circuit definition:
-    // x_0 * w_0 + w_1 + 2 == 0
-    let json_path = Path::new("./mock").join(format!("mock.json"));
-    let noir_json = std::fs::read(&json_path).unwrap();
-
-    let mut program = NoirProgram::new(&noir_json);
-    program.set_inputs(vec![F::<G1>::from(2), F::<G1>::from(3), -F::<G1>::from(8)]);
-
-    let mut cs = ShapeCS::<E1>::new();
-    program.vanilla_synthesize(&mut cs, &[]);
-
-    dbg!(&cs.constraints);
-    dbg!(cs.num_aux());
-    dbg!(cs.num_inputs());
-  }
-
-  // `fold.json` is:
-  // pub fn main(x0: Field, w: pub [Field;2]) -> pub [Field;2] {
-  //   [x0 * w[0] + w[1] + 1, (x0 + 3) * w[1] + w[0]]
-  // }
-
-  #[test]
-  fn test_fold_noir_synthesize_empty() {
-    let json_path = Path::new("./mock").join(format!("fold.json"));
-    let noir_json = std::fs::read(&json_path).unwrap();
-
-    let mut program = NoirProgram::new(&noir_json);
-
-    let mut cs = ShapeCS::<E1>::new();
-    program.vanilla_synthesize(&mut cs, &[]);
-
-    dbg!(&cs.constraints);
-    dbg!(cs.num_aux());
-    dbg!(cs.num_inputs());
-  }
-
-  // TODO: This fails now because we pass in an empty array for `z`
-  #[test]
-  fn test_fold_noir_synthesize_full() {
-    let json_path = Path::new("./mock").join(format!("fold.json"));
-    let noir_json = std::fs::read(&json_path).unwrap();
-
-    let mut program = NoirProgram::new(&noir_json);
-    program.set_inputs(vec![F::<G1>::from(1), F::<G1>::from(1), F::<G1>::from(1)]);
-
-    // Check:
-    // 1 * 1 + 1 + 1 == 3
-    // (1 + 3) * 1 + 1 = 4
-
-    let mut cs = ShapeCS::<E1>::new();
-    program.vanilla_synthesize(&mut cs, &[]);
-
-    // dbg!(&cs.constraints);
-    // dbg!(cs.num_aux());
-    // dbg!(cs.num_inputs());
-  }
 }
