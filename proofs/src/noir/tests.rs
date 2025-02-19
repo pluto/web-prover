@@ -16,9 +16,20 @@ use tracing_test::traced_test;
 use super::*;
 use crate::program::utils;
 
+const ADD_EXTERNAL: &[u8] = include_bytes!("../../examples/noir_circuit_data/add_external.json");
+const SQUARE_ZEROTH: &[u8] = include_bytes!("../../examples/noir_circuit_data/square_zeroth.json");
+const SWAP_MEMORY: &[u8] = include_bytes!("../../examples/noir_circuit_data/swap_memory.json");
+
+const EXTERNAL_INPUTS: [[u64; 2]; 2] = [[5, 7], [13, 1]];
+const MAX_ROM_LENGTH: usize = 10;
+
 #[derive(Debug, Clone)]
 pub struct NoirMemory {
+  // TODO: Using a BTreeSet here would perhaps be preferable, or just some kind of set that checks
+  // over circuit indices
   pub circuits:     Vec<NoirRomCircuit>,
+  // TODO: I really think the ROM can just be removed and we can clean this up, but leaving it for
+  // now is a bit easier
   pub rom:          Vec<u64>,
   pub public_input: Vec<F<G1>>,
 }
@@ -26,9 +37,11 @@ pub struct NoirMemory {
 #[derive(Clone, Debug)]
 pub struct NoirRomCircuit {
   pub circuit:       NoirProgram,
+  // TODO: It would be nice to have the circuit index automatically be used in the memory, but
+  // perhaps we don't even need memory
   pub circuit_index: usize,
+  // TODO: Not having ROM size here would be nice, but mayabe we don't even need ROM
   pub rom_size:      usize,
-  //   pub private_input: Vec<F<G1>>,
 }
 
 impl NonUniformCircuit<E1> for NoirMemory {
@@ -43,11 +56,12 @@ impl NonUniformCircuit<E1> for NoirMemory {
 
   fn secondary_circuit(&self) -> Self::C2 { Default::default() }
 
-  fn initial_circuit_index(&self) -> usize { self.rom[0] as usize }
+  // Use the initial input to set this
+  fn initial_circuit_index(&self) -> usize { self.num_circuits() as usize }
 }
 
 impl StepCircuit<F<G1>> for NoirRomCircuit {
-  fn arity(&self) -> usize { dbg!(self.circuit.arity() + 1 + self.rom_size) }
+  fn arity(&self) -> usize { self.circuit.arity() + 1 + self.rom_size }
 
   fn circuit_index(&self) -> usize { self.circuit_index }
 
@@ -209,6 +223,41 @@ fn test_mock_noir_ivc() {
       F::<G1>::from(0), // ROM
       F::<G1>::from(0), // ROM
       F::<G1>::from(0), // ROM
+    ],
+  };
+
+  let snark = run(&memory);
+  dbg!(snark.unwrap().zi_primary());
+}
+
+#[test]
+#[traced_test]
+fn test_mock_noir_nivc() {
+  let mut add_external = NoirProgram::new(ADD_EXTERNAL);
+  add_external.set_private_inputs(vec![F::<G1>::from(5), F::<G1>::from(7)]);
+  let add_external =
+    NoirRomCircuit { circuit: add_external, circuit_index: 0, rom_size: 3 };
+  let square_zeroth = NoirRomCircuit {
+    circuit:       NoirProgram::new(SQUARE_ZEROTH),
+    circuit_index: 1,
+    rom_size:      3,
+  };
+  let swap_memory = NoirRomCircuit {
+    circuit:       NoirProgram::new(SWAP_MEMORY),
+    circuit_index: 2,
+    rom_size:      3,
+  };
+
+  let memory = NoirMemory {
+    circuits:     vec![add_external, square_zeroth, swap_memory],
+    rom:          vec![0, 1, 2],
+    public_input: vec![
+      F::<G1>::from(1), // Actual input
+      F::<G1>::from(2), // Actual input
+      F::<G1>::from(0), // PC
+      F::<G1>::from(0), // ROM
+      F::<G1>::from(1), // ROM
+      F::<G1>::from(2), // ROM
     ],
   };
 
