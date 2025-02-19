@@ -21,22 +21,27 @@ use tokio_util::{
 };
 use tracing::debug;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
+use wasm_bindgen::prelude::*;
 use web_sys::window;
 use ws_stream_wasm::WsMeta;
+use js_sys::{Function, Promise};
 
 use crate::{
   config, config::NotaryMode, errors, errors::ClientErrors, origo::OrigoSecrets,
   tls_client_async2::bind_client, TeeProof,
 };
 
+
 async fn sleep(ms: u64) {
-  let promise = js_sys::Promise::new(&mut |resolve, _| {
-    window()
-      .unwrap()
-      .set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, ms as i32)
-      .unwrap();
-  });
-  JsFuture::from(promise).await.unwrap();
+    #[wasm_bindgen]
+    extern "C" {
+        #[wasm_bindgen(js_namespace = globalThis)]
+        fn setTimeout(callback: &Function, timeout: i32);
+    }
+    let promise = Promise::new(&mut |resolve, _| {
+        setTimeout(&resolve, ms as i32);
+    });
+    JsFuture::from(promise).await.unwrap();
 }
 
 pub(crate) async fn proxy(

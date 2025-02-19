@@ -22,7 +22,10 @@ use proofs::program::{
 };
 use serde::Deserialize;
 use tls_client2::tls_core::msgs::message::MessagePayload;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::{
+  io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+  time::{timeout, Duration}
+};
 use tokio_stream::StreamExt;
 use tokio_util::{
   codec::{Framed, LengthDelimitedCodec},
@@ -31,7 +34,6 @@ use tokio_util::{
 use tracing::{debug, error, info};
 use uuid::Uuid;
 use ws_stream_tungstenite::WsStream;
-
 use crate::{
   axum_websocket::WebSocket,
   errors::NotaryServerError,
@@ -138,10 +140,12 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let mut tee_tls_stream = tee_tls_acceptor.accept(socket).await?;
   proxy_service(&mut tee_tls_stream, session_id, target_host, target_port, state.clone()).await?;
 
-  use tokio::time::{timeout, Duration};
+  // TODO: This synchronization logic is obviously horrible.
+  // It should use framing at a higher level on this network connection
+  // issue: https://github.com/pluto/web-prover/issues/470
+  debug!("synchronize: reading remaining socket data");
   let mut buf = [0u8; 1024];
-  debug!("synchronizing socket");
-  match timeout(Duration::from_millis(200), tee_tls_stream.read(&mut buf)).await {
+  match timeout(Duration::from_millis(1000), tee_tls_stream.read(&mut buf)).await {
     Ok(Ok(n)) => {
       debug!("read bytes: n={:?}, buf={:?}", n, hex::encode(buf));
     },
@@ -152,9 +156,13 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
       debug!("no bytes to read, proceeding");
     },
   }
+  debug!("synchronize: magic byte to notify client to terminate TLS");
+  tee_tls_stream.write_all(&[0xFF]).await?;
+  tee_tls_stream.flush().await?;
 
-  debug!("Sending magic byte to indicate readiness to read");
+  debug!("synchronize: magic byte to indicate readiness to read");
   tee_tls_stream.write_all(&[0xAA]).await?;
+  tee_tls_stream.flush().await?;
 
   let mut framed_stream = Framed::new(tee_tls_stream, LengthDelimitedCodec::new());
 
