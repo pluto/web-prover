@@ -34,17 +34,6 @@ pub fn load_proving_params_512() -> Result<Vec<u8>, std::io::Error> {
   // TODO: A stub for iOS
   load_artifact_bytes(PROVING_PARAMS_512)
 }
-// pub const PROVING_PARAMS_256: &str = concat!(
-//   "proofs/web_proof_circuits/circom-artifacts-256b-v",
-//   env!("WEB_PROVER_CIRCUITS_VERSION"),
-//   "/serialized_setup_256b_rom_length_100.bin"
-// );
-// #[cfg(not(target_arch = "wasm32"))]
-// pub const PROVING_PARAMS_BYTES_256: &str = concat!(
-//   "proofs/web_proof_circuits/circom-artifacts-256b-v",
-//   env!("WEB_PROVER_CIRCUITS_VERSION"),
-//   "/serialized_setup_256b_rom_length_100.bin"
-// );
 
 // -------------------------------------- 512B circuits -------------------------------------- //
 /// Circuit 0
