@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
+use circuit::{Circuit, RomCircuit};
 use client_side_prover::{
   supernova::{NonUniformCircuit, RecursiveSNARK, StepCircuit},
   traits::{snark::default_ck_hint, Dual},
@@ -13,42 +14,19 @@ use utils::into_input_json;
 
 use super::*;
 
+pub mod circuit;
 pub mod data;
 pub mod manifest;
 pub mod utils;
 
 type CompressedProof = FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>>;
-pub struct Memory {
-  pub circuits: Vec<RomCircuit>,
+pub struct Memory<C: Circuit> {
+  pub circuits: Vec<RomCircuit<C>>,
   pub rom:      Vec<u64>,
 }
 
-#[derive(Clone)]
-pub struct RomCircuit {
-  pub circuit:                CircomCircuit,
-  pub circuit_index:          usize,
-  pub rom_size:               usize,
-  pub nivc_io:                Option<Vec<F<G1>>>,
-  pub private_input:          Option<HashMap<String, Value>>,
-  pub witness_generator_type: WitnessGeneratorType,
-}
-
-// NOTE (Colin): This is added so we can cache only the active circuits we are using.
-impl Default for RomCircuit {
-  fn default() -> Self {
-    Self {
-      circuit:                CircomCircuit::default(),
-      circuit_index:          usize::MAX - 1,
-      rom_size:               0,
-      nivc_io:                None,
-      private_input:          None,
-      witness_generator_type: WitnessGeneratorType::Raw(vec![]),
-    }
-  }
-}
-
-impl NonUniformCircuit<E1> for Memory {
-  type C1 = RomCircuit;
+impl<C: Circuit + Clone + Sync + Send> NonUniformCircuit<E1> for Memory<C> {
+  type C1 = RomCircuit<C>;
   type C2 = TrivialCircuit<F<G2>>;
 
   fn num_circuits(&self) -> usize { self.circuits.len() }
@@ -62,7 +40,7 @@ impl NonUniformCircuit<E1> for Memory {
   fn initial_circuit_index(&self) -> usize { self.rom[0] as usize }
 }
 
-impl StepCircuit<F<G1>> for RomCircuit {
+impl<C: Circuit + Clone + Sync + Send> StepCircuit<F<G1>> for RomCircuit<C> {
   fn arity(&self) -> usize { self.circuit.arity() + 1 + self.rom_size }
 
   fn circuit_index(&self) -> usize { self.circuit_index }
@@ -277,7 +255,8 @@ pub fn initialize_setup_data(
   });
 }
 
-pub fn initialize_circuit_list(setup_data: &InitializedSetup) -> Vec<RomCircuit> {
+// TODO: This will take more adjusting
+pub fn initialize_circuit_list<C: Circuit>(setup_data: &InitializedSetup) -> Vec<RomCircuit<C>> {
   setup_data
     .r1cs
     .iter()

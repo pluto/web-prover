@@ -15,6 +15,7 @@ use r1cs::R1CS;
 use serde::{Deserialize, Serialize};
 
 use super::*;
+use crate::program::circuit::Circuit;
 
 pub mod r1cs;
 pub mod witness;
@@ -50,10 +51,12 @@ impl Default for CircomCircuit {
   fn default() -> Self { Self { r1cs: Arc::new(R1CS::default()), witness: None } }
 }
 
-impl CircomCircuit {
-  pub fn arity(&self) -> usize { self.r1cs.num_public_inputs }
+impl Circuit for CircomCircuit {
+  type WitnessGenerator = WitnessGeneratorType;
 
-  pub fn vanilla_synthesize<CS: ConstraintSystem<F<G1>>>(
+  fn arity(&self) -> usize { self.r1cs.num_public_inputs }
+
+  fn vanilla_synthesize<CS: ConstraintSystem<F<G1>>>(
     &self,
     cs: &mut CS,
     z: &[AllocatedNum<F<G1>>],
