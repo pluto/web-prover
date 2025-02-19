@@ -57,7 +57,7 @@ impl NonUniformCircuit<E1> for NoirMemory {
   fn secondary_circuit(&self) -> Self::C2 { Default::default() }
 
   // Use the initial input to set this
-  fn initial_circuit_index(&self) -> usize { self.num_circuits() as usize }
+  fn initial_circuit_index(&self) -> usize { self.rom[0] as usize }
 }
 
 impl StepCircuit<F<G1>> for NoirRomCircuit {
