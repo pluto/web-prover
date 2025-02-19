@@ -70,7 +70,7 @@ impl NoirProgram {
 
     // TODO: we could probably avoid this but i'm lazy
     // Create a map to track allocated variables for the cs
-    let mut allocated_vars: HashMap<Witness, Variable> = HashMap::new();
+    let mut allocated_vars: HashMap<Witness, AllocatedNum<F<G1>>> = HashMap::new();
 
     // Set up public inputs
     self.circuit().public_parameters.0.iter().for_each(|witness| {
@@ -79,8 +79,10 @@ impl NoirProgram {
         let f = convert_to_acir_field(inputs[witness.as_usize()]);
         acvm.as_mut().unwrap().overwrite_witness(*witness, f);
       }
-      let var =
-        cs.alloc_input(|| format!("public_{}", witness.as_usize()), || Ok(F::<G1>::ONE)).unwrap();
+      // TODO: Fix unwrap
+      // Alloc 1 for now and update later as needed
+      let var = AllocatedNum::alloc_input(&mut *cs, || Ok(F::<G1>::ONE)).unwrap();
+      println!("AllocatedNum pub input: {var:?}");
       allocated_vars.insert(*witness, var);
     });
 
@@ -91,8 +93,7 @@ impl NoirProgram {
         let f = convert_to_acir_field(inputs[witness.as_usize()]);
         acvm.as_mut().unwrap().overwrite_witness(*witness, f);
       }
-      let var =
-        cs.alloc(|| format!("private_{}", witness.as_usize()), || Ok(F::<G1>::ONE)).unwrap();
+      let var = AllocatedNum::alloc_input(&mut *cs, || Ok(F::<G1>::ONE)).unwrap();
       allocated_vars.insert(*witness, var);
     });
 
@@ -111,19 +112,18 @@ impl NoirProgram {
 
     // Helper to get or create a variable for a witness
     let get_var = |witness: &Witness,
-                   allocated_vars: &mut HashMap<Witness, Variable>,
+                   allocated_vars: &mut HashMap<Witness, AllocatedNum<F<G1>>>,
                    cs: &mut CS,
                    gate_idx: usize|
      -> Result<Variable, SynthesisError> {
-      if let Some(&var) = allocated_vars.get(witness) {
-        Ok(var)
+      if let Some(var) = allocated_vars.get(witness) {
+        Ok(var.get_variable())
       } else {
         let var = AllocatedNum::alloc(cs.namespace(|| format!("aux_{gate_idx}")), || {
           Ok(get_witness_value(witness))
-        })?
-        .get_variable();
-        allocated_vars.insert(*witness, var);
-        Ok(var)
+        })?;
+        allocated_vars.insert(*witness, var.clone());
+        Ok(var.get_variable())
       }
     };
 
@@ -184,14 +184,28 @@ impl NoirProgram {
       }
     }
 
+    let mut z_out = vec![];
     if let Some(wmap) = acir_witness_map {
       for ret in &self.circuit().return_values.0 {
         dbg!(&ret);
         dbg!(wmap.get(ret));
+        // let output_witness = wmap.get(ret).unwrap();
+        z_out.push(allocated_vars.get(ret).unwrap().clone());
       }
     }
 
-    Ok(vec![]) // Return appropriate outputs if needed
+    // TODO: We need to make a list of the range of the public inputs
+    for public_input in &self.circuit().public_parameters.0 {
+      cs.enforce(
+        || format!("pub input enforce {}", public_input.as_usize()),
+        |lc| {
+          lc + z[public_input.as_usize() - self.circuit().private_parameters.len()].get_variable()
+        },
+        |lc| lc + CS::one(),
+        |lc| lc + allocated_vars.get(public_input).unwrap().get_variable(),
+      );
+    }
+    Ok(z_out) // Return appropriate outputs if needed
   }
 }
 
@@ -288,6 +302,7 @@ mod tests {
     dbg!(cs.num_inputs());
   }
 
+  // TODO: This fails now because we pass in an empty array for `z`
   #[test]
   fn test_fold_noir_synthesize_full() {
     let json_path = Path::new("./mock").join(format!("fold.json"));
