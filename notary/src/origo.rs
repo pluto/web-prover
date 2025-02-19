@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+  fs,
+  sync::{Arc, Mutex},
+};
 
 use alloy_primitives::utils::keccak256;
 use axum::{
@@ -9,6 +12,9 @@ use axum::{
 use client::origo::{SignBody, SignedVerificationReply, VerifyBody, VerifyReply};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
+use k256::{
+  ecdsa::SigningKey as Secp256k1SigningKey, elliptic_curve::rand_core, pkcs8::DecodePrivateKey,
+};
 use proofs::{
   circuits::{CIRCUIT_SIZE_512, MAX_STACK_HEIGHT},
   errors::ProofError,
@@ -36,6 +42,23 @@ use crate::{
   tlsn::ProtocolUpgrade,
   verifier, SharedState,
 };
+
+pub struct OrigoSigningKey(pub(crate) Secp256k1SigningKey);
+
+impl OrigoSigningKey {
+  pub fn load(private_key_pem_path: &str) -> Self {
+    if private_key_pem_path.is_empty() {
+      info!("Using ephemeral origo signing key");
+      Self::ephemeral()
+    } else {
+      info!("Using origo signing key: {}", private_key_pem_path);
+      let raw = fs::read_to_string(private_key_pem_path).unwrap();
+      Self(Secp256k1SigningKey::from_pkcs8_pem(&raw).unwrap())
+    }
+  }
+
+  pub fn ephemeral() -> Self { Self(Secp256k1SigningKey::random(&mut rand_core::OsRng)) }
+}
 
 #[derive(Deserialize)]
 pub struct SignQuery {
@@ -120,16 +143,16 @@ pub async fn sign(
 
   // need secp256k1 here for Solidity
   let (signature, recover_id) =
-    state.origo_signing_key.clone().sign_prehash_recoverable(&merkle_root).unwrap();
+    state.origo_signing_key.0.sign_prehash_recoverable(&merkle_root).unwrap();
 
   let signer_address =
-    alloy_primitives::Address::from_public_key(state.origo_signing_key.verifying_key());
+    alloy_primitives::Address::from_public_key(state.origo_signing_key.0.verifying_key());
 
   let verifying_key =
     k256::ecdsa::VerifyingKey::recover_from_prehash(&merkle_root.clone(), &signature, recover_id)
       .unwrap();
 
-  assert_eq!(state.origo_signing_key.verifying_key(), &verifying_key);
+  assert_eq!(state.origo_signing_key.0.verifying_key(), &verifying_key);
 
   // TODO is this right? we need lower form S for sure though
   let s = if signature.normalize_s().is_some() {
@@ -157,7 +180,7 @@ pub async fn sign(
 pub fn sign_verification(
   query: VerifyReply,
   State(state): State<Arc<SharedState>>,
-) -> Result<Json<SignedVerificationReply>, ProxyError> {
+) -> Result<SignedVerificationReply, ProxyError> {
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
 
@@ -170,16 +193,16 @@ pub fn sign_verification(
 
   // need secp256k1 here for Solidity
   let (signature, recover_id) =
-    state.origo_signing_key.clone().sign_prehash_recoverable(&merkle_root).unwrap();
+    state.origo_signing_key.0.sign_prehash_recoverable(&merkle_root).unwrap();
 
   let signer_address =
-    alloy_primitives::Address::from_public_key(state.origo_signing_key.verifying_key());
+    alloy_primitives::Address::from_public_key(state.origo_signing_key.0.verifying_key());
 
   let verifying_key =
     k256::ecdsa::VerifyingKey::recover_from_prehash(&merkle_root.clone(), &signature, recover_id)
       .unwrap();
 
-  assert_eq!(state.origo_signing_key.verifying_key(), &verifying_key);
+  assert_eq!(state.origo_signing_key.0.verifying_key(), &verifying_key);
 
   // TODO is this right? we need lower form S for sure though
   let s = if signature.normalize_s().is_some() {
@@ -204,7 +227,7 @@ pub fn sign_verification(
     signer:      "0x".to_string() + &hex::encode(signer_address),
   };
 
-  Ok(Json(response))
+  Ok(response)
 }
 
 #[derive(Clone)]
@@ -390,7 +413,7 @@ pub async fn verify(
         debug!(
           "value_polynomial_digest: {:?}",
           polynomial_digest(
-            &payload.origo_proof.value.clone().unwrap().as_bytes(),
+            payload.origo_proof.value.clone().unwrap().as_bytes(),
             ciphertext_digest,
             0,
           )
@@ -409,7 +432,7 @@ pub async fn verify(
     },
   };
 
-  sign_verification(verify_output, State(state))
+  sign_verification(verify_output, State(state)).map(Json)
 }
 
 pub async fn websocket_notarize(

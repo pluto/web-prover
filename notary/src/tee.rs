@@ -9,8 +9,12 @@ use caratls_ekm_google_confidential_space_server::GoogleConfidentialSpaceTokenGe
 #[cfg(feature = "tee-dummy-token-generator")]
 use caratls_ekm_server::DummyTokenGenerator;
 use caratls_ekm_server::TeeTlsAcceptor;
-use client::{errors::ClientErrors, origo::OrigoSecrets, TeeProof, TeeProofData};
-use hyper::upgrade::Upgraded;
+use client::{
+  origo::{OrigoSecrets, VerifyReply},
+  TeeProof, TeeProofData,
+};
+use futures_util::SinkExt;
+use hyper::{body::Bytes, upgrade::Upgraded};
 use hyper_util::rt::TokioIo;
 use proofs::program::{
   http::{ManifestRequest, ManifestResponse},
@@ -19,18 +23,22 @@ use proofs::program::{
 use serde::Deserialize;
 use tls_client2::tls_core::msgs::message::MessagePayload;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tracing::{debug, error, field::debug, info};
+use tokio_stream::StreamExt;
+use tokio_util::{
+  codec::{Framed, LengthDelimitedCodec},
+  compat::FuturesAsyncReadCompatExt,
+};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
   axum_websocket::WebSocket,
   errors::NotaryServerError,
-  origo::proxy_service,
+  origo::{proxy_service, sign_verification},
   tls_parser::{Direction, ParsedMessage, WrappedPayload},
   tlsn::ProtocolUpgrade,
-  verifier, SharedState,
+  SharedState,
 };
 
 #[derive(Deserialize)]
@@ -148,15 +156,16 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   debug!("Sending magic byte to indicate readiness to read");
   tee_tls_stream.write_all(&[0xAA]).await?;
 
-  // TODO: Consider implementing from_stream instead of read_wire_struct
-  let manifest_bytes = read_wire_struct(&mut tee_tls_stream).await;
-  let manifest = Manifest::from_wire_bytes(&manifest_bytes);
-  // Checking if manifest is valid
-  manifest.validate()?;
+  let mut framed_stream = Framed::new(tee_tls_stream, LengthDelimitedCodec::new());
+
+  let manifest_frame =
+    framed_stream.next().await.ok_or_else(|| NotaryServerError::ManifestMissing)??;
+  let manifest = Manifest::try_from(manifest_frame.as_ref())?;
   // dbg!(&manifest);
 
-  let secret_bytes = read_wire_struct(&mut tee_tls_stream).await;
-  let origo_secrets = OrigoSecrets::from_wire_bytes(&secret_bytes);
+  let secret_frame =
+    framed_stream.next().await.ok_or_else(|| NotaryServerError::MissingOrigoSecrets)??;
+  let origo_secrets = OrigoSecrets::try_from(secret_frame.as_ref())?;
   // dbg!(&origo_secrets);
 
   let handshake_server_key =
@@ -185,46 +194,90 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
     .unwrap();
   // dbg!(parsed_transcript);
 
-  let mut app_data_vec = Vec::new();
-  for message in &parsed_transcript.payload {
-    if let ParsedMessage { payload, direction, .. } = message {
-      if let Some(app_data) = get_app_data(payload) {
-        // if let Ok(readable_data) = String::from_utf8(app_data.clone()) {
-        //   debug!("{:?} app_data: {}", direction, readable_data);
-        // }
-        app_data_vec.push(app_data);
+  let (request, response) = extract_request_and_response(&parsed_transcript.payload)?;
+
+  // send TeeProof to client
+  let tee_proof = create_tee_proof(&manifest, &request, &response, State(state))?;
+  let tee_proof_bytes: Vec<u8> = tee_proof.try_into()?;
+  framed_stream.send(Bytes::from(tee_proof_bytes)).await?;
+  framed_stream.flush().await?;
+
+  Ok(())
+}
+
+pub fn extract_request_and_response(
+  parsed_transcript: &[ParsedMessage],
+) -> Result<(ManifestRequest, ManifestResponse), NotaryServerError> {
+  let mut request_header = None;
+  let mut request_body = None;
+  let mut response_header = None;
+  let mut response_body = None;
+
+  // Classify parsed messages into headers and bodies
+  for ParsedMessage { payload, direction, .. } in parsed_transcript {
+    if let Some(app_data) = get_app_data(payload) {
+      debug!("App data message {:?}: {:?}", direction, String::from_utf8_lossy(&app_data));
+      match direction {
+        Direction::Sent if request_header.is_none() => request_header = Some(app_data),
+        Direction::Sent => request_body = Some(app_data),
+        Direction::Received if response_header.is_none() => response_header = Some(app_data),
+        Direction::Received => response_body = Some(app_data),
       }
     }
   }
 
-  if app_data_vec.len() != 3 {
-    return Err(NotaryServerError::MissingAppDataMessages(3, app_data_vec.len()));
-  }
+  // Ensure mandatory headers are present
+  let request_header =
+    request_header.ok_or(NotaryServerError::MissingAppDataMessages(Direction::Sent, 2, 0))?;
+  let response_header =
+    response_header.ok_or(NotaryServerError::MissingAppDataMessages(Direction::Received, 2, 0))?;
 
-  let request_header = app_data_vec[0].clone();
-  // TODO: Do we expect to get request_body as well part of app_data?
-  let response_header = app_data_vec[1].clone();
-  let response_body = app_data_vec[2].clone();
+  let request = ManifestRequest::from_payload(&request_header, request_body.as_deref())?;
+  let response =
+    ManifestResponse::from_payload(&response_header, response_body.as_deref().unwrap_or_default())?;
 
-  let request = ManifestRequest::from_payload(&request_header, None)?;
-  debug!("{:?}", request);
+  Ok((request, response))
+}
 
-  let response = ManifestResponse::from_payload(&response_header, &response_body)?;
-  debug!("{:?}", response);
+// TODO: Should TeeProof and other proofs be moved to `proofs` crate?
+// Otherwise, adding TeeProof::manifest necessitates extra dependencies on the client
+// Notice that all inputs to this function are from `proofs` crate
+pub fn create_tee_proof(
+  manifest: &Manifest,
+  request: &ManifestRequest,
+  response: &ManifestResponse,
+  State(state): State<Arc<SharedState>>,
+) -> Result<TeeProof, NotaryServerError> {
+  validate_notarization_legal(manifest, request, response)?;
 
+  let manifest_hash = manifest.to_keccak_digest()?;
+  let to_sign = VerifyReply {
+    // Using manifest hash as a value here since we are not exposing any values extracted
+    // from the request or response
+    value:    format!("0x{}", hex::encode(manifest_hash)),
+    manifest: manifest.clone(),
+  };
+  let signature = sign_verification(to_sign, State(state)).unwrap();
+
+  let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
+
+  Ok(TeeProof { data, signature })
+}
+
+/// Check if `manifest`, `request`, and `response` all fulfill requirements necessary for
+/// a proof to be created
+fn validate_notarization_legal(
+  manifest: &Manifest,
+  request: &ManifestRequest,
+  response: &ManifestResponse,
+) -> Result<(), NotaryServerError> {
+  manifest.validate()?;
   if !manifest.request.is_subset_of(&request) {
     return Err(NotaryServerError::ManifestRequestMismatch);
   }
-
   if !manifest.response.is_subset_of(&response) {
     return Err(NotaryServerError::ManifestResponseMismatch);
   }
-
-  // send TeeProof to client
-  let tee_proof = TeeProof::from_manifest(&manifest);
-  let tee_proof_bytes = tee_proof.to_write_bytes();
-  tee_tls_stream.write_all(&tee_proof_bytes).await?;
-
   Ok(())
 }
 
@@ -236,27 +289,4 @@ fn get_app_data(payload: &WrappedPayload) -> Option<Vec<u8>> {
     },
     _ => None,
   }
-}
-
-// TODO: Refactor into struct helpers/trait
-async fn read_wire_struct<R: AsyncReadExt + Unpin>(stream: &mut R) -> Vec<u8> {
-  // Buffer to store the "header" (4 bytes, indicating the length of the struct)
-  let mut len_buf = [0u8; 4];
-  stream.read_exact(&mut len_buf).await.unwrap();
-  // dbg!(format!("len_buf={:?}", len_buf));
-
-  // Deserialize the length prefix (convert from little-endian to usize)
-  let body_len = u32::from_le_bytes(len_buf) as usize;
-  // dbg!(format!("body_len={body_len}"));
-
-  // Allocate a buffer to hold only the bytes needed for the struct
-  let mut body_buf = vec![0u8; body_len];
-  stream.read_exact(&mut body_buf).await.unwrap();
-  // dbg!(format!("body_buf={:?}", body_buf));
-
-  // Prepend len_buf to manifest_buf
-  let mut wire_struct_buf = len_buf.to_vec();
-  wire_struct_buf.extend(body_buf);
-
-  wire_struct_buf
 }

@@ -1,3 +1,5 @@
+extern crate core;
+
 pub mod tlsn;
 #[cfg(not(target_arch = "wasm32"))] mod tlsn_native;
 #[cfg(target_arch = "wasm32")] mod tlsn_wasm32;
@@ -178,7 +180,7 @@ pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, errors:
   };
 
   let response = client.post(url).json(&proxy_config).send().await?;
-  assert!(response.status() == hyper::StatusCode::OK);
+  assert_eq!(response.status(), hyper::StatusCode::OK);
   let tee_proof = response.json::<TeeProof>().await?;
   Ok(Proof::Proxy(tee_proof))
 }
@@ -186,52 +188,22 @@ pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, errors:
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TeeProof {
   pub data:      TeeProofData,
-  pub signature: String,
+  pub signature: SignedVerificationReply,
+}
+
+impl TryFrom<&[u8]> for TeeProof {
+  type Error = serde_json::Error;
+
+  fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> { serde_json::from_slice(bytes) }
+}
+
+impl TryFrom<TeeProof> for Vec<u8> {
+  type Error = serde_json::Error;
+
+  fn try_from(proof: TeeProof) -> Result<Self, Self::Error> { serde_json::to_vec(&proof) }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TeeProofData {
   pub manifest_hash: Vec<u8>,
-}
-
-impl TeeProof {
-  pub fn from_manifest(manifest: &Manifest) -> Self {
-    let manifest_hash = manifest.to_keccak_digest();
-    let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
-    // TODO: How do I sign this?
-    let signature = "sign(hash(TeeProofData))".to_string();
-    TeeProof { data, signature }
-  }
-
-  pub fn to_write_bytes(&self) -> Vec<u8> {
-    let serialized = self.to_bytes();
-    let length = serialized.len() as u32;
-    let mut wire_data = length.to_le_bytes().to_vec();
-    wire_data.extend(serialized);
-    wire_data
-  }
-
-  pub fn from_wire_bytes(buffer: &[u8]) -> Self {
-    // Confirm the buffer is at least large enough to contain the "header"
-    if buffer.len() < 4 {
-      panic!("Unexpected buffer length: {} < 4", buffer.len());
-    }
-
-    // Extract the first 4 bytes as the length prefix
-    let length_bytes = &buffer[..4];
-    let length = u32::from_le_bytes(length_bytes.try_into().unwrap()) as usize;
-
-    // Ensure the buffer contains enough data for the length specified
-    if buffer.len() < 4 + length {
-      panic!("Unexpected buffer length: {} < {} + 4", buffer.len(), length);
-    }
-
-    // Extract the serialized data from the buffer
-    let serialized_data = &buffer[4..4 + length];
-    Self::from_bytes(serialized_data)
-  }
-
-  fn to_bytes(&self) -> Vec<u8> { serde_json::to_vec(&self).unwrap() }
-
-  fn from_bytes(bytes: &[u8]) -> TeeProof { serde_json::from_slice(bytes).unwrap() }
 }

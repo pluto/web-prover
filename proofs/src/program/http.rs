@@ -576,7 +576,6 @@ pub(crate) mod tests {
       br#"{"key1": "value1"}"#,
     )
     .unwrap();
-
     let expected_response = create_response!(
         body: ResponseBody {
             json: vec![JsonKey::String("key1".to_string())]
