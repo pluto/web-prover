@@ -22,4 +22,4 @@ tokio ={ workspace=true }
 proofs={ workspace=true }
 
 [build-dependencies]
-cargo_metadata={ workspace = true }
+cargo_metadata={ workspace=true }

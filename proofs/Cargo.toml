@@ -12,25 +12,25 @@ thiserror  ={ workspace=true }
 tracing    ={ workspace=true }
 tls-client2={ workspace=true } # a bit of an odd dependency to have in here imo
 
-hex                                 ={ workspace = true }
-client-side-prover                  ={ workspace = true }
-ff                                  ={ workspace = true, features = ["derive"] }
-bellpepper-core                     ={ workspace = true }
-halo2curves                         ={ workspace = true }
-url                                 ={ workspace = true }
+hex                                 ={ workspace=true }
+client-side-prover                  ={ workspace=true }
+ff                                  ={ workspace=true, features=["derive"] }
+bellpepper-core                     ={ workspace=true }
+halo2curves                         ={ workspace=true }
+url                                 ={ workspace=true }
 web-proof-circuits-witness-generator={ workspace=true }
 
-byteorder ={ workspace = true }
-num-bigint={ workspace = true }
-itertools ={ workspace = true }
+byteorder ={ workspace=true }
+num-bigint={ workspace=true }
+itertools ={ workspace=true }
 
-bincode={ workspace = true }
+bincode={ workspace=true }
 
-tokio={ workspace = true, features = ["rt", "macros"] }
+tokio={ workspace=true, features=["rt", "macros"] }
 # Using `regress` crate for compatibility with ECMAScript regular expressions in Manifest validation
-regress    ={ workspace = true }
-regex      ={ workspace = true }
-tiny-keccak={ workspace = true, features = ["keccak"] }
+regress    ={ workspace=true }
+regex      ={ workspace=true }
+tiny-keccak={ workspace=true, features=["keccak"] }
 
 #- Wasm target configuration ----------------------------------------------------------------------#
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -43,11 +43,11 @@ wasm-bindgen-futures="0.4.37"
 circom_witnesscalc={ git="https://github.com/pluto/circom-witnesscalc" } # Fork is needed apparently??
 
 [dev-dependencies]
-tracing-test={ workspace = true }
-tempdir     ={ workspace = true }
+tracing-test={ workspace=true }
+tempdir     ={ workspace=true }
 
 [build-dependencies]
-cargo_metadata={ workspace = true }
+cargo_metadata={ workspace=true }
 
 [features]
 verify-steps=[]
