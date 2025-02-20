@@ -24,7 +24,7 @@ use serde::Deserialize;
 use tls_client2::tls_core::msgs::message::MessagePayload;
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
-  time::{timeout, Duration}
+  time::{timeout, Duration},
 };
 use tokio_stream::StreamExt;
 use tokio_util::{
