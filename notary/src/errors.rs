@@ -5,7 +5,7 @@ use axum::{
 use eyre::Report;
 use proofs::errors::ProofError;
 use thiserror::Error;
-use tlsn_verifier::tls::{VerifierConfigBuilderError, VerifierError};
+use tlsn_verifier::{VerifierConfigBuilderError, VerifierError};
 use tracing::error;
 use web_prover_core::errors::ManifestError;
 
