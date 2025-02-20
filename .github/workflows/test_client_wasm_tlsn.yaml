@@ -1,4 +1,4 @@
-name: Test Client WASM with TEE
+name: Test Client WASM with TLSN
 
 on:
   workflow_call:
@@ -63,7 +63,7 @@ jobs:
 
           # TODO quick workaround to use TEE fixture instead of Origo fixture in
           #      client_wasm/demo/js/index.js proverConfig
-          cp fixture/client.tee_tcp_local.json fixture/client.tlsn_tcp_local.json
+          cp fixture/client.tlsn_tcp_local.json fixture/client.origo_tcp_local.json
 
           cd client_wasm/demo
           npm test
