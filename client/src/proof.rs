@@ -40,10 +40,10 @@ pub async fn construct_program_data_and_proof<const CIRCUIT_SIZE: usize>(
   setup_data: Arc<InitializedSetup>,
 ) -> Result<OrigoProof, ClientErrors> {
   let NivcCircuitInputs { private_inputs, fold_inputs, initial_nivc_input } =
-    manifest.build_inputs::<CIRCUIT_SIZE>(&request_inputs, &response_inputs)?;
+    manifest.build_inputs::<CIRCUIT_SIZE>(request_inputs, response_inputs)?;
 
   let NIVCRom { circuit_data, rom } =
-    manifest.build_rom::<CIRCUIT_SIZE>(&request_inputs, &response_inputs);
+    manifest.build_rom::<CIRCUIT_SIZE>(request_inputs, response_inputs);
 
   debug!("Generating response's parameters...");
   let setup_params = SetupParams::<Online> {

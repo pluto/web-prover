@@ -295,7 +295,7 @@ impl Transcript<ParsedTLS> {
       }
     }
 
-    return Ok(Transcript { payload: PayloadHTTP { request, response } });
+    Ok(Transcript { payload: PayloadHTTP { request, response } })
   }
 
   pub fn verify_certificate_sig(&self) -> Result<(), ProxyError> {

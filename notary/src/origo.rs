@@ -404,7 +404,7 @@ pub async fn verify(
         );
       } else if output[0]
         != polynomial_digest(
-          &payload.origo_proof.value.clone().unwrap().as_bytes(),
+          payload.origo_proof.value.clone().unwrap().as_bytes(),
           ciphertext_digest,
           0,
         )

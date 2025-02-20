@@ -38,7 +38,6 @@ use crate::{
   axum_websocket::WebSocket,
   errors::NotaryServerError,
   origo::{proxy_service, sign_verification},
-  tls_parser::{Direction, ParsedMessage, WrappedPayload},
   tlsn::ProtocolUpgrade,
   SharedState,
 };
@@ -269,7 +268,7 @@ fn validate_notarization_legal(
   response: &NotaryResponse,
 ) -> Result<(), NotaryServerError> {
   manifest.validate()?;
-  if !manifest.request.is_subset_of(&request) {
+  if !manifest.request.is_subset_of(request) {
     return Err(NotaryServerError::ManifestRequestMismatch);
   }
   if !response.matches_client_manifest(&manifest.response) {

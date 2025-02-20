@@ -1480,6 +1480,7 @@ dependencies = [
  "wasm-bindgen-rayon",
  "wasm-bindgen-test",
  "web-proof-circuits-witness-generator",
+ "web-prover-core",
  "web-sys",
  "web-time 1.1.0",
  "webpki-roots 0.26.7",
@@ -4671,6 +4672,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-proof-circuits-witness-generator",
+ "web-prover-core",
 ]
 
 [[package]]
@@ -7330,6 +7332,22 @@ dependencies = [
  "serde_json",
  "sppark",
  "thiserror 2.0.6",
+]
+
+[[package]]
+name = "web-prover-core"
+version = "0.1.0"
+dependencies = [
+ "ff",
+ "num-bigint 0.4.6",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tiny-keccak",
+ "tls-client",
+ "tracing",
+ "url",
+ "web-proof-circuits-witness-generator",
 ]
 
 [[package]]
