@@ -240,35 +240,13 @@ impl ManifestResponse {
       }
     }
 
-    // Note: self is the original manifest, other is the actual data
-    let json_contains_path = |json: &serde_json::Value, path: &[JsonKey]| -> bool {
-      let mut current = json;
-
-      for key in path {
-        match key {
-          JsonKey::String(s) => {
-            current = match current.get(s) {
-              Some(value) => value,
-              None => {
-                debug!("Failed to find key '{}' in path {:?}", s, path);
-                return false;
-              },
-            };
-          },
-          // todo: support
-          _ => panic!("JsonKey::num not supported"),
-        }
+    if let Some(other_json_actual) = other.body.json_actual.as_ref() {
+      if !self.body.json.is_empty() && !json_contains_path(other_json_actual, &self.body.json) {
+        debug!("Missing JSON path={:?}, actual_json={:?}", self.body.json, other_json_actual);
+        return false;
       }
-      true
-    };
-
-    // TODO: Add JsonKey Num support, cleanup the manifest to better subset check.
-    if !json_contains_path(&other.body.json_actual.as_ref().unwrap(), &self.body.json) {
-      debug!(
-        "Missing JSON path={:?}, actual_json={:?}",
-        self.body.json,
-        other.body.json_actual.as_ref().unwrap()
-      );
+    } else {
+      debug!("Missing json_actual in other response");
       return false;
     }
 
@@ -276,6 +254,35 @@ impl ManifestResponse {
     debug!("All checks passed");
     true
   }
+}
+
+fn json_contains_path(json: &serde_json::Value, expected_path: &[JsonKey]) -> bool {
+  let mut current = json;
+
+  for key in expected_path {
+    match key {
+      JsonKey::String(s) =>
+        if let Some(value) = current.get(s) {
+          current = value;
+        } else {
+          debug!("Key `{}` not found in path {:?}", s, expected_path);
+          return false;
+        },
+      JsonKey::Num(n) =>
+        if let Some(array) = current.as_array() {
+          if let Some(value) = array.get(*n) {
+            current = value;
+          } else {
+            debug!("Array index `{}` out of bounds in path {:?}", n, expected_path);
+            return false;
+          }
+        } else {
+          debug!("Expected array at key {:?} in path {:?}", n, expected_path);
+          return false;
+        },
+    }
+  }
+  true
 }
 
 /// Template variable type
@@ -782,5 +789,103 @@ pub(crate) mod tests {
     // Modify the method in the other request, making it not a subset
     other_request.method = "POST".to_string();
     assert!(!base_request.is_subset_of(&other_request));
+  }
+
+  #[test]
+  fn test_json_contains_path_valid_object_path() {
+    let json = json!({
+        "key1": {
+            "key2": {
+                "key3": "value"
+            }
+        }
+    });
+    let path = vec![
+      JsonKey::String("key1".to_string()),
+      JsonKey::String("key2".to_string()),
+      JsonKey::String("key3".to_string()),
+    ];
+    assert!(json_contains_path(&json, &path));
+  }
+
+  #[test]
+  fn test_json_contains_path_valid_array_path() {
+    let json = json!({
+        "key1": [
+            {
+                "key2": "value1"
+            },
+            {
+                "key3": "value2"
+            }
+        ]
+    });
+    let path = vec![
+      JsonKey::String("key1".to_string()),
+      JsonKey::Num(1),
+      JsonKey::String("key3".to_string()),
+    ];
+    assert!(json_contains_path(&json, &path));
+  }
+
+  #[test]
+  fn test_json_contains_path_invalid_key() {
+    let json = json!({
+        "key1": {
+            "key2": "value"
+        }
+    });
+    let path =
+      vec![JsonKey::String("key1".to_string()), JsonKey::String("invalid_key".to_string())];
+    assert!(!json_contains_path(&json, &path));
+  }
+
+  #[test]
+  fn test_json_contains_path_invalid_array_index() {
+    let json = json!({
+        "key1": [
+            "value1",
+            "value2"
+        ]
+    });
+    let path = vec![
+      JsonKey::String("key1".to_string()),
+      JsonKey::Num(3), // Out of bounds
+    ];
+    assert!(!json_contains_path(&json, &path));
+  }
+
+  #[test]
+  fn test_json_contains_path_index_on_non_array() {
+    let json = json!({
+        "key1": {
+            "key2": "value"
+        }
+    });
+    let path = vec![
+      JsonKey::String("key1".to_string()),
+      JsonKey::Num(0), // Applying index on a non-array
+    ];
+    assert!(!json_contains_path(&json, &path));
+  }
+
+  #[test]
+  fn test_json_contains_path_nested_objects() {
+    let json = json!({
+        "key1": {
+            "key2": {
+                "key3": {
+                    "key4": "value"
+                }
+            }
+        }
+    });
+    let path = vec![
+      JsonKey::String("key1".to_string()),
+      JsonKey::String("key2".to_string()),
+      JsonKey::String("key3".to_string()),
+      JsonKey::String("key4".to_string()),
+    ];
+    assert!(json_contains_path(&json, &path));
   }
 }
