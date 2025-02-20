@@ -10,20 +10,20 @@ crate-type=["cdylib", "rlib"]
 
 [dependencies]
 client              ={ workspace=true, features=["websocket"] }
-js-sys              ="0.3.64"
-serde-wasm-bindgen  ="0.6.1"
+js-sys              ={ workspace = true }
+serde-wasm-bindgen  ={ workspace = true }
 serde_json          ={ workspace=true }
 tracing             ={ workspace=true }
-wasm-bindgen        ="=0.2.93"
+wasm-bindgen        ={ workspace = true }
 wasm-bindgen-rayon  ={ workspace=true }
-wasm-bindgen-futures="=0.4.43"
+wasm-bindgen-futures={ workspace = true }
 tracing-subscriber  ={ workspace=true, features=["time"] }
-tracing-web         ="0.1.2"
+tracing-web         ={ workspace = true }
 
 # time crate: https://crates.io/crates/time
 # NOTE: It is required, otherwise "time not implemented on this platform" error happens right after "!@# 2".
 # Probably due to tokio's time feature is used in tlsn-prover?
-time     ={ version="0.3.34", features=["wasm-bindgen"] }
+time     ={ workspace = true, features = ["wasm-bindgen"] }
 tlsn-core={ workspace=true }
 
 # NOTE: Leacing this here in case we still need it for tlsn flow.
@@ -34,13 +34,13 @@ tlsn-core={ workspace=true }
 # logging them with `console.error`. This is great for development, but requires
 # all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
 # code size when deploying.
-console_error_panic_hook={ version="0.1.7" }
+console_error_panic_hook={ workspace = true }
 
 [dev-dependencies]
-wasm-bindgen-test="0.3.34"
+wasm-bindgen-test={ workspace = true }
 
 [build-dependencies]
-cargo_metadata="0.19.1"
+cargo_metadata={ workspace = true }
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt=[

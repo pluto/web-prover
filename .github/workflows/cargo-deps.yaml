@@ -1,0 +1,32 @@
+name: Cargo Dependencies
+
+on:
+  workflow_call:
+    inputs:
+      web-prover-circuits-cache-key:
+        required: true
+        type: string
+
+jobs:
+  cargo-autoinherit:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-rust-ubuntu
+        with:
+          rust-cache-key: clippy # TODO: What do I put here? I don't need clippy, just cargo
+
+      - name: Install cargo-autoinherit
+        run: cargo install cargo-autoinherit
+
+      - name: Check if deps are inherited into workspace
+        run: |
+          cargo autoinherit
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Your dependencies are not centralized in the cargo workspace. Make sure to run `cargo autoinherit` and try again."
+            exit 1
+          fi
+

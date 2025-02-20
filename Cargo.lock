@@ -3879,7 +3879,7 @@ dependencies = [
  "async-trait",
  "axum",
  "axum-core",
- "base64 0.21.7",
+ "base64 0.22.1",
  "caratls_ekm_google_confidential_space_server",
  "caratls_ekm_server",
  "cargo_metadata",

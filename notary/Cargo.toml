@@ -10,50 +10,48 @@ tee-dummy-token-generator                    =[]
 tee-google-confidential-space-token-generator=[]
 
 [dependencies]
-client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="8e7eb839e901dcee416179116bb0f9c4f7ae683c" }
-proofs={ path="../proofs", package="proofs" }
-client={ path="../client", package="client" }
+client-side-prover={ workspace = true }
+proofs={ workspace = true }
+client={ workspace = true }
 hyper={ workspace=true, features=["client", "http1", "server"] }
 hyper-util={ workspace=true }
 serde={ workspace=true }
 serde_json={ workspace=true }
-rustls={ version="0.23.11", default-features=false, features=["logging", "tls12", "std", "ring"] }
+rustls={ workspace = true, features = ["logging", "tls12", "std", "ring"] }
 tokio={ workspace=true }
 tokio-util={ workspace=true, features=["compat"] }
 tracing={ workspace=true }
 tracing-subscriber={ workspace=true }
 futures={ workspace=true }
-futures-util="0.3.30"
+futures-util={ workspace = true }
 tokio-rustls={ workspace=true, features=["ring"] }
-tower-http={ version="0.5.2", features=["cors"] }
-tower-service="0.3.2"
-rustls-pemfile="2.1.2"
+tower-http={ workspace = true, features = ["cors"] }
+tower-service={ workspace = true }
+rustls-pemfile={ workspace = true }
 tlsn-verifier={ workspace=true }
-tokio-tungstenite={ version="0.23.1", features=["stream"] }
-ws_stream_tungstenite={ git="https://github.com/pluto/ws_stream_tungstenite.git", branch="latest", features=[
-  "tokio",
-] }
-nom="7.0"
+tokio-tungstenite={ workspace = true, features = ["stream"] }
+ws_stream_tungstenite={ workspace = true, features = ["tokio"] }
+nom={ workspace = true }
 
-async-trait     ="0.1.67"
-axum            ={ version="0.7", features=["ws", "json"] }
-axum-core       ="0.4"
-eyre            ="0.6.8"
-p256            ="0.13"
-base64          ="0.21.0"
-http            ="1.1"
-sha1            ="0.10"
-config          ="0.14.0"
+async-trait     ={ workspace = true }
+axum            ={ workspace = true, features = ["ws", "json"] }
+axum-core       ={ workspace = true }
+eyre            ={ workspace = true }
+p256            ={ workspace = true }
+base64          ={ workspace = true }
+http            ={ workspace = true }
+sha1            ={ workspace = true }
+config          ={ workspace = true }
 clap            ={ workspace=true }
-rustls-acme     ={ version="0.10", default-features=false, features=["ring", "tokio"] }
-tokio-stream    ={ version="0.1", features=["net"] }
+rustls-acme     ={ workspace = true, features = ["ring", "tokio"] }
+tokio-stream    ={ workspace = true, features = ["net"] }
 thiserror       ={ workspace=true }
-hex             ="0.4"
-tls-parser      ="0.12.0"
-rs_merkle       ="1.4.2"
-alloy-primitives={ version="0.8.2", features=["k256"] }
-k256            ={ version="0.13.3", features=["ecdsa"] }
-reqwest         ={ version="0.12", features=["json"] }
+hex             ={ workspace = true }
+tls-parser      ={ workspace = true }
+rs_merkle       ={ workspace = true }
+alloy-primitives={ workspace = true, features = ["k256"] }
+k256            ={ workspace = true, features = ["ecdsa"] }
+reqwest         ={ workspace = true, features = ["json"] }
 uuid            ={ workspace=true }
 
 tls-client2={ workspace=true }
@@ -63,7 +61,7 @@ caratls_ekm_google_confidential_space_server={ workspace=true }
 web-proof-circuits-witness-generator        ={ workspace=true }
 
 [dev-dependencies]
-tower="0.4.13"
+tower={ workspace = true }
 
 [build-dependencies]
-cargo_metadata="0.19.1"
+cargo_metadata={ workspace = true }
