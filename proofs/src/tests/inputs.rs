@@ -686,11 +686,12 @@ pub(crate) fn complex_manifest() -> Manifest {
         ("Server".to_string(), "nginx/1.18.0".to_string()),
       ]),
       body:    ResponseBody {
-        json: vec![
+        json:        vec![
           JsonKey::String(String::from("data")),
           JsonKey::String(String::from("orderDetails")),
           JsonKey::String(String::from("orderId")),
         ],
+        json_actual: None,
       },
     },
   }

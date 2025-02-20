@@ -11,6 +11,7 @@
 
 mod conn;
 use std::{
+  io::Read,
   pin::Pin,
   task::{Context, Poll},
 };
@@ -152,6 +153,14 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
               // Loop until we've processed all the data we received in this read.
               // Note that we must make one iteration even if `received == 0`.
               let mut processed = 0;
+
+              // Check for a special termination character. We do not need to place
+              // it back on the buffer because we recreate the reader below.
+              let mut reader = rx_tls_buf[..received].reader();
+              let mut bytes_buf = [0u8; 1];
+              reader.read_exact(&mut bytes_buf)?;
+              let is_terminate_byte = received == 1 && bytes_buf.first().cloned() == Some(255);
+
               let mut reader = rx_tls_buf[..received].reader();
               loop {
                   processed += client.read_tls(&mut reader)?;
@@ -165,19 +174,9 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
 
               trace!("processed {} tls bytes from server", processed);
 
-              // By convention if `AsyncRead::read` returns 0, it means EOF, i.e. the peer
-              // has closed the socket.  Also close on received_close_notify, else we hang.
-
-              // if client.received_close_notify() {
-                  // break 'conn;
-                  // client_closed = true;
-                  // rx_tls_fut = Fuse::terminated();
-              // }
-
-              // TODO change from tracy:
-              if received == 0 || client.received_close_notify() {
-              // if received == 0  {
-                  debug!("server closed connection");
+              // Check: EOF or server properly closed or proxy closed
+              if received == 0 || client.received_close_notify() || is_terminate_byte {
+                  trace!("connection closed: eof or server closed or proxy terminate");
                   server_closed = true;
                   client.server_closed().await?;
 
@@ -185,6 +184,7 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
                   rx_tls_fut = Fuse::terminated();
               } else {
                   // Reset the read future so next iteration we can read again.
+                  trace!("ready to read more data....");
                   rx_tls_fut = server_rx.read(&mut rx_tls_buf).fuse();
               }
           }

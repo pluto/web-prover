@@ -7,7 +7,7 @@ use tls_client2::{
   tls_core::{
     msgs::{
       codec::{self, Codec, Reader},
-      enums::Compression,
+      enums::{Compression, ContentType},
       handshake::{
         ClientExtension, ClientHelloPayload, HandshakeMessagePayload, HandshakePayload, Random,
         ServerExtension, ServerHelloPayload, SessionID,
@@ -62,6 +62,12 @@ pub struct UnparsedMessage {
   pub payload:   Vec<u8>,
 }
 
+#[derive(Debug, Clone)]
+pub struct PayloadHTTP {
+  pub request:  Vec<u8>,
+  pub response: Vec<u8>,
+}
+
 /// State transitions for Transcripts
 ///
 /// 1. Raw: Raw network data, only structure is direction
@@ -82,9 +88,14 @@ impl TranscriptState for Flattened {
   type MessageFormat = Vec<UnparsedMessage>;
 }
 #[derive(Debug, Clone)]
-pub struct Parsed;
-impl TranscriptState for Parsed {
+pub struct ParsedTLS;
+impl TranscriptState for ParsedTLS {
   type MessageFormat = Vec<ParsedMessage>;
+}
+#[derive(Debug, Clone)]
+pub struct ParsedHTTP;
+impl TranscriptState for ParsedHTTP {
+  type MessageFormat = PayloadHTTP;
 }
 
 #[derive(Debug, Clone)]
@@ -143,7 +154,7 @@ impl Transcript<Flattened> {
     app_server_iv: Option<Vec<u8>>,
     app_client_key: Option<Vec<u8>>,
     app_client_iv: Option<Vec<u8>>,
-  ) -> Result<Transcript<Parsed>, ProxyError> {
+  ) -> Result<Transcript<ParsedTLS>, ProxyError> {
     info!("key_as_string: {:?}, length: {}", handshake_server_key, handshake_server_key.len());
     info!("iv_as_string: {:?}, length: {}", handshake_server_iv, handshake_server_iv.len());
 
@@ -201,15 +212,15 @@ impl Transcript<Flattened> {
                     // TODO: Move decrypters initialized out of here into top of parse
                     // and cleanup sequence number handling.
                     decrypters = vec![
-                      (handshake_cipher_key, Some(handshake_server_iv), KeyMode::Handshake, seq),
-                      (app_server_cipher_key, app_server_iv.as_deref(), KeyMode::Application, 0),
-                      (app_client_cipher_key, app_client_iv.as_deref(), KeyMode::Application, 0),
+                      (handshake_cipher_key, Some(handshake_server_iv), seq),
+                      (app_server_cipher_key, app_server_iv.as_deref(), 0),
+                      (app_client_cipher_key, app_client_iv.as_deref(), 0),
                     ]
                     .into_iter()
-                    .flat_map(|(key, iv, mode, seq)| match iv {
+                    .flat_map(|(key, iv, seq)| match iv {
                       Some(inner_iv) => match make_decrypter(key, inner_iv.to_vec()) {
                         Ok((dec, suite)) =>
-                          Some(Ok(DecryptWrapper { inner: dec, seq, mode, ciphersuite: suite })),
+                          Some(Ok(DecryptWrapper { inner: dec, seq, ciphersuite: suite })),
                         Err(e) => Some(Err(e)),
                       },
                       None => None,
@@ -261,7 +272,32 @@ impl Transcript<Flattened> {
   }
 }
 
-impl Transcript<Parsed> {
+impl Transcript<ParsedTLS> {
+  /// Convert a ParsedTLS transcript into an HTTP request/response pair by
+  /// joining all the AppData sent to the server or received by the client.
+  pub fn into_http(self) -> Result<Transcript<ParsedHTTP>, ProxyError> {
+    let mut request = Vec::new();
+    let mut response = Vec::new();
+
+    let match_app_data = |w: &WrappedPayload| match w {
+      WrappedPayload::Encrypted(_) => Vec::new(),
+      WrappedPayload::Decrypted(msg) => match &msg.payload {
+        MessagePayload::ApplicationData(payload) => payload.0.clone(),
+        _ => Vec::new(),
+      },
+    };
+
+    for m in self.payload.iter() {
+      if m.direction == Direction::Sent {
+        request.extend(match_app_data(&m.payload))
+      } else {
+        response.extend(match_app_data(&m.payload));
+      }
+    }
+
+    return Ok(Transcript { payload: PayloadHTTP { request, response } });
+  }
+
   pub fn verify_certificate_sig(&self) -> Result<(), ProxyError> {
     // TODO: get hash algorithm from cipher suite in a better way
     let handshake_hash_buffer = HandshakeHashBuffer::new();
@@ -457,11 +493,6 @@ fn local_parse_record(i: &[u8]) -> IResult<&[u8], tls_parser::TlsRawRecord> {
   Ok((i, tls_parser::TlsRawRecord { hdr, data }))
 }
 
-#[derive(Debug, Clone)]
-enum KeyMode {
-  Handshake,
-  Application,
-}
 enum SupportedSuites {
   AesGcm,
   ChachaPoly,
@@ -469,7 +500,6 @@ enum SupportedSuites {
 struct DecryptWrapper {
   inner:       Decrypter,
   seq:         u64,
-  mode:        KeyMode,
   ciphersuite: SupportedSuites,
 }
 
@@ -523,7 +553,7 @@ fn handle_application_data(
   decrypters: &mut Vec<DecryptWrapper>,
 ) -> Result<Vec<WrappedPayload>, ProxyError> {
   let msg = OpaqueMessage {
-    typ:     tls_client2::tls_core::msgs::enums::ContentType::ApplicationData,
+    typ:     ContentType::ApplicationData,
     version: tls_client2::ProtocolVersion::TLSv1_3,
     payload: tls_client2::tls_core::msgs::base::Payload(record),
   };
@@ -569,16 +599,24 @@ fn trial_decrypt(
 ) -> Result<Vec<WrappedPayload>, ProxyError> {
   let possible_decryption = decrypters
     .iter_mut()
-    .flat_map(|pair| match pair.decrypt(&msg) {
-      Some(pt) => Some((pt, &pair.mode)),
-      None => None,
-    })
-    .map(|(plain_message, mode)| {
-      match mode {
-        KeyMode::Handshake => Some(process_handshake(plain_message)),
-        KeyMode::Application => {
-          Some(vec![WrappedPayload::Decrypted(plain_message.try_into().unwrap())]) // todo: handle
-                                                                                   // error
+    .flat_map(|decrypter| decrypter.decrypt(&msg))
+    .map(|plain_message| {
+      match plain_message.typ {
+        ContentType::ApplicationData =>
+          Some(vec![WrappedPayload::Decrypted(plain_message.try_into().unwrap())]),
+        ContentType::Handshake => Some(process_handshake(plain_message)),
+        ContentType::Alert => {
+          // TODO: handle this.
+          debug!(
+            "skipping alert: type={:?}, payload={:?}",
+            ContentType::Alert,
+            hex::encode(plain_message.payload.0)
+          );
+          None
+        },
+        _ => {
+          error!("unsupported message type: type={:?}", plain_message.typ);
+          None
         },
       }
     })
@@ -586,7 +624,7 @@ fn trial_decrypt(
     .pop()
     .unwrap_or(None);
 
-  // If we fail to decrypt, log the error and hand back encrypted data.
+  // If we fail to decrypt with all keys, log the error and hand back encrypted data.
   match possible_decryption {
     Some(p) => Ok(p),
     None => {
