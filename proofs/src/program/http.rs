@@ -476,7 +476,7 @@ impl ManifestRequest {
     // TODO: Do we expect requests to have bodies? (piotr-roslaniec): POST/PUT requests may have
     // bodies
 
-    let body = if body_bytes.len() > 0 {
+    let body = if !body_bytes.is_empty() {
       serde_json::from_slice(body_bytes)
         .map_err(|_| ProofError::InvalidManifest("Invalid body bytes".to_string()))?
     } else {
@@ -560,14 +560,19 @@ impl ManifestRequest {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
+  use std::{collections::HashMap, string::ToString};
 
   use serde_json::json;
 
   use super::*;
+  use crate::program::{
+    http::{ManifestRequest, ManifestResponse},
+    ProofError,
+  };
 
-  #[macro_export]
   /// Creates a new HTTP request with optional parameters.
+  #[macro_export]
   macro_rules! request {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
@@ -599,11 +604,12 @@ mod tests {
     }};
   }
 
-  #[macro_export]
   /// Creates a new HTTP response with optional parameters.
+  #[macro_export]
   macro_rules! response {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
+        #[allow(unused_mut)]
         let mut response = ManifestResponse {
             status: "200".to_string(),
             version: "HTTP/1.1".to_string(),
@@ -629,12 +635,13 @@ mod tests {
     }};
   }
 
-  #[macro_export]
   /// Creates a `NotaryResponse` by taking a `ManifestResponse` and optional overrides for
   /// `NotaryResponseBody`.
+  #[macro_export]
   macro_rules! notary_response {
     // Match with ManifestResponse and optional overrides for NotaryResponseBody
     ($response:expr, $($key:ident: $value:expr),* $(,)?) => {{
+        #[allow(unused_mut)]
         let mut notary_response_body = NotaryResponseBody {
             json: Some(json!({})), // Default to empty JSON
         };
@@ -929,8 +936,8 @@ mod tests {
     assert!(!base_request.is_subset_of(&other_request));
   }
 
-  #[macro_export]
   /// Creates a response body with a given serde_json::Value
+  #[macro_export]
   macro_rules! notary_body {
     ($($key:tt : $value:tt),* $(,)?) => {{
         NotaryResponseBody {
@@ -953,7 +960,7 @@ mod tests {
         }
     );
     // ["key1", "key2", "key3"]
-    let mut path = vec![
+    let path = vec![
       JsonKey::String("key1".to_string()),
       JsonKey::String("key2".to_string()),
       JsonKey::String("key3".to_string()),

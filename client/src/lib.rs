@@ -18,7 +18,7 @@ use std::collections::HashMap;
 
 use origo::SignedVerificationReply;
 use proofs::{
-  program::manifest::{Manifest, NIVCRom, OrigoManifest},
+  program::{manifest::NIVCRom, plain_manifest::Manifest},
   proof::FoldingProof,
 };
 use serde::{Deserialize, Serialize};
@@ -52,7 +52,7 @@ pub fn get_web_prover_circuits_version() -> String {
 pub async fn prover_inner(
   config: config::Config,
   proving_params: Option<Vec<u8>>,
-) -> Result<Proof, errors::ClientErrors> {
+) -> Result<Proof, ClientErrors> {
   info!("GIT_HASH: {}", env!("GIT_HASH"));
   match config.mode {
     config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
@@ -123,7 +123,7 @@ pub async fn prover_inner_origo(
   Ok(Proof::Origo(proof))
 }
 
-pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
+pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, ClientErrors> {
   let session_id = config.set_session_id();
 
   // TEE mode uses Origo networking stack with minimal changes

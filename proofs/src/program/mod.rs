@@ -35,6 +35,7 @@ use crate::{
 pub mod data;
 pub mod http;
 pub mod manifest;
+pub mod plain_manifest;
 pub mod utils;
 
 // TODO: Consider moving contents of mod.rs files to a separate files. mod.rs files should

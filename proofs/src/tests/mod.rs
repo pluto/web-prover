@@ -21,8 +21,9 @@ use super::*;
 use crate::program::{
   data::{CircuitData, NotExpanded, ProofParams, SetupParams, UninitializedSetup},
   initialize_setup_data,
-  manifest::{InitialNIVCInputs, Manifest, NIVCRom, NivcCircuitInputs},
+  manifest::{InitialNIVCInputs, NIVCRom, NivcCircuitInputs, OrigoManifest},
 };
+
 pub(crate) mod inputs;
 mod witnesscalc;
 
@@ -149,7 +150,7 @@ async fn test_end_to_end_proofs_get() {
 
   let request_inputs = simple_request_inputs();
   let response_inputs = simple_response_inputs();
-  let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
+  let manifest: OrigoManifest = serde_json::from_str(TEST_MANIFEST).unwrap();
 
   let InitialNIVCInputs { ciphertext_digest, .. } = manifest
     .initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE>(

@@ -4,7 +4,8 @@ use web_proof_circuits_witness_generator::json::JsonKey;
 
 use crate::program::{
   http::{ManifestRequest, ManifestResponse, ManifestResponseBody},
-  manifest::{EncryptionInput, Manifest},
+  manifest::{EncryptionInput, OrigoManifest},
+  plain_manifest::Manifest,
 };
 
 pub const ADD_EXTERNAL_R1CS: &[u8] = include_bytes!("examples/circuit_data/add_external.r1cs");
@@ -657,7 +658,7 @@ pub(crate) fn complex_response_inputs() -> EncryptionInput {
   }
 }
 
-pub(crate) fn complex_manifest() -> Manifest {
+pub(crate) fn complex_manifest() -> OrigoManifest {
   Manifest {
     // manifest_version: "1".to_string(),
     // id:               "complex-manifest".to_string(),
@@ -693,4 +694,5 @@ pub(crate) fn complex_manifest() -> Manifest {
       },
     },
   }
+  .into()
 }

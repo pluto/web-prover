@@ -18,7 +18,7 @@ use hyper::{body::Bytes, upgrade::Upgraded};
 use hyper_util::rt::TokioIo;
 use proofs::program::{
   http::{ManifestRequest, NotaryResponse},
-  manifest::Manifest,
+  plain_manifest::Manifest,
 };
 use serde::Deserialize;
 use tokio::{

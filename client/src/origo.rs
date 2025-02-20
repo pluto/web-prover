@@ -5,7 +5,8 @@ use proofs::{
   circuits::construct_setup_data,
   program::{
     data::{Offline, SetupParams},
-    manifest::{EncryptionInput, Manifest, OrigoManifest, TLSEncryption},
+    manifest::{EncryptionInput, OrigoManifest, TLSEncryption},
+    plain_manifest::Manifest,
   },
   F, G1, G2,
 };
