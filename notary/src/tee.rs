@@ -29,7 +29,7 @@ use tokio_util::{
 use tracing::{debug, error, info};
 use uuid::Uuid;
 use web_prover_core::{
-  http::{ManifestRequest, ManifestResponse, NotaryResponse},
+  http::{ManifestRequest, NotaryResponse},
   manifest::Manifest,
 };
 use ws_stream_tungstenite::WsStream;

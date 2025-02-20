@@ -10,7 +10,6 @@ use serde::Deserialize;
 use serde_json::Value;
 use tracing::info;
 use uuid::Uuid;
-use web_proof_circuits_witness_generator::json::JsonKey;
 use web_prover_core::http::{
   ManifestRequest, ManifestResponse, ManifestResponseBody, NotaryResponse, NotaryResponseBody,
 };

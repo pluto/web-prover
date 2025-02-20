@@ -466,6 +466,83 @@ impl ManifestRequest {
     Ok(())
   }
 
+  fn validate_vars(&self) -> Result<(), ManifestError> {
+    let mut all_tokens = vec![];
+
+    // Parse and validate tokens in the body
+    if let Some(body_tokens) = self.body.as_ref().map(extract_tokens) {
+      for token in &body_tokens {
+        if !self.vars.contains_key(token) {
+          return Err(ManifestError::InvalidManifest(format!(
+            "Token `<% {} %>` not declared in `vars`",
+            token
+          )));
+        }
+      }
+      all_tokens.extend(body_tokens);
+    }
+
+    // Parse and validate tokens in headers
+    for value in self.headers.values() {
+      let header_tokens = extract_tokens(&serde_json::Value::String(value.clone()));
+      for token in &header_tokens {
+        if !self.vars.contains_key(token) {
+          return Err(ManifestError::InvalidManifest(format!(
+            "Token `<% {} %>` not declared in `vars`",
+            token
+          )));
+        }
+      }
+      all_tokens.extend(header_tokens);
+    }
+
+    for var_key in self.vars.keys() {
+      if !all_tokens.contains(var_key) {
+        return Err(ManifestError::InvalidManifest(format!(
+          "Token `<% {} %>` not declared in `body` or `headers`",
+          var_key
+        )));
+      }
+    }
+
+    // Validate each `vars` entry
+    for (key, var_def) in &self.vars {
+      // Validate regex (if defined)
+      if let Some(regex_pattern) = var_def.regex.as_ref() {
+        // Using `regress` crate for compatibility with ECMAScript regular expressions
+        let _regex = regress::Regex::new(regex_pattern).map_err(|_| {
+          ManifestError::InvalidManifest(format!("Invalid regex pattern for `{}`", key))
+        })?;
+        // TODO: It will definitely not match it here because it's a template variable, not an
+        // actual variable
+        // TODO: How does the Manifest receiver (notary) verifies this?
+        // if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
+        //   if regex.find(value.as_str().unwrap_or("")).is_none() {
+        //     return Err(ManifestError::InvalidManifest(format!(
+        //       "Value for token `<% {} %>` does not match regex",
+        //       key
+        //     )));
+        //   }
+        // }
+      }
+
+      // Validate length (if applicable)
+      if let Some(length) = var_def.length {
+        if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
+          if value.as_str().unwrap_or("").len() != length {
+            return Err(ManifestError::InvalidManifest(format!(
+              "Value for token `<% {} %>` does not meet length constraint",
+              key
+            )));
+          }
+        }
+      }
+
+      // TODO: Validate the token "type" constraint
+    }
+    Ok(())
+  }
+
   /// Parses the HTTP request from the given bytes.
   pub fn from_payload(bytes: &[u8]) -> Result<Self, ManifestError> {
     // todo: dedup me
@@ -563,6 +640,37 @@ impl ManifestRequest {
     // self.method == other.method && self.url == other.url && self.body == other.body
     self.method == other.method && self.url == other.url
   }
+}
+
+fn extract_tokens(value: &serde_json::Value) -> Vec<String> {
+  let mut tokens = vec![];
+
+  match value {
+    serde_json::Value::String(s) => {
+      let token_regex = regex::Regex::new(r"<%\s*(\w+)\s*%>").unwrap();
+      for capture in token_regex.captures_iter(s) {
+        if let Some(token) = capture.get(1) {
+          // Extract token name
+          tokens.push(token.as_str().to_string());
+        }
+      }
+    },
+    serde_json::Value::Object(map) => {
+      // Recursively parse nested objects
+      for (_, v) in map {
+        tokens.extend(extract_tokens(v));
+      }
+    },
+    serde_json::Value::Array(arr) => {
+      // Recursively parse arrays
+      for v in arr {
+        tokens.extend(extract_tokens(v));
+      }
+    },
+    _ => {},
+  }
+
+  tokens
 }
 
 #[cfg(test)]
@@ -916,6 +1024,26 @@ pub mod tests {
         assert!(msg.contains("Invalid body bytes"));
       },
       _ => panic!("Expected invalid body parsing error"),
+    }
+  }
+
+  #[test]
+  fn test_validate_vars_with_missing_token() {
+    let header_bytes: &[u8] =
+      b"POST /path HTTP/1.1\r\nX-Custom-Header: <% missing_token %>\r\n\r\n";
+    let body_bytes: &[u8] = br#"{"key": "value"}"#;
+
+    let mut request = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
+    request.vars = HashMap::new(); // No vars provided, but the template references a token
+
+    let result = request.validate_vars();
+    assert!(result.is_err());
+
+    match result {
+      Err(ManifestError::InvalidManifest(msg)) => {
+        assert!(msg.contains("Token `<% missing_token %>` not declared in `vars`"));
+      },
+      _ => panic!("Expected missing token error"),
     }
   }
 
