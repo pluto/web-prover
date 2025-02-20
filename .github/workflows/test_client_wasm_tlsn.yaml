@@ -61,7 +61,7 @@ jobs:
           # symlink proofs/web_proof_circuits
           (cd client_wasm/demo/static && rm -rf build && ln -s ../../../proofs/web_proof_circuits build)
 
-          # TODO quick workaround to use TEE fixture instead of Origo fixture in
+          # TODO quick workaround to use TLSN fixture instead of Origo fixture in
           #      client_wasm/demo/js/index.js proverConfig
           cp fixture/client.tlsn_tcp_local.json fixture/client.origo_tcp_local.json
 
