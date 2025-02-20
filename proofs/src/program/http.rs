@@ -269,7 +269,7 @@ impl ManifestResponse {
         self.body.json,
         other.body.json_actual.as_ref().unwrap()
       );
-      return false
+      return false;
     }
 
     // All checks passed
@@ -522,7 +522,6 @@ pub(crate) mod tests {
 
   #[test]
   fn test_matches_other_response() {
-    
     let sourced_response = create_response!(
         headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
         body: ResponseBody {
