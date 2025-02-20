@@ -29,4 +29,15 @@ jobs:
             echo "Your dependencies are not centralized in the cargo workspace. Make sure to run `cargo autoinherit` and try again."
             exit 1
           fi
+      
+      - name: Install cargo-udeps
+        run: cargo install cargo-udeps
+        
+      - name: Check for unused dependencies
+        run: |
+          cargo udeps --workspace
+          if [ $? -ne 0 ]; then
+            echo "There are unused dependencies. Please clean up your Cargo.toml files."
+            exit 1
+          fi
 
