@@ -275,8 +275,10 @@ fn validate_notarization_legal(
   if !manifest.request.is_subset_of(&request) {
     return Err(NotaryServerError::ManifestRequestMismatch);
   }
+
   if !manifest.response.is_subset_of(&response) {
     return Err(NotaryServerError::ManifestResponseMismatch);
   }
+
   Ok(())
 }
