@@ -56,7 +56,6 @@ alloy-primitives={ version="0.8.2", features=["k256"] }
 k256            ={ version="0.13.3", features=["ecdsa"] }
 reqwest         ={ version="0.12", features=["json"] }
 uuid            ={ workspace=true }
-
 tls-client2={ workspace=true }
 
 caratls_ekm_server                          ={ workspace=true }

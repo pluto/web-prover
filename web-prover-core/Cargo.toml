@@ -8,10 +8,10 @@ serde                               ={ workspace=true }
 serde_json                          ={ workspace=true }
 tracing                             ={ workspace=true }
 thiserror                           ={ workspace=true }
-ff                                  ={ workspace=true }
 tiny-keccak                         ={ workspace=true }
-num-bigint                          ={ workspace=true }
 web-proof-circuits-witness-generator={ workspace=true }
-tls-client2                         ={ workspace=true } # a bit of an odd dependency to have in here imo, TODO: I agree
 url                                 ={ workspace=true }
 derive_more                         ={ workspace=true }
+# Using `regress` crate for compatibility with ECMAScript regular expressions in Manifest validation
+regress="0.10.3"
+regex  ="1.11.1"
