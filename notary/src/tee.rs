@@ -280,13 +280,3 @@ fn validate_notarization_legal(
   }
   Ok(())
 }
-
-fn get_app_data(payload: &WrappedPayload) -> Option<Vec<u8>> {
-  match payload {
-    WrappedPayload::Decrypted(decrypted) => match &decrypted.payload {
-      MessagePayload::ApplicationData(app_data) => Some(app_data.clone().0),
-      _ => None,
-    },
-    _ => None,
-  }
-}

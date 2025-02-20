@@ -159,7 +159,7 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
               let mut reader = rx_tls_buf[..received].reader();
               let mut bytes_buf = [0u8; 1];
               reader.read_exact(&mut bytes_buf)?;
-              let is_terminate_byte = received == 1 && bytes_buf.get(0).cloned() == Some(255);
+              let is_terminate_byte = received == 1 && bytes_buf.first().cloned() == Some(255);
 
               let mut reader = rx_tls_buf[..received].reader();
               loop {
