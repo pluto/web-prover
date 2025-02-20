@@ -13,7 +13,7 @@ use circuits::{
 use client_side_prover::supernova::RecursiveSNARK;
 use inputs::{
   complex_manifest, complex_request_inputs, complex_response_inputs, simple_request_inputs,
-  simple_response_inputs, TEST_MANIFEST,
+  simple_response_inputs,
 };
 use web_proof_circuits_witness_generator::polynomial_digest;
 
@@ -129,6 +129,8 @@ fn wasm_witness_generator_type_256b() -> [WitnessGeneratorType; 3] {
 #[tokio::test]
 // #[tracing_test::traced_test]
 async fn test_end_to_end_proofs_get() {
+  use web_prover_core::test_utils::TEST_MANIFEST;
+
   const CIRCUIT_SIZE: usize = 256;
   let setup_data = UninitializedSetup {
     r1cs_types:              vec![

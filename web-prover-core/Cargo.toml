@@ -14,3 +14,4 @@ num-bigint                          ={ workspace=true }
 web-proof-circuits-witness-generator={ workspace=true }
 tls-client2                         ={ workspace=true } # a bit of an odd dependency to have in here imo, TODO: I agree
 url                                 ={ workspace=true }
+derive_more                         ={ workspace=true }

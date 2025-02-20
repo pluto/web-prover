@@ -17,14 +17,12 @@ pub mod tls_client_async2;
 use std::collections::HashMap;
 
 use origo::SignedVerificationReply;
-use proofs::{
-  program::{manifest::NIVCRom, plain_manifest::Manifest},
-  proof::FoldingProof,
-};
+use proofs::{program::manifest::NIVCRom, proof::FoldingProof};
 use serde::{Deserialize, Serialize};
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
 use tracing::{debug, info};
+use web_prover_core::manifest::Manifest;
 
 use crate::errors::ClientErrors;
 

@@ -3954,6 +3954,7 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "web-proof-circuits-witness-generator",
+ "web-prover-core",
  "ws_stream_tungstenite 0.13.0 (git+https://github.com/pluto/ws_stream_tungstenite.git?branch=latest)",
 ]
 
@@ -7338,6 +7339,7 @@ dependencies = [
 name = "web-prover-core"
 version = "0.1.0"
 dependencies = [
+ "derive_more 2.0.1",
  "ff",
  "num-bigint 0.4.6",
  "serde",

@@ -3,11 +3,8 @@ use serde::{Deserialize, Serialize};
 use tiny_keccak::{Hasher, Keccak};
 
 use crate::{
-  errors::ProofError,
-  program::{
-    http::{ManifestRequest, ManifestResponse},
-    manifest::OrigoManifest,
-  },
+  errors::ManifestError,
+  http::{ManifestRequest, ManifestResponse},
 };
 
 /// Manifest containing [`ManifestRequest`] and [`ManifestResponse`]
@@ -31,7 +28,7 @@ pub struct Manifest {
 impl Manifest {
   /// Validates `Manifest` request and response fields. They are validated against valid statuses,
   /// http methods, and template variables.
-  pub fn validate(&self) -> Result<(), ProofError> {
+  pub fn validate(&self) -> Result<(), ManifestError> {
     // TODO: Validate manifest version, id, title, description, prepareUrl
     self.request.validate()?;
     self.response.validate()?;
@@ -45,7 +42,7 @@ impl Manifest {
   }
 
   /// Compute a `Keccak256` hash of the serialized Manifest
-  pub fn to_keccak_digest(&self) -> Result<[u8; 32], ProofError> {
+  pub fn to_keccak_digest(&self) -> Result<[u8; 32], ManifestError> {
     let as_bytes: Vec<u8> = self.try_into()?;
     let mut hasher = Keccak::v256();
     let mut output = [0u8; 32];
@@ -73,10 +70,6 @@ impl TryFrom<Manifest> for Vec<u8> {
   type Error = serde_json::Error;
 
   fn try_from(manifest: Manifest) -> Result<Self, Self::Error> { serde_json::to_vec(&manifest) }
-}
-
-impl From<OrigoManifest> for Manifest {
-  fn from(value: OrigoManifest) -> Self { value.0 }
 }
 
 #[cfg(test)]
@@ -193,10 +186,10 @@ mod tests {
     let manifest = create_manifest!(request!(method: "INVALID".to_string()), response!(),);
     let result = manifest.validate();
     assert!(result.is_err());
-    if let Err(ProofError::InvalidManifest(message)) = result {
+    if let Err(ManifestError::InvalidManifest(message)) = result {
       assert_eq!(message, "Invalid HTTP method");
     } else {
-      panic!("Expected ProofError::InvalidManifest");
+      panic!("Expected ManifestError::InvalidManifest");
     }
   }
 
@@ -205,10 +198,10 @@ mod tests {
     let manifest = create_manifest!(request!(url: "ftp://example.com".to_string()), response!(),);
     let result = manifest.validate();
     assert!(result.is_err());
-    if let Err(ProofError::InvalidManifest(message)) = result {
+    if let Err(ManifestError::InvalidManifest(message)) = result {
       assert_eq!(message, "Only HTTPS URLs are allowed");
     } else {
-      panic!("Expected ProofError::InvalidManifest");
+      panic!("Expected ManifestError::InvalidManifest");
     }
   }
 
@@ -217,10 +210,10 @@ mod tests {
     let manifest = create_manifest!(request!(), response!(status: "500".to_string()),);
     let result = manifest.validate();
     assert!(result.is_err());
-    if let Err(ProofError::InvalidManifest(message)) = result {
+    if let Err(ManifestError::InvalidManifest(message)) = result {
       assert_eq!(message, "Unsupported HTTP status");
     } else {
-      panic!("Expected ProofError::InvalidManifest");
+      panic!("Expected ManifestError::InvalidManifest");
     }
   }
 
@@ -254,10 +247,10 @@ mod tests {
     );
     let result = manifest.validate();
     assert!(result.is_err());
-    if let Err(ProofError::InvalidManifest(message)) = result {
+    if let Err(ManifestError::InvalidManifest(message)) = result {
       assert_eq!(message, "Invalid Content-Type header: invalid/type");
     } else {
-      panic!("Expected ProofError::InvalidManifest");
+      panic!("Expected ManifestError::InvalidManifest");
     }
   }
 }

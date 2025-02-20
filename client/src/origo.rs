@@ -6,7 +6,6 @@ use proofs::{
   program::{
     data::{Offline, SetupParams},
     manifest::{EncryptionInput, OrigoManifest, TLSEncryption},
-    plain_manifest::Manifest,
   },
   F, G1, G2,
 };
@@ -17,6 +16,7 @@ use web_proof_circuits_witness_generator::{
   http::{compute_http_witness, HttpMaskType},
   json::json_value_digest,
 };
+use web_prover_core::manifest::Manifest;
 
 use crate::{
   config::{self},

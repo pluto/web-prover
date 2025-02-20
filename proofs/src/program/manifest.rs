@@ -44,13 +44,12 @@ use web_proof_circuits_witness_generator::{
   json::{json_value_digest, parser::parse, JsonKey, RawJsonMachine},
   polynomial_digest, poseidon, ByteOrPad,
 };
+use web_prover_core::{http::MAX_HTTP_HEADERS, manifest::Manifest};
 
 use crate::{
   circuits::MAX_STACK_HEIGHT,
   program::{
     data::{CircuitData, FoldInput},
-    manifest,
-    plain_manifest::Manifest,
     F, G1,
   },
   ProofError,
@@ -60,10 +59,6 @@ use crate::{
 pub const DATA_SIGNAL_NAME: &str = "data";
 /// Public IO vars
 pub const PUBLIC_IO_VARS: usize = 11;
-/// Max HTTP headers
-pub(crate) const MAX_HTTP_HEADERS: usize = 25;
-/// HTTP/1.1
-pub const HTTP_1_1: &str = "HTTP/1.1";
 
 /// A type of `Manifest` with special methods for Origo mode.
 #[derive(Debug, Clone, Serialize, Deserialize, From)]
@@ -85,6 +80,10 @@ impl TryFrom<&OrigoManifest> for Vec<u8> {
   }
 }
 
+impl From<OrigoManifest> for Manifest {
+  fn from(value: OrigoManifest) -> Self { value.0 }
+}
+
 impl OrigoManifest {
   /// Initial inputs
   pub fn initial_inputs<const MAX_STACK_HEIGHT: usize, const CIRCUIT_SIZE: usize>(
@@ -94,7 +93,7 @@ impl OrigoManifest {
     response_ciphertext: &[Vec<u8>],
   ) -> Result<InitialNIVCInputs, ProofError> {
     let ciphertext_digest =
-      manifest::compute_ciphertext_digest::<CIRCUIT_SIZE>(request_ciphertext, response_ciphertext);
+      compute_ciphertext_digest::<CIRCUIT_SIZE>(request_ciphertext, response_ciphertext);
 
     // TODO: This assumes the start line format here as well.
     // digest the start line for request/response using the ciphertext_digest as a random input
@@ -192,14 +191,14 @@ impl OrigoManifest {
         &response_inputs.ciphertext,
       )?;
 
-    let _ = manifest::build_plaintext_authentication_circuit_inputs::<CIRCUIT_SIZE>(
+    let _ = build_plaintext_authentication_circuit_inputs::<CIRCUIT_SIZE>(
       request_inputs,
       ciphertext_digest,
       &mut private_inputs,
     )?;
     // debug!("private_inputs: {:?}", private_inputs.len());
 
-    let (_, request_body) = manifest::build_http_verification_circuit_inputs::<CIRCUIT_SIZE>(
+    let (_, request_body) = build_http_verification_circuit_inputs::<CIRCUIT_SIZE>(
       &request_inputs.plaintext,
       ciphertext_digest,
       &headers_digest,
@@ -207,7 +206,7 @@ impl OrigoManifest {
     )?;
     // debug!("private_inputs: {:?}", private_inputs.len());
 
-    let _ = manifest::build_json_extraction_circuit_inputs::<CIRCUIT_SIZE>(
+    let _ = build_json_extraction_circuit_inputs::<CIRCUIT_SIZE>(
       &request_body,
       ciphertext_digest,
       (Some(&[]), Some(&self.0.response.body.json_path)), /* WARN: sending response keys for
@@ -216,21 +215,21 @@ impl OrigoManifest {
     )?;
     // debug!("private_inputs: {:?}", private_inputs.len());
 
-    let _ = manifest::build_plaintext_authentication_circuit_inputs::<CIRCUIT_SIZE>(
+    let _ = build_plaintext_authentication_circuit_inputs::<CIRCUIT_SIZE>(
       response_inputs,
       ciphertext_digest,
       &mut private_inputs,
     )?;
 
     // debug!("private_inputs: {:?}", private_inputs.len());
-    let (_, response_body) = manifest::build_http_verification_circuit_inputs::<CIRCUIT_SIZE>(
+    let (_, response_body) = build_http_verification_circuit_inputs::<CIRCUIT_SIZE>(
       &response_inputs.plaintext,
       ciphertext_digest,
       &headers_digest,
       &mut private_inputs,
     )?;
 
-    let _ = manifest::build_json_extraction_circuit_inputs::<CIRCUIT_SIZE>(
+    let _ = build_json_extraction_circuit_inputs::<CIRCUIT_SIZE>(
       &response_body,
       ciphertext_digest,
       (None, Some(&self.0.response.body.json_path)),
@@ -687,10 +686,12 @@ pub fn compute_ciphertext_digest<const CIRCUIT_SIZE: usize>(
 
 #[cfg(test)]
 mod tests {
+  use web_prover_core::{http::HTTP_1_1, test_utils::TEST_MANIFEST};
+
   use super::*;
   use crate::tests::inputs::{
     complex_manifest, complex_request_inputs, complex_response_inputs, simple_request_inputs,
-    simple_response_inputs, TEST_MANIFEST,
+    simple_response_inputs,
   };
 
   #[test]

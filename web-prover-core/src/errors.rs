@@ -8,4 +8,8 @@ pub enum ManifestError {
   /// The error is an invalid manifest
   #[error("Invalid manifest: {0}")]
   InvalidManifest(String),
+
+  /// Serde operation failed
+  #[error("Serde error occurred: {0}")]
+  SerdeError(#[from] serde_json::Error),
 }

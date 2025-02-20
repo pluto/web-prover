@@ -7,7 +7,6 @@ use hyper::{
   header::{HeaderName, HeaderValue},
   Request,
 };
-use proofs::program::plain_manifest::Manifest;
 use serde::{Deserialize, Serialize};
 use serde_with::{
   base64::{Base64, Standard},
@@ -15,6 +14,7 @@ use serde_with::{
   serde_as,
 };
 use url::Url;
+use web_prover_core::manifest::Manifest;
 
 use crate::errors::ClientErrors;
 

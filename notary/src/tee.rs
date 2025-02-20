@@ -16,10 +16,6 @@ use client::{
 use futures_util::SinkExt;
 use hyper::{body::Bytes, upgrade::Upgraded};
 use hyper_util::rt::TokioIo;
-use proofs::program::{
-  http::{ManifestRequest, NotaryResponse},
-  plain_manifest::Manifest,
-};
 use serde::Deserialize;
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
@@ -32,6 +28,10 @@ use tokio_util::{
 };
 use tracing::{debug, error, info};
 use uuid::Uuid;
+use web_prover_core::{
+  http::{ManifestRequest, ManifestResponse, NotaryResponse},
+  manifest::Manifest,
+};
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
