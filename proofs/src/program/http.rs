@@ -16,7 +16,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use tracing::debug;
 pub use web_proof_circuits_witness_generator::json::JsonKey;
 
@@ -269,6 +269,7 @@ impl ManifestResponse {
         self.body.json,
         other.body.json_actual.as_ref().unwrap()
       );
+      return false
     }
 
     // All checks passed
@@ -521,11 +522,12 @@ pub(crate) mod tests {
 
   #[test]
   fn test_matches_other_response() {
+    
     let sourced_response = create_response!(
         headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
         body: ResponseBody {
             json: vec![JsonKey::String("key1".to_string()), JsonKey::String("key2".to_string())],
-            json_actual: None,
+            json_actual: Some(json!({"key1": {"key2": "value1"}})),
         }
     );
 
@@ -618,7 +620,7 @@ pub(crate) mod tests {
     let expected_response = create_response!(
         body: ResponseBody {
             json: vec![JsonKey::String("key1".to_string())],
-            json_actual: None
+            json_actual: Some(json!({"key1": "value1"}))
         }
     );
     assert_eq!(response, expected_response);
@@ -654,8 +656,8 @@ pub(crate) mod tests {
         message: "OK".to_string(),
         headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
         body: ResponseBody {
-            json: vec![JsonKey::String("key1".to_string())], // Missing "key2"
-            json_actual: None
+            json: vec![JsonKey::String("key1".to_string())],  // Missing "key2"
+            json_actual: Some(json!({"key1": {"thing2": "value2"}})),
         }
     );
     assert!(!base_response.is_subset_of(&other_response));
@@ -689,7 +691,7 @@ pub(crate) mod tests {
 
   #[test]
   fn test_invalid_header_utf8() {
-    let header_bytes: &[u8] = b"\xFF\xFEInvalid UTF-8 Header";
+    let header_bytes: &[u8] = b"\xFF\xFEInvalid UTF-8 Header\r\n\r\n";
     let body_bytes: &[u8] = br#"{}"#;
 
     let result = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat());
