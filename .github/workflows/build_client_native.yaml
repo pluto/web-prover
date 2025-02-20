@@ -37,7 +37,7 @@ jobs:
           key: ${{ inputs.web-prover-circuits-cache-key }}
 
       - run: |
-          cargo +nightly-2024-10-28 build -p client --release
+          cargo +nightly build -p client --release
 
       - uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-latest'
