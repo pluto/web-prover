@@ -105,6 +105,8 @@ jobs:
       - web-prover-circuits
       - build_notary
       - test_client_wasm_origo
+      - test_client_wasm_tlsn
+      - test_client_native_tee
       - test_client_native_origo
       - test_client_native_tlsn
       # - test_client_native_tee
