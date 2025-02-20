@@ -424,7 +424,10 @@ pub async fn verify(
         // TODO: add the manifest digest?
         debug!("output from verifier: {output:?}");
         // This unwrap should be safe for now as the value will always be present
-        VerifyReply { value: payload.origo_proof.value.unwrap(), manifest: payload.manifest }
+        VerifyReply {
+          value:    payload.origo_proof.value.unwrap(),
+          manifest: payload.manifest.into(),
+        }
       }
     },
     Err(e) => {

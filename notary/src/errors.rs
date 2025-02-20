@@ -89,6 +89,9 @@ pub enum NotaryServerError {
   #[error(transparent)]
   ProofError(#[from] ProofError),
 
+  #[error("Missing application-level data messages. Direction={0}, expected={1}, received={2}")]
+  MissingAppDataMessages(Direction, usize, usize),
+
   // TODO: Update to contain feedback
   #[error("Manifest-request mismatch")]
   ManifestRequestMismatch,
@@ -102,6 +105,9 @@ pub enum NotaryServerError {
 
   #[error("Origo secrets are missing")]
   MissingOrigoSecrets,
+
+  #[error(transparent)]
+  ProxyError(#[from] ProxyError),
 }
 
 impl From<VerifierError> for NotaryServerError {

@@ -10,7 +10,8 @@ serde      ={ workspace=true }
 serde_json ={ workspace=true }
 thiserror  ={ workspace=true }
 tracing    ={ workspace=true }
-tls-client2={ workspace=true } # a bit of an odd dependency to have in here imo
+tls-client2={ workspace=true } # a bit of an odd dependency to have in here imo # TODO: Fix this
+derive_more={ workspace=true }
 
 hex                                 ="0.4"
 client-side-prover                  ={ git="https://github.com/pluto/client-side-prover", rev="8e7eb839e901dcee416179116bb0f9c4f7ae683c" }

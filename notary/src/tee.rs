@@ -205,8 +205,7 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   //  maybe clean this up and share code.
   let transcript = state.origo_sessions.lock().unwrap().get(session_id).cloned().unwrap();
   let http = transcript
-    .into_flattened()
-    .unwrap() // todo: error me
+    .into_flattened()?
     .into_parsed(
       &handshake_server_key,
       &handshake_server_iv,
@@ -216,8 +215,7 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
       Some(app_client_iv.to_vec()),
     )
     .unwrap()
-    .into_http()
-    .unwrap();
+    .into_http()?;
 
   // todo: cleanup
   debug!("request={:?}", bytes_to_ascii(http.payload.request.clone()));
@@ -274,10 +272,8 @@ fn validate_notarization_legal(
   if !manifest.request.is_subset_of(&request) {
     return Err(NotaryServerError::ManifestRequestMismatch);
   }
-
   if !response.matches_client_manifest(&manifest.response) {
     return Err(NotaryServerError::ManifestResponseMismatch);
   }
-
   Ok(())
 }

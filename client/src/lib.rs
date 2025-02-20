@@ -18,7 +18,7 @@ use std::collections::HashMap;
 
 use origo::SignedVerificationReply;
 use proofs::{
-  program::manifest::{Manifest, NIVCRom},
+  program::manifest::{Manifest, NIVCRom, OrigoManifest},
   proof::FoldingProof,
 };
 use serde::{Deserialize, Serialize};
@@ -62,9 +62,9 @@ pub async fn prover_inner(
   }
 }
 
-pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
+pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, ClientErrors> {
   let root_store =
-    crate::tls::tls_client_default_root_store(config.notary_ca_cert.clone().map(|c| vec![c]));
+    tls::tls_client_default_root_store(config.notary_ca_cert.clone().map(|c| vec![c]));
 
   let max_sent_data = config
     .max_sent_data
@@ -99,26 +99,25 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, erro
 pub async fn prover_inner_origo(
   config: config::Config,
   proving_params: Option<Vec<u8>>,
-) -> Result<Proof, errors::ClientErrors> {
+) -> Result<Proof, ClientErrors> {
   let session_id = config.session_id.clone();
 
   let mut proof = origo::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
 
-  let manifest =
-    config.proving.manifest.clone().ok_or(errors::ClientErrors::ManifestMissingError)?;
+  let manifest = config.proving.manifest.clone().ok_or(ClientErrors::ManifestMissingError)?;
 
   debug!("sending proof to proxy for verification");
-  let verify_response =
-    origo::verify(config, origo::VerifyBody { session_id, origo_proof: proof.clone(), manifest })
-      .await?;
-  // Note: The above `?` will push out the `ProofError::VerifyFailed` from the `origo::verify`
-  // method now. We no longer return an inner bool here, we just use the Result enum itself
-
+  let verify_response = origo::verify(config, origo::VerifyBody {
+    session_id,
+    origo_proof: proof.clone(),
+    manifest: manifest.into(),
+  })
+  .await?;
   proof.sign_reply = Some(verify_response);
 
   debug!("proof.value: {:?}\nproof.verify_reply: {:?}", proof.value, proof.sign_reply);
 
-  // TODO: This is where we should output richer proof data, the verikfy response has the hash of
+  // TODO: This is where we should output richer proof data, the verify response has the hash of
   // the target value now. Since this is in the client, we can use the private variables here. We
   // just need to get out the value.
   Ok(Proof::Origo(proof))
@@ -147,7 +146,7 @@ pub struct ProxyConfig {
   pub manifest:       Manifest,
 }
 
-pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, errors::ClientErrors> {
+pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, ClientErrors> {
   let session_id = config.session_id.clone();
 
   let url = format!(

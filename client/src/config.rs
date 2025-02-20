@@ -7,7 +7,7 @@ use hyper::{
   header::{HeaderName, HeaderValue},
   Request,
 };
-use proofs::program::manifest::Manifest;
+use proofs::program::manifest::{Manifest, OrigoManifest};
 use serde::{Deserialize, Serialize};
 use serde_with::{
   base64::{Base64, Standard},

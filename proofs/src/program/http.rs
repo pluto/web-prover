@@ -473,7 +473,8 @@ impl ManifestRequest {
     let body_bytes = &rest[delimiter.len()..];
 
     let (method, url, version, headers) = Self::parse_header(header_bytes)?;
-    // TODO: Do we expect requests to have bodies?
+    // TODO: Do we expect requests to have bodies? (piotr-roslaniec): POST/PUT requests may have
+    // bodies
 
     let body = if body_bytes.len() > 0 {
       serde_json::from_slice(body_bytes)
@@ -767,7 +768,6 @@ mod tests {
     let body_bytes: &[u8] = br#"{"key1": "value1"}"#;
 
     let response = NotaryResponse::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
-
     let manifest_response = response!(
         headers: std::collections::HashMap::from([
             ("Content-Type".to_string(), "application/json".to_string())
