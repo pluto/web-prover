@@ -28,8 +28,11 @@ use crate::{
 /// Response body type
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ResponseBody {
-  /// JSON keys
+  /// JSON Keys
   pub json: Vec<JsonKey>,
+
+  /// JSON Real Value
+  pub json_actual: Option<serde_json::Value>,
 }
 
 /// Default HTTP version
@@ -124,7 +127,16 @@ impl ManifestResponse {
   ///
   /// - `header_bytes`: The bytes representing the HTTP response headers and metadata.
   /// - `body_bytes`: The bytes representing the HTTP response body.
-  pub fn from_payload(header_bytes: &[u8], body_bytes: &[u8]) -> Result<Self, ProofError> {
+  pub fn from_payload(bytes: &[u8]) -> Result<Self, ProofError> {
+    let delimiter = b"\r\n\r\n";
+    let split_position = bytes
+      .windows(delimiter.len())
+      .position(|window| window == delimiter)
+      .ok_or_else(|| ProofError::InvalidManifest("Invalid HTTP format".to_string()))?;
+
+    let (header_bytes, rest) = bytes.split_at(split_position);
+    let body_bytes = &rest[delimiter.len()..];
+
     let (headers, status, version, message) = Self::parse_header(header_bytes)?;
     let body = Self::parse_body(body_bytes)?;
     Ok(Self { status, version, message, headers, body })
@@ -141,19 +153,21 @@ impl ManifestResponse {
   /// The parsed HTTP response body.
   fn parse_body(body_bytes: &[u8]) -> Result<ResponseBody, ProofError> {
     if body_bytes.is_empty() {
-      return Ok(ResponseBody { json: Vec::new() });
+      return Ok(ResponseBody { json: Vec::new(), json_actual: None });
     }
 
     let body_json: Value = serde_json::from_slice(body_bytes)
       .map_err(|_| ProofError::InvalidManifest("Failed to parse body as valid JSON".to_string()))?;
 
     let body = ResponseBody {
-      json: match body_json {
+      json:        match &body_json {
         Value::Object(map) => map.keys().cloned().map(JsonKey::String).collect(),
         _ =>
           return Err(ProofError::InvalidManifest("Body is not a valid JSON object".to_string())),
       },
+      json_actual: Some(body_json),
     };
+
     Ok(body)
   }
 
@@ -226,21 +240,36 @@ impl ManifestResponse {
       }
     }
 
-    // Check if all JSON keys in `self.body` are present in `other.body`
-    for self_key in &self.body.json {
-      if !other.body.json.iter().any(|other_key| self_key == other_key) {
-        debug!("Missing JSON key {:?}", self_key);
-        return false;
-      }
-    }
+    // Note: self is the original manifest, other is the actual data
+    let json_contains_path = |json: &serde_json::Value, path: &[JsonKey]| -> bool {
+      let mut current = json;
 
-    // TODO: We are NOT checking the body contents yet! So this "DSL" is not supported:
-    // 			"body": {
-    // 					"json": [
-    // 						"hello"
-    // 					],
-    // 					"contains": "world"
-    // 				}
+      for key in path {
+        match key {
+          JsonKey::String(s) => {
+            current = match current.get(s) {
+              Some(value) => value,
+              None => {
+                debug!("Failed to find key '{}' in path {:?}", s, path);
+                return false;
+              },
+            };
+          },
+          // todo: support
+          _ => panic!("JsonKey::num not supported"),
+        }
+      }
+      true
+    };
+
+    // TODO: Add JsonKey Num support, cleanup the manifest to better subset check.
+    if !json_contains_path(&other.body.json_actual.as_ref().unwrap(), &self.body.json) {
+      debug!(
+        "Missing JSON path={:?}, actual_json={:?}",
+        self.body.json,
+        other.body.json_actual.as_ref().unwrap()
+      );
+    }
 
     // All checks passed
     debug!("All checks passed");
@@ -314,17 +343,27 @@ impl ManifestRequest {
   }
 
   /// Parses the HTTP request from the given bytes.
-  pub fn from_payload(header_bytes: &[u8], body_bytes: Option<&[u8]>) -> Result<Self, ProofError> {
+  pub fn from_payload(bytes: &[u8]) -> Result<Self, ProofError> {
+    // todo: dedup me
+    let delimiter = b"\r\n\r\n";
+    let split_position = bytes
+      .windows(delimiter.len())
+      .position(|window| window == delimiter)
+      .ok_or_else(|| ProofError::InvalidManifest("Invalid HTTP format".to_string()))?;
+
+    let (header_bytes, rest) = bytes.split_at(split_position);
+    let body_bytes = &rest[delimiter.len()..];
+
     let (method, url, version, headers) = Self::parse_header(header_bytes)?;
     // TODO: Do we expect requests to have bodies?
-    let body = if let Some(bytes) = body_bytes {
-      Some(
-        serde_json::from_slice(bytes)
-          .map_err(|_| ProofError::InvalidManifest("Invalid body bytes".to_string()))?,
-      )
+
+    let body = if body_bytes.len() > 0 {
+      serde_json::from_slice(body_bytes)
+        .map_err(|_| ProofError::InvalidManifest("Invalid body bytes".to_string()))?
     } else {
       None
     };
+
     Ok(Self { method, url, version, headers, body, vars: HashMap::new() })
   }
 
@@ -452,6 +491,7 @@ pub(crate) mod tests {
             ]),
             body: ResponseBody {
                 json: vec![JsonKey::String("key1".to_string()), JsonKey::String("key2".to_string())],
+                json_actual: None,
             },
         };
 
@@ -466,9 +506,9 @@ pub(crate) mod tests {
 
   #[test]
   fn test_parse_response() {
-    let header_bytes = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
-    let body_bytes = br#"{"key1": "value1", "key2": "value2"}"#;
-    let response = ManifestResponse::from_payload(header_bytes, body_bytes).unwrap();
+    let header_bytes: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
+    let body_bytes: &[u8] = br#"{"key1": "value1", "key2": "value2"}"#;
+    let response = ManifestResponse::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
     assert_eq!(response.status, "200");
     assert_eq!(response.version, "HTTP/1.1");
     assert_eq!(response.message, "OK");
@@ -485,6 +525,7 @@ pub(crate) mod tests {
         headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
         body: ResponseBody {
             json: vec![JsonKey::String("key1".to_string()), JsonKey::String("key2".to_string())],
+            json_actual: None,
         }
     );
 
@@ -507,24 +548,23 @@ pub(crate) mod tests {
 
   #[test]
   fn test_response_with_missing_body() {
-    let response = ManifestResponse::from_payload(
-      b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n",
-      br#""#,
-    )
-    .unwrap();
+    let header_bytes: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n";
+    let body_bytes: &[u8] = br#""#;
+
+    let response = ManifestResponse::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
     let expected_response = create_response!(
         headers: HashMap::from([("Content-Type".to_string(), "text/plain".to_string())]),
-        body: ResponseBody { json: vec![] }
+        body: ResponseBody { json: vec![], json_actual: None}
     );
     assert_eq!(response, expected_response);
   }
 
   #[test]
   fn test_invalid_body_parsing() {
-    let header_bytes = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
-    let invalid_body_bytes = br#"This is not JSON"#;
+    let header_bytes: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
+    let invalid_body_bytes: &[u8] = br#"This is not JSON"#;
 
-    let result = ManifestResponse::from_payload(header_bytes, invalid_body_bytes);
+    let result = ManifestResponse::from_payload(&[header_bytes, invalid_body_bytes].concat());
     assert!(result.is_err());
 
     match result {
@@ -557,7 +597,7 @@ pub(crate) mod tests {
   fn test_validate_empty_message() {
     let response = create_response!(
         message: "".to_string(), // Invalid, empty message
-        body: ResponseBody { json: vec![JsonKey::String("key1".to_string())] }
+        body: ResponseBody { json: vec![JsonKey::String("key1".to_string())], json_actual: None }
     );
     let result = response.validate();
     assert!(result.is_err());
@@ -571,14 +611,14 @@ pub(crate) mod tests {
 
   #[test]
   fn test_valid_response_with_optional_body() {
-    let response = ManifestResponse::from_payload(
-      b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n",
-      br#"{"key1": "value1"}"#,
-    )
-    .unwrap();
+    let header_bytes: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
+    let body_bytes: &[u8] = br#"{"key1": "value1"}"#;
+    let response = ManifestResponse::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
+
     let expected_response = create_response!(
         body: ResponseBody {
-            json: vec![JsonKey::String("key1".to_string())]
+            json: vec![JsonKey::String("key1".to_string())],
+            json_actual: None
         }
     );
     assert_eq!(response, expected_response);
@@ -586,10 +626,10 @@ pub(crate) mod tests {
 
   #[test]
   fn test_response_missing_json_with_application_json_header() {
-    let header_bytes = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
-    let empty_body_bytes = br#"{}"#;
+    let header_bytes: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
+    let empty_body_bytes: &[u8] = br#"{}"#;
 
-    let result = ManifestResponse::from_payload(header_bytes, empty_body_bytes);
+    let result = ManifestResponse::from_payload(&[header_bytes, empty_body_bytes].concat());
     assert!(result.is_ok());
 
     let response = result.unwrap();
@@ -604,7 +644,8 @@ pub(crate) mod tests {
         message: "OK".to_string(),
         headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
         body: ResponseBody {
-            json: vec![JsonKey::String("key1".to_string()), JsonKey::String("key2".to_string())]
+            json: vec![JsonKey::String("key1".to_string()), JsonKey::String("key2".to_string())],
+            json_actual: None
         }
     );
     let other_response = create_response!(
@@ -613,7 +654,8 @@ pub(crate) mod tests {
         message: "OK".to_string(),
         headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
         body: ResponseBody {
-            json: vec![JsonKey::String("key1".to_string())] // Missing "key2"
+            json: vec![JsonKey::String("key1".to_string())], // Missing "key2"
+            json_actual: None
         }
     );
     assert!(!base_response.is_subset_of(&other_response));
@@ -621,10 +663,10 @@ pub(crate) mod tests {
 
   #[test]
   fn test_parse_request_valid_with_body() {
-    let header_bytes = b"POST /path HTTP/1.1\r\nContent-Type: application/json\r\n\r\n";
-    let body_bytes = br#"{"key1": "value1"}"#;
+    let header_bytes: &[u8] = b"POST /path HTTP/1.1\r\nContent-Type: application/json\r\n\r\n";
+    let body_bytes: &[u8] = br#"{"key1": "value1"}"#;
 
-    let request = ManifestRequest::from_payload(header_bytes, Some(body_bytes)).unwrap();
+    let request = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
     assert_eq!(request.method, "POST");
     assert_eq!(request.url, "/path");
     assert_eq!(request.version, "HTTP/1.1");
@@ -637,7 +679,7 @@ pub(crate) mod tests {
   fn test_parse_request_valid_without_body() {
     let header_bytes = b"GET /path HTTP/1.1\r\nContent-Type: text/plain\r\n\r\n";
 
-    let request = ManifestRequest::from_payload(header_bytes, None).unwrap();
+    let request = ManifestRequest::from_payload(header_bytes).unwrap();
     assert_eq!(request.method, "GET");
     assert_eq!(request.url, "/path");
     assert_eq!(request.version, "HTTP/1.1");
@@ -647,10 +689,10 @@ pub(crate) mod tests {
 
   #[test]
   fn test_invalid_header_utf8() {
-    let header_bytes = b"\xFF\xFEInvalid UTF-8 Header";
-    let body_bytes = br#"{}"#;
+    let header_bytes: &[u8] = b"\xFF\xFEInvalid UTF-8 Header";
+    let body_bytes: &[u8] = br#"{}"#;
 
-    let result = ManifestRequest::from_payload(header_bytes, Some(body_bytes));
+    let result = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat());
     assert!(result.is_err());
 
     match result {
@@ -663,10 +705,10 @@ pub(crate) mod tests {
 
   #[test]
   fn test_invalid_request_start_line() {
-    let header_bytes = b"INVALID_START_LINE\r\nContent-Type: application/json\r\n\r\n";
-    let body_bytes = br#"{}"#;
+    let header_bytes: &[u8] = b"INVALID_START_LINE\r\nContent-Type: application/json\r\n\r\n";
+    let body_bytes: &[u8] = br#"{}"#;
 
-    let result = ManifestRequest::from_payload(header_bytes, Some(body_bytes));
+    let result = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat());
     assert!(result.is_err());
 
     match result {
@@ -679,9 +721,9 @@ pub(crate) mod tests {
 
   #[test]
   fn test_https_url_validation() {
-    let header_bytes = b"GET /path HTTP/1.1\r\n\r\n";
+    let header_bytes: &[u8] = b"GET /path HTTP/1.1\r\n\r\n";
 
-    let mut request = ManifestRequest::from_payload(header_bytes, None).unwrap();
+    let mut request = ManifestRequest::from_payload(header_bytes).unwrap();
     request.url = "http://example.com".to_string(); // Invalid (HTTP instead of HTTPS)
 
     let result = request.validate();
@@ -696,10 +738,10 @@ pub(crate) mod tests {
 
   #[test]
   fn test_multiple_headers_parsing() {
-    let header_bytes = b"POST /path HTTP/1.1\r\nContent-Type: application/json\r\nAuthorization: Bearer token\r\n\r\n";
-    let body_bytes = br#"{"key": "value"}"#;
+    let header_bytes: &[u8] = b"POST /path HTTP/1.1\r\nContent-Type: application/json\r\nAuthorization: Bearer token\r\n\r\n";
+    let body_bytes: &[u8] = br#"{"key": "value"}"#;
 
-    let request = ManifestRequest::from_payload(header_bytes, Some(body_bytes)).unwrap();
+    let request = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
     assert_eq!(request.method, "POST");
     assert_eq!(request.headers.len(), 2);
     assert_eq!(request.headers.get("Authorization").unwrap(), "Bearer token");
@@ -707,10 +749,10 @@ pub(crate) mod tests {
 
   #[test]
   fn test_parse_invalid_body() {
-    let header_bytes = b"POST /path HTTP/1.1\r\nContent-Type: application/json\r\n\r\n";
-    let invalid_body_bytes = b"This is not a valid JSON body";
+    let header_bytes: &[u8] = b"POST /path HTTP/1.1\r\nContent-Type: application/json\r\n\r\n";
+    let invalid_body_bytes: &[u8] = b"This is not a valid JSON body";
 
-    let result = ManifestRequest::from_payload(header_bytes, Some(invalid_body_bytes));
+    let result = ManifestRequest::from_payload(&[header_bytes, invalid_body_bytes].concat());
     assert!(result.is_err());
 
     match result {

@@ -64,11 +64,18 @@ async fn from_reqwest_response(response: Response) -> ManifestResponse {
     .iter()
     .map(|(k, v)| (capitalize_header(k.as_ref()), v.to_str().unwrap_or("").to_string()))
     .collect();
+
   let body: HashMap<String, String> = response.json().await.unwrap_or_default();
   // TODO: How to handle JsonKey::Num?
   // TODO Use plain JSON in Manifest etc., and convert to JsonKey as needed
-  let body: Vec<JsonKey> = body.keys().map(|k| JsonKey::String(k.to_string())).collect();
-  ManifestResponse { status, version, message, headers, body: ResponseBody { json: body } }
+  let json_keys: Vec<JsonKey> = body.keys().map(|k| JsonKey::String(k.to_string())).collect();
+  ManifestResponse {
+    status,
+    version,
+    message,
+    headers,
+    body: ResponseBody { json: json_keys, json_actual: None },
+  }
 }
 
 fn from_reqwest_request(request: &Request) -> ManifestRequest {

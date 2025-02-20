@@ -34,6 +34,7 @@ use tokio_util::{
 use tracing::{debug, error, info};
 use uuid::Uuid;
 use ws_stream_tungstenite::WsStream;
+
 use crate::{
   axum_websocket::WebSocket,
   errors::NotaryServerError,
@@ -42,6 +43,21 @@ use crate::{
   tlsn::ProtocolUpgrade,
   SharedState,
 };
+
+pub fn bytes_to_ascii(bytes: Vec<u8>) -> String {
+  bytes
+    .iter()
+    .map(|&byte| {
+      match byte {
+        0x0D => "\\r".to_string(),                        // CR
+        0x0A => "\\n".to_string(),                        // LF
+        0x09 => "\\t".to_string(),                        // Tab
+        0x00..=0x1F | 0x7F => format!("\\x{:02x}", byte), // Other control characters
+        _ => (byte as char).to_string(),
+      }
+    })
+    .collect()
+}
 
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
@@ -145,7 +161,7 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   // issue: https://github.com/pluto/web-prover/issues/470
   debug!("synchronize: reading remaining socket data");
   let mut buf = [0u8; 1024];
-  match timeout(Duration::from_millis(1000), tee_tls_stream.read(&mut buf)).await {
+  match timeout(Duration::from_millis(500), tee_tls_stream.read(&mut buf)).await {
     Ok(Ok(n)) => {
       debug!("read bytes: n={:?}, buf={:?}", n, hex::encode(buf));
     },
@@ -159,6 +175,7 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   debug!("synchronize: magic byte to notify client to terminate TLS");
   tee_tls_stream.write_all(&[0xFF]).await?;
   tee_tls_stream.flush().await?;
+  tokio::time::sleep(Duration::from_millis(500)).await; // don't ask.
 
   debug!("synchronize: magic byte to indicate readiness to read");
   tee_tls_stream.write_all(&[0xAA]).await?;
@@ -188,9 +205,9 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   // TODO (autoparallel): This duplicates some code we see in `notary/src/origo.rs`, so we could
   //  maybe clean this up and share code.
   let transcript = state.origo_sessions.lock().unwrap().get(session_id).cloned().unwrap();
-  let parsed_transcript = transcript
+  let http = transcript
     .into_flattened()
-    .unwrap()
+    .unwrap() // todo: error me
     .into_parsed(
       &handshake_server_key,
       &handshake_server_iv,
@@ -199,10 +216,19 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
       Some(app_client_key.to_vec()),
       Some(app_client_iv.to_vec()),
     )
+    .unwrap()
+    .into_http()
     .unwrap();
-  // dbg!(parsed_transcript);
 
-  let (request, response) = extract_request_and_response(&parsed_transcript.payload)?;
+  // todo: cleanup
+  debug!("request={:?}", bytes_to_ascii(http.payload.request.clone()));
+  debug!("response={:?}", bytes_to_ascii(http.payload.response.clone()));
+
+  let request = ManifestRequest::from_payload(&http.payload.request)?;
+  debug!("{:?}", request);
+
+  let response = ManifestResponse::from_payload(&http.payload.response)?;
+  debug!("{:?}", response);
 
   // send TeeProof to client
   let tee_proof = create_tee_proof(&manifest, &request, &response, State(state))?;
@@ -211,40 +237,6 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   framed_stream.flush().await?;
 
   Ok(())
-}
-
-pub fn extract_request_and_response(
-  parsed_transcript: &[ParsedMessage],
-) -> Result<(ManifestRequest, ManifestResponse), NotaryServerError> {
-  let mut request_header = None;
-  let mut request_body = None;
-  let mut response_header = None;
-  let mut response_body = None;
-
-  // Classify parsed messages into headers and bodies
-  for ParsedMessage { payload, direction, .. } in parsed_transcript {
-    if let Some(app_data) = get_app_data(payload) {
-      debug!("App data message {:?}: {:?}", direction, String::from_utf8_lossy(&app_data));
-      match direction {
-        Direction::Sent if request_header.is_none() => request_header = Some(app_data),
-        Direction::Sent => request_body = Some(app_data),
-        Direction::Received if response_header.is_none() => response_header = Some(app_data),
-        Direction::Received => response_body = Some(app_data),
-      }
-    }
-  }
-
-  // Ensure mandatory headers are present
-  let request_header =
-    request_header.ok_or(NotaryServerError::MissingAppDataMessages(Direction::Sent, 2, 0))?;
-  let response_header =
-    response_header.ok_or(NotaryServerError::MissingAppDataMessages(Direction::Received, 2, 0))?;
-
-  let request = ManifestRequest::from_payload(&request_header, request_body.as_deref())?;
-  let response =
-    ManifestResponse::from_payload(&response_header, response_body.as_deref().unwrap_or_default())?;
-
-  Ok((request, response))
 }
 
 // TODO: Should TeeProof and other proofs be moved to `proofs` crate?

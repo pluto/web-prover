@@ -14,34 +14,33 @@ use caratls_ekm_client::TeeTlsConnector;
 use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
 use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt};
 use hyper::StatusCode;
+use js_sys::{Function, Promise};
 use tls_client2::origo::OrigoConnection;
 use tokio_util::{
   codec::{Framed, LengthDelimitedCodec},
   compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt},
 };
 use tracing::debug;
-use wasm_bindgen_futures::{spawn_local, JsFuture};
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::window;
 use ws_stream_wasm::WsMeta;
-use js_sys::{Function, Promise};
 
 use crate::{
   config, config::NotaryMode, errors, errors::ClientErrors, origo::OrigoSecrets,
   tls_client_async2::bind_client, TeeProof,
 };
 
-
 async fn sleep(ms: u64) {
-    #[wasm_bindgen]
-    extern "C" {
-        #[wasm_bindgen(js_namespace = globalThis)]
-        fn setTimeout(callback: &Function, timeout: i32);
-    }
-    let promise = Promise::new(&mut |resolve, _| {
-        setTimeout(&resolve, ms as i32);
-    });
-    JsFuture::from(promise).await.unwrap();
+  #[wasm_bindgen]
+  extern "C" {
+    #[wasm_bindgen(js_namespace = globalThis)]
+    fn setTimeout(callback: &Function, timeout: i32);
+  }
+  let promise = Promise::new(&mut |resolve, _| {
+    setTimeout(&resolve, ms as i32);
+  });
+  JsFuture::from(promise).await.unwrap();
 }
 
 pub(crate) async fn proxy(
