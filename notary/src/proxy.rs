@@ -4,14 +4,16 @@ use axum::{
   extract::{self, Query, State},
   Json,
 };
-use client::TeeProof;
 use reqwest::{Request, Response};
 use serde::Deserialize;
 use serde_json::Value;
 use tracing::info;
 use uuid::Uuid;
-use web_prover_core::http::{
-  ManifestRequest, ManifestResponse, ManifestResponseBody, NotaryResponse, NotaryResponseBody,
+use web_prover_core::{
+  http::{
+    ManifestRequest, ManifestResponse, ManifestResponseBody, NotaryResponse, NotaryResponseBody,
+  },
+  proof::TeeProof,
 };
 
 use crate::{errors::NotaryServerError, tee::create_tee_proof, SharedState};

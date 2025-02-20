@@ -16,7 +16,7 @@ use web_proof_circuits_witness_generator::{
   http::{compute_http_witness, HttpMaskType},
   json::json_value_digest,
 };
-use web_prover_core::manifest::Manifest;
+use web_prover_core::{manifest::Manifest, proof::SignedVerificationReply};
 
 use crate::{
   config::{self},
@@ -29,17 +29,6 @@ use crate::{
 pub struct SignBody {
   pub handshake_server_iv:  String,
   pub handshake_server_key: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SignedVerificationReply {
-  pub merkle_leaves: Vec<String>,
-  pub digest:        String,
-  pub signature:     String,
-  pub signature_r:   String,
-  pub signature_s:   String,
-  pub signature_v:   u8,
-  pub signer:        String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

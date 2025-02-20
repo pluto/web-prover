@@ -16,13 +16,15 @@ mod tls;
 pub mod tls_client_async2;
 use std::collections::HashMap;
 
-use origo::SignedVerificationReply;
 use proofs::{program::manifest::NIVCRom, proof::FoldingProof};
 use serde::{Deserialize, Serialize};
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
 use tracing::{debug, info};
-use web_prover_core::manifest::Manifest;
+use web_prover_core::{
+  manifest::Manifest,
+  proof::{SignedVerificationReply, TeeProof},
+};
 
 use crate::errors::ClientErrors;
 
@@ -180,27 +182,4 @@ pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, ClientE
   assert_eq!(response.status(), hyper::StatusCode::OK);
   let tee_proof = response.json::<TeeProof>().await?;
   Ok(Proof::Proxy(tee_proof))
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct TeeProof {
-  pub data:      TeeProofData,
-  pub signature: SignedVerificationReply,
-}
-
-impl TryFrom<&[u8]> for TeeProof {
-  type Error = serde_json::Error;
-
-  fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> { serde_json::from_slice(bytes) }
-}
-
-impl TryFrom<TeeProof> for Vec<u8> {
-  type Error = serde_json::Error;
-
-  fn try_from(proof: TeeProof) -> Result<Self, Self::Error> { serde_json::to_vec(&proof) }
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct TeeProofData {
-  pub manifest_hash: Vec<u8>,
 }

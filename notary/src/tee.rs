@@ -9,10 +9,7 @@ use caratls_ekm_google_confidential_space_server::GoogleConfidentialSpaceTokenGe
 #[cfg(feature = "tee-dummy-token-generator")]
 use caratls_ekm_server::DummyTokenGenerator;
 use caratls_ekm_server::TeeTlsAcceptor;
-use client::{
-  origo::{OrigoSecrets, VerifyReply},
-  TeeProof, TeeProofData,
-};
+use client::origo::{OrigoSecrets, VerifyReply};
 use futures_util::SinkExt;
 use hyper::{body::Bytes, upgrade::Upgraded};
 use hyper_util::rt::TokioIo;
@@ -31,6 +28,7 @@ use uuid::Uuid;
 use web_prover_core::{
   http::{ManifestRequest, NotaryResponse},
   manifest::Manifest,
+  proof::{TeeProof, TeeProofData},
 };
 use ws_stream_tungstenite::WsStream;
 
@@ -254,7 +252,6 @@ pub fn create_tee_proof(
     manifest: manifest.clone(),
   };
   let signature = sign_verification(to_sign, State(state)).unwrap();
-
   let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
 
   Ok(TeeProof { data, signature })

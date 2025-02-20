@@ -9,7 +9,7 @@ use axum::{
   response::Response,
   Json,
 };
-use client::origo::{SignBody, SignedVerificationReply, VerifyBody, VerifyReply};
+use client::origo::{SignBody, VerifyBody, VerifyReply};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use k256::{
@@ -32,6 +32,7 @@ use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{debug, error, info};
 use uuid::Uuid;
 use web_proof_circuits_witness_generator::polynomial_digest;
+use web_prover_core::proof::SignedVerificationReply;
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
