@@ -4,7 +4,12 @@ use std::time::Duration;
 
 use http_body_util::BodyExt;
 use hyper::{body::Bytes, Request};
+use proofs::program::manifest::Manifest;
 use serde::{Deserialize, Serialize};
+use spansy::{
+  json::{parse, JsonValue},
+  Spanned,
+};
 pub use tlsn_core::attestation::Attestation;
 use tlsn_core::{
   presentation::{Presentation, PresentationOutput},
@@ -16,10 +21,15 @@ use tlsn_core::{
 use tlsn_formats::http::{DefaultHttpCommitter, HttpCommit, HttpTranscript};
 use tlsn_prover::{state::Closed, Prover};
 use tracing::debug;
+use utils::range::ToRangeSet;
+use web_proof_circuits_witness_generator::json::JsonKey;
 
 use crate::errors;
 
-pub async fn notarize(prover: Prover<Closed>) -> Result<Presentation, errors::ClientErrors> {
+pub async fn notarize(
+  prover: Prover<Closed>,
+  manifest: &Option<Manifest>,
+) -> Result<Presentation, errors::ClientErrors> {
   let mut prover = prover.start_notarize();
   let transcript = HttpTranscript::parse(prover.transcript())?;
 
@@ -32,7 +42,7 @@ pub async fn notarize(prover: Prover<Closed>) -> Result<Presentation, errors::Cl
   let config = RequestConfig::default();
   let (attestation, secrets) = prover.finalize(&config).await?;
 
-  let presentation = present(attestation, secrets).await?;
+  let presentation = present(manifest, attestation, secrets).await?;
   Ok(presentation)
 }
 
@@ -45,29 +55,105 @@ pub struct VerifyResult {
 }
 
 pub async fn present(
+  manifest: &Option<Manifest>,
   attestation: Attestation,
   secrets: Secrets,
 ) -> Result<Presentation, errors::ClientErrors> {
+  // get the manifest
+  let manifest = match manifest {
+    Some(manifest) => manifest,
+    None => return Err(errors::ClientErrors::Other("Manifest is missing".to_string())),
+  };
+
   // Parse the HTTP transcript.
   let transcript = HttpTranscript::parse(secrets.transcript())?;
 
   // Build a transcript proof.
   let mut builder = secrets.transcript_proof_builder();
+
   let request = &transcript.requests[0];
   // Reveal the structure of the request without the headers or body.
   builder.reveal_sent(&request.without_data())?;
   // Reveal the request target.
   builder.reveal_sent(&request.request.target)?;
-  // Reveal all headers except the value of the User-Agent header.
+  // Reveal request headers in manifetst.
   for header in &request.headers {
-    if !header.name.as_str().eq_ignore_ascii_case("User-Agent") {
+    if manifest.request.headers.contains_key(header.name.as_str().to_ascii_lowercase().as_str()) {
       builder.reveal_sent(header)?;
     } else {
       builder.reveal_sent(&header.without_value())?;
     }
   }
-  // Reveal the entire response.
-  builder.reveal_recv(&transcript.responses[0])?;
+
+  // Reveal the response start line and headers.
+  let response = &transcript.responses[0];
+  builder.reveal_recv(&response.without_data())?;
+  // todo: do we need to reveal target value? isn't it already done in previous line?
+  for header in &response.headers {
+    if manifest.response.headers.contains_key(header.name.as_str().to_ascii_lowercase().as_str()) {
+      builder.reveal_recv(header)?;
+    } else {
+      builder.reveal_recv(&header.without_value())?;
+    }
+  }
+
+  let response_body = match &response.body {
+    Some(body) => body,
+    None => return Err(errors::ClientErrors::Other("Response body is missing".to_string())),
+  };
+
+  let body_span = response_body.span();
+  dbg!(&body_span);
+
+  // reveal keys specified in manifest
+  // reveal values specified in manifest
+
+  let content_span = response_body.content.span();
+  let initial_index = match content_span.indices().min() {
+    Some(index) => index,
+    None => return Err(errors::ClientErrors::Other("Content span is empty".to_string())),
+  };
+  dbg!(initial_index);
+
+  let mut content_value = parse(content_span.clone().to_bytes()).unwrap();
+  content_value.offset(initial_index);
+  dbg!(&content_value);
+
+  for key in manifest.response.body.json.iter() {
+    let key = match key {
+      JsonKey::String(s) => s.clone(),
+      JsonKey::Num(n) => n.to_string(),
+    };
+
+    match content_value {
+      JsonValue::Object(ref v) => {
+        // reveal object without pairs
+        builder.reveal_recv(&v.without_pairs())?;
+
+        for kv in v.elems.iter() {
+          if key.as_str() == kv.key {
+            // reveal key
+            builder.reveal_recv(&kv.key.to_range_set())?;
+          }
+        }
+      },
+      JsonValue::Array(ref v) => {
+        // reveal array without elements
+        builder.reveal_recv(&v.without_values())?;
+      },
+      _ => {},
+    };
+    let key_span = content_value.get(key.as_str());
+    match key_span {
+      Some(key_span) => {
+        content_value = key_span.clone();
+      },
+      None =>
+        return Err(errors::ClientErrors::Other(format!("Key {} not found in response body", key))),
+    }
+  }
+
+  builder.reveal_recv(&content_value.to_range_set())?;
 
   let transcript_proof = builder.build()?;
 

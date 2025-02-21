@@ -1517,6 +1517,7 @@ dependencies = [
  "tlsn-formats",
  "tlsn-prover",
  "tlsn-tls-client",
+ "tlsn-utils 0.1.0 (git+https://github.com/tlsnotary/tlsn-utils?rev=e7b2db6)",
  "tokio",
  "tokio-rustls 0.26.1",
  "tokio-util",

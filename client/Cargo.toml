@@ -27,6 +27,7 @@ tls-client        ={ workspace=true }
 tls-client2       ={ workspace=true }
 tls-core          ={ workspace=true }
 tlsn-common       ={ workspace=true }
+tlsn-utils        ={ workspace=true }
 tlsn-formats      ={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.7" }
 client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="8e7eb839e901dcee416179116bb0f9c4f7ae683c" }
 web-prover-core   ={ workspace=true }
