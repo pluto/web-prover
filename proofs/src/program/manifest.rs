@@ -1016,7 +1016,7 @@ mod tests {
   //  `test_end_to_end_proofs` test with error: thread 'tests::test_end_to_end_proofs_get' panicked
   // at proofs/src/tests/mod.rs:230:84:  called `Result::unwrap()` on an `Err` value:
   // NovaError(InvalidSumcheckProof)
-  const TEST_MANIFEST_TO_VALIDATE: &str = r#"
+  const TEST_MANIFEST_WITHOUT_VARS: &str = r#"
 {
     "manifestVersion": "1",
     "id": "reddit-user-karma",
@@ -1031,18 +1031,6 @@ mod tests {
             "connection": "close",
             "Authorization": "Bearer <% token %>",
             "User-Agent": "test-agent"
-        },
-        "body": {
-            "userId": "<% userId %>"
-        },
-        "vars": {
-            "userId": {
-                "regex": "[a-z]{,20}+"
-            },
-            "token": {
-                "type": "base64",
-                "length": 32
-            }
         }
     },
     "response": {
@@ -1063,9 +1051,19 @@ mod tests {
 
   #[test]
   fn test_green_path_manifest_validation() {
-    let manifest: Manifest = serde_json::from_str(TEST_MANIFEST_TO_VALIDATE).unwrap();
+    let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
     let result = manifest.validate();
     assert!(result.is_ok());
+  }
+
+  #[test]
+  fn test_parse_manifest_without_vars() {
+    let manifest: Manifest = serde_json::from_str(TEST_MANIFEST_WITHOUT_VARS).unwrap();
+    let result = manifest.validate();
+    assert!(result.is_ok());
+
+    assert!(manifest.request.body.is_none()); // Optional field we omitted
+    assert_eq!(manifest.request.vars, HashMap::new()); // Optional field we provide default for
   }
 
   #[test]
