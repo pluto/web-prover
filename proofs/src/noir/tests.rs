@@ -10,6 +10,7 @@ use client_side_prover::{
   supernova::{NonUniformCircuit, RecursiveSNARK, StepCircuit},
   traits::snark::default_ck_hint,
 };
+use ff::derive::bitvec::ptr::swap;
 use tracing::trace;
 use tracing_test::traced_test;
 
@@ -93,7 +94,7 @@ pub fn run(memory: &NoirMemory) -> Result<RecursiveSNARK<E1>, ProofError> {
   // TODO: This is stupid to do, but I need to get around the original setting of the witness.
   // Having separate setup is the way (we already know this)
   let mut memory_clone = memory.clone();
-  memory_clone.circuits[0].circuit.witness = None;
+  memory_clone.circuits.iter_mut().for_each(|circ| circ.circuit.witness = None);
   let public_params = PublicParams::setup(&memory_clone, &*default_ck_hint(), &*default_ck_hint());
 
   let z0_primary = &memory.public_input;
@@ -237,16 +238,17 @@ fn test_mock_noir_nivc() {
   add_external.set_private_inputs(vec![F::<G1>::from(5), F::<G1>::from(7)]);
   let add_external =
     NoirRomCircuit { circuit: add_external, circuit_index: 0, rom_size: 3 };
-  let square_zeroth = NoirRomCircuit {
-    circuit:       NoirProgram::new(SQUARE_ZEROTH),
-    circuit_index: 1,
-    rom_size:      3,
-  };
-  let swap_memory = NoirRomCircuit {
-    circuit:       NoirProgram::new(SWAP_MEMORY),
-    circuit_index: 2,
-    rom_size:      3,
-  };
+
+  // TODO: The issue is the private inputs need to be an empty vector or else this isn't computed at
+  // all. Be careful, this is insanely touchy and I hate that it is this way.
+  let mut square_zeroth = NoirProgram::new(SQUARE_ZEROTH);
+  square_zeroth.set_private_inputs(vec![]);
+  let square_zeroth =
+    NoirRomCircuit { circuit: square_zeroth, circuit_index: 1, rom_size: 3 };
+  let mut swap_memory = NoirProgram::new(SWAP_MEMORY);
+  swap_memory.set_private_inputs(vec![]);
+  let swap_memory =
+    NoirRomCircuit { circuit: swap_memory, circuit_index: 2, rom_size: 3 };
 
   let memory = NoirMemory {
     circuits:     vec![add_external, square_zeroth, swap_memory],
