@@ -40,6 +40,9 @@ pub fn default_version() -> String { HTTP_1_1.to_string() }
 /// Default HTTP message
 pub fn default_message() -> String { "OK".to_string() }
 
+/// Returns an empty `HashMap` as the default value for `vars`
+fn default_empty_vars() -> HashMap<String, TemplateVar> { HashMap::new() }
+
 /// HTTP Response items required for circuits
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ManifestResponse {
@@ -304,6 +307,7 @@ pub struct ManifestRequest {
   /// Request JSON body
   pub body:    Option<serde_json::Value>,
   /// Request JSON vars to be used in templates
+  #[serde(default = "default_empty_vars")]
   pub vars:    HashMap<String, TemplateVar>,
 }
 
