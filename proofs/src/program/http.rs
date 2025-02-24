@@ -376,6 +376,13 @@ impl ManifestResponse {
       return Err(ProofError::InvalidManifest("Expected at least one JSON item".to_string()));
     }
 
+    const MAX_JSON_PATH_LENGTH: usize = 100;
+    if self.body.json_path.len() > MAX_JSON_PATH_LENGTH {
+      return Err(ProofError::InvalidManifest(
+        "Invalid JSON path length: ".to_string() + &self.body.json_path.len().to_string(),
+      ));
+    }
+
     Ok(())
   }
 }
@@ -1126,7 +1133,7 @@ mod tests {
 
   #[test]
   fn test_very_deep_nesting() {
-    // Test different depths: 3, 10, and 100 levels
+    // Test different depths: 5, 25, and 100 levels
     let depths = vec![5, 25, 100];
 
     for depth in depths {
