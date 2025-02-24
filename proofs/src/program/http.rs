@@ -15,7 +15,6 @@
 
 use std::collections::HashMap;
 
-use ff::derive::bitvec::macros::internal::funty::Fundamental;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 pub use web_proof_circuits_witness_generator::json::JsonKey;
@@ -157,13 +156,13 @@ impl NotaryResponseBody {
           return false;
         }
         if let Some(n) = actual.as_u64() {
-          return n == expected.as_u64();
+          return n == (*expected as u64);
         }
         if let Some(n) = actual.as_i64() {
-          return n == expected.as_i64();
+          return n == (*expected as i64);
         }
         if let Some(n) = actual.as_f64() {
-          return (n - expected.as_f64()).abs() < f64::EPSILON;
+          return (n - (*expected as f64)).abs() < f64::EPSILON;
         }
         false
       },
