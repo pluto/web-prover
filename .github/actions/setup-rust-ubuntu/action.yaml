@@ -42,6 +42,7 @@ runs:
     - shell: bash
       run: |
         rustup toolchain install --no-self-update nightly
+        rustup component add --toolchain nightly clippy
         cargo install cbindgen
 
     - name: Verify installations
