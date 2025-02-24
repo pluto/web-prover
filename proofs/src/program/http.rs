@@ -449,7 +449,7 @@ pub(crate) mod tests {
   /// Creates a new HTTP request with optional parameters.
   macro_rules! create_request {
     // Match with optional parameters
-    ($($key:ident: $value:expr),* $(,)?) => {{
+    ($($key:ident: $value:expr_2021),* $(,)?) => {{
         let mut request = ManifestRequest {
             method: "GET".to_string(),
             url: "https://example.com".to_string(),
@@ -482,7 +482,7 @@ pub(crate) mod tests {
   /// Creates a new HTTP response with optional parameters.
   macro_rules! create_response {
     // Match with optional parameters
-    ($($key:ident: $value:expr),* $(,)?) => {{
+    ($($key:ident: $value:expr_2021),* $(,)?) => {{
         let mut response = ManifestResponse {
             status: "200".to_string(),
             version: "HTTP/1.1".to_string(),

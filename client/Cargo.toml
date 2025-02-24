@@ -1,9 +1,9 @@
 [package]
-name   ="client"
-version="0.5.0"
-edition="2021"
-build  ="build.rs"
-publish=false
+name             ="client"
+version          ="0.5.0"
+build            ="build.rs"
+publish          =false
+edition.workspace=true
 
 [features]
 default=["tee-dummy-token-verifier"]

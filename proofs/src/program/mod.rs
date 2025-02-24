@@ -190,7 +190,7 @@ pub async fn run(
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
   for (idx, &op_code) in
-    resized_rom.iter().enumerate().take_while(|(_, &op_code)| op_code != u64::MAX)
+    resized_rom.iter().enumerate().take_while(|&(_, &op_code)| op_code != u64::MAX)
   {
     info!("Step {} of ROM", idx);
     debug!("Opcode = {:?}", op_code);

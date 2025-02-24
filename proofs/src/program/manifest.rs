@@ -994,9 +994,9 @@ mod tests {
 
   macro_rules! create_manifest {
     (
-        $request:expr,
-        $response:expr
-        $(, $field:ident = $value:expr)* $(,)?
+        $request:expr_2021,
+        $response:expr_2021
+        $(, $field:ident = $value:expr_2021)* $(,)?
     ) => {{
         Manifest {
             // manifest_version: "1".to_string(),

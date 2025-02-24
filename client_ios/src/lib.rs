@@ -1,5 +1,5 @@
 use std::{
-  ffi::{c_char, CStr, CString},
+  ffi::{CStr, CString, c_char},
   time::Instant,
 };
 
@@ -13,13 +13,13 @@ struct Output {
   error: Option<String>,
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[allow(clippy::missing_safety_doc)]
 pub unsafe extern "C" fn get_web_prover_circuits_version() -> *const c_char {
   CString::new(client::get_web_prover_circuits_version()).unwrap().into_raw()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[allow(clippy::missing_safety_doc)]
 pub unsafe extern "C" fn setup_tracing() {
   let collector =
@@ -27,7 +27,7 @@ pub unsafe extern "C" fn setup_tracing() {
   tracing::subscriber::set_global_default(collector).map_err(|e| panic!("{e:?}")).unwrap();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 // TODO: We should probably clarify this safety doc
 #[allow(clippy::missing_safety_doc)]
 pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
@@ -61,10 +61,9 @@ pub unsafe extern "C" fn prover(config_json: *const c_char) -> *const c_char {
       let backtrace = std::backtrace::Backtrace::capture();
       let out = Output {
         proof: None,
-        error: if let Some(e) = err.downcast_ref::<&str>() {
-          Some(format!("Captured Panic\nError: {}\n\nStack:\n{}", e, backtrace))
-        } else {
-          Some(format!("Captured Panic\n{:#?}\n\nStack:\n{}", err, backtrace))
+        error: match err.downcast_ref::<&str>() {
+          Some(e) => Some(format!("Captured Panic\nError: {}\n\nStack:\n{}", e, backtrace)),
+          _ => Some(format!("Captured Panic\n{:#?}\n\nStack:\n{}", err, backtrace)),
         },
       };
       let out_json = serde_json::to_string_pretty(&out).unwrap(); // should never panic

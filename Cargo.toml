@@ -2,7 +2,8 @@
 members=["client", "client_ios", "client_wasm", "notary", "proofs"]
 # members =["client", "client_wasm", "proofs"] # config for wasm32 rust analyzer
 # members =["client", "client_ios"] # config for ios rust analyzer
-resolver="2"
+package.edition="2024"
+resolver       ="2"
 
 [workspace.metadata]
 # https://github.com/pluto/web-prover-circuits/releases

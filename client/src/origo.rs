@@ -252,10 +252,10 @@ mod tests {
   fn test_manifest_serialization() {
     let mut origo_conn = OrigoConnection::new();
     origo_conn.secret_map.insert("Handshake:server_iv".to_string(), vec![1, 2, 3]);
-    let origo_secrets = OrigoSecrets::from_origo_conn(&origo_conn);
+    let origo_secrets = &OrigoSecrets::from_origo_conn(&origo_conn);
 
     let serialized: Vec<u8> = origo_secrets.try_into().unwrap();
-    let deserialized: OrigoSecrets = OrigoSecrets::try_from(&serialized).unwrap();
-    assert_eq!(origo_secrets, deserialized);
+    let deserialized: OrigoSecrets = OrigoSecrets::try_from(serialized.as_ref()).unwrap();
+    assert_eq!(*origo_secrets, deserialized);
   }
 }

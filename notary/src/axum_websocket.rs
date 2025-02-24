@@ -457,11 +457,11 @@ where S: Send + Sync
 }
 
 fn header_contains(headers: &HeaderMap, key: HeaderName, value: &'static str) -> bool {
-  let header = if let Some(header) = headers.get(&key) {
+  let header = match headers.get(&key) { Some(header) => {
     header
-  } else {
+  } _ => {
     return false;
-  };
+  }};
 
   if let Ok(header) = std::str::from_utf8(header.as_bytes()) {
     header.to_ascii_lowercase().contains(value)

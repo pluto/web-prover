@@ -75,9 +75,9 @@ impl TcpUpgrade {
 }
 
 pub fn header_eq(headers: &HeaderMap, key: HeaderName, value: &'static str) -> bool {
-  if let Some(header) = headers.get(&key) {
+  match headers.get(&key) { Some(header) => {
     header.as_bytes().eq_ignore_ascii_case(value.as_bytes())
-  } else {
+  } _ => {
     false
-  }
+  }}
 }
