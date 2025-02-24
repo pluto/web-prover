@@ -948,6 +948,7 @@ mod tests {
             }
         }
     );
+    // ["key1", "key2", "key3"]
     let mut path = vec![
       JsonKey::String("key1".to_string()),
       JsonKey::String("key2".to_string()),
@@ -955,11 +956,15 @@ mod tests {
     ];
     assert!(json.matches_path(&path));
 
-    path.push(JsonKey::String("value".to_string()));
-    assert!(json.matches_path(&path));
+    // ["key1", "key2", "key3", "value"]
+    let mut path_with_value = path.clone();
+    path_with_value.push(JsonKey::String("value".to_string()));
+    assert!(json.matches_path(&path_with_value));
 
-    path.push(JsonKey::String("invalid".to_string()));
-    assert!(!json.matches_path(&path));
+    // ["key1", "key2", "key3", "value", "invalid"]
+    let mut path_with_invalid_value = path.clone();
+    path_with_invalid_value.push(JsonKey::String("invalid_value".to_string()));
+    assert!(!json.matches_path(&path_with_invalid_value));
   }
 
   #[test]
