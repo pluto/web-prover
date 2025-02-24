@@ -193,6 +193,8 @@ pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncrypt
     .into_iter()
     .unzip();
 
+  // TODO (sambhav): seq is set assuming that server won't change session keys in between req/res
+  // sessions. Should revisit.
   Ok(TLSEncryption {
     request:  EncryptionInput {
       key:        request_key,
