@@ -15,16 +15,20 @@ impl WitnessOutput {
 
 #[wasm_bindgen]
 unsafe extern "C" {
+  // Foreign function binding to JavaScript's createWitness
   #[wasm_bindgen(js_namespace = witness, js_name = createWitness)]
-  async fn create_witness_js(input: &JsValue, opcode: u64) -> JsValue;
+  fn create_witness_js(input: &JsValue, opcode: u64) -> js_sys::Promise;
 }
 
 #[wasm_bindgen]
 pub async fn create_witness(input: JsValue, opcode: u64) -> Result<WitnessOutput, JsValue> {
-  // Convert the Rust WitnessInput to a JsValue
-  let js_witnesses_output = create_witness_js(&input, opcode).await;
-  // Call JavaScript function and await the Promise
-  info!("result: {:?}", js_witnesses_output);
+  // Call the JavaScript function, which returns a Promise
+  let promise: js_sys::Promise = unsafe { create_witness_js(&input, opcode) };
+
+  // Await the resolution of the promise
+  let js_witnesses_output = wasm_bindgen_futures::JsFuture::from(promise).await?;
+
+  // Convert the result to a WitnessOutput
   let js_obj = js_sys::Object::from(js_witnesses_output);
   let data_value = js_sys::Reflect::get(&js_obj, &JsValue::from_str("data"))?;
   let array = js_sys::Array::from(&data_value);
