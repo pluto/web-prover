@@ -298,14 +298,6 @@ fn find_ciphertext_permutation<const CIRCUIT_SIZE: usize>(
   // - request, response[0..-1]
   // - request, response[1..-1]
 
-  // Case: first message from server after request
-  let actual_ciphertext_digest =
-    compute_ciphertext_digest::<CIRCUIT_SIZE>(&request_messages, &response_messages[1..]);
-  if actual_ciphertext_digest == expected_ciphertext_digest {
-    debug!("Ciphertext found in response[1..] permutation");
-    return response_messages[1..].to_vec();
-  }
-
   // Case: receiving message & not the last message. Drop last message, it's close notify.
   let actual_ciphertext_digest = compute_ciphertext_digest::<CIRCUIT_SIZE>(
     &request_messages,
@@ -316,15 +308,25 @@ fn find_ciphertext_permutation<const CIRCUIT_SIZE: usize>(
     return response_messages[0..response_messages.len() - 1].to_vec();
   }
 
-  // Case: first message from server after request
-  // Case: receiving message & not the last message. Drop last message, it's close notify.
-  let actual_ciphertext_digest = compute_ciphertext_digest::<CIRCUIT_SIZE>(
-    &request_messages,
-    &response_messages[1..response_messages.len() - 1],
-  );
-  if actual_ciphertext_digest == expected_ciphertext_digest {
-    debug!("Ciphertext found in response[1..-1] permutation");
-    return response_messages[1..response_messages.len() - 1].to_vec();
+  for i in 0..response_messages.len() {
+    // Case: remove first messages from response, changecipherspec from server
+    let actual_ciphertext_digest =
+      compute_ciphertext_digest::<CIRCUIT_SIZE>(&request_messages, &response_messages[i..]);
+    if actual_ciphertext_digest == expected_ciphertext_digest {
+      debug!("Ciphertext found in response[{i}..] permutation");
+      return response_messages[i..].to_vec();
+    }
+
+    // Case: first message from server after request
+    // Case: receiving message & not the last message. Drop last message, it's close notify.
+    let actual_ciphertext_digest = compute_ciphertext_digest::<CIRCUIT_SIZE>(
+      &request_messages,
+      &response_messages[i..response_messages.len() - 1],
+    );
+    if actual_ciphertext_digest == expected_ciphertext_digest {
+      debug!("Ciphertext found in response[{i}..-1] permutation");
+      return response_messages[i..response_messages.len() - 1].to_vec();
+    }
   }
 
   panic!("Ciphertext not found in any permutation");

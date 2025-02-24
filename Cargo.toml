@@ -79,7 +79,6 @@ serde_json    ={ workspace=true }
 
 [profile.dev]
 opt-level      =1
-overflow-checks=false
 split-debuginfo="unpacked"
 incremental    =true
 
