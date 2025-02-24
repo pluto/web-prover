@@ -1,11 +1,13 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use axum::{
   extract::{self, Query, State},
   Json,
 };
 use client::TeeProof;
-use proofs::program::http::{JsonKey, ManifestRequest, ManifestResponse, ResponseBody};
+use proofs::program::http::{
+  ManifestRequest, ManifestResponse, ManifestResponseBody, NotaryResponse, NotaryResponseBody,
+};
 use reqwest::{Request, Response};
 use serde::Deserialize;
 use serde_json::Value;
@@ -55,7 +57,7 @@ pub async fn proxy(
 
 // TODO: This, similarly to other from_* methods, should be a trait
 // Requires adding reqwest to proofs crate
-async fn from_reqwest_response(response: Response) -> ManifestResponse {
+async fn from_reqwest_response(response: Response) -> NotaryResponse {
   let status = response.status().as_u16().to_string();
   let version = format!("{:?}", response.version());
   let message = response.status().canonical_reason().unwrap_or("").to_string();
@@ -64,17 +66,16 @@ async fn from_reqwest_response(response: Response) -> ManifestResponse {
     .iter()
     .map(|(k, v)| (capitalize_header(k.as_ref()), v.to_str().unwrap_or("").to_string()))
     .collect();
-
-  let body: HashMap<String, String> = response.json().await.unwrap_or_default();
-  // TODO: How to handle JsonKey::Num?
-  // TODO Use plain JSON in Manifest etc., and convert to JsonKey as needed
-  let json_keys: Vec<JsonKey> = body.keys().map(|k| JsonKey::String(k.to_string())).collect();
-  ManifestResponse {
-    status,
-    version,
-    message,
-    headers,
-    body: ResponseBody { json: json_keys, json_actual: None },
+  let json = response.json().await.ok();
+  NotaryResponse {
+    response:             ManifestResponse {
+      status,
+      version,
+      message,
+      headers,
+      body: ManifestResponseBody { json_path: vec![] },
+    },
+    notary_response_body: NotaryResponseBody { json },
   }
 }
 

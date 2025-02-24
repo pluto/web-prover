@@ -534,7 +534,7 @@ impl Manifest {
     let raw_response_json_machine =
       RawJsonMachine::<MAX_STACK_HEIGHT>::from_chosen_sequence_and_input(
         ciphertext_digest,
-        &self.response.body.json,
+        &self.response.body.json_path,
       )?;
     let json_sequence_digest_hash =
       poseidon::<1>(&[raw_response_json_machine.compress_tree_hash()]);
@@ -606,7 +606,7 @@ impl Manifest {
     let _ = build_json_extraction_circuit_inputs::<CIRCUIT_SIZE>(
       &request_body,
       ciphertext_digest,
-      (Some(&[]), Some(&self.response.body.json)), // WARN: sending response keys for request
+      (Some(&[]), Some(&self.response.body.json_path)), // WARN: sending response keys for request
       &mut private_inputs,
     )?;
     // debug!("private_inputs: {:?}", private_inputs.len());
@@ -628,7 +628,7 @@ impl Manifest {
     let _ = build_json_extraction_circuit_inputs::<CIRCUIT_SIZE>(
       &response_body,
       ciphertext_digest,
-      (None, Some(&self.response.body.json)),
+      (None, Some(&self.response.body.json_path)),
       &mut private_inputs,
     )?;
 
@@ -730,8 +730,8 @@ impl Manifest {
 mod tests {
   use super::*;
   use crate::{
-    create_request, create_response,
-    program::http::{ResponseBody, TemplateVar},
+    program::http::{ManifestResponseBody, TemplateVar},
+    request, response,
     tests::inputs::{
       complex_manifest, complex_request_inputs, complex_response_inputs, simple_request_inputs,
       simple_response_inputs, TEST_MANIFEST,
@@ -739,7 +739,7 @@ mod tests {
   };
 
   #[test]
-  fn test_serialize() {
+  fn test_deserialize() {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
     // verify defaults are working
     assert_eq!(manifest.request.version, HTTP_1_1);
@@ -752,7 +752,7 @@ mod tests {
     assert_eq!(manifest.response.version, HTTP_1_1);
     assert_eq!(manifest.response.headers.len(), 2);
     assert_eq!(manifest.response.headers.get("Content-Type").unwrap(), "text/plain; charset=utf-8");
-    assert_eq!(manifest.response.body.json.len(), 1);
+    assert_eq!(manifest.response.body.json_path, vec![JsonKey::String("hello".to_string())]);
   }
 
   fn simple_inputs() -> (EncryptionInput, EncryptionInput) {
@@ -1054,8 +1054,7 @@ mod tests {
         "body": {
             "json": [
                 "hello"
-            ],
-            "contains": "this_string_exists_in_body"
+            ]
         }
     }
 }
@@ -1070,8 +1069,7 @@ mod tests {
 
   #[test]
   fn test_manifest_validation_invalid_method() {
-    let manifest =
-      create_manifest!(create_request!(method: "INVALID".to_string()), create_response!(),);
+    let manifest = create_manifest!(request!(method: "INVALID".to_string()), response!());
     let result = manifest.validate();
     assert!(result.is_err());
     if let Err(ProofError::InvalidManifest(message)) = result {
@@ -1083,8 +1081,7 @@ mod tests {
 
   #[test]
   fn test_manifest_validation_invalid_url() {
-    let manifest =
-      create_manifest!(create_request!(url: "ftp://example.com".to_string()), create_response!(),);
+    let manifest = create_manifest!(request!(url: "ftp://example.com".to_string()), response!(),);
     let result = manifest.validate();
     assert!(result.is_err());
     if let Err(ProofError::InvalidManifest(message)) = result {
@@ -1096,8 +1093,7 @@ mod tests {
 
   #[test]
   fn test_manifest_validation_invalid_response_status() {
-    let manifest =
-      create_manifest!(create_request!(), create_response!(status: "500".to_string()),);
+    let manifest = create_manifest!(request!(), response!(status: "500".to_string()),);
     let result = manifest.validate();
     assert!(result.is_err());
     if let Err(ProofError::InvalidManifest(message)) = result {
@@ -1117,11 +1113,11 @@ mod tests {
       r#type: Some("base64".to_string()),
     });
     let manifest = create_manifest!(
-      create_request!(
+      request!(
           headers: HashMap::new(), // Invalid because "Authorization" makes use of `<TOKEN>`
           vars: vars
       ),
-      create_response!(),
+      response!(),
     );
     let result = manifest.validate();
     assert!(result.is_err());
@@ -1130,8 +1126,8 @@ mod tests {
   #[test]
   fn test_manifest_validation_invalid_content_type() {
     let manifest = create_manifest!(
-      create_request!(),
-      create_response!(headers: HashMap::from([
+      request!(),
+      response!(headers: HashMap::from([
           ("Content-Type".to_string(), "invalid/type".to_string())
       ])),
     );

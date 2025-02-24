@@ -17,11 +17,10 @@ use futures_util::SinkExt;
 use hyper::{body::Bytes, upgrade::Upgraded};
 use hyper_util::rt::TokioIo;
 use proofs::program::{
-  http::{ManifestRequest, ManifestResponse},
+  http::{ManifestRequest, NotaryResponse},
   manifest::Manifest,
 };
 use serde::Deserialize;
-use tls_client2::tls_core::msgs::message::MessagePayload;
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
   time::{timeout, Duration},
@@ -227,7 +226,7 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let request = ManifestRequest::from_payload(&http.payload.request)?;
   debug!("{:?}", request);
 
-  let response = ManifestResponse::from_payload(&http.payload.response)?;
+  let response = NotaryResponse::from_payload(&http.payload.response)?;
   debug!("{:?}", response);
 
   // send TeeProof to client
@@ -245,7 +244,7 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
 pub fn create_tee_proof(
   manifest: &Manifest,
   request: &ManifestRequest,
-  response: &ManifestResponse,
+  response: &NotaryResponse,
   State(state): State<Arc<SharedState>>,
 ) -> Result<TeeProof, NotaryServerError> {
   validate_notarization_legal(manifest, request, response)?;
@@ -269,14 +268,14 @@ pub fn create_tee_proof(
 fn validate_notarization_legal(
   manifest: &Manifest,
   request: &ManifestRequest,
-  response: &ManifestResponse,
+  response: &NotaryResponse,
 ) -> Result<(), NotaryServerError> {
   manifest.validate()?;
   if !manifest.request.is_subset_of(&request) {
     return Err(NotaryServerError::ManifestRequestMismatch);
   }
 
-  if !manifest.response.is_subset_of(&response) {
+  if !response.matches_client_manifest(&manifest.response) {
     return Err(NotaryServerError::ManifestResponseMismatch);
   }
 

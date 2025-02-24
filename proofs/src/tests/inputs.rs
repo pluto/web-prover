@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use web_proof_circuits_witness_generator::json::JsonKey;
 
 use crate::program::{
-  http::{ManifestRequest, ManifestResponse, ResponseBody},
+  http::{ManifestRequest, ManifestResponse, ManifestResponseBody},
   manifest::{EncryptionInput, Manifest},
 };
 
@@ -52,8 +52,7 @@ pub(crate) const TEST_MANIFEST: &str = r#"
         "body": {
             "json": [
                 "hello"
-            ],
-            "contains": "this_string_exists_in_body"
+            ]
         }
     }
 }
@@ -685,13 +684,12 @@ pub(crate) fn complex_manifest() -> Manifest {
         ("Date".to_string(), "Mon, 27 Jan 2025 10:15:31 GMT".to_string()),
         ("Server".to_string(), "nginx/1.18.0".to_string()),
       ]),
-      body:    ResponseBody {
-        json:        vec![
+      body:    ManifestResponseBody {
+        json_path: vec![
           JsonKey::String(String::from("data")),
           JsonKey::String(String::from("orderDetails")),
           JsonKey::String(String::from("orderId")),
         ],
-        json_actual: None,
       },
     },
   }

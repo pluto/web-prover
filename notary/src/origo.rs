@@ -24,7 +24,6 @@ use proofs::{
 };
 use rs_merkle::{Hasher, MerkleTree};
 use serde::{Deserialize, Serialize};
-use tls_parser::rusticata_macros::debug;
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
   net::TcpStream,

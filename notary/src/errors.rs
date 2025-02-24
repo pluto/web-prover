@@ -8,8 +8,6 @@ use thiserror::Error;
 use tlsn_verifier::tls::{VerifierConfigBuilderError, VerifierError};
 use tracing::error;
 
-use crate::tls_parser::Direction;
-
 #[derive(Debug, Error)]
 pub enum ProxyError {
   #[error(transparent)]
