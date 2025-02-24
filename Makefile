@@ -38,13 +38,13 @@ ios: artifacts
 	-cargo install cbindgen
 	# Build simulator
 	rustup target add aarch64-apple-ios-sim --toolchain nightly
-	RUSTFLAGS="-C panic=unwind" cargo +nightly build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
+	RUSTFLAGS="-C panic=unwind" cargo build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
 	mkdir -p target/sim/headers
 	~/.cargo/bin/cbindgen --lang c --crate client_ios --output target/sim/headers/Prover.h
 	mv target/aarch64-apple-ios-sim/release/libclient_ios.a target/sim/libProver.a
 	# Build device
 	rustup target add aarch64-apple-ios --toolchain nightly
-	RUSTFLAGS="-C panic=unwind" cargo +nightly  build -p client_ios --release --target aarch64-apple-ios # builds target/aarch64-apple-ios/release/libclient_ios.a
+	RUSTFLAGS="-C panic=unwind" cargo build -p client_ios --release --target aarch64-apple-ios # builds target/aarch64-apple-ios/release/libclient_ios.a
 	mkdir -p target/device/headers
 	~/.cargo/bin/cbindgen --lang c --crate client_ios --output target/device/headers/Prover.h
 	mv target/aarch64-apple-ios/release/libclient_ios.a target/device/libProver.a

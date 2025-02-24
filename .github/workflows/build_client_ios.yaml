@@ -39,11 +39,11 @@ jobs:
           rm -rf target/PlutoProver.xcframework
           mkdir -p target/{sim,device}/headers
 
-          cargo +nightly build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
+          cargo build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
           cbindgen --lang c --crate client_ios --output target/sim/headers/Prover.h
           mv target/aarch64-apple-ios-sim/release/libclient_ios.a target/sim/libProver.a
 
-          cargo +nightly  build -p client_ios --release --target aarch64-apple-ios # builds target/aarch64-apple-ios/release/libclient_ios.a
+          cargo build -p client_ios --release --target aarch64-apple-ios # builds target/aarch64-apple-ios/release/libclient_ios.a
           cbindgen --lang c --crate client_ios --output target/device/headers/Prover.h
           mv target/aarch64-apple-ios/release/libclient_ios.a target/device/libProver.a
 
