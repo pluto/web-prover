@@ -17,7 +17,6 @@ use std::collections::HashMap;
 
 use ff::derive::bitvec::macros::internal::funty::Fundamental;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use tracing::debug;
 pub use web_proof_circuits_witness_generator::json::JsonKey;
 
@@ -64,7 +63,7 @@ impl TryFrom<&[u8]> for NotaryResponseBody {
       return Ok(Self { json: None });
     }
     // Attempt to parse the body as JSON.
-    let json: Value = serde_json::from_slice(body_bytes)
+    let json: serde_json::Value = serde_json::from_slice(body_bytes)
       .map_err(|_| ProofError::InvalidManifest("Failed to parse body as valid JSON".to_string()))?;
     Ok(Self { json: Some(json) })
   }
@@ -103,10 +102,11 @@ impl NotaryResponseBody {
   /// # Returns
   /// `true` if the traversal successfully matches the sequence or reaches the expected value;
   /// `false` otherwise.
-  fn traverse_json_path(&self, initial_value: &Value, json_path: &[JsonKey]) -> bool {
+  fn traverse_json_path(&self, initial_value: &serde_json::Value, json_path: &[JsonKey]) -> bool {
     let mut current = initial_value;
 
     for (i, key) in json_path.iter().enumerate() {
+      // If the element is last, we return true because we've reached the end of the path
       let is_last = i == json_path.len() - 1;
 
       match key {
@@ -126,7 +126,7 @@ impl NotaryResponseBody {
           if is_last {
             return true;
           }
-          current = current.as_array().and_then(|arr| arr.get(*expected as usize)).unwrap();
+          current = current.as_array().and_then(|arr| arr.get(*expected)).unwrap();
         },
       }
     }
@@ -134,10 +134,10 @@ impl NotaryResponseBody {
     false
   }
 
-  fn handle_string_key(&self, current: &Value, expected: &str, is_last: bool) -> bool {
+  fn handle_string_key(&self, current: &serde_json::Value, expected: &str, is_last: bool) -> bool {
     match current {
-      Value::String(actual) => is_last && actual == expected,
-      Value::Object(obj) => obj.contains_key(expected),
+      serde_json::Value::String(actual) => is_last && actual == expected,
+      serde_json::Value::Object(obj) => obj.contains_key(expected),
       _ => {
         debug!("Expected string or object, found: {:?}", current);
         false
@@ -145,9 +145,14 @@ impl NotaryResponseBody {
     }
   }
 
-  fn handle_numeric_key(&self, current: &Value, expected: &usize, is_last: bool) -> bool {
+  fn handle_numeric_key(
+    &self,
+    current: &serde_json::Value,
+    expected: &usize,
+    is_last: bool,
+  ) -> bool {
     match current {
-      Value::Number(actual) => {
+      serde_json::Value::Number(actual) => {
         if !is_last {
           return false;
         }
@@ -162,7 +167,7 @@ impl NotaryResponseBody {
         }
         false
       },
-      Value::Array(arr) => expected >= &0 && *expected < arr.len(),
+      serde_json::Value::Array(arr) => expected >= &0 && *expected < arr.len(),
       _ => {
         debug!("Expected number or array, found: {:?}", current);
         false
@@ -627,7 +632,7 @@ mod tests {
     // Match with ManifestResponse and optional overrides for NotaryResponseBody
     ($response:expr, $($key:ident: $value:expr),* $(,)?) => {{
         let mut notary_response_body = NotaryResponseBody {
-            json: Some(serde_json::json!({})), // Default to empty JSON
+            json: Some(json!({})), // Default to empty JSON
         };
 
         // Apply custom key-value overrides for NotaryResponseBody
@@ -646,7 +651,7 @@ mod tests {
   #[test]
   fn test_parse_response() {
     let header_bytes: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
-    let body = serde_json::json!({"key1": { "key2": 3 }});
+    let body = json!({"key1": { "key2": 3 }});
     let response =
       NotaryResponse::from_payload(&[header_bytes, body.to_string().as_bytes()].concat()).unwrap();
     assert_eq!(response.response.status, "200");
@@ -663,7 +668,7 @@ mod tests {
     let response = response!();
     let notary_response = notary_response!(
       response.clone(),
-      json: Some(serde_json::json!({
+      json: Some(json!({
             "key1": {"key2": 3},
         })),
     );
@@ -770,7 +775,7 @@ mod tests {
     );
     let expected_response = notary_response!(
         manifest_response,
-        json: Some(serde_json::json!({"key1": "value1"}))
+        json: Some(json!({"key1": "value1"}))
     );
 
     assert_eq!(response, expected_response);
@@ -785,7 +790,7 @@ mod tests {
       NotaryResponse::from_payload(&[header_bytes, empty_body_bytes].concat()).unwrap();
 
     assert_eq!(notary_response.response.body.json_path.len(), 0);
-    assert_eq!(notary_response.notary_response_body.json, Some(serde_json::json!({})));
+    assert_eq!(notary_response.notary_response_body.json, Some(json!({})));
   }
 
   #[test]
@@ -926,7 +931,7 @@ mod tests {
   macro_rules! notary_body {
     ($($key:tt : $value:tt),* $(,)?) => {{
         NotaryResponseBody {
-            json: Some(serde_json::json!({
+            json: Some(json!({
                 $(
                     $key: $value
                 ),*
@@ -1138,9 +1143,9 @@ mod tests {
 
     for depth in depths {
       // Build nested JSON structure
-      let mut json_value = serde_json::json!("value");
+      let mut json_value = json!("value");
       for i in (0..depth).rev() {
-        json_value = serde_json::json!({
+        json_value = json!({
             format!("level{}", i): json_value
         });
       }
