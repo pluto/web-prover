@@ -1,7 +1,5 @@
 // logic common to wasm32 and native
 
-use std::time::Duration;
-
 use http_body_util::BodyExt;
 use hyper::{body::Bytes, Request};
 use proofs::program::manifest::Manifest;
@@ -12,10 +10,7 @@ use spansy::{
 };
 pub use tlsn_core::attestation::Attestation;
 use tlsn_core::{
-  presentation::{Presentation, PresentationOutput},
-  request::RequestConfig,
-  signing::VerifyingKey,
-  transcript::TranscriptCommitConfig,
+  presentation::Presentation, request::RequestConfig, transcript::TranscriptCommitConfig,
   CryptoProvider, Secrets,
 };
 use tlsn_formats::http::{DefaultHttpCommitter, HttpCommit, HttpTranscript};
@@ -24,25 +19,30 @@ use tracing::debug;
 use utils::range::ToRangeSet;
 use web_proof_circuits_witness_generator::json::JsonKey;
 
-use crate::errors;
+use crate::{errors, SignedVerificationReply};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TlsnProof {
+  pub proof:      Presentation,
+  pub sign_reply: Option<SignedVerificationReply>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TlsnVerifyBody {
+  pub proof:    Presentation,
+  pub manifest: Manifest,
+}
 
 pub async fn notarize(
   prover: Prover<Closed>,
-  manifest: &Option<Manifest>,
+  manifest: &Manifest,
 ) -> Result<Presentation, errors::ClientErrors> {
-  let manifest = match manifest {
-    Some(manifest) => manifest,
-    None => return Err(errors::ClientErrors::Other("Manifest is missing".to_string())),
-  };
-
   let mut prover = prover.start_notarize();
   let transcript = HttpTranscript::parse(prover.transcript())?;
 
   // Commit to the transcript.
-  dbg!(&transcript);
   let mut builder = TranscriptCommitConfig::builder(prover.transcript());
   DefaultHttpCommitter::default().commit_transcript(&mut builder, &transcript)?;
-  dbg!(&builder);
 
   // Reveal the response start line and headers.
   let response = &transcript.responses[0];
@@ -52,9 +52,6 @@ pub async fn notarize(
     None => return Err(errors::ClientErrors::Other("Response body is missing".to_string())),
   };
 
-  let body_span = response_body.span();
-  dbg!(&body_span);
-
   // reveal keys specified in manifest
   // reveal values specified in manifest
 
@@ -63,11 +60,9 @@ pub async fn notarize(
     Some(index) => index,
     None => return Err(errors::ClientErrors::Other("Content span is empty".to_string())),
   };
-  dbg!(initial_index);
 
   let mut content_value = parse(content_span.clone().to_bytes()).unwrap();
   content_value.offset(initial_index);
-  dbg!(&content_value);
 
   for key in manifest.response.body.json.iter() {
     let key = match key {
@@ -77,19 +72,18 @@ pub async fn notarize(
 
     match content_value {
       JsonValue::Object(ref v) => {
-        // reveal object without pairs
-        // builder.reveal_recv(&v.without_pairs())?;
+        // commit object without pairs
         builder.commit_recv(&v.without_pairs())?;
 
         for kv in v.elems.iter() {
           if key.as_str() == kv.key {
-            // reveal key
+            // commit key
             builder.commit_recv(&kv.key.to_range_set())?;
           }
         }
       },
       JsonValue::Array(ref v) => {
-        // reveal array without elements
+        // commit array without elements
         builder.commit_recv(&v.without_values())?;
       },
       _ => {},
@@ -103,14 +97,10 @@ pub async fn notarize(
         return Err(errors::ClientErrors::Other(format!("Key {} not found in response body", key))),
     }
   }
-
-  dbg!(&content_value);
   builder.commit_recv(&content_value.to_range_set())?;
-  // builder.reveal_recv(&content_value.to_range_set())?;
 
   prover.transcript_commit(builder.build()?);
 
-  dbg!(&prover);
   // Request an attestation.
   let config = RequestConfig::default();
   let (attestation, secrets) = prover.finalize(&config).await?;
@@ -175,9 +165,6 @@ pub async fn present(
     None => return Err(errors::ClientErrors::Other("Response body is missing".to_string())),
   };
 
-  let body_span = response_body.span();
-  dbg!(&body_span);
-
   // reveal keys specified in manifest
   // reveal values specified in manifest
 
@@ -186,11 +173,9 @@ pub async fn present(
     Some(index) => index,
     None => return Err(errors::ClientErrors::Other("Content span is empty".to_string())),
   };
-  dbg!(initial_index);
 
   let mut content_value = parse(content_span.clone().to_bytes()).unwrap();
   content_value.offset(initial_index);
-  dbg!(&content_value);
 
   for key in manifest.response.body.json.iter() {
     let key = match key {
@@ -226,7 +211,6 @@ pub async fn present(
     }
   }
 
-  dbg!(&content_value);
   builder.reveal_recv(&content_value.to_range_set())?;
 
   let transcript_proof = builder.build()?;
@@ -241,44 +225,6 @@ pub async fn present(
   let presentation: Presentation = builder.build()?;
 
   Ok(presentation)
-}
-
-pub async fn verify(presentation: Presentation) -> Result<(), errors::ClientErrors> {
-  let provider = CryptoProvider::default();
-
-  let VerifyingKey { alg, data: key_data } = presentation.verifying_key();
-
-  println!(
-    "Verifying presentation with {alg} key: {}\n\n**Ask yourself, do you trust this key?**\n",
-    hex::encode(key_data)
-  );
-
-  // Verify the presentation.
-  let PresentationOutput { server_name, connection_info, transcript, .. } =
-    presentation.verify(&provider).unwrap();
-
-  // The time at which the connection was started.
-  let time = chrono::DateTime::UNIX_EPOCH + Duration::from_secs(connection_info.time);
-  let server_name = server_name.unwrap();
-  let mut partial_transcript = transcript.unwrap();
-  // Set the unauthenticated bytes so they are distinguishable.
-  partial_transcript.set_unauthed(b'X');
-
-  let sent = String::from_utf8_lossy(partial_transcript.sent_unsafe());
-  let recv = String::from_utf8_lossy(partial_transcript.received_unsafe());
-
-  println!("-------------------------------------------------------------------");
-  println!(
-    "Successfully verified that the data below came from a session with {server_name} at {time}.",
-  );
-  println!("Note that the data which the Prover chose not to disclose are shown as X.\n");
-  println!("Data sent:\n");
-  println!("{}\n", sent);
-  println!("Data received:\n");
-  println!("{}\n", recv);
-  println!("-------------------------------------------------------------------");
-
-  Ok(())
 }
 
 pub async fn send_request(
