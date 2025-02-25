@@ -34,7 +34,7 @@ pub enum NotaryMode {
 /// Proving data containing [`Manifest`] and serialized witnesses used for WASM
 #[derive(Deserialize, Clone, Debug)]
 pub struct ProvingData {
-  pub manifest: Option<Manifest>, // TODO: Why is it optional?
+  pub manifest: Option<Manifest>, // TODO(#515)
 }
 
 #[serde_as]

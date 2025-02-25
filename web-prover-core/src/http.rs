@@ -556,8 +556,6 @@ impl ManifestRequest {
     let body_bytes = &rest[delimiter.len()..];
 
     let (method, url, version, headers) = Self::parse_header(header_bytes)?;
-    // TODO: Do we expect requests to have bodies? (piotr-roslaniec): POST/PUT requests may have
-    // bodies
 
     let body = if !body_bytes.is_empty() {
       serde_json::from_slice(body_bytes)
