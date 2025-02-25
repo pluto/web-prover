@@ -5,6 +5,7 @@ use hyper::{body::Bytes, Request};
 use proofs::program::manifest::Manifest;
 use serde::{Deserialize, Serialize};
 use spansy::{
+  http::Response,
   json::{parse, JsonValue},
   Spanned,
 };
@@ -16,7 +17,7 @@ use tlsn_core::{
 use tlsn_formats::http::{DefaultHttpCommitter, HttpCommit, HttpTranscript};
 use tlsn_prover::{state::Closed, Prover};
 use tracing::debug;
-use utils::range::ToRangeSet;
+use utils::range::{RangeSet, ToRangeSet};
 use web_proof_circuits_witness_generator::json::JsonKey;
 
 use crate::{errors, SignedVerificationReply};
@@ -33,27 +34,25 @@ pub struct TlsnVerifyBody {
   pub manifest: Manifest,
 }
 
-pub async fn notarize(
-  prover: Prover<Closed>,
-  manifest: &Manifest,
-) -> Result<Presentation, errors::ClientErrors> {
-  let mut prover = prover.start_notarize();
-  let transcript = HttpTranscript::parse(prover.transcript())?;
+#[derive(Serialize, Deserialize)]
+pub struct VerifyResult {
+  pub server_name: String,
+  pub time:        u64,
+  pub sent:        String,
+  pub recv:        String,
+}
 
-  // Commit to the transcript.
-  let mut builder = TranscriptCommitConfig::builder(prover.transcript());
-  DefaultHttpCommitter::default().commit_transcript(&mut builder, &transcript)?;
-
-  // Reveal the response start line and headers.
-  let response = &transcript.responses[0];
-
+fn compute_mask_range_set(
+  response: &Response,
+  keys: &[JsonKey],
+) -> Result<Vec<RangeSet<usize>>, errors::ClientErrors> {
   let response_body = match &response.body {
     Some(body) => body,
     None => return Err(errors::ClientErrors::Other("Response body is missing".to_string())),
   };
 
-  // reveal keys specified in manifest
-  // reveal values specified in manifest
+  // commit to keys specified in manifest
+  // commit values specified in manifest
 
   let content_span = response_body.content.span();
   let initial_index = match content_span.indices().min() {
@@ -64,27 +63,22 @@ pub async fn notarize(
   let mut content_value = parse(content_span.clone().to_bytes()).unwrap();
   content_value.offset(initial_index);
 
-  for key in manifest.response.body.json.iter() {
+  let mut range_sets = Vec::new();
+  for key in keys {
     let key = match key {
       JsonKey::String(s) => s.clone(),
       JsonKey::Num(n) => n.to_string(),
     };
 
     match content_value {
-      JsonValue::Object(ref v) => {
-        // commit object without pairs
-        builder.commit_recv(&v.without_pairs())?;
-
+      JsonValue::Object(ref v) =>
         for kv in v.elems.iter() {
           if key.as_str() == kv.key {
-            // commit key
-            builder.commit_recv(&kv.key.to_range_set())?;
+            range_sets.push(kv.key.to_range_set());
           }
-        }
-      },
+        },
       JsonValue::Array(ref v) => {
-        // commit array without elements
-        builder.commit_recv(&v.without_values())?;
+        range_sets.push(v.without_values());
       },
       _ => {},
     };
@@ -97,7 +91,26 @@ pub async fn notarize(
         return Err(errors::ClientErrors::Other(format!("Key {} not found in response body", key))),
     }
   }
-  builder.commit_recv(&content_value.to_range_set())?;
+  range_sets.push(content_value.to_range_set());
+  Ok(range_sets)
+}
+
+pub async fn notarize(
+  prover: Prover<Closed>,
+  manifest: &Manifest,
+) -> Result<Presentation, errors::ClientErrors> {
+  let mut prover = prover.start_notarize();
+  let transcript = HttpTranscript::parse(prover.transcript())?;
+
+  // Commit to the transcript.
+  let mut builder = TranscriptCommitConfig::builder(prover.transcript());
+  DefaultHttpCommitter::default().commit_transcript(&mut builder, &transcript)?;
+
+  let range_sets =
+    compute_mask_range_set(&transcript.responses[0], &manifest.response.body.json_path)?;
+  for range_set in range_sets {
+    builder.commit_recv(&range_set)?;
+  }
 
   prover.transcript_commit(builder.build()?);
 
@@ -107,14 +120,6 @@ pub async fn notarize(
 
   let presentation = present(&Some(manifest.clone()), attestation, secrets).await?;
   Ok(presentation)
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct VerifyResult {
-  pub server_name: String,
-  pub time:        u64,
-  pub sent:        String,
-  pub recv:        String,
 }
 
 pub async fn present(
@@ -160,58 +165,11 @@ pub async fn present(
     }
   }
 
-  let response_body = match &response.body {
-    Some(body) => body,
-    None => return Err(errors::ClientErrors::Other("Response body is missing".to_string())),
-  };
-
-  // reveal keys specified in manifest
-  // reveal values specified in manifest
-
-  let content_span = response_body.content.span();
-  let initial_index = match content_span.indices().min() {
-    Some(index) => index,
-    None => return Err(errors::ClientErrors::Other("Content span is empty".to_string())),
-  };
-
-  let mut content_value = parse(content_span.clone().to_bytes()).unwrap();
-  content_value.offset(initial_index);
-
-  for key in manifest.response.body.json.iter() {
-    let key = match key {
-      JsonKey::String(s) => s.clone(),
-      JsonKey::Num(n) => n.to_string(),
-    };
-
-    match content_value {
-      JsonValue::Object(ref v) => {
-        // reveal object without pairs
-        builder.reveal_recv(&v.without_pairs())?;
-
-        for kv in v.elems.iter() {
-          if key.as_str() == kv.key {
-            // reveal key
-            builder.reveal_recv(&kv.key.to_range_set())?;
-          }
-        }
-      },
-      JsonValue::Array(ref v) => {
-        // reveal array without elements
-        builder.reveal_recv(&v.without_values())?;
-      },
-      _ => {},
-    };
-    let key_span = content_value.get(key.as_str());
-    match key_span {
-      Some(key_span) => {
-        content_value = key_span.clone();
-      },
-      None =>
-        return Err(errors::ClientErrors::Other(format!("Key {} not found in response body", key))),
-    }
+  let range_sets =
+    compute_mask_range_set(&transcript.responses[0], &manifest.response.body.json_path)?;
+  for range_set in range_sets {
+    builder.reveal_recv(&range_set)?;
   }
-
-  builder.reveal_recv(&content_value.to_range_set())?;
 
   let transcript_proof = builder.build()?;
 

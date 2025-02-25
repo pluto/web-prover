@@ -76,21 +76,6 @@ pub async fn prover(
 }
 
 #[wasm_bindgen]
-pub async fn verify(proof: &str, notary_pubkey_str: &str) -> Result<String, JsValue> {
-  panic::set_hook(Box::new(console_error_panic_hook::hook));
-
-  let proof: Presentation = serde_json::from_str(proof)
-    .map_err(|e| JsValue::from_str(&format!("Could not deserialize proof: {:?}", e)))?;
-
-  let result = client::tlsn::verify(proof)
-    .await
-    .map_err(|e| JsValue::from_str(&format!("Could not verify proof: {:?}", e)))?;
-
-  serde_json::to_string_pretty(&result)
-    .map_err(|e| JsValue::from_str(&format!("Could not serialize result: {:?}", e)))
-}
-
-#[wasm_bindgen]
 pub fn setup_tracing(logging_filter: &str) {
   let fmt_layer = tracing_subscriber::fmt::layer()
         .with_ansi(false) // Only partially supported across browsers
