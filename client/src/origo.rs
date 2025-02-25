@@ -127,7 +127,7 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
   let http_body = compute_http_witness(&flattened_plaintext, HttpMaskType::Body);
   let value = json_value_digest::<{ proofs::circuits::MAX_STACK_HEIGHT }>(
     &http_body,
-    &manifest.response.body.json_path,
+    &manifest.response.body.json_path(),
   )?;
 
   proof.value = Some(String::from_utf8_lossy(&value).into_owned());

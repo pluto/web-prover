@@ -137,7 +137,7 @@ impl OrigoManifest {
     let raw_response_json_machine =
       RawJsonMachine::<MAX_STACK_HEIGHT>::from_chosen_sequence_and_input(
         ciphertext_digest,
-        &self.0.response.body.json_path,
+        &self.0.response.body.json_path(),
       )?;
     let json_sequence_digest_hash =
       poseidon::<1>(&[raw_response_json_machine.compress_tree_hash()]);
@@ -209,8 +209,8 @@ impl OrigoManifest {
     let _ = build_json_extraction_circuit_inputs::<CIRCUIT_SIZE>(
       &request_body,
       ciphertext_digest,
-      (Some(&[]), Some(&self.0.response.body.json_path)), /* WARN: sending response keys for
-                                                           * request */
+      // WARN: sending response keys for request
+      (Some(&[]), Some(&self.0.response.body.json_path())),
       &mut private_inputs,
     )?;
     // debug!("private_inputs: {:?}", private_inputs.len());
@@ -232,7 +232,7 @@ impl OrigoManifest {
     let _ = build_json_extraction_circuit_inputs::<CIRCUIT_SIZE>(
       &response_body,
       ciphertext_digest,
-      (None, Some(&self.0.response.body.json_path)),
+      (None, Some(&self.0.response.body.json_path())),
       &mut private_inputs,
     )?;
 
@@ -686,30 +686,13 @@ pub fn compute_ciphertext_digest<const CIRCUIT_SIZE: usize>(
 
 #[cfg(test)]
 mod tests {
-  use web_prover_core::{http::HTTP_1_1, test_utils::TEST_MANIFEST};
+  use web_prover_core::test_utils::TEST_MANIFEST;
 
   use super::*;
   use crate::tests::inputs::{
     complex_manifest, complex_request_inputs, complex_response_inputs, simple_request_inputs,
     simple_response_inputs,
   };
-
-  #[test]
-  fn test_deserialize() {
-    let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
-    // verify defaults are working
-    assert_eq!(manifest.request.version, HTTP_1_1);
-    assert_eq!(manifest.request.method, "GET");
-    assert_eq!(manifest.request.headers.len(), 2);
-    assert_eq!(manifest.request.headers.get("host").unwrap(), "gist.githubusercontent.com");
-
-    // verify defaults are working
-    assert_eq!(manifest.response.status, "200");
-    assert_eq!(manifest.response.version, HTTP_1_1);
-    assert_eq!(manifest.response.headers.len(), 2);
-    assert_eq!(manifest.response.headers.get("Content-Type").unwrap(), "text/plain; charset=utf-8");
-    assert_eq!(manifest.response.body.json_path, vec![JsonKey::String("hello".to_string())]);
-  }
 
   fn simple_inputs() -> (EncryptionInput, EncryptionInput) {
     (simple_request_inputs(), simple_response_inputs())

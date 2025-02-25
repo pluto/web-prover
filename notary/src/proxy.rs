@@ -75,7 +75,8 @@ async fn from_reqwest_response(response: Response) -> NotaryResponse {
       version,
       message,
       headers,
-      body: ManifestResponseBody { json_path: vec![] },
+      // TODO: This makes me think that perhaps this should be an optional field or something else
+      body: ManifestResponseBody::default(),
     },
     notary_response_body: NotaryResponseBody { json },
   }
