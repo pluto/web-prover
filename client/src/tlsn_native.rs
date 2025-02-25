@@ -51,9 +51,10 @@ pub async fn setup_tcp_connection(
 
   let request: Request<Full<Bytes>> = hyper::Request::builder()
     .uri(format!(
-      "https://{}:{}/v1/tlsnotary?session_id={}",
+      "https://{}:{}/v1/{}?session_id={}",
       config.notary_host.clone(),
       config.notary_port.clone(),
+      config.mode.to_string(),
       session_id.clone(),
     ))
     .method("GET")

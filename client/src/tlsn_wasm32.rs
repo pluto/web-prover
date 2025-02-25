@@ -12,15 +12,11 @@ pub async fn setup_connection(
 ) -> Result<Prover<Closed>, ClientErrors> {
   let session_id = config.set_session_id();
 
-  let websocket_proxy_url = config.websocket_proxy_url.clone();
-  let websocket_proxy_url = websocket_proxy_url
-    .as_ref()
-    .ok_or_else(|| ClientErrors::Other("websocket_proxy_url is missing".to_string()))?;
-
   let wss_url = format!(
-    "wss://{}:{}/v1/tlsnotary?session_id={}",
+    "wss://{}:{}/v1/{}?session_id={}",
     config.notary_host,
     config.notary_port,
+    config.mode.to_string(),
     session_id.clone(),
   );
 
@@ -36,8 +32,17 @@ pub async fn setup_connection(
     ])
     .finish();
 
-  let (_, client_ws_stream) =
-    WsMeta::connect(format!("{}?{}", websocket_proxy_url, ws_query), None).await?;
+  let (_, client_ws_stream) = WsMeta::connect(
+    format!(
+      "wss://{}:{}/v1/{}/websocket_proxy?{}",
+      config.notary_host,
+      config.notary_port,
+      config.mode.to_string(),
+      ws_query
+    ),
+    None,
+  )
+  .await?;
   let client_ws_stream_into = client_ws_stream.into_io();
 
   let (mpc_tls_connection, prover_fut) = prover.connect(client_ws_stream_into).await?;
