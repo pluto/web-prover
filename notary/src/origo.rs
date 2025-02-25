@@ -38,9 +38,11 @@ use ws_stream_tungstenite::WsStream;
 use crate::{
   axum_websocket::WebSocket,
   errors::{NotaryServerError, ProxyError},
+  origo_verifier,
   tls_parser::{Direction, Transcript, UnparsedMessage},
   tlsn::ProtocolUpgrade,
-  verifier, SharedState,
+  verifier::VerifyQuery,
+  SharedState,
 };
 
 pub struct OrigoSigningKey(pub(crate) Secp256k1SigningKey);
@@ -177,15 +179,15 @@ pub async fn sign(
   Ok(Json(response))
 }
 
-pub fn sign_verification(
-  query: VerifyReply,
+pub fn sign_verification<T: AsRef<[u8]>>(
+  query: VerifyQuery<T>,
   State(state): State<Arc<SharedState>>,
-) -> Result<SignedVerificationReply, ProxyError> {
+) -> Result<SignedVerificationReply, NotaryServerError> {
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
 
   let leaf_hashes = vec![
-    KeccakHasher::hash(query.value.as_bytes()),
+    KeccakHasher::hash(query.value.as_ref()),
     KeccakHasher::hash(serde_json::to_string(&query.manifest)?.as_bytes()),
   ];
   let merkle_tree = MerkleTree::<KeccakHasher>::from_leaves(&leaf_hashes);
@@ -335,7 +337,7 @@ fn find_ciphertext_permutation<const CIRCUIT_SIZE: usize>(
 pub async fn verify(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<VerifyBody>,
-) -> Result<Json<SignedVerificationReply>, ProxyError> {
+) -> Result<Json<SignedVerificationReply>, NotaryServerError> {
   let proof = FoldingProof {
     proof:           payload.origo_proof.proof.proof.clone(),
     verifier_digest: payload.origo_proof.proof.verifier_digest.clone(),
@@ -377,7 +379,7 @@ pub async fn verify(
   assert_eq!(ciphertext_digest, expected_ciphertext_digest);
 
   let (z0_primary, _) = verifier.setup_params.extend_public_inputs(
-    &verifier::flatten_rom(payload.origo_proof.rom.rom),
+    &origo_verifier::flatten_rom(payload.origo_proof.rom.rom),
     &initial_nivc_input.to_vec(),
   )?;
   let z0_secondary = vec![F::<G2>::from(0)];

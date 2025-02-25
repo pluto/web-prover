@@ -37,6 +37,7 @@ use crate::{
   errors::NotaryServerError,
   origo::{proxy_service, sign_verification},
   tlsn::ProtocolUpgrade,
+  verifier::VerifyQuery,
   SharedState,
 };
 
@@ -245,7 +246,7 @@ pub fn create_tee_proof(
   validate_notarization_legal(manifest, request, response)?;
 
   let manifest_hash = manifest.to_keccak_digest()?;
-  let to_sign = VerifyReply {
+  let to_sign = VerifyQuery {
     // Using manifest hash as a value here since we are not exposing any values extracted
     // from the request or response
     value:    format!("0x{}", hex::encode(manifest_hash)),

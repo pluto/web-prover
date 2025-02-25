@@ -1,17 +1,24 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use axum::{
-  extract::{FromRequestParts, Query, State},
+  extract::{self, FromRequestParts, Query, State},
   http::{header, request::Parts},
   response::Response,
+  Json,
 };
+use client::{tlsn::TlsnVerifyBody, SignedVerificationReply};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
-use p256::ecdsa::{Signature, SigningKey};
+use p256::ecdsa::SigningKey;
 use serde::Deserialize;
 use tlsn_common::config::ProtocolConfigValidator;
-use tlsn_core::{attestation::AttestationConfig, signing::SignatureAlgId, CryptoProvider};
+use tlsn_core::{
+  attestation::AttestationConfig,
+  presentation::PresentationOutput,
+  signing::{SignatureAlgId, VerifyingKey},
+  CryptoProvider,
+};
 use tlsn_verifier::{Verifier, VerifierConfig};
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{debug, error, info};
@@ -21,7 +28,9 @@ use ws_stream_tungstenite::WsStream;
 use crate::{
   axum_websocket::{WebSocket, WebSocketUpgrade},
   errors::NotaryServerError,
+  origo::sign_verification,
   tcp::{header_eq, TcpUpgrade},
+  verifier::VerifyQuery,
   SharedState,
 };
 // TODO: use this place of our local file once this gets merged: https://github.com/tokio-rs/axum/issues/2848
@@ -172,4 +181,34 @@ pub async fn tcp_notarize(
       error!(?session_id, "Failed notarization using tcp: {err}");
     },
   }
+}
+
+pub async fn verify(
+  State(state): State<Arc<SharedState>>,
+  extract::Json(verify_body): extract::Json<TlsnVerifyBody>,
+) -> Result<Json<SignedVerificationReply>, NotaryServerError> {
+  let provider = CryptoProvider::default();
+
+  let VerifyingKey { alg, data: key_data } = verify_body.proof.verifying_key();
+
+  println!("Verifying presentation with {alg} key: {}", hex::encode(key_data));
+
+  // Verify the presentation.
+  let PresentationOutput { server_name, connection_info, transcript, .. } =
+    verify_body.proof.verify(&provider).unwrap();
+
+  // TODO: how should notary sign these fields? Should these be combined with a domain separator?
+  // The time at which the connection was started.
+  let _time = chrono::DateTime::UNIX_EPOCH + Duration::from_secs(connection_info.time);
+  let _server_name = server_name.unwrap();
+
+  // Set the unauthenticated bytes so they are distinguishable.
+  let mut partial_transcript = transcript.unwrap();
+  partial_transcript.set_unauthed(b'X');
+
+  sign_verification(
+    VerifyQuery { manifest: verify_body.manifest, value: partial_transcript.received_unsafe() },
+    State(state),
+  )
+  .map(Json)
 }
