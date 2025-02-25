@@ -30,19 +30,92 @@ pub async fn notarize(
   prover: Prover<Closed>,
   manifest: &Option<Manifest>,
 ) -> Result<Presentation, errors::ClientErrors> {
+  let manifest = match manifest {
+    Some(manifest) => manifest,
+    None => return Err(errors::ClientErrors::Other("Manifest is missing".to_string())),
+  };
+
   let mut prover = prover.start_notarize();
   let transcript = HttpTranscript::parse(prover.transcript())?;
 
   // Commit to the transcript.
+  dbg!(&transcript);
   let mut builder = TranscriptCommitConfig::builder(prover.transcript());
   DefaultHttpCommitter::default().commit_transcript(&mut builder, &transcript)?;
+  dbg!(&builder);
+
+  // Reveal the response start line and headers.
+  let response = &transcript.responses[0];
+
+  let response_body = match &response.body {
+    Some(body) => body,
+    None => return Err(errors::ClientErrors::Other("Response body is missing".to_string())),
+  };
+
+  let body_span = response_body.span();
+  dbg!(&body_span);
+
+  // reveal keys specified in manifest
+  // reveal values specified in manifest
+
+  let content_span = response_body.content.span();
+  let initial_index = match content_span.indices().min() {
+    Some(index) => index,
+    None => return Err(errors::ClientErrors::Other("Content span is empty".to_string())),
+  };
+  dbg!(initial_index);
+
+  let mut content_value = parse(content_span.clone().to_bytes()).unwrap();
+  content_value.offset(initial_index);
+  dbg!(&content_value);
+
+  for key in manifest.response.body.json.iter() {
+    let key = match key {
+      JsonKey::String(s) => s.clone(),
+      JsonKey::Num(n) => n.to_string(),
+    };
+
+    match content_value {
+      JsonValue::Object(ref v) => {
+        // reveal object without pairs
+        // builder.reveal_recv(&v.without_pairs())?;
+        builder.commit_recv(&v.without_pairs())?;
+
+        for kv in v.elems.iter() {
+          if key.as_str() == kv.key {
+            // reveal key
+            builder.commit_recv(&kv.key.to_range_set())?;
+          }
+        }
+      },
+      JsonValue::Array(ref v) => {
+        // reveal array without elements
+        builder.commit_recv(&v.without_values())?;
+      },
+      _ => {},
+    };
+    let key_span = content_value.get(key.as_str());
+    match key_span {
+      Some(key_span) => {
+        content_value = key_span.clone();
+      },
+      None =>
+        return Err(errors::ClientErrors::Other(format!("Key {} not found in response body", key))),
+    }
+  }
+
+  dbg!(&content_value);
+  builder.commit_recv(&content_value.to_range_set())?;
+  // builder.reveal_recv(&content_value.to_range_set())?;
+
   prover.transcript_commit(builder.build()?);
 
+  dbg!(&prover);
   // Request an attestation.
   let config = RequestConfig::default();
   let (attestation, secrets) = prover.finalize(&config).await?;
 
-  let presentation = present(manifest, attestation, secrets).await?;
+  let presentation = present(&Some(manifest.clone()), attestation, secrets).await?;
   Ok(presentation)
 }
 
@@ -153,6 +226,7 @@ pub async fn present(
     }
   }
 
+  dbg!(&content_value);
   builder.reveal_recv(&content_value.to_range_set())?;
 
   let transcript_proof = builder.build()?;

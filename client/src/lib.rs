@@ -103,6 +103,8 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, Clie
 
   let p = tlsn::notarize(prover, &config.proving.manifest).await?;
 
+  tlsn::verify(p.clone()).await?;
+
   // TODO(WJ 2025-02-04): We might want to return an presentation instead of an attestation here, no
   // sure yet. The thought process here is that the verify api on TLSN takes a presentation, not
   // an attestation.
