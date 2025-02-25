@@ -66,6 +66,7 @@ num-bigint ="0.4"
 ff         ={ version="0.13", default-features=false, features=["derive"] }
 tiny-keccak={ version="2.0.2", features=["keccak"] }
 url        ="2.5.4"
+chrono     ="0.4"
 
 tracing-test="0.2"
 

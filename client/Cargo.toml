@@ -67,11 +67,11 @@ base64="0.22.0"
 tokio-util={ version="0.7", features=[
   "compat",
 ] } # compat is used to work with AsyncRead and AsyncWrite from other crates
-chrono="0.4"
+
 p256={ version="0.13", features=["pem", "ecdsa"] }
 
-uuid={ workspace=true }
-
+uuid      ={ workspace=true }
+chrono    ={ workspace=true }
 clap      ={ workspace=true }
 serde_with={ version="3.12.0", features=["base64"] }
 

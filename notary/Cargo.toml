@@ -12,6 +12,7 @@ tee-google-confidential-space-token-generator=[]
 [dependencies]
 tlsn-core  ={ workspace=true }
 tlsn-common={ workspace=true }
+chrono     ={ workspace=true }
 
 client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="8e7eb839e901dcee416179116bb0f9c4f7ae683c" }
 proofs={ workspace=true }

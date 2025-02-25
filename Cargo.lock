@@ -4184,6 +4184,7 @@ dependencies = [
  "caratls_ekm_google_confidential_space_server",
  "caratls_ekm_server",
  "cargo_metadata",
+ "chrono",
  "clap 4.5.23",
  "client",
  "client-side-prover",
