@@ -1,12 +1,9 @@
-use client_side_prover::supernova::snark::{CompressedSNARK, VerifierKey};
-use proofs::{
-  circuits::{construct_setup_data_from_fs, PROVING_PARAMS_512},
-  program::{
-    data::{CircuitData, Offline, Online, SetupParams},
-    manifest::Manifest,
-  },
-  E1, F, G1, G2, S1, S2,
-};
+use std::sync::Arc;
+
+use alloy_primitives::utils::keccak256;
+use client::SignedVerificationReply;
+use proofs::program::manifest::Manifest;
+use rs_merkle::{Hasher, MerkleTree};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -17,53 +14,72 @@ pub struct Verifier {
   pub verifier_key: VerifierKey<E1, S1, S2>,
 }
 
+use crate::{errors::NotaryServerError, SharedState, State};
+
+#[derive(Clone)]
+struct KeccakHasher;
+
+impl Hasher for KeccakHasher {
+  type Hash = [u8; 32];
+
+  fn hash(data: &[u8]) -> Self::Hash { keccak256(data).into() }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VerifyQuery<T: AsRef<[u8]>> {
   pub value:    T,
   pub manifest: Manifest,
 }
 
-pub fn flatten_rom(rom: Vec<String>) -> Vec<String> {
-  rom
-    .iter()
-    .map(|s| {
-      s.rfind('_')
-        .and_then(
-          |i| if s[i + 1..].chars().all(|c| c.is_ascii_digit()) { Some(&s[..i]) } else { None },
-        )
-        .unwrap_or(s)
-        .to_string()
-    })
-    .collect()
-}
+pub fn sign_verification<T: AsRef<[u8]>>(
+  query: VerifyQuery<T>,
+  State(state): State<Arc<SharedState>>,
+) -> Result<SignedVerificationReply, NotaryServerError> {
+  // TODO check OSCP and CT (maybe)
+  // TODO check target_name matches SNI and/or cert name (let's discuss)
 
-pub fn initialize_verifier() -> Result<Verifier, ProxyError> {
-  let bytes = std::fs::read(PROVING_PARAMS_512)?;
-  let setup_data = construct_setup_data_from_fs::<{ proofs::circuits::CIRCUIT_SIZE_512 }>()?;
-  let rom_data = HashMap::from([
-    (String::from("PLAINTEXT_AUTHENTICATION"), CircuitData { opcode: 0 }),
-    (String::from("HTTP_VERIFICATION"), CircuitData { opcode: 1 }),
-    (String::from("JSON_EXTRACTION"), CircuitData { opcode: 2 }),
-  ]);
+  let leaf_hashes = vec![
+    KeccakHasher::hash(query.value.as_ref()),
+    KeccakHasher::hash(serde_json::to_string(&query.manifest)?.as_bytes()),
+  ];
+  let merkle_tree = MerkleTree::<KeccakHasher>::from_leaves(&leaf_hashes);
+  let merkle_root = merkle_tree.root().unwrap();
 
-  let setup_params = SetupParams::<Offline> {
-    public_params: bytes,
-    // TODO: These are incorrect, but we don't know them until the internal parser completes.
-    // during the transition to `into_online` they're populated.
-    vk_digest_primary: F::<G1>::from(0),
-    vk_digest_secondary: F::<G2>::from(0),
-    setup_data,
-    rom_data,
-  }
-  .into_online()?;
+  // need secp256k1 here for Solidity
+  let (signature, recover_id) =
+    state.origo_signing_key.0.sign_prehash_recoverable(&merkle_root).unwrap();
 
-  let (pk, verifier_key) = CompressedSNARK::<E1, S1, S2>::setup(&setup_params.public_params)?;
-  debug!(
-    "initialized pk pk_primary.digest={:?}, hex(primary)={:?}, pk_secondary.digest={:?}",
-    pk.pk_primary.vk_digest,
-    hex::encode(pk.pk_primary.vk_digest.to_bytes()),
-    pk.pk_secondary.vk_digest,
-  );
+  let signer_address =
+    alloy_primitives::Address::from_public_key(state.origo_signing_key.0.verifying_key());
 
-  Ok(Verifier { setup_params, verifier_key })
+  let verifying_key =
+    k256::ecdsa::VerifyingKey::recover_from_prehash(&merkle_root.clone(), &signature, recover_id)
+      .unwrap();
+
+  assert_eq!(state.origo_signing_key.0.verifying_key(), &verifying_key);
+
+  // TODO is this right? we need lower form S for sure though
+  let s = if signature.normalize_s().is_some() {
+    hex::encode(signature.normalize_s().unwrap().to_bytes())
+  } else {
+    hex::encode(signature.s().to_bytes())
+  };
+
+  let response = SignedVerificationReply {
+    merkle_leaves: vec![
+      "0x".to_string() + &hex::encode(leaf_hashes[0]),
+      "0x".to_string() + &hex::encode(leaf_hashes[1]),
+    ],
+    digest:        "0x".to_string() + &hex::encode(merkle_root),
+    signature:     "0x".to_string() + &hex::encode(signature.to_der().as_bytes()),
+    signature_r:   "0x".to_string() + &hex::encode(signature.r().to_bytes()),
+    signature_s:   "0x".to_string() + &s,
+
+    // the good old +27
+    // https://docs.openzeppelin.com/contracts/4.x/api/utils#ECDSA-tryRecover-bytes32-bytes-
+    signature_v: recover_id.to_byte() + 27,
+    signer:      "0x".to_string() + &hex::encode(signer_address),
+  };
+
+  Ok(response)
 }

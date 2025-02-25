@@ -28,7 +28,6 @@ use ws_stream_tungstenite::WsStream;
 use crate::{
   axum_websocket::{WebSocket, WebSocketUpgrade},
   errors::NotaryServerError,
-  origo::sign_verification,
   tcp::{header_eq, TcpUpgrade},
   verifier::VerifyQuery,
   SharedState,
@@ -206,7 +205,7 @@ pub async fn verify(
   let mut partial_transcript = transcript.unwrap();
   partial_transcript.set_unauthed(b'X');
 
-  sign_verification(
+  crate::verifier::sign_verification(
     VerifyQuery { manifest: verify_body.manifest, value: partial_transcript.received_unsafe() },
     State(state),
   )

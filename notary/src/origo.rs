@@ -3,7 +3,6 @@ use std::{
   sync::{Arc, Mutex},
 };
 
-use alloy_primitives::utils::keccak256;
 use axum::{
   extract::{self, Query, State},
   response::Response,
@@ -22,7 +21,6 @@ use proofs::{
   proof::FoldingProof,
   F, G1, G2,
 };
-use rs_merkle::{Hasher, MerkleTree};
 use serde::{Deserialize, Serialize};
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
@@ -67,17 +65,6 @@ pub struct SignQuery {
   session_id: Uuid,
 }
 
-#[derive(Serialize)]
-pub struct SignReply {
-  merkle_root: String,
-  leaves:      Vec<String>,
-  signature:   String,
-  signature_r: String,
-  signature_s: String,
-  signature_v: u8,
-  signer:      String,
-}
-
 #[derive(Serialize, Debug, Clone)]
 pub struct VerifierInputs {
   request_messages:  Vec<Vec<u8>>,
@@ -89,7 +76,7 @@ pub async fn sign(
   query: Query<SignQuery>,
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<SignBody>,
-) -> Result<Json<SignReply>, ProxyError> {
+) -> Result<(), ProxyError> {
   let transcript =
     state.origo_sessions.lock().unwrap().get(&query.session_id.to_string()).cloned().unwrap();
 
@@ -132,113 +119,7 @@ pub async fn sign(
     .unwrap()
     .insert(query.session_id.to_string(), VerifierInputs { request_messages, response_messages });
 
-  // TODO check OSCP and CT (maybe)
-  // TODO check target_name matches SNI and/or cert name (let's discuss)
-
-  let leaves: Vec<String> = vec!["request".to_string(), "response".to_string()]; // TODO
-
-  let leaf_hashes: Vec<[u8; 32]> =
-    leaves.iter().map(|leaf| KeccakHasher::hash(leaf.as_bytes())).collect();
-
-  let merkle_tree = MerkleTree::<KeccakHasher>::from_leaves(&leaf_hashes);
-  let merkle_root = merkle_tree.root().unwrap();
-
-  // need secp256k1 here for Solidity
-  let (signature, recover_id) =
-    state.origo_signing_key.0.sign_prehash_recoverable(&merkle_root).unwrap();
-
-  let signer_address =
-    alloy_primitives::Address::from_public_key(state.origo_signing_key.0.verifying_key());
-
-  let verifying_key =
-    k256::ecdsa::VerifyingKey::recover_from_prehash(&merkle_root.clone(), &signature, recover_id)
-      .unwrap();
-
-  assert_eq!(state.origo_signing_key.0.verifying_key(), &verifying_key);
-
-  // TODO is this right? we need lower form S for sure though
-  let s = if signature.normalize_s().is_some() {
-    hex::encode(signature.normalize_s().unwrap().to_bytes())
-  } else {
-    hex::encode(signature.s().to_bytes())
-  };
-
-  let response = SignReply {
-    merkle_root: "0x".to_string() + &hex::encode(merkle_root),
-    leaves,
-    signature: "0x".to_string() + &hex::encode(signature.to_der().as_bytes()),
-    signature_r: "0x".to_string() + &hex::encode(signature.r().to_bytes()),
-    signature_s: "0x".to_string() + &s,
-
-    // the good old +27
-    // https://docs.openzeppelin.com/contracts/4.x/api/utils#ECDSA-tryRecover-bytes32-bytes-
-    signature_v: recover_id.to_byte() + 27,
-    signer: "0x".to_string() + &hex::encode(signer_address),
-  };
-
-  Ok(Json(response))
-}
-
-pub fn sign_verification<T: AsRef<[u8]>>(
-  query: VerifyQuery<T>,
-  State(state): State<Arc<SharedState>>,
-) -> Result<SignedVerificationReply, NotaryServerError> {
-  // TODO check OSCP and CT (maybe)
-  // TODO check target_name matches SNI and/or cert name (let's discuss)
-
-  let leaf_hashes = vec![
-    KeccakHasher::hash(query.value.as_ref()),
-    KeccakHasher::hash(serde_json::to_string(&query.manifest)?.as_bytes()),
-  ];
-  let merkle_tree = MerkleTree::<KeccakHasher>::from_leaves(&leaf_hashes);
-  let merkle_root = merkle_tree.root().unwrap();
-
-  // need secp256k1 here for Solidity
-  let (signature, recover_id) =
-    state.origo_signing_key.0.sign_prehash_recoverable(&merkle_root).unwrap();
-
-  let signer_address =
-    alloy_primitives::Address::from_public_key(state.origo_signing_key.0.verifying_key());
-
-  let verifying_key =
-    k256::ecdsa::VerifyingKey::recover_from_prehash(&merkle_root.clone(), &signature, recover_id)
-      .unwrap();
-
-  assert_eq!(state.origo_signing_key.0.verifying_key(), &verifying_key);
-
-  // TODO is this right? we need lower form S for sure though
-  let s = if signature.normalize_s().is_some() {
-    hex::encode(signature.normalize_s().unwrap().to_bytes())
-  } else {
-    hex::encode(signature.s().to_bytes())
-  };
-
-  let response = SignedVerificationReply {
-    merkle_leaves: vec![
-      "0x".to_string() + &hex::encode(leaf_hashes[0]),
-      "0x".to_string() + &hex::encode(leaf_hashes[1]),
-    ],
-    digest:        "0x".to_string() + &hex::encode(merkle_root),
-    signature:     "0x".to_string() + &hex::encode(signature.to_der().as_bytes()),
-    signature_r:   "0x".to_string() + &hex::encode(signature.r().to_bytes()),
-    signature_s:   "0x".to_string() + &s,
-
-    // the good old +27
-    // https://docs.openzeppelin.com/contracts/4.x/api/utils#ECDSA-tryRecover-bytes32-bytes-
-    signature_v: recover_id.to_byte() + 27,
-    signer:      "0x".to_string() + &hex::encode(signer_address),
-  };
-
-  Ok(response)
-}
-
-#[derive(Clone)]
-struct KeccakHasher;
-
-impl Hasher for KeccakHasher {
-  type Hash = [u8; 32];
-
-  fn hash(data: &[u8]) -> Self::Hash { keccak256(data).into() }
+  Ok(())
 }
 
 #[derive(Deserialize)]
@@ -439,7 +320,7 @@ pub async fn verify(
     },
   };
 
-  sign_verification(verify_output, State(state)).map(Json)
+  crate::verifier::sign_verification(verify_output, State(state)).map(Json)
 }
 
 pub async fn websocket_notarize(
