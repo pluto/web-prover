@@ -33,6 +33,21 @@ pub enum ExtractorType {
   Object,
 }
 
+impl TryFrom<&str> for ExtractorType {
+  type Error = ExtractorError;
+
+  fn try_from(value: &str) -> Result<Self, Self::Error> {
+    match value {
+      "string" => Ok(ExtractorType::String),
+      "number" => Ok(ExtractorType::Number),
+      "boolean" => Ok(ExtractorType::Boolean),
+      "array" => Ok(ExtractorType::Array),
+      "object" => Ok(ExtractorType::Object),
+      _ => Err(ExtractorError::UnsupportedExtractorType(value.to_string())),
+    }
+  }
+}
+
 impl Display for ExtractorType {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let str = match self {
@@ -200,7 +215,7 @@ mod tests {
     extractor,
     parser::{
       predicate::{Comparison, PredicateType},
-      test_utils::{assert_extraction_error, assert_extraction_success, create_json_config},
+      test_utils::{assert_extraction_success, create_json_config},
       ExtractorType,
     },
     predicate,
@@ -253,6 +268,7 @@ mod tests {
 
   mod error_handling {
     use super::*;
+    use crate::parser::test_utils::assert_extraction_error;
 
     #[test]
     fn invalid_key() {
