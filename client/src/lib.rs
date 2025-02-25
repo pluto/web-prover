@@ -16,16 +16,17 @@ mod tls;
 pub mod tls_client_async2;
 use std::collections::HashMap;
 
+use origo::OrigoProof;
 pub use proofs::program::data::UninitializedSetup;
 use proofs::{
   circuits::{construct_setup_data_from_fs, CIRCUIT_SIZE_512},
-  program::manifest::NIVCRom,
+  program::manifest::{Manifest, NIVCRom},
   proof::FoldingProof,
 };
 use serde::{Deserialize, Serialize};
+use tlsn::{TlsnProof, TlsnVerifyBody};
 use tlsn_common::config::ProtocolConfig;
 pub use tlsn_core::attestation::Attestation;
-use tlsn_core::presentation::Presentation;
 use tlsn_prover::ProverConfig;
 use tracing::{debug, info};
 use web_prover_core::{
@@ -35,21 +36,23 @@ use web_prover_core::{
 
 use crate::errors::ClientErrors;
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct OrigoProof {
-  pub proof:             FoldingProof<Vec<u8>, String>,
-  pub rom:               NIVCRom,
-  pub ciphertext_digest: [u8; 32],
-  pub sign_reply:        Option<SignedVerificationReply>,
-  pub value:             Option<String>,
-}
-
 #[derive(Debug, Serialize)]
 pub enum Proof {
-  TLSN(Box<Presentation>),
+  Tlsn(TlsnProof),
   Origo(OrigoProof),
   TEE(TeeProof),
   Proxy(TeeProof),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct SignedVerificationReply {
+  pub merkle_leaves: Vec<String>,
+  pub digest:        String,
+  pub signature:     String,
+  pub signature_r:   String,
+  pub signature_s:   String,
+  pub signature_v:   u8,
+  pub signer:        String,
 }
 
 pub fn get_web_prover_circuits_version() -> String {
@@ -71,9 +74,6 @@ pub async fn prover_inner(
 }
 
 pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, ClientErrors> {
-  let root_store =
-    tls::tls_client_default_root_store(config.notary_ca_cert.clone().map(|c| vec![c]));
-
   let max_sent_data = config
     .max_sent_data
     .ok_or_else(|| ClientErrors::Other("max_sent_data is missing".to_string()))?;
@@ -101,14 +101,18 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, Clie
     tlsn_native::setup_tcp_connection(&mut config, prover_config).await
   };
 
-  let p = tlsn::notarize(prover, &config.proving.manifest).await?;
+  let manifest = match config.proving.manifest.clone() {
+    Some(m) => m,
+    None => return Err(errors::ClientErrors::ManifestMissingError),
+  };
 
-  tlsn::verify(p.clone()).await?;
+  let p = tlsn::notarize(prover, &manifest).await?;
 
-  // TODO(WJ 2025-02-04): We might want to return an presentation instead of an attestation here, no
-  // sure yet. The thought process here is that the verify api on TLSN takes a presentation, not
-  // an attestation.
-  Ok(Proof::TLSN(Box::new(p)))
+  let verify_response = verify(config, TlsnVerifyBody { manifest, proof: p.clone() }).await?;
+
+  debug!("proof.verify_reply: {:?}", verify_response);
+
+  Ok(Proof::Tlsn(TlsnProof { proof: p, sign_reply: Some(verify_response) }))
 }
 
 #[allow(unused_variables)]

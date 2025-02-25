@@ -6,6 +6,7 @@ use proofs::{
     data::{Offline, SetupParams, UninitializedSetup},
     manifest::{EncryptionInput, OrigoManifest, TLSEncryption},
   },
+  proof::FoldingProof,
   F, G1, G2,
 };
 use serde::{Deserialize, Serialize};
@@ -21,7 +22,7 @@ use crate::{
   config::{self},
   errors::ClientErrors,
   tls::decrypt_tls_ciphertext,
-  OrigoProof,
+  SignedVerificationReply,
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -37,12 +38,13 @@ pub struct VerifyBody {
   pub manifest:    OrigoManifest,
 }
 
-// TODO: Okay, right now we just want to take what's in here and actually just produce a signature
-// as the reply instead. So pretend this is signed content for now and not actual raw values.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct VerifyReply {
-  pub value:    String,
-  pub manifest: Manifest,
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct OrigoProof {
+  pub proof:             FoldingProof<Vec<u8>, String>,
+  pub rom:               NIVCRom,
+  pub ciphertext_digest: [u8; 32],
+  pub sign_reply:        Option<SignedVerificationReply>,
+  pub value:             Option<String>,
 }
 
 pub async fn sign(
@@ -79,39 +81,6 @@ pub async fn sign(
   debug!("\n{}\n\n", String::from_utf8(sign_response.clone())?);
 
   Ok(sign_response)
-}
-
-pub async fn verify(
-  config: crate::config::Config,
-  verify_body: VerifyBody,
-) -> Result<SignedVerificationReply, crate::errors::ClientErrors> {
-  let url = format!(
-    "https://{}:{}/v1/origo/verify",
-    config.notary_host.clone(),
-    config.notary_port.clone(),
-  );
-
-  // TODO reqwest uses browsers fetch API for WASM target? if true, can't add trust anchors
-  #[cfg(target_arch = "wasm32")]
-  let client = reqwest::ClientBuilder::new().build()?;
-
-  #[cfg(not(target_arch = "wasm32"))]
-  let client = {
-    let mut client_builder = reqwest::ClientBuilder::new().use_rustls_tls();
-    if let Some(cert) = config.notary_ca_cert {
-      client_builder =
-        client_builder.add_root_certificate(reqwest::tls::Certificate::from_der(&cert)?);
-    }
-    client_builder.build()?
-  };
-
-  let response = client.post(url).json(&verify_body).send().await?;
-  assert_eq!(response.status(), hyper::StatusCode::OK, "response={:?}", response);
-  let verify_response = response.json::<SignedVerificationReply>().await?;
-
-  debug!("\n{:?}\n\n", verify_response.clone());
-
-  Ok(verify_response)
 }
 
 // TODO: We probably don't need to call this "proxy_and_sign" since we don't sign in here
@@ -194,8 +163,6 @@ pub(crate) async fn generate_proof(
     setup_params.setup_data,
   )
   .await
-
-  // return Ok(OrigoProof(proof));
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
