@@ -64,6 +64,9 @@ impl IntoResponse for ProxyError {
 #[derive(Debug, thiserror::Error)]
 pub enum NotaryServerError {
   #[error(transparent)]
+  ProxyError(#[from] ProxyError),
+
+  #[error(transparent)]
   Unexpected(#[from] Report),
 
   #[error("Error occurred during notarization: {0}")]
