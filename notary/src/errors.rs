@@ -7,6 +7,7 @@ use proofs::errors::ProofError;
 use thiserror::Error;
 use tlsn_verifier::tls::{VerifierConfigBuilderError, VerifierError};
 use tracing::error;
+use web_prover_core::errors::ManifestError;
 
 #[derive(Debug, Error)]
 pub enum ProxyError {
@@ -102,6 +103,12 @@ pub enum NotaryServerError {
 
   #[error("Origo secrets are missing")]
   MissingOrigoSecrets,
+
+  #[error(transparent)]
+  ProxyError(#[from] ProxyError),
+
+  #[error(transparent)]
+  ManifestError(#[from] ManifestError),
 }
 
 impl From<VerifierError> for NotaryServerError {

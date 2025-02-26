@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
 use web_proof_circuits_witness_generator::json::JsonKey;
-
-use crate::program::{
+use web_prover_core::{
   http::{ManifestRequest, ManifestResponse, ManifestResponseBody},
-  manifest::{EncryptionInput, Manifest},
+  manifest::Manifest,
 };
+
+use crate::program::manifest::{EncryptionInput, OrigoManifest};
 
 pub const ADD_EXTERNAL_R1CS: &[u8] = include_bytes!("examples/circuit_data/add_external.r1cs");
 pub const SQUARE_ZEROTH_R1CS: &[u8] = include_bytes!("examples/circuit_data/square_zeroth.r1cs");
@@ -15,48 +16,6 @@ pub const EXTERNAL_INPUTS: [[u64; 2]; 2] = [[5, 7], [13, 1]];
 pub const ADD_EXTERNAL_GRAPH: &[u8] = include_bytes!("examples/circuit_data/add_external.bin");
 pub const SQUARE_ZEROTH_GRAPH: &[u8] = include_bytes!("examples/circuit_data/square_zeroth.bin");
 pub const SWAP_MEMORY_GRAPH: &[u8] = include_bytes!("examples/circuit_data/swap_memory.bin");
-
-pub(crate) const TEST_MANIFEST: &str = r#"
-{
-    "manifestVersion": "1",
-    "id": "reddit-user-karma",
-    "title": "Total Reddit Karma",
-    "description": "Generate a proof that you have a certain amount of karma",
-    "prepareUrl": "https://www.reddit.com/login/",
-    "request": {
-        "method": "GET",
-        "url": "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json",
-        "headers": {
-            "host": "gist.githubusercontent.com",
-            "connection": "close"
-        },
-        "body": {
-            "userId": "<% userId %>"
-        },
-        "vars": {
-            "userId": {
-                "regex": "[a-z]{,20}+"
-            },
-            "token": {
-                "type": "base64",
-                "length": 32
-            }
-        }
-    },
-    "response": {
-        "status": "200",
-        "headers": {
-            "Content-Type": "text/plain; charset=utf-8",
-            "Content-Length": "22"
-        },
-        "body": {
-            "json": [
-                "hello"
-            ]
-        }
-    }
-}
-"#;
 
 pub(crate) fn simple_request_inputs() -> EncryptionInput {
   EncryptionInput {
@@ -657,7 +616,7 @@ pub(crate) fn complex_response_inputs() -> EncryptionInput {
   }
 }
 
-pub(crate) fn complex_manifest() -> Manifest {
+pub fn complex_manifest() -> OrigoManifest {
   Manifest {
     // manifest_version: "1".to_string(),
     // id:               "complex-manifest".to_string(),
@@ -693,4 +652,5 @@ pub(crate) fn complex_manifest() -> Manifest {
       },
     },
   }
+  .into()
 }

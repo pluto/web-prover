@@ -5,7 +5,7 @@ use proofs::{
   circuits::construct_setup_data,
   program::{
     data::{Offline, SetupParams},
-    manifest::{EncryptionInput, Manifest, TLSEncryption},
+    manifest::{EncryptionInput, OrigoManifest, TLSEncryption},
   },
   F, G1, G2,
 };
@@ -16,6 +16,7 @@ use web_proof_circuits_witness_generator::{
   http::{compute_http_witness, HttpMaskType},
   json::json_value_digest,
 };
+use web_prover_core::{manifest::Manifest, proof::SignedVerificationReply};
 
 use crate::{
   config::{self},
@@ -30,22 +31,11 @@ pub struct SignBody {
   pub handshake_server_key: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SignedVerificationReply {
-  pub merkle_leaves: Vec<String>,
-  pub digest:        String,
-  pub signature:     String,
-  pub signature_r:   String,
-  pub signature_s:   String,
-  pub signature_v:   u8,
-  pub signer:        String,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VerifyBody {
   pub session_id:  String,
   pub origo_proof: OrigoProof,
-  pub manifest:    Manifest,
+  pub manifest:    OrigoManifest,
 }
 
 // TODO: Okay, right now we just want to take what's in here and actually just produce a signature
@@ -159,10 +149,10 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
   let manifest = config.proving.manifest.unwrap();
 
   let mut proof = generate_proof(
-    manifest.clone(),
-    proving_params.unwrap(),
-    request_inputs,
-    response_inputs.clone(),
+    &manifest.clone().into(),
+    &proving_params.unwrap(),
+    &request_inputs,
+    &response_inputs,
   )
   .await?;
   let flattened_plaintext: Vec<u8> = response_inputs.plaintext.into_iter().flatten().collect();
@@ -178,14 +168,14 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
 }
 
 pub(crate) async fn generate_proof(
-  manifest: Manifest,
-  proving_params: Vec<u8>,
-  request_inputs: EncryptionInput,
-  response_inputs: EncryptionInput,
+  manifest: &OrigoManifest,
+  proving_params: &[u8],
+  request_inputs: &EncryptionInput,
+  response_inputs: &EncryptionInput,
 ) -> Result<OrigoProof, ClientErrors> {
   let setup_data = construct_setup_data::<{ proofs::circuits::CIRCUIT_SIZE_512 }>()?;
   let program_data = SetupParams::<Offline> {
-    public_params: proving_params,
+    public_params: proving_params.to_vec(),
     vk_digest_primary: F::<G1>::from(0), // These need to be right.
     vk_digest_secondary: F::<G2>::from(0),
     setup_data,

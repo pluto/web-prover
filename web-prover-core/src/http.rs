@@ -19,10 +19,12 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 pub use web_proof_circuits_witness_generator::json::JsonKey;
 
-use crate::{
-  errors::ProofError,
-  program::manifest::{HTTP_1_1, MAX_HTTP_HEADERS},
-};
+use crate::errors::ManifestError;
+
+/// Max HTTP headers
+pub const MAX_HTTP_HEADERS: usize = 25;
+/// HTTP/1.1
+pub const HTTP_1_1: &str = "HTTP/1.1";
 
 /// A type of response body used to describe conditions in the client `Manifest`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -33,15 +35,16 @@ pub struct ManifestResponseBody {
 }
 
 impl TryFrom<&[u8]> for ManifestResponseBody {
-  type Error = ProofError;
+  type Error = ManifestError;
 
   fn try_from(body_bytes: &[u8]) -> Result<Self, Self::Error> {
     if body_bytes.is_empty() {
       return Ok(Self { json_path: vec![] });
     }
     // Attempt to parse the body as JSON path.
-    let json_path: Vec<JsonKey> = serde_json::from_slice(body_bytes)
-      .map_err(|_| ProofError::InvalidManifest("Failed to parse body as valid JSON".to_string()))?;
+    let json_path: Vec<JsonKey> = serde_json::from_slice(body_bytes).map_err(|_| {
+      ManifestError::InvalidManifest("Failed to parse body as valid JSON".to_string())
+    })?;
     Ok(Self { json_path })
   }
 }
@@ -55,15 +58,16 @@ pub struct NotaryResponseBody {
 }
 
 impl TryFrom<&[u8]> for NotaryResponseBody {
-  type Error = ProofError;
+  type Error = ManifestError;
 
   fn try_from(body_bytes: &[u8]) -> Result<Self, Self::Error> {
     if body_bytes.is_empty() {
       return Ok(Self { json: None });
     }
     // Attempt to parse the body as JSON.
-    let json: serde_json::Value = serde_json::from_slice(body_bytes)
-      .map_err(|_| ProofError::InvalidManifest("Failed to parse body as valid JSON".to_string()))?;
+    let json: serde_json::Value = serde_json::from_slice(body_bytes).map_err(|_| {
+      ManifestError::InvalidManifest("Failed to parse body as valid JSON".to_string())
+    })?;
     Ok(Self { json: Some(json) })
   }
 }
@@ -189,12 +193,12 @@ impl NotaryResponse {
   ///
   /// - `header_bytes`: The bytes representing the HTTP response headers and metadata.
   /// - `body_bytes`: The bytes representing the HTTP response body.
-  pub fn from_payload(bytes: &[u8]) -> Result<Self, ProofError> {
+  pub fn from_payload(bytes: &[u8]) -> Result<Self, ManifestError> {
     let delimiter = b"\r\n\r\n";
     let split_position = bytes
       .windows(delimiter.len())
       .position(|window| window == delimiter)
-      .ok_or_else(|| ProofError::InvalidManifest("Invalid HTTP format".to_string()))?;
+      .ok_or_else(|| ManifestError::InvalidManifest("Invalid HTTP format".to_string()))?;
 
     let (header_bytes, rest) = bytes.split_at(split_position);
     let body_bytes = &rest[delimiter.len()..];
@@ -218,9 +222,9 @@ impl NotaryResponse {
   /// The parsed HTTP response header.
   fn parse_header(
     header_bytes: &[u8],
-  ) -> Result<(HashMap<String, String>, String, String, String), ProofError> {
+  ) -> Result<(HashMap<String, String>, String, String, String), ManifestError> {
     let headers_str = std::str::from_utf8(header_bytes).map_err(|_| {
-      ProofError::InvalidManifest("Failed to interpret headers as valid UTF-8".to_string())
+      ManifestError::InvalidManifest("Failed to interpret headers as valid UTF-8".to_string())
     })?;
     let mut headers = HashMap::new();
     let mut status = String::new();
@@ -235,7 +239,9 @@ impl NotaryResponse {
         // Process the first line as the HTTP response start-line
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() < 3 {
-          return Err(ProofError::InvalidManifest("Invalid HTTP response start-line".to_string()));
+          return Err(ManifestError::InvalidManifest(
+            "Invalid HTTP response start-line".to_string(),
+          ));
         }
         version = parts[0].to_string();
         status = parts[1].to_string();
@@ -245,7 +251,7 @@ impl NotaryResponse {
         if let Some((key, value)) = line.split_once(": ") {
           headers.insert(key.to_string(), value.to_string());
         } else {
-          return Err(ProofError::InvalidManifest(format!("Invalid header line: {}", line)));
+          return Err(ManifestError::InvalidManifest(format!("Invalid header line: {}", line)));
         }
       }
     }
@@ -332,16 +338,16 @@ impl ManifestResponse {
   /// # Returns
   ///
   /// The validated HTTP response.
-  pub fn validate(&self) -> Result<(), ProofError> {
+  pub fn validate(&self) -> Result<(), ManifestError> {
     // TODO: What are legal statuses?
     const VALID_STATUSES: [&str; 2] = ["200", "201"];
     if !VALID_STATUSES.contains(&self.status.as_str()) {
-      return Err(ProofError::InvalidManifest("Unsupported HTTP status".to_string()));
+      return Err(ManifestError::InvalidManifest("Unsupported HTTP status".to_string()));
     }
 
     // TODO: What HTTP versions are supported?
     if self.version != "HTTP/1.1" {
-      return Err(ProofError::InvalidManifest(
+      return Err(ManifestError::InvalidManifest(
         "Invalid HTTP version: ".to_string() + &self.version,
       ));
     }
@@ -349,14 +355,14 @@ impl ManifestResponse {
     // TODO: What is the max supported message length?
     // TODO: Not covered by serde's #default annotation. Is '""' a valid message?
     if self.message.len() > 1024 || self.message.is_empty() {
-      return Err(ProofError::InvalidManifest(
+      return Err(ManifestError::InvalidManifest(
         "Invalid message length: ".to_string() + &self.message,
       ));
     }
 
     // We always expect at least one header, "Content-Type"
     if self.headers.len() > MAX_HTTP_HEADERS || self.headers.is_empty() {
-      return Err(ProofError::InvalidManifest(
+      return Err(ManifestError::InvalidManifest(
         "Invalid headers length: ".to_string() + &self.headers.len().to_string(),
       ));
     }
@@ -364,7 +370,7 @@ impl ManifestResponse {
     let content_type =
       self.headers.get("Content-Type").or_else(|| self.headers.get("content-type"));
     if content_type.is_none() {
-      return Err(ProofError::InvalidManifest("Missing 'Content-Type' header".to_string()));
+      return Err(ManifestError::InvalidManifest("Missing 'Content-Type' header".to_string()));
     }
     let content_type = content_type.unwrap();
 
@@ -373,19 +379,19 @@ impl ManifestResponse {
       content_type == legal_type || content_type.starts_with(&format!("{};", legal_type))
     });
     if !is_valid_content_type {
-      return Err(ProofError::InvalidManifest(
+      return Err(ManifestError::InvalidManifest(
         "Invalid Content-Type header: ".to_string() + content_type,
       ));
     }
 
     // When Content-Type is application/json, we expect at least one JSON item
     if content_type == "application/json" && self.body.json_path.is_empty() {
-      return Err(ProofError::InvalidManifest("Expected at least one JSON item".to_string()));
+      return Err(ManifestError::InvalidManifest("Expected at least one JSON item".to_string()));
     }
 
     const MAX_JSON_PATH_LENGTH: usize = 100;
     if self.body.json_path.len() > MAX_JSON_PATH_LENGTH {
-      return Err(ProofError::InvalidManifest(
+      return Err(ManifestError::InvalidManifest(
         "Invalid JSON path length: ".to_string() + &self.body.json_path.len().to_string(),
       ));
     }
@@ -434,25 +440,25 @@ impl ManifestRequest {
   /// # Returns
   ///
   /// The validated HTTP request.
-  pub fn validate(&self) -> Result<(), ProofError> {
+  pub fn validate(&self) -> Result<(), ManifestError> {
     // TODO: What HTTP methods are supported?
     const ALLOWED_METHODS: [&str; 2] = ["GET", "POST"];
     if !ALLOWED_METHODS.contains(&self.method.as_str()) {
-      return Err(ProofError::InvalidManifest("Invalid HTTP method".to_string()));
+      return Err(ManifestError::InvalidManifest("Invalid HTTP method".to_string()));
     }
 
     // Not a valid URL
     if url::Url::parse(&self.url).is_err() {
-      return Err(ProofError::InvalidManifest("Invalid URL: ".to_string() + &self.url));
+      return Err(ManifestError::InvalidManifest("Invalid URL: ".to_string() + &self.url));
     }
 
     if !self.url.starts_with("https://") {
-      return Err(ProofError::InvalidManifest("Only HTTPS URLs are allowed".to_string()));
+      return Err(ManifestError::InvalidManifest("Only HTTPS URLs are allowed".to_string()));
     }
 
     // TODO: What HTTP versions are supported?
     if self.version != "HTTP/1.1" {
-      return Err(ProofError::InvalidManifest(
+      return Err(ManifestError::InvalidManifest(
         "Invalid HTTP version: ".to_string() + &self.version,
       ));
     }
@@ -460,24 +466,100 @@ impl ManifestRequest {
     Ok(())
   }
 
+  fn validate_vars(&self) -> Result<(), ManifestError> {
+    let mut all_tokens = vec![];
+
+    // Parse and validate tokens in the body
+    if let Some(body_tokens) = self.body.as_ref().map(extract_tokens) {
+      for token in &body_tokens {
+        if !self.vars.contains_key(token) {
+          return Err(ManifestError::InvalidManifest(format!(
+            "Token `<% {} %>` not declared in `vars`",
+            token
+          )));
+        }
+      }
+      all_tokens.extend(body_tokens);
+    }
+
+    // Parse and validate tokens in headers
+    for value in self.headers.values() {
+      let header_tokens = extract_tokens(&serde_json::Value::String(value.clone()));
+      for token in &header_tokens {
+        if !self.vars.contains_key(token) {
+          return Err(ManifestError::InvalidManifest(format!(
+            "Token `<% {} %>` not declared in `vars`",
+            token
+          )));
+        }
+      }
+      all_tokens.extend(header_tokens);
+    }
+
+    for var_key in self.vars.keys() {
+      if !all_tokens.contains(var_key) {
+        return Err(ManifestError::InvalidManifest(format!(
+          "Token `<% {} %>` not declared in `body` or `headers`",
+          var_key
+        )));
+      }
+    }
+
+    // Validate each `vars` entry
+    for (key, var_def) in &self.vars {
+      // Validate regex (if defined)
+      if let Some(regex_pattern) = var_def.regex.as_ref() {
+        // Using `regress` crate for compatibility with ECMAScript regular expressions
+        let _regex = regress::Regex::new(regex_pattern).map_err(|_| {
+          ManifestError::InvalidManifest(format!("Invalid regex pattern for `{}`", key))
+        })?;
+        // TODO: It will definitely not match it here because it's a template variable, not an
+        // actual variable
+        // TODO: How does the Manifest receiver (notary) verifies this?
+        // if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
+        //   if regex.find(value.as_str().unwrap_or("")).is_none() {
+        //     return Err(ManifestError::InvalidManifest(format!(
+        //       "Value for token `<% {} %>` does not match regex",
+        //       key
+        //     )));
+        //   }
+        // }
+      }
+
+      // Validate length (if applicable)
+      if let Some(length) = var_def.length {
+        if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
+          if value.as_str().unwrap_or("").len() != length {
+            return Err(ManifestError::InvalidManifest(format!(
+              "Value for token `<% {} %>` does not meet length constraint",
+              key
+            )));
+          }
+        }
+      }
+
+      // TODO: Validate the token "type" constraint
+    }
+    Ok(())
+  }
+
   /// Parses the HTTP request from the given bytes.
-  pub fn from_payload(bytes: &[u8]) -> Result<Self, ProofError> {
+  pub fn from_payload(bytes: &[u8]) -> Result<Self, ManifestError> {
     // todo: dedup me
     let delimiter = b"\r\n\r\n";
     let split_position = bytes
       .windows(delimiter.len())
       .position(|window| window == delimiter)
-      .ok_or_else(|| ProofError::InvalidManifest("Invalid HTTP format".to_string()))?;
+      .ok_or_else(|| ManifestError::InvalidManifest("Invalid HTTP format".to_string()))?;
 
     let (header_bytes, rest) = bytes.split_at(split_position);
     let body_bytes = &rest[delimiter.len()..];
 
     let (method, url, version, headers) = Self::parse_header(header_bytes)?;
-    // TODO: Do we expect requests to have bodies?
 
-    let body = if body_bytes.len() > 0 {
+    let body = if !body_bytes.is_empty() {
       serde_json::from_slice(body_bytes)
-        .map_err(|_| ProofError::InvalidManifest("Invalid body bytes".to_string()))?
+        .map_err(|_| ManifestError::InvalidManifest("Invalid body bytes".to_string()))?
     } else {
       None
     };
@@ -488,19 +570,19 @@ impl ManifestRequest {
   /// Parses the HTTP request start-line and headers from the given bytes.
   fn parse_header(
     header_bytes: &[u8],
-  ) -> Result<(String, String, String, HashMap<String, String>), ProofError> {
+  ) -> Result<(String, String, String, HashMap<String, String>), ManifestError> {
     let header_str = std::str::from_utf8(header_bytes).map_err(|_| {
-      ProofError::InvalidManifest("Failed to interpret headers as valid UTF-8".to_string())
+      ManifestError::InvalidManifest("Failed to interpret headers as valid UTF-8".to_string())
     })?;
     let mut lines = header_str.lines();
 
     let start_line = lines.next().ok_or_else(|| {
-      ProofError::InvalidManifest("Missing start-line in the HTTP request.".to_string())
+      ManifestError::InvalidManifest("Missing start-line in the HTTP request.".to_string())
     })?;
 
     let parts: Vec<&str> = start_line.split_whitespace().collect();
     if parts.len() < 3 {
-      return Err(ProofError::InvalidManifest("Invalid HTTP request start-line.".to_string()));
+      return Err(ManifestError::InvalidManifest("Invalid HTTP request start-line.".to_string()));
     }
 
     let method = parts[0].to_string();
@@ -515,7 +597,7 @@ impl ManifestRequest {
       if let Some((key, value)) = line.split_once(": ") {
         headers.insert(key.to_string(), value.to_string());
       } else {
-        return Err(ProofError::InvalidManifest(format!("Invalid header line: {}", line)));
+        return Err(ManifestError::InvalidManifest(format!("Invalid header line: {}", line)));
       }
     }
 
@@ -558,15 +640,48 @@ impl ManifestRequest {
   }
 }
 
+fn extract_tokens(value: &serde_json::Value) -> Vec<String> {
+  let mut tokens = vec![];
+
+  match value {
+    serde_json::Value::String(s) => {
+      let token_regex = regex::Regex::new(r"<%\s*(\w+)\s*%>").unwrap();
+      for capture in token_regex.captures_iter(s) {
+        if let Some(token) = capture.get(1) {
+          // Extract token name
+          tokens.push(token.as_str().to_string());
+        }
+      }
+    },
+    serde_json::Value::Object(map) => {
+      // Recursively parse nested objects
+      for (_, v) in map {
+        tokens.extend(extract_tokens(v));
+      }
+    },
+    serde_json::Value::Array(arr) => {
+      // Recursively parse arrays
+      for v in arr {
+        tokens.extend(extract_tokens(v));
+      }
+    },
+    _ => {},
+  }
+
+  tokens
+}
+
 #[cfg(test)]
-mod tests {
+pub mod tests {
+  use std::{collections::HashMap, string::ToString};
 
   use serde_json::json;
 
   use super::*;
+  use crate::http::{ManifestRequest, ManifestResponse};
 
-  #[macro_export]
   /// Creates a new HTTP request with optional parameters.
+  #[macro_export]
   macro_rules! request {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
@@ -598,11 +713,12 @@ mod tests {
     }};
   }
 
-  #[macro_export]
   /// Creates a new HTTP response with optional parameters.
+  #[macro_export]
   macro_rules! response {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
+        #[allow(unused_mut)]
         let mut response = ManifestResponse {
             status: "200".to_string(),
             version: "HTTP/1.1".to_string(),
@@ -628,12 +744,13 @@ mod tests {
     }};
   }
 
-  #[macro_export]
   /// Creates a `NotaryResponse` by taking a `ManifestResponse` and optional overrides for
   /// `NotaryResponseBody`.
+  #[macro_export]
   macro_rules! notary_response {
     // Match with ManifestResponse and optional overrides for NotaryResponseBody
     ($response:expr, $($key:ident: $value:expr),* $(,)?) => {{
+        #[allow(unused_mut)]
         let mut notary_response_body = NotaryResponseBody {
             json: Some(json!({})), // Default to empty JSON
         };
@@ -721,7 +838,7 @@ mod tests {
     let result = NotaryResponse::from_payload(&[header_bytes, invalid_body_bytes].concat());
     assert!(result.is_err());
 
-    if let Err(ProofError::InvalidManifest(msg)) = result {
+    if let Err(ManifestError::InvalidManifest(msg)) = result {
       assert!(msg.contains("Failed to parse body as valid JSON"));
     } else {
       panic!("Expected an invalid manifest error for body parsing");
@@ -739,7 +856,7 @@ mod tests {
     assert!(result.is_err());
 
     match result {
-      Err(ProofError::InvalidManifest(msg)) => {
+      Err(ManifestError::InvalidManifest(msg)) => {
         assert!(msg.contains("Unsupported HTTP status"));
       },
       _ => panic!("Expected invalid manifest error for unsupported HTTP status"),
@@ -754,7 +871,7 @@ mod tests {
     let result = invalid_response.validate();
     assert!(result.is_err());
 
-    if let Err(ProofError::InvalidManifest(msg)) = result {
+    if let Err(ManifestError::InvalidManifest(msg)) = result {
       assert!(msg.contains("Invalid message length"));
     } else {
       panic!("Expected invalid manifest error for empty message");
@@ -767,7 +884,6 @@ mod tests {
     let body_bytes: &[u8] = br#"{"key1": "value1"}"#;
 
     let response = NotaryResponse::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
-
     let manifest_response = response!(
         headers: std::collections::HashMap::from([
             ("Content-Type".to_string(), "application/json".to_string())
@@ -842,7 +958,7 @@ mod tests {
     assert!(result.is_err());
 
     match result {
-      Err(ProofError::InvalidManifest(msg)) => {
+      Err(ManifestError::InvalidManifest(msg)) => {
         assert!(msg.contains("Failed to interpret headers as valid UTF-8"));
       },
       _ => panic!("Expected invalid UTF-8 headers error"),
@@ -858,7 +974,7 @@ mod tests {
     assert!(result.is_err());
 
     match result {
-      Err(ProofError::InvalidManifest(msg)) => {
+      Err(ManifestError::InvalidManifest(msg)) => {
         assert!(msg.contains("Invalid HTTP request start-line"));
       },
       _ => panic!("Expected invalid start-line error"),
@@ -875,7 +991,7 @@ mod tests {
     let result = request.validate();
     assert!(result.is_err());
     match result {
-      Err(ProofError::InvalidManifest(msg)) => {
+      Err(ManifestError::InvalidManifest(msg)) => {
         assert!(msg.contains("Only HTTPS URLs are allowed"));
       },
       _ => panic!("Expected error for non-HTTPS URL"),
@@ -902,10 +1018,30 @@ mod tests {
     assert!(result.is_err());
 
     match result {
-      Err(ProofError::InvalidManifest(msg)) => {
+      Err(ManifestError::InvalidManifest(msg)) => {
         assert!(msg.contains("Invalid body bytes"));
       },
       _ => panic!("Expected invalid body parsing error"),
+    }
+  }
+
+  #[test]
+  fn test_validate_vars_with_missing_token() {
+    let header_bytes: &[u8] =
+      b"POST /path HTTP/1.1\r\nX-Custom-Header: <% missing_token %>\r\n\r\n";
+    let body_bytes: &[u8] = br#"{"key": "value"}"#;
+
+    let mut request = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
+    request.vars = HashMap::new(); // No vars provided, but the template references a token
+
+    let result = request.validate_vars();
+    assert!(result.is_err());
+
+    match result {
+      Err(ManifestError::InvalidManifest(msg)) => {
+        assert!(msg.contains("Token `<% missing_token %>` not declared in `vars`"));
+      },
+      _ => panic!("Expected missing token error"),
     }
   }
 
@@ -929,8 +1065,8 @@ mod tests {
     assert!(!base_request.is_subset_of(&other_request));
   }
 
-  #[macro_export]
   /// Creates a response body with a given serde_json::Value
+  #[macro_export]
   macro_rules! notary_body {
     ($($key:tt : $value:tt),* $(,)?) => {{
         NotaryResponseBody {
@@ -953,7 +1089,7 @@ mod tests {
         }
     );
     // ["key1", "key2", "key3"]
-    let mut path = vec![
+    let path = vec![
       JsonKey::String("key1".to_string()),
       JsonKey::String("key2".to_string()),
       JsonKey::String("key3".to_string()),

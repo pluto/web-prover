@@ -9,17 +9,10 @@ use caratls_ekm_google_confidential_space_server::GoogleConfidentialSpaceTokenGe
 #[cfg(feature = "tee-dummy-token-generator")]
 use caratls_ekm_server::DummyTokenGenerator;
 use caratls_ekm_server::TeeTlsAcceptor;
-use client::{
-  origo::{OrigoSecrets, VerifyReply},
-  TeeProof, TeeProofData,
-};
+use client::origo::{OrigoSecrets, VerifyReply};
 use futures_util::SinkExt;
 use hyper::{body::Bytes, upgrade::Upgraded};
 use hyper_util::rt::TokioIo;
-use proofs::program::{
-  http::{ManifestRequest, NotaryResponse},
-  manifest::Manifest,
-};
 use serde::Deserialize;
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
@@ -32,13 +25,17 @@ use tokio_util::{
 };
 use tracing::{debug, error, info};
 use uuid::Uuid;
+use web_prover_core::{
+  http::{ManifestRequest, NotaryResponse},
+  manifest::Manifest,
+  proof::{TeeProof, TeeProofData},
+};
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
   axum_websocket::WebSocket,
   errors::NotaryServerError,
   origo::{proxy_service, sign_verification},
-  tls_parser::{Direction, ParsedMessage, WrappedPayload},
   tlsn::ProtocolUpgrade,
   SharedState,
 };
@@ -205,8 +202,7 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   //  maybe clean this up and share code.
   let transcript = state.origo_sessions.lock().unwrap().get(session_id).cloned().unwrap();
   let http = transcript
-    .into_flattened()
-    .unwrap() // todo: error me
+    .into_flattened()?
     .into_parsed(
       &handshake_server_key,
       &handshake_server_iv,
@@ -216,8 +212,7 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
       Some(app_client_iv.to_vec()),
     )
     .unwrap()
-    .into_http()
-    .unwrap();
+    .into_http()?;
 
   // todo: cleanup
   debug!("request={:?}", bytes_to_ascii(http.payload.request.clone()));
@@ -257,7 +252,6 @@ pub fn create_tee_proof(
     manifest: manifest.clone(),
   };
   let signature = sign_verification(to_sign, State(state)).unwrap();
-
   let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
 
   Ok(TeeProof { data, signature })
@@ -271,13 +265,11 @@ fn validate_notarization_legal(
   response: &NotaryResponse,
 ) -> Result<(), NotaryServerError> {
   manifest.validate()?;
-  if !manifest.request.is_subset_of(&request) {
+  if !manifest.request.is_subset_of(request) {
     return Err(NotaryServerError::ManifestRequestMismatch);
   }
-
   if !response.matches_client_manifest(&manifest.response) {
     return Err(NotaryServerError::ManifestResponseMismatch);
   }
-
   Ok(())
 }

@@ -16,15 +16,15 @@ mod tls;
 pub mod tls_client_async2;
 use std::collections::HashMap;
 
-use origo::SignedVerificationReply;
-use proofs::{
-  program::manifest::{Manifest, NIVCRom},
-  proof::FoldingProof,
-};
+use proofs::{program::manifest::NIVCRom, proof::FoldingProof};
 use serde::{Deserialize, Serialize};
 pub use tlsn_core::proof::TlsProof;
 use tlsn_prover::tls::ProverConfig;
 use tracing::{debug, info};
+use web_prover_core::{
+  manifest::Manifest,
+  proof::{SignedVerificationReply, TeeProof},
+};
 
 use crate::errors::ClientErrors;
 
@@ -52,7 +52,7 @@ pub fn get_web_prover_circuits_version() -> String {
 pub async fn prover_inner(
   config: config::Config,
   proving_params: Option<Vec<u8>>,
-) -> Result<Proof, errors::ClientErrors> {
+) -> Result<Proof, ClientErrors> {
   info!("GIT_HASH: {}", env!("GIT_HASH"));
   match config.mode {
     config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
@@ -62,9 +62,9 @@ pub async fn prover_inner(
   }
 }
 
-pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
+pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, ClientErrors> {
   let root_store =
-    crate::tls::tls_client_default_root_store(config.notary_ca_cert.clone().map(|c| vec![c]));
+    tls::tls_client_default_root_store(config.notary_ca_cert.clone().map(|c| vec![c]));
 
   let max_sent_data = config
     .max_sent_data
@@ -99,32 +99,31 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, erro
 pub async fn prover_inner_origo(
   config: config::Config,
   proving_params: Option<Vec<u8>>,
-) -> Result<Proof, errors::ClientErrors> {
+) -> Result<Proof, ClientErrors> {
   let session_id = config.session_id.clone();
 
   let mut proof = origo::proxy_and_sign_and_generate_proof(config.clone(), proving_params).await?;
 
-  let manifest =
-    config.proving.manifest.clone().ok_or(errors::ClientErrors::ManifestMissingError)?;
+  let manifest = config.proving.manifest.clone().ok_or(ClientErrors::ManifestMissingError)?;
 
   debug!("sending proof to proxy for verification");
-  let verify_response =
-    origo::verify(config, origo::VerifyBody { session_id, origo_proof: proof.clone(), manifest })
-      .await?;
-  // Note: The above `?` will push out the `ProofError::VerifyFailed` from the `origo::verify`
-  // method now. We no longer return an inner bool here, we just use the Result enum itself
-
+  let verify_response = origo::verify(config, origo::VerifyBody {
+    session_id,
+    origo_proof: proof.clone(),
+    manifest: manifest.into(),
+  })
+  .await?;
   proof.sign_reply = Some(verify_response);
 
   debug!("proof.value: {:?}\nproof.verify_reply: {:?}", proof.value, proof.sign_reply);
 
-  // TODO: This is where we should output richer proof data, the verikfy response has the hash of
+  // TODO: This is where we should output richer proof data, the verify response has the hash of
   // the target value now. Since this is in the client, we can use the private variables here. We
   // just need to get out the value.
   Ok(Proof::Origo(proof))
 }
 
-pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, errors::ClientErrors> {
+pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, ClientErrors> {
   let session_id = config.set_session_id();
 
   // TEE mode uses Origo networking stack with minimal changes
@@ -147,7 +146,7 @@ pub struct ProxyConfig {
   pub manifest:       Manifest,
 }
 
-pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, errors::ClientErrors> {
+pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, ClientErrors> {
   let session_id = config.session_id.clone();
 
   let url = format!(
@@ -183,27 +182,4 @@ pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, errors:
   assert_eq!(response.status(), hyper::StatusCode::OK);
   let tee_proof = response.json::<TeeProof>().await?;
   Ok(Proof::Proxy(tee_proof))
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct TeeProof {
-  pub data:      TeeProofData,
-  pub signature: SignedVerificationReply,
-}
-
-impl TryFrom<&[u8]> for TeeProof {
-  type Error = serde_json::Error;
-
-  fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> { serde_json::from_slice(bytes) }
-}
-
-impl TryFrom<TeeProof> for Vec<u8> {
-  type Error = serde_json::Error;
-
-  fn try_from(proof: TeeProof) -> Result<Self, Self::Error> { serde_json::to_vec(&proof) }
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct TeeProofData {
-  pub manifest_hash: Vec<u8>,
 }

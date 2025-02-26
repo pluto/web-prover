@@ -4,7 +4,7 @@ use client_side_prover::supernova::PublicParams;
 use proofs::{
   program::{
     data::{InitializedSetup, InstanceParams, NotExpanded, Online, ProofParams, SetupParams},
-    manifest::{EncryptionInput, Manifest, NIVCRom, NivcCircuitInputs},
+    manifest::{EncryptionInput, NIVCRom, NivcCircuitInputs, OrigoManifest},
   },
   E1, F, G1, G2,
 };
@@ -32,18 +32,18 @@ use crate::{ClientErrors, OrigoProof};
 /// - create consolidate [`InstanceParams`]
 /// - expand private inputs into fold inputs as per circuits
 pub async fn construct_program_data_and_proof<const CIRCUIT_SIZE: usize>(
-  manifest: Manifest,
-  request_inputs: EncryptionInput,
-  response_inputs: EncryptionInput,
+  manifest: &OrigoManifest,
+  request_inputs: &EncryptionInput,
+  response_inputs: &EncryptionInput,
   vks: (F<G1>, F<G2>),
   proving_params: Arc<PublicParams<E1>>,
   setup_data: Arc<InitializedSetup>,
 ) -> Result<OrigoProof, ClientErrors> {
   let NivcCircuitInputs { private_inputs, fold_inputs, initial_nivc_input } =
-    manifest.build_inputs::<CIRCUIT_SIZE>(&request_inputs, &response_inputs)?;
+    manifest.build_inputs::<CIRCUIT_SIZE>(request_inputs, response_inputs)?;
 
   let NIVCRom { circuit_data, rom } =
-    manifest.build_rom::<CIRCUIT_SIZE>(&request_inputs, &response_inputs);
+    manifest.build_rom::<CIRCUIT_SIZE>(request_inputs, response_inputs);
 
   debug!("Generating response's parameters...");
   let setup_params = SetupParams::<Online> {
