@@ -2,18 +2,40 @@ name: Auto Version Bump
 
 on:
   push:
-    branches:
-      - main
+    branches: ["main"]
     paths:
       - 'crates/**'
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
-  detect-and-bump:
+  verify-permissions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Token Permissions
+        run: |
+          # Test repository write access
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               -H "Accept: application/vnd.github.v3+json" \
+               "https://api.github.com/repos/${{ github.repository }}" | \
+          jq -e '.permissions.push == true and .permissions.pull_requests == true' || {
+            echo "Error: Token does not have required permissions (push and pull_request)"
+            echo "Please ensure the workflow has 'contents: write' and 'pull-requests: write' permissions"
+            exit 1
+          }
+          echo "✓ Token permissions verified successfully"
+
+  version-bump:
+    needs: verify-permissions
+    if: ${{ !contains(github.event.head_commit.message, 'bump version') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Install Rust
         uses: actions-rs/toolchain@v1
@@ -21,34 +43,81 @@ jobs:
           profile: minimal
           toolchain: stable
           
+      - name: Cache cargo-edit
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/bin/cargo-set-version
+          key: ${{ runner.os }}-cargo-edit
+          
       - name: Install cargo-edit
-        run: cargo install cargo-edit
+        run: |
+          if ! command -v cargo-set-version &> /dev/null; then
+            cargo install cargo-edit --version 0.13.1
+          fi
           
       - name: Detect changes and bump versions
         id: detect-changes
         run: |
-          # Get list of changed files
-          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep "crates/" || echo "")
+          # Ensure we can find the last non-bump commit
+          LAST_NON_BUMP_COMMIT=$(git log --pretty=format:"%H" -i --grep="bump version" --invert-grep -n 1) || {
+            echo "Error: Could not find last non-bump commit"
+            exit 1
+          }
           
-          # Extract unique crate names from changed files
-          CHANGED_CRATES=$(echo "$CHANGED_FILES" | grep -o "crates/[^/]*" | sort -u | cut -d'/' -f2)
+          # Get list of changed files since last commit that's not a version bump
+          CHANGED_FILES=$(git diff --name-only $LAST_NON_BUMP_COMMIT HEAD | grep "crates/" || echo "")
+          
+          # Extract unique crate paths from changed files
+          CHANGED_CRATE_PATHS=$(echo "$CHANGED_FILES" | grep -o "crates/[^/]*" | sort -u || echo "")
+          
+          # Check if we found any changed crates
+          if [ -z "$CHANGED_CRATE_PATHS" ]; then
+            echo "No crate changes detected. Skipping version bump."
+            echo "changed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "Changes detected in the following crates:"
+          echo "$CHANGED_CRATE_PATHS"
+          
+          # Create list of changed crates for PR description
+          CRATE_NAMES=""
           
           # For each changed crate, bump its minor version
-          for CRATE in $CHANGED_CRATES; do
-            if [ -f "crates/$CRATE/Cargo.toml" ]; then
-              echo "Bumping version for $CRATE"
-              (cd "crates/$CRATE" && cargo set-version --bump minor)
+          for CRATE_PATH in $CHANGED_CRATE_PATHS; do
+            CRATE_NAME=$(echo "$CRATE_PATH" | cut -d'/' -f2)
+            if [ -f "$CRATE_PATH/Cargo.toml" ]; then
+              echo "Bumping version for $CRATE_NAME"
+              # Get current version before bump
+              CURRENT_VERSION=$(grep -m 1 "version = " "$CRATE_PATH/Cargo.toml" | cut -d'"' -f2)
+              
+              # Bump the version
+              (cd "$CRATE_PATH" && cargo set-version --bump minor)
+              
+              # Get new version after bump
+              NEW_VERSION=$(grep -m 1 "version = " "$CRATE_PATH/Cargo.toml" | cut -d'"' -f2)
+              
+              CRATE_NAMES="$CRATE_NAMES\n- $CRATE_NAME: $CURRENT_VERSION → $NEW_VERSION"
             fi
           done
           
-          echo "changed_crates=$(echo $CHANGED_CRATES | tr '\n' ' ')" >> $GITHUB_ENV
+          echo "crate_changes<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$CRATE_NAMES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "changed=true" >> $GITHUB_OUTPUT
       
       - name: Create Pull Request
+        if: steps.detect-changes.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v5
         with:
-          commit-message: "chore: bump versions for affected crates"
+          commit-message: "chore: bump version for modified crates"
           title: "chore: automatic version bump"
           branch: "auto-version-bump"
+          delete-branch: true
           body: |
-            Automatic version bump for changed crates:
-            ${{ env.changed_crates }}
+            ## Automatic Version Bump
+            
+            This PR updates the versions of the following crates:
+            ${{ steps.detect-changes.outputs.crate_changes }}
+            
+            Changes were detected in these crates after the last non-version-bump commit to main.
