@@ -46,3 +46,11 @@ jobs:
           path: "target/release/client"
           retention-days: 7
           if-no-files-found: "error"
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.os == 'macos-latest'
+        with:
+          name: "client.macos.arm64"
+          path: "target/release/client"
+          retention-days: 7
+          if-no-files-found: "error"
