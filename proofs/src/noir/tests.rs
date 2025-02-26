@@ -10,7 +10,6 @@ use client_side_prover::{
   supernova::{NonUniformCircuit, RecursiveSNARK, StepCircuit},
   traits::snark::default_ck_hint,
 };
-use ff::derive::bitvec::ptr::swap;
 use tracing::trace;
 use tracing_test::traced_test;
 
@@ -20,9 +19,6 @@ use crate::program::utils;
 const ADD_EXTERNAL: &[u8] = include_bytes!("../../examples/noir_circuit_data/add_external.json");
 const SQUARE_ZEROTH: &[u8] = include_bytes!("../../examples/noir_circuit_data/square_zeroth.json");
 const SWAP_MEMORY: &[u8] = include_bytes!("../../examples/noir_circuit_data/swap_memory.json");
-
-const EXTERNAL_INPUTS: [[u64; 2]; 2] = [[5, 7], [13, 1]];
-const MAX_ROM_LENGTH: usize = 10;
 
 #[derive(Debug, Clone)]
 pub struct NoirMemory {
@@ -55,7 +51,7 @@ impl NonUniformCircuit<E1> for NoirMemory {
     self.circuits[circuit_index].clone()
   }
 
-  fn secondary_circuit(&self) -> Self::C2 { Default::default() }
+  fn secondary_circuit(&self) -> Self::C2 { TrivialCircuit::default() }
 
   // Use the initial input to set this
   fn initial_circuit_index(&self) -> usize { self.rom[0] as usize }
@@ -98,7 +94,7 @@ pub fn run(memory: &NoirMemory) -> Result<RecursiveSNARK<E1>, ProofError> {
   let public_params = PublicParams::setup(&memory_clone, &*default_ck_hint(), &*default_ck_hint());
 
   let z0_primary = &memory.public_input;
-  let z0_secondary = &vec![F::<G2>::ZERO];
+  let z0_secondary = &[F::<G2>::ZERO];
 
   let mut recursive_snark_option = None;
 
@@ -140,29 +136,17 @@ pub fn run(memory: &NoirMemory) -> Result<RecursiveSNARK<E1>, ProofError> {
   Ok(recursive_snark?)
 }
 
-fn noir_mock() -> NoirProgram {
-  // Circuit definition:
-  // x_0 * w_0 + w_1 + 2 == 0
-  let json_path = Path::new("./mock").join(format!("mock.json"));
-  let noir_json = std::fs::read(&json_path).unwrap();
-
-  NoirProgram::new(&noir_json)
-}
-
 // `fold.json` is:
 // pub fn main(x0: Field, w: pub [Field;2]) -> pub [Field;2] {
 //   [x0 * w[0] + w[1] + 1, (x0 + 3) * w[1] + w[0]]
 // }
 fn noir_fold() -> NoirProgram {
-  // Circuit definition:
-  // x_0 * w_0 + w_1 + 2 == 0
   let json_path = Path::new("./mock").join(format!("fold.json"));
   let noir_json = std::fs::read(&json_path).unwrap();
 
   NoirProgram::new(&noir_json)
 }
 
-// This is fucking stupid. Why can't we all be sane. i'm not anymore
 #[test]
 fn test_conversions() {
   let f = F::<G1>::from(5);
@@ -174,61 +158,40 @@ fn test_conversions() {
   assert_eq!(halo2_f, F::<G1>::from(3));
 }
 
-// TODO: Should probably have a check here, but I believe this is correct!
-#[test]
-fn test_mock_noir_synthesize_empty() {
-  // Circuit definition:
-  // x_0 * w_0 + w_1 + 2 == 0
-  let json_path = Path::new("./mock").join(format!("mock.json"));
-  let noir_json = std::fs::read(&json_path).unwrap();
-  let program = NoirProgram::new(&noir_json);
-
-  let mut cs = ShapeCS::<E1>::new();
-
-  program.vanilla_synthesize(&mut cs, &[]);
-
-  dbg!(cs.num_constraints());
-
-  dbg!(&cs.constraints);
-  dbg!(cs.num_aux());
-  dbg!(cs.num_inputs());
-}
-
-// #[test]
-// fn test_mock_noir_synthesize_full() {
-//   program.set_private_inputs(vec![F::<G1>::from(2), F::<G1>::from(3), -F::<G1>::from(8)]);
-
-//   let mut cs = ShapeCS::<E1>::new();
-//   program.vanilla_synthesize(&mut cs, &[]);
-
-//   dbg!(&cs.constraints);
-//   dbg!(cs.num_aux());
-//   dbg!(cs.num_inputs());
-// }
-
 #[test]
 #[traced_test]
 fn test_mock_noir_ivc() {
   let mut circuit = noir_fold();
   circuit.set_private_inputs(vec![F::<G1>::from(3)]);
 
-  let rom_circuit = NoirRomCircuit { circuit, circuit_index: 0, rom_size: 3 };
+  let rom_circuit = NoirRomCircuit { circuit, circuit_index: 0, rom_size: 2 };
 
   let memory = NoirMemory {
     circuits:     vec![rom_circuit],
-    rom:          vec![0, 0, 0],
+    rom:          vec![0, 0],
     public_input: vec![
       F::<G1>::from(1), // Actual input
       F::<G1>::from(2), // Actual input
       F::<G1>::from(0), // PC
       F::<G1>::from(0), // ROM
       F::<G1>::from(0), // ROM
-      F::<G1>::from(0), // ROM
     ],
   };
 
-  let snark = run(&memory);
-  dbg!(snark.unwrap().zi_primary());
+  let snark = run(&memory).unwrap();
+  let zi = snark.zi_primary();
+  dbg!(zi);
+  // First fold:
+  // step_out[0] == 3 * 1 + 2 + 1   == 6
+  // step_out[1] == (3 + 3) * 2 + 1 == 13
+  // Second fold:
+  // step_out[0] == 3 * 6 + 13 + 1 == 32
+  // step_out[1] == (3 + 3) * 13 + 6 == 84
+  assert_eq!(zi[0], F::<G1>::from(32));
+  assert_eq!(zi[1], F::<G1>::from(84));
+  assert_eq!(zi[2], F::<G1>::from(2));
+  assert_eq!(zi[3], F::<G1>::from(0));
+  assert_eq!(zi[4], F::<G1>::from(0));
 }
 
 #[test]
@@ -263,42 +226,22 @@ fn test_mock_noir_nivc() {
     ],
   };
 
-  let snark = run(&memory);
-  dbg!(snark.unwrap().zi_primary());
-}
-
-#[test]
-fn test_fold_noir_synthesize_empty() {
-  let json_path = Path::new("./mock").join(format!("fold.json"));
-  let noir_json = std::fs::read(&json_path).unwrap();
-
-  let mut program = NoirProgram::new(&noir_json);
-
-  let mut cs = ShapeCS::<E1>::new();
-  program.vanilla_synthesize(&mut cs, &[]);
-
-  dbg!(&cs.constraints);
-  dbg!(cs.num_aux());
-  dbg!(cs.num_inputs());
-}
-
-// TODO: This fails now because we pass in an empty array for `z`
-#[test]
-fn test_fold_noir_synthesize_full() {
-  let json_path = Path::new("./mock").join(format!("fold.json"));
-  let noir_json = std::fs::read(&json_path).unwrap();
-
-  let mut program = NoirProgram::new(&noir_json);
-  program.set_private_inputs(vec![F::<G1>::from(1), F::<G1>::from(1), F::<G1>::from(1)]);
-
-  // Check:
-  // 1 * 1 + 1 + 1 == 3
-  // (1 + 3) * 1 + 1 = 4
-
-  let mut cs = ShapeCS::<E1>::new();
-  program.vanilla_synthesize(&mut cs, &[]);
-
-  // dbg!(&cs.constraints);
-  // dbg!(cs.num_aux());
-  // dbg!(cs.num_inputs());
+  let snark = run(&memory).unwrap();
+  let zi = snark.zi_primary();
+  dbg!(zi);
+  // First fold:
+  // step_out[0] == 1 + 5 == 6
+  // step_out[1] == 2 + 7 == 9
+  // Second fold:
+  // step_out[0] == 6 ** 2 == 36
+  // step_out[1] == 9
+  // Third fold:
+  // step_out[0] == 9
+  // step_out[1] == 36
+  assert_eq!(zi[0], F::<G1>::from(9));
+  assert_eq!(zi[1], F::<G1>::from(36));
+  assert_eq!(zi[2], F::<G1>::from(3));
+  assert_eq!(zi[3], F::<G1>::from(0));
+  assert_eq!(zi[4], F::<G1>::from(1));
+  assert_eq!(zi[5], F::<G1>::from(2));
 }

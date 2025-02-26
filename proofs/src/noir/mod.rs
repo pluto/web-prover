@@ -1,6 +1,5 @@
 use acvm::{
   acir::{
-    self,
     acir_field::GenericFieldElement,
     circuit::{brillig::BrilligBytecode, Circuit, Opcode, Program},
     native_types::{Witness, WitnessMap},
@@ -71,9 +70,6 @@ impl NoirProgram {
     } else {
       None
     };
-    // dbg!(self.circuit().private_parameters.len());
-    // dbg!(self.circuit().public_parameters.0.len());
-    // dbg!(self.circuit().return_values.0.len());
 
     // For folding in particular:
     assert_eq!(self.circuit().return_values.0.len(), self.circuit().public_parameters.0.len());
@@ -108,17 +104,13 @@ impl NoirProgram {
 
     // Set up private inputs
     self.circuit().private_parameters.iter().for_each(|witness| {
-      println!("private instance: {witness:?}");
-      let f = if let Some(inputs) = &self.witness {
+      let f = self.witness.as_ref().map(|inputs| {
         let f = convert_to_acir_field(inputs[witness.as_usize()]);
         acvm.as_mut().unwrap().overwrite_witness(*witness, f);
-        Some(f)
-      } else {
-        None
-      };
+        f
+      });
       let var = AllocatedNum::alloc(&mut *cs, || Ok(convert_to_halo2_field(f.unwrap_or_default())))
         .unwrap();
-      trace!("overwriting {witness:?} with {var:?}");
       allocated_vars.insert(*witness, var);
     });
 
@@ -162,12 +154,7 @@ impl NoirProgram {
 
         // Process multiplication terms (these form the A and B matrices in R1CS)
         for mul_term in &gate.mul_terms {
-          // Convert coefficient from ACIR field to Halo2 field representation
           let coeff = convert_to_halo2_field(mul_term.0);
-
-          // Get or create variables for both sides of multiplication
-          // If we've seen this witness before, we'll reuse its variable
-          // If not, we'll allocate a new one
           let left_var = get_var(&mul_term.1, &mut allocated_vars, cs, gate_idx)?;
           let right_var = get_var(&mul_term.2, &mut allocated_vars, cs, gate_idx)?;
 
@@ -179,27 +166,19 @@ impl NoirProgram {
 
         // Process addition terms (these contribute to the C matrix in R1CS)
         for add_term in &gate.linear_combinations {
-          // Convert coefficient as before
           let coeff = convert_to_halo2_field(add_term.0);
-
-          // Get or create variable for this term
           let var = get_var(&add_term.1, &mut allocated_vars, cs, gate_idx)?;
-
-          // Add to final terms (Cz) with appropriate coefficient
           final_terms = final_terms + (coeff, var);
         }
 
         // Handle constant term if present
         if !gate.q_c.is_zero() {
-          // Convert constant coefficient
           let const_coeff = convert_to_halo2_field(gate.q_c);
-          // Subtract constant term using the ONE input (index 0)
-          // We subtract because we're moving it to the other side of equation
+          // Negate the constant term since we're moving it to the other side of the equation
           final_terms = final_terms - (const_coeff, Variable::new_unchecked(Index::Input(0)));
         }
 
         // Enforce the R1CS constraint: Az ∘ Bz = Cz
-        // This represents our equation in the form: (left_terms) * (right_terms) = final_terms
         cs.enforce(
           || format!("gate_{gate_idx}"),
           |_| left_terms.clone(),
@@ -210,29 +189,10 @@ impl NoirProgram {
     }
 
     let mut z_out = vec![];
-    // if let Some(wmap) = acir_witness_map {
     for ret in &self.circuit().return_values.0 {
-      // dbg!(&ret);
-      // dbg!(wmap.get(ret));
-      // let output_witness = wmap.get(ret).unwrap();
       z_out.push(allocated_vars.get(ret).unwrap().clone());
     }
-    // }
 
-    // TODO: We need to make a list of the range of the public inputs. I'm not even convinced we
-    // actually need this constraint here as we can just use z directly, but I think we need to
-    // allocate the public inputs into the circuit itself since these z's are essentially aux
-    // variables the circuit uses to fold
-    // for public_input in &self.circuit().public_parameters.0 {
-    //   cs.enforce(
-    //     || format!("pub input enforce {}", public_input.as_usize()),
-    //     |lc| {
-    //       lc + z[public_input.as_usize() -
-    // self.circuit().private_parameters.len()].get_variable()     },
-    //     |lc| lc + CS::one(),
-    //     |lc| lc + allocated_vars.get(public_input).unwrap().get_variable(),
-    //   );
-    // }
     Ok(dbg!(z_out))
   }
 }
@@ -245,7 +205,6 @@ fn convert_to_halo2_field(f: GenericFieldElement<Fr>) -> F<G1> {
   F::<G1>::from_repr(arr).unwrap()
 }
 
-// why the fuck is this fucking big endian?
 fn convert_to_acir_field(f: F<G1>) -> GenericFieldElement<Fr> {
   let mut bytes = f.to_bytes();
   bytes.reverse();
