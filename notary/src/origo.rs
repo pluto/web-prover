@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+  fs,
+  sync::{Arc, Mutex},
+};
 
 use alloy_primitives::utils::keccak256;
 use axum::{
@@ -6,9 +9,12 @@ use axum::{
   response::Response,
   Json,
 };
-use client::origo::{SignBody, SignedVerificationReply, VerifyBody, VerifyReply};
+use client::origo::{SignBody, VerifyBody, VerifyReply};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
+use k256::{
+  ecdsa::SigningKey as Secp256k1SigningKey, elliptic_curve::rand_core, pkcs8::DecodePrivateKey,
+};
 use proofs::{
   circuits::{CIRCUIT_SIZE_512, MAX_STACK_HEIGHT},
   errors::ProofError,
@@ -18,7 +24,6 @@ use proofs::{
 };
 use rs_merkle::{Hasher, MerkleTree};
 use serde::{Deserialize, Serialize};
-use tls_parser::rusticata_macros::debug;
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
   net::TcpStream,
@@ -27,6 +32,7 @@ use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tracing::{debug, error, info};
 use uuid::Uuid;
 use web_proof_circuits_witness_generator::polynomial_digest;
+use web_prover_core::proof::SignedVerificationReply;
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
@@ -36,6 +42,23 @@ use crate::{
   tlsn::ProtocolUpgrade,
   verifier, SharedState,
 };
+
+pub struct OrigoSigningKey(pub(crate) Secp256k1SigningKey);
+
+impl OrigoSigningKey {
+  pub fn load(private_key_pem_path: &str) -> Self {
+    if private_key_pem_path.is_empty() {
+      info!("Using ephemeral origo signing key");
+      Self::ephemeral()
+    } else {
+      info!("Using origo signing key: {}", private_key_pem_path);
+      let raw = fs::read_to_string(private_key_pem_path).unwrap();
+      Self(Secp256k1SigningKey::from_pkcs8_pem(&raw).unwrap())
+    }
+  }
+
+  pub fn ephemeral() -> Self { Self(Secp256k1SigningKey::random(&mut rand_core::OsRng)) }
+}
 
 #[derive(Deserialize)]
 pub struct SignQuery {
@@ -120,16 +143,16 @@ pub async fn sign(
 
   // need secp256k1 here for Solidity
   let (signature, recover_id) =
-    state.origo_signing_key.clone().sign_prehash_recoverable(&merkle_root).unwrap();
+    state.origo_signing_key.0.sign_prehash_recoverable(&merkle_root).unwrap();
 
   let signer_address =
-    alloy_primitives::Address::from_public_key(state.origo_signing_key.verifying_key());
+    alloy_primitives::Address::from_public_key(state.origo_signing_key.0.verifying_key());
 
   let verifying_key =
     k256::ecdsa::VerifyingKey::recover_from_prehash(&merkle_root.clone(), &signature, recover_id)
       .unwrap();
 
-  assert_eq!(state.origo_signing_key.verifying_key(), &verifying_key);
+  assert_eq!(state.origo_signing_key.0.verifying_key(), &verifying_key);
 
   // TODO is this right? we need lower form S for sure though
   let s = if signature.normalize_s().is_some() {
@@ -157,7 +180,7 @@ pub async fn sign(
 pub fn sign_verification(
   query: VerifyReply,
   State(state): State<Arc<SharedState>>,
-) -> Result<Json<SignedVerificationReply>, ProxyError> {
+) -> Result<SignedVerificationReply, ProxyError> {
   // TODO check OSCP and CT (maybe)
   // TODO check target_name matches SNI and/or cert name (let's discuss)
 
@@ -170,16 +193,16 @@ pub fn sign_verification(
 
   // need secp256k1 here for Solidity
   let (signature, recover_id) =
-    state.origo_signing_key.clone().sign_prehash_recoverable(&merkle_root).unwrap();
+    state.origo_signing_key.0.sign_prehash_recoverable(&merkle_root).unwrap();
 
   let signer_address =
-    alloy_primitives::Address::from_public_key(state.origo_signing_key.verifying_key());
+    alloy_primitives::Address::from_public_key(state.origo_signing_key.0.verifying_key());
 
   let verifying_key =
     k256::ecdsa::VerifyingKey::recover_from_prehash(&merkle_root.clone(), &signature, recover_id)
       .unwrap();
 
-  assert_eq!(state.origo_signing_key.verifying_key(), &verifying_key);
+  assert_eq!(state.origo_signing_key.0.verifying_key(), &verifying_key);
 
   // TODO is this right? we need lower form S for sure though
   let s = if signature.normalize_s().is_some() {
@@ -204,7 +227,7 @@ pub fn sign_verification(
     signer:      "0x".to_string() + &hex::encode(signer_address),
   };
 
-  Ok(Json(response))
+  Ok(response)
 }
 
 #[derive(Clone)]
@@ -275,14 +298,6 @@ fn find_ciphertext_permutation<const CIRCUIT_SIZE: usize>(
   // - request, response[0..-1]
   // - request, response[1..-1]
 
-  // Case: first message from server after request
-  let actual_ciphertext_digest =
-    compute_ciphertext_digest::<CIRCUIT_SIZE>(&request_messages, &response_messages[1..]);
-  if actual_ciphertext_digest == expected_ciphertext_digest {
-    debug!("Ciphertext found in response[1..] permutation");
-    return response_messages[1..].to_vec();
-  }
-
   // Case: receiving message & not the last message. Drop last message, it's close notify.
   let actual_ciphertext_digest = compute_ciphertext_digest::<CIRCUIT_SIZE>(
     &request_messages,
@@ -293,15 +308,25 @@ fn find_ciphertext_permutation<const CIRCUIT_SIZE: usize>(
     return response_messages[0..response_messages.len() - 1].to_vec();
   }
 
-  // Case: first message from server after request
-  // Case: receiving message & not the last message. Drop last message, it's close notify.
-  let actual_ciphertext_digest = compute_ciphertext_digest::<CIRCUIT_SIZE>(
-    &request_messages,
-    &response_messages[1..response_messages.len() - 1],
-  );
-  if actual_ciphertext_digest == expected_ciphertext_digest {
-    debug!("Ciphertext found in response[1..-1] permutation");
-    return response_messages[1..response_messages.len() - 1].to_vec();
+  for i in 0..response_messages.len() {
+    // Case: remove first messages from response, changecipherspec from server
+    let actual_ciphertext_digest =
+      compute_ciphertext_digest::<CIRCUIT_SIZE>(&request_messages, &response_messages[i..]);
+    if actual_ciphertext_digest == expected_ciphertext_digest {
+      debug!("Ciphertext found in response[{i}..] permutation");
+      return response_messages[i..].to_vec();
+    }
+
+    // Case: first message from server after request
+    // Case: receiving message & not the last message. Drop last message, it's close notify.
+    let actual_ciphertext_digest = compute_ciphertext_digest::<CIRCUIT_SIZE>(
+      &request_messages,
+      &response_messages[i..response_messages.len() - 1],
+    );
+    if actual_ciphertext_digest == expected_ciphertext_digest {
+      debug!("Ciphertext found in response[{i}..-1] permutation");
+      return response_messages[i..response_messages.len() - 1].to_vec();
+    }
   }
 
   panic!("Ciphertext not found in any permutation");
@@ -380,7 +405,7 @@ pub async fn verify(
         );
       } else if output[0]
         != polynomial_digest(
-          &payload.origo_proof.value.clone().unwrap().as_bytes(),
+          payload.origo_proof.value.clone().unwrap().as_bytes(),
           ciphertext_digest,
           0,
         )
@@ -390,7 +415,7 @@ pub async fn verify(
         debug!(
           "value_polynomial_digest: {:?}",
           polynomial_digest(
-            &payload.origo_proof.value.clone().unwrap().as_bytes(),
+            payload.origo_proof.value.clone().unwrap().as_bytes(),
             ciphertext_digest,
             0,
           )
@@ -400,7 +425,10 @@ pub async fn verify(
         // TODO: add the manifest digest?
         debug!("output from verifier: {output:?}");
         // This unwrap should be safe for now as the value will always be present
-        VerifyReply { value: payload.origo_proof.value.unwrap(), manifest: payload.manifest }
+        VerifyReply {
+          value:    payload.origo_proof.value.unwrap(),
+          manifest: payload.manifest.into(),
+        }
       }
     },
     Err(e) => {
@@ -409,7 +437,7 @@ pub async fn verify(
     },
   };
 
-  sign_verification(verify_output, State(state))
+  sign_verification(verify_output, State(state)).map(Json)
 }
 
 pub async fn websocket_notarize(

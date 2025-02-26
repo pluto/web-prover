@@ -4,19 +4,24 @@ use std::{
   pin::Pin,
   sync::Arc,
   task::{Context, Poll},
-  time::Duration,
 };
 
+use bytes::Bytes;
 #[cfg(feature = "tee-dummy-token-verifier")]
 use caratls_ekm_client::DummyTokenVerifier;
 use caratls_ekm_client::TeeTlsConnector;
 #[cfg(feature = "tee-google-confidential-space-token-verifier")]
 use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
-use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt};
+use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt};
 use hyper::StatusCode;
+use js_sys::{Function, Promise};
 use tls_client2::origo::OrigoConnection;
-use tokio_util::compat::TokioAsyncReadCompatExt;
+use tokio_util::{
+  codec::{Framed, LengthDelimitedCodec},
+  compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt},
+};
 use tracing::debug;
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::window;
 use ws_stream_wasm::WsMeta;
@@ -27,11 +32,13 @@ use crate::{
 };
 
 async fn sleep(ms: u64) {
-  let promise = js_sys::Promise::new(&mut |resolve, _| {
-    window()
-      .unwrap()
-      .set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, ms as i32)
-      .unwrap();
+  #[wasm_bindgen]
+  extern "C" {
+    #[wasm_bindgen(js_namespace = globalThis)]
+    fn setTimeout(callback: &Function, timeout: i32);
+  }
+  let promise = Promise::new(&mut |resolve, _| {
+    setTimeout(&resolve, ms as i32);
   });
   JsFuture::from(promise).await.unwrap();
 }
@@ -165,7 +172,7 @@ async fn handle_tee_mode(
   let (mut request_sender, connection) =
     hyper::client::conn::http1::handshake(client_tls_conn).await?;
 
-  let (connection_sender, connection_receiver) = oneshot::channel();
+  let (connection_sender, _) = oneshot::channel();
   let connection_fut = connection.without_shutdown();
   spawn_local(async {
     let result = connection_fut.await;
@@ -191,14 +198,22 @@ async fn handle_tee_mode(
     debug!("Waiting for magic byte, received: {:?}", buffer[0]);
   }
 
-  let manifest_bytes = config.proving.manifest.unwrap().to_wire_bytes();
-  reunited_socket.write_all(&manifest_bytes).await?;
+  let mut framed_reunited_socket =
+    Framed::new(reunited_socket.compat(), LengthDelimitedCodec::new());
 
-  let origo_secret_bytes = OrigoSecrets::from_origo_conn(&origo_conn).to_wire_bytes();
-  reunited_socket.write_all(&origo_secret_bytes).await?;
+  let manifest = config.proving.manifest.unwrap();
+  let manifest_bytes: Vec<u8> = (&manifest).try_into().unwrap();
+  framed_reunited_socket.send(Bytes::from(manifest_bytes)).await?;
 
-  let tee_proof_bytes = crate::origo::read_wire_struct(&mut reunited_socket).await;
-  let tee_proof = TeeProof::from_wire_bytes(&tee_proof_bytes);
+  let origo_secrets = OrigoSecrets::from_origo_conn(&origo_conn);
+  let origo_secrets_bytes: Vec<u8> = (&origo_secrets).try_into().unwrap();
+  framed_reunited_socket.send(Bytes::from(origo_secrets_bytes)).await?;
+
+  framed_reunited_socket.flush().await?;
+
+  let tee_proof_frame =
+    framed_reunited_socket.next().await.ok_or_else(|| ClientErrors::TeeProofMissing)??;
+  let tee_proof = TeeProof::try_from(tee_proof_frame.as_ref())?;
 
   // TODO something will be dropped here. if it's dropped, it closes ...
   // let mut client_socket = connection_receiver.await.unwrap()?.io.into_inner();

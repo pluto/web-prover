@@ -18,6 +18,7 @@
 use hex;
 
 use super::*;
+use crate::program::CompressedProof;
 
 /// Folding proof``
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -28,7 +29,7 @@ pub struct FoldingProof<T, V> {
   pub verifier_digest: V,
 }
 
-impl FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>> {
+impl CompressedProof {
   /// Serializes a `FoldingProof` into a format suitable for storage or transmission.
   ///
   /// # Returns
@@ -48,7 +49,7 @@ impl FoldingProof<Vec<u8>, String> {
   /// # Returns
   ///
   /// A `FoldingProof` with a `CompressedSNARK<E1, S1, S2>` proof and a `F<G1>` verifier digest.
-  pub fn deserialize(self) -> Result<FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>>, ProofError> {
+  pub fn deserialize(self) -> Result<CompressedProof, ProofError> {
     let proof = bincode::deserialize(&self.proof[..])?;
 
     Ok(FoldingProof {

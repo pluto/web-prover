@@ -1,21 +1,22 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use axum::{
   extract::{self, Query, State},
   Json,
 };
-use client::TeeProof;
-use proofs::program::{
-  http::{JsonKey, ManifestRequest, ManifestResponse, ResponseBody},
-  manifest::HTTP_1_1,
-};
 use reqwest::{Request, Response};
 use serde::Deserialize;
 use serde_json::Value;
-use tracing::{debug, info};
+use tracing::info;
 use uuid::Uuid;
+use web_prover_core::{
+  http::{
+    ManifestRequest, ManifestResponse, ManifestResponseBody, NotaryResponse, NotaryResponseBody,
+  },
+  proof::TeeProof,
+};
 
-use crate::{errors::NotaryServerError, SharedState};
+use crate::{errors::NotaryServerError, tee::create_tee_proof, SharedState};
 
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
@@ -51,25 +52,14 @@ pub async fn proxy(
   let response = from_reqwest_response(reqwest_response).await;
   // debug!("{:?}", response);
 
-  // if !payload.manifest.request.is_subset_of(&request) {
-  //   return Err(NotaryServerError::ManifestRequestMismatch);
-  // }
-
-  // if !payload.manifest.response.is_subset_of(&response) {
-  //   return Err(NotaryServerError::ManifestResponseMismatch);
-  // }
-
-  // TODO: Maybe move that to `TeeProof::from_manifest`?
-  payload.manifest.validate()?;
-
-  let tee_proof = TeeProof::from_manifest(&payload.manifest);
+  let tee_proof = create_tee_proof(&payload.manifest, &request, &response, State(state))?;
 
   Ok(Json(tee_proof))
 }
 
 // TODO: This, similarly to other from_* methods, should be a trait
 // Requires adding reqwest to proofs crate
-async fn from_reqwest_response(response: Response) -> ManifestResponse {
+async fn from_reqwest_response(response: Response) -> NotaryResponse {
   let status = response.status().as_u16().to_string();
   let version = format!("{:?}", response.version());
   let message = response.status().canonical_reason().unwrap_or("").to_string();
@@ -78,11 +68,17 @@ async fn from_reqwest_response(response: Response) -> ManifestResponse {
     .iter()
     .map(|(k, v)| (capitalize_header(k.as_ref()), v.to_str().unwrap_or("").to_string()))
     .collect();
-  let body: HashMap<String, String> = response.json().await.unwrap_or_default();
-  // TODO: How to handle JsonKey::Num?
-  // TODO Use plain JSON in Manifest etc., and convert to JsonKey as needed
-  let body: Vec<JsonKey> = body.keys().map(|k| JsonKey::String(k.to_string())).collect();
-  ManifestResponse { status, version, message, headers, body: ResponseBody { json: body } }
+  let json = response.json().await.ok();
+  NotaryResponse {
+    response:             ManifestResponse {
+      status,
+      version,
+      message,
+      headers,
+      body: ManifestResponseBody { json_path: vec![] },
+    },
+    notary_response_body: NotaryResponseBody { json },
+  }
 }
 
 fn from_reqwest_request(request: &Request) -> ManifestRequest {

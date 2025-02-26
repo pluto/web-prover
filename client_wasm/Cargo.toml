@@ -1,6 +1,6 @@
 [package]
 name   ="client_wasm"
-version="0.4.0"
+version="0.6.0"
 edition="2021"
 build  ="build.rs"
 publish=false
@@ -43,7 +43,13 @@ wasm-bindgen-test="0.3.34"
 cargo_metadata="0.19.1"
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt=["-Oz", "--enable-threads", "--enable-mutable-globals", "--enable-bulk-memory"]
+wasm-opt=[
+  "-Oz",
+  "--enable-threads",
+  "--enable-mutable-globals",
+  "--enable-bulk-memory",
+  "--enable-nontrapping-float-to-int",
+]
 
 [package.metadata.wasm-pack.profile.dev.wasm-bindgen]
 dwarf-debug-info=true

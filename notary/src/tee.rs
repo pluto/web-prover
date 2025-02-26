@@ -9,29 +9,51 @@ use caratls_ekm_google_confidential_space_server::GoogleConfidentialSpaceTokenGe
 #[cfg(feature = "tee-dummy-token-generator")]
 use caratls_ekm_server::DummyTokenGenerator;
 use caratls_ekm_server::TeeTlsAcceptor;
-use client::{errors::ClientErrors, origo::OrigoSecrets, TeeProof, TeeProofData};
-use hyper::upgrade::Upgraded;
+use client::origo::{OrigoSecrets, VerifyReply};
+use futures_util::SinkExt;
+use hyper::{body::Bytes, upgrade::Upgraded};
 use hyper_util::rt::TokioIo;
-use proofs::program::{
-  http::{ManifestRequest, ManifestResponse},
-  manifest::Manifest,
-};
 use serde::Deserialize;
-use tls_client2::tls_core::msgs::message::MessagePayload;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tracing::{debug, error, field::debug, info};
+use tokio::{
+  io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+  time::{timeout, Duration},
+};
+use tokio_stream::StreamExt;
+use tokio_util::{
+  codec::{Framed, LengthDelimitedCodec},
+  compat::FuturesAsyncReadCompatExt,
+};
+use tracing::{debug, error, info};
 use uuid::Uuid;
+use web_prover_core::{
+  http::{ManifestRequest, NotaryResponse},
+  manifest::Manifest,
+  proof::{TeeProof, TeeProofData},
+};
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
   axum_websocket::WebSocket,
   errors::NotaryServerError,
-  origo::proxy_service,
-  tls_parser::{Direction, ParsedMessage, WrappedPayload},
+  origo::{proxy_service, sign_verification},
   tlsn::ProtocolUpgrade,
-  verifier, SharedState,
+  SharedState,
 };
+
+pub fn bytes_to_ascii(bytes: Vec<u8>) -> String {
+  bytes
+    .iter()
+    .map(|&byte| {
+      match byte {
+        0x0D => "\\r".to_string(),                        // CR
+        0x0A => "\\n".to_string(),                        // LF
+        0x09 => "\\t".to_string(),                        // Tab
+        0x00..=0x1F | 0x7F => format!("\\x{:02x}", byte), // Other control characters
+        _ => (byte as char).to_string(),
+      }
+    })
+    .collect()
+}
 
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
@@ -130,10 +152,12 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   let mut tee_tls_stream = tee_tls_acceptor.accept(socket).await?;
   proxy_service(&mut tee_tls_stream, session_id, target_host, target_port, state.clone()).await?;
 
-  use tokio::time::{timeout, Duration};
+  // TODO: This synchronization logic is obviously horrible.
+  // It should use framing at a higher level on this network connection
+  // issue: https://github.com/pluto/web-prover/issues/470
+  debug!("synchronize: reading remaining socket data");
   let mut buf = [0u8; 1024];
-  debug!("synchronizing socket");
-  match timeout(Duration::from_millis(200), tee_tls_stream.read(&mut buf)).await {
+  match timeout(Duration::from_millis(500), tee_tls_stream.read(&mut buf)).await {
     Ok(Ok(n)) => {
       debug!("read bytes: n={:?}, buf={:?}", n, hex::encode(buf));
     },
@@ -144,19 +168,25 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
       debug!("no bytes to read, proceeding");
     },
   }
+  debug!("synchronize: magic byte to notify client to terminate TLS");
+  tee_tls_stream.write_all(&[0xFF]).await?;
+  tee_tls_stream.flush().await?;
+  tokio::time::sleep(Duration::from_millis(500)).await; // don't ask.
 
-  debug!("Sending magic byte to indicate readiness to read");
+  debug!("synchronize: magic byte to indicate readiness to read");
   tee_tls_stream.write_all(&[0xAA]).await?;
+  tee_tls_stream.flush().await?;
 
-  // TODO: Consider implementing from_stream instead of read_wire_struct
-  let manifest_bytes = read_wire_struct(&mut tee_tls_stream).await;
-  let manifest = Manifest::from_wire_bytes(&manifest_bytes);
-  // Checking if manifest is valid
-  manifest.validate()?;
+  let mut framed_stream = Framed::new(tee_tls_stream, LengthDelimitedCodec::new());
+
+  let manifest_frame =
+    framed_stream.next().await.ok_or_else(|| NotaryServerError::ManifestMissing)??;
+  let manifest = Manifest::try_from(manifest_frame.as_ref())?;
   // dbg!(&manifest);
 
-  let secret_bytes = read_wire_struct(&mut tee_tls_stream).await;
-  let origo_secrets = OrigoSecrets::from_wire_bytes(&secret_bytes);
+  let secret_frame =
+    framed_stream.next().await.ok_or_else(|| NotaryServerError::MissingOrigoSecrets)??;
+  let origo_secrets = OrigoSecrets::try_from(secret_frame.as_ref())?;
   // dbg!(&origo_secrets);
 
   let handshake_server_key =
@@ -171,9 +201,8 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
   // TODO (autoparallel): This duplicates some code we see in `notary/src/origo.rs`, so we could
   //  maybe clean this up and share code.
   let transcript = state.origo_sessions.lock().unwrap().get(session_id).cloned().unwrap();
-  let parsed_transcript = transcript
-    .into_flattened()
-    .unwrap()
+  let http = transcript
+    .into_flattened()?
     .into_parsed(
       &handshake_server_key,
       &handshake_server_iv,
@@ -182,81 +211,65 @@ pub async fn tee_proxy_service<S: AsyncWrite + AsyncRead + Send + Unpin>(
       Some(app_client_key.to_vec()),
       Some(app_client_iv.to_vec()),
     )
-    .unwrap();
-  // dbg!(parsed_transcript);
+    .unwrap()
+    .into_http()?;
 
-  let mut app_data_vec = Vec::new();
-  for message in &parsed_transcript.payload {
-    if let ParsedMessage { payload, direction, .. } = message {
-      if let Some(app_data) = get_app_data(payload) {
-        // if let Ok(readable_data) = String::from_utf8(app_data.clone()) {
-        //   debug!("{:?} app_data: {}", direction, readable_data);
-        // }
-        app_data_vec.push(app_data);
-      }
-    }
-  }
+  // todo: cleanup
+  debug!("request={:?}", bytes_to_ascii(http.payload.request.clone()));
+  debug!("response={:?}", bytes_to_ascii(http.payload.response.clone()));
 
-  if app_data_vec.len() != 3 {
-    return Err(NotaryServerError::MissingAppDataMessages(3, app_data_vec.len()));
-  }
-
-  let request_header = app_data_vec[0].clone();
-  // TODO: Do we expect to get request_body as well part of app_data?
-  let response_header = app_data_vec[1].clone();
-  let response_body = app_data_vec[2].clone();
-
-  let request = ManifestRequest::from_payload(&request_header, None)?;
+  let request = ManifestRequest::from_payload(&http.payload.request)?;
   debug!("{:?}", request);
 
-  let response = ManifestResponse::from_payload(&response_header, &response_body)?;
+  let response = NotaryResponse::from_payload(&http.payload.response)?;
   debug!("{:?}", response);
 
-  // if !manifest.request.is_subset_of(&request) {
-  //   return Err(NotaryServerError::ManifestRequestMismatch);
-  // }
-
-  // if !manifest.response.is_subset_of(&response) {
-  //   return Err(NotaryServerError::ManifestResponseMismatch);
-  // }
-
   // send TeeProof to client
-  let tee_proof = TeeProof::from_manifest(&manifest);
-  let tee_proof_bytes = tee_proof.to_write_bytes();
-  tee_tls_stream.write_all(&tee_proof_bytes).await?;
+  let tee_proof = create_tee_proof(&manifest, &request, &response, State(state))?;
+  let tee_proof_bytes: Vec<u8> = tee_proof.try_into()?;
+  framed_stream.send(Bytes::from(tee_proof_bytes)).await?;
+  framed_stream.flush().await?;
 
   Ok(())
 }
 
-fn get_app_data(payload: &WrappedPayload) -> Option<Vec<u8>> {
-  match payload {
-    WrappedPayload::Decrypted(decrypted) => match &decrypted.payload {
-      MessagePayload::ApplicationData(app_data) => Some(app_data.clone().0),
-      _ => None,
-    },
-    _ => None,
-  }
+// TODO: Should TeeProof and other proofs be moved to `proofs` crate?
+// Otherwise, adding TeeProof::manifest necessitates extra dependencies on the client
+// Notice that all inputs to this function are from `proofs` crate
+pub fn create_tee_proof(
+  manifest: &Manifest,
+  request: &ManifestRequest,
+  response: &NotaryResponse,
+  State(state): State<Arc<SharedState>>,
+) -> Result<TeeProof, NotaryServerError> {
+  validate_notarization_legal(manifest, request, response)?;
+
+  let manifest_hash = manifest.to_keccak_digest()?;
+  let to_sign = VerifyReply {
+    // Using manifest hash as a value here since we are not exposing any values extracted
+    // from the request or response
+    value:    format!("0x{}", hex::encode(manifest_hash)),
+    manifest: manifest.clone(),
+  };
+  let signature = sign_verification(to_sign, State(state)).unwrap();
+  let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
+
+  Ok(TeeProof { data, signature })
 }
 
-// TODO: Refactor into struct helpers/trait
-async fn read_wire_struct<R: AsyncReadExt + Unpin>(stream: &mut R) -> Vec<u8> {
-  // Buffer to store the "header" (4 bytes, indicating the length of the struct)
-  let mut len_buf = [0u8; 4];
-  stream.read_exact(&mut len_buf).await.unwrap();
-  // dbg!(format!("len_buf={:?}", len_buf));
-
-  // Deserialize the length prefix (convert from little-endian to usize)
-  let body_len = u32::from_le_bytes(len_buf) as usize;
-  // dbg!(format!("body_len={body_len}"));
-
-  // Allocate a buffer to hold only the bytes needed for the struct
-  let mut body_buf = vec![0u8; body_len];
-  stream.read_exact(&mut body_buf).await.unwrap();
-  // dbg!(format!("body_buf={:?}", body_buf));
-
-  // Prepend len_buf to manifest_buf
-  let mut wire_struct_buf = len_buf.to_vec();
-  wire_struct_buf.extend(body_buf);
-
-  wire_struct_buf
+/// Check if `manifest`, `request`, and `response` all fulfill requirements necessary for
+/// a proof to be created
+fn validate_notarization_legal(
+  manifest: &Manifest,
+  request: &ManifestRequest,
+  response: &NotaryResponse,
+) -> Result<(), NotaryServerError> {
+  manifest.validate()?;
+  if !manifest.request.is_subset_of(request) {
+    return Err(NotaryServerError::ManifestRequestMismatch);
+  }
+  if !response.matches_client_manifest(&manifest.response) {
+    return Err(NotaryServerError::ManifestResponseMismatch);
+  }
+  Ok(())
 }

@@ -33,12 +33,14 @@ use crate::{
 };
 
 pub mod data;
-pub mod http;
 pub mod manifest;
 pub mod utils;
 
+// TODO: Consider moving contents of mod.rs files to a separate files. mod.rs files should
+//  only be used to adjust the visibility of exported items.
+
 /// Compressed proof type
-type CompressedProof = FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>>;
+pub type CompressedProof = FoldingProof<CompressedSNARK<E1, S1, S2>, F<G1>>;
 
 /// Represents the memory used in the proof system.
 ///

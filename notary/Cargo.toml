@@ -1,6 +1,6 @@
 [package]
 name   ="notary"
-version="0.4.0"
+version="0.6.0"
 edition="2021"
 build  ="build.rs"
 
@@ -11,8 +11,9 @@ tee-google-confidential-space-token-generator=[]
 
 [dependencies]
 client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="8e7eb839e901dcee416179116bb0f9c4f7ae683c" }
-proofs={ path="../proofs", package="proofs" }
-client={ path="../client", package="client" }
+proofs={ workspace=true }
+client={ workspace=true }
+web-prover-core={ workspace=true }
 hyper={ workspace=true, features=["client", "http1", "server"] }
 hyper-util={ workspace=true }
 serde={ workspace=true }
@@ -55,8 +56,7 @@ alloy-primitives={ version="0.8.2", features=["k256"] }
 k256            ={ version="0.13.3", features=["ecdsa"] }
 reqwest         ={ version="0.12", features=["json"] }
 uuid            ={ workspace=true }
-
-tls-client2={ workspace=true }
+tls-client2     ={ workspace=true }
 
 caratls_ekm_server                          ={ workspace=true }
 caratls_ekm_google_confidential_space_server={ workspace=true }

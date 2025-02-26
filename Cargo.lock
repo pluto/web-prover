@@ -121,7 +121,7 @@ dependencies = [
  "bytes",
  "cfg-if",
  "const-hex",
- "derive_more",
+ "derive_more 1.0.0",
  "foldhash",
  "hashbrown 0.15.2",
  "indexmap 2.7.0",
@@ -1426,7 +1426,7 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
 name = "client"
-version = "0.4.0"
+version = "0.6.0"
 dependencies = [
  "async-tungstenite 0.25.1",
  "base64 0.22.1",
@@ -1480,6 +1480,7 @@ dependencies = [
  "wasm-bindgen-rayon",
  "wasm-bindgen-test",
  "web-proof-circuits-witness-generator",
+ "web-prover-core",
  "web-sys",
  "web-time 1.1.0",
  "webpki-roots 0.26.7",
@@ -1530,7 +1531,7 @@ dependencies = [
 
 [[package]]
 name = "client_ios"
-version = "0.4.0"
+version = "0.6.0"
 dependencies = [
  "cargo_metadata",
  "client",
@@ -1544,7 +1545,7 @@ dependencies = [
 
 [[package]]
 name = "client_wasm"
-version = "0.4.0"
+version = "0.6.0"
 dependencies = [
  "cargo_metadata",
  "client",
@@ -1646,7 +1647,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68578f196d2a33ff61b27fae256c3164f65e36382648e30666dde05b8cc9dfdf"
 dependencies = [
  "async-trait",
- "convert_case",
+ "convert_case 0.6.0",
  "json5",
  "nom",
  "pathdiff",
@@ -1761,6 +1762,15 @@ name = "convert_case"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "convert_case"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb402b8d4c85569410425650ce3eddc7d698ed96d39a73f941b08fb63082f1e7"
 dependencies = [
  "unicode-segmentation",
 ]
@@ -2101,7 +2111,16 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a9b99b9cbbe49445b21764dc0625032a89b145a2642e67603e1c936f5458d05"
 dependencies = [
- "derive_more-impl",
+ "derive_more-impl 1.0.0",
+]
+
+[[package]]
+name = "derive_more"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "093242cf7570c207c83073cf82f79706fe7b8317e98620a47d5be7c3d8497678"
+dependencies = [
+ "derive_more-impl 2.0.1",
 ]
 
 [[package]]
@@ -2110,6 +2129,19 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb7330aeadfbe296029522e6c40f315320aba36fc43a5b3632f3795348f3bd22"
 dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.90",
+ "unicode-xid",
+]
+
+[[package]]
+name = "derive_more-impl"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bda628edc44c4bb645fbe0f758797143e4e07926f7ebf4e9bdfbd3d2ce621df3"
+dependencies = [
+ "convert_case 0.7.1",
  "proc-macro2",
  "quote",
  "syn 2.0.90",
@@ -3873,7 +3905,7 @@ dependencies = [
 
 [[package]]
 name = "notary"
-version = "0.4.0"
+version = "0.6.0"
 dependencies = [
  "alloy-primitives",
  "async-trait",
@@ -3922,6 +3954,7 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "web-proof-circuits-witness-generator",
+ "web-prover-core",
  "ws_stream_tungstenite 0.13.0 (git+https://github.com/pluto/ws_stream_tungstenite.git?branch=latest)",
 ]
 
@@ -4609,7 +4642,7 @@ dependencies = [
 
 [[package]]
 name = "proofs"
-version = "0.4.0"
+version = "0.6.0"
 dependencies = [
  "bellpepper-core",
  "bincode",
@@ -4617,28 +4650,26 @@ dependencies = [
  "cargo_metadata",
  "circom_witnesscalc",
  "client-side-prover",
+ "derive_more 2.0.1",
  "ff",
  "halo2curves",
  "hex",
  "itertools 0.13.0",
  "js-sys",
  "num-bigint 0.4.6",
- "regex",
- "regress",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
  "tempdir",
  "thiserror 1.0.69",
- "tiny-keccak",
  "tls-client",
  "tokio",
  "tracing",
  "tracing-test",
- "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-proof-circuits-witness-generator",
+ "web-prover-core",
 ]
 
 [[package]]
@@ -6152,7 +6183,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 [[package]]
 name = "tls-client"
 version = "0.1.0-alpha.5"
-source = "git+https://github.com/pluto/tls-origo-legacy#53657fa08d87b9b15b3578d769d5265b8548afcc"
+source = "git+https://github.com/pluto/tls-origo-legacy#47e4c30425aff40c0f081a7e718c17491a308d8b"
 dependencies = [
  "aes-gcm",
  "async-trait",
@@ -6183,7 +6214,7 @@ dependencies = [
 [[package]]
 name = "tls-core"
 version = "0.0.0"
-source = "git+https://github.com/pluto/tls-origo-legacy#53657fa08d87b9b15b3578d769d5265b8548afcc"
+source = "git+https://github.com/pluto/tls-origo-legacy#47e4c30425aff40c0f081a7e718c17491a308d8b"
 dependencies = [
  "futures",
  "hmac",
@@ -7310,6 +7341,22 @@ dependencies = [
  "serde_json",
  "sppark",
  "thiserror 2.0.6",
+]
+
+[[package]]
+name = "web-prover-core"
+version = "0.1.0"
+dependencies = [
+ "derive_more 2.0.1",
+ "regex",
+ "regress",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tiny-keccak",
+ "tracing",
+ "url",
+ "web-proof-circuits-witness-generator",
 ]
 
 [[package]]

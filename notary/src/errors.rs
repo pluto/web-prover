@@ -7,6 +7,7 @@ use proofs::errors::ProofError;
 use thiserror::Error;
 use tlsn_verifier::tls::{VerifierConfigBuilderError, VerifierError};
 use tracing::error;
+use web_prover_core::errors::ManifestError;
 
 #[derive(Debug, Error)]
 pub enum ProxyError {
@@ -89,9 +90,6 @@ pub enum NotaryServerError {
   #[error(transparent)]
   ProofError(#[from] ProofError),
 
-  #[error("Missing application-level data messages. Expected: {0}, Actual: {1}")]
-  MissingAppDataMessages(usize, usize),
-
   // TODO: Update to contain feedback
   #[error("Manifest-request mismatch")]
   ManifestRequestMismatch,
@@ -99,6 +97,18 @@ pub enum NotaryServerError {
   // TODO: Update to contain feedback
   #[error("Manifest-response mismatch")]
   ManifestResponseMismatch,
+
+  #[error("Manifest is missing")]
+  ManifestMissing,
+
+  #[error("Origo secrets are missing")]
+  MissingOrigoSecrets,
+
+  #[error(transparent)]
+  ProxyError(#[from] ProxyError),
+
+  #[error(transparent)]
+  ManifestError(#[from] ManifestError),
 }
 
 impl From<VerifierError> for NotaryServerError {

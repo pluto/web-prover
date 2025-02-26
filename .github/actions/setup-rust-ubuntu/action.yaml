@@ -41,7 +41,7 @@ runs:
 
     - shell: bash
       run: |
-        rustup toolchain install nightly-2024-10-28
+        rustup toolchain install --no-self-update nightly-2024-10-28
         cargo install cbindgen
 
     - name: Verify installations

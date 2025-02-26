@@ -1,5 +1,5 @@
 [workspace]
-members=["client", "client_ios", "client_wasm", "notary", "proofs", "tests"]
+members=["client", "client_ios", "client_wasm", "notary", "proofs", "web-prover-core"]
 # members =["client", "client_wasm", "proofs"] # config for wasm32 rust analyzer
 # members =["client", "client_ios"] # config for ios rust analyzer
 resolver="2"
@@ -13,6 +13,7 @@ web_prover_circuits_version="0.10.0"
 client={ path="client" }
 proofs={ path="proofs" }
 notary={ path="notary" }
+web-prover-core={ path="web-prover-core" }
 # Serde
 serde     ={ version="1.0.204", features=["derive"] }
 serde_json="1.0.120"
@@ -55,7 +56,12 @@ tokio-rustls={ version="0.26.0", default-features=false, features=["logging", "t
 # circuits witness generator
 web-proof-circuits-witness-generator={ git="https://github.com/pluto/web-prover-circuits", rev="0a09df087612d45fa3b0d5914d93c72417edb58b" }
 
-uuid={ version="1.10.0", default-features=false, features=["v4", "serde"] }
+uuid       ={ version="1.10.0", default-features=false, features=["v4", "serde"] }
+derive_more={ version="2.0.1", features=["full"] }
+num-bigint ="0.4"
+ff         ={ version="0.13", default-features=false, features=["derive"] }
+tiny-keccak={ version="2.0.2", features=["keccak"] }
+url        ="2.5.4"
 
 tracing-test="0.2.5"
 
@@ -82,7 +88,6 @@ serde_json    ={ workspace=true }
 
 [profile.dev]
 opt-level      =1
-overflow-checks=false
 split-debuginfo="unpacked"
 incremental    =true
 
