@@ -6,7 +6,6 @@
 use std::path::Path;
 
 use client_side_prover::{
-  bellpepper::shape_cs::ShapeCS,
   supernova::{NonUniformCircuit, RecursiveSNARK, StepCircuit},
   traits::snark::default_ck_hint,
 };
