@@ -1,0 +1,54 @@
+name: Auto Version Bump
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'crates/**'
+
+jobs:
+  detect-and-bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          
+      - name: Install cargo-edit
+        run: cargo install cargo-edit
+          
+      - name: Detect changes and bump versions
+        id: detect-changes
+        run: |
+          # Get list of changed files
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep "crates/" || echo "")
+          
+          # Extract unique crate names from changed files
+          CHANGED_CRATES=$(echo "$CHANGED_FILES" | grep -o "crates/[^/]*" | sort -u | cut -d'/' -f2)
+          
+          # For each changed crate, bump its minor version
+          for CRATE in $CHANGED_CRATES; do
+            if [ -f "crates/$CRATE/Cargo.toml" ]; then
+              echo "Bumping version for $CRATE"
+              (cd "crates/$CRATE" && cargo set-version --bump minor)
+            fi
+          done
+          
+          echo "changed_crates=$(echo $CHANGED_CRATES | tr '\n' ' ')" >> $GITHUB_ENV
+      
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: "chore: bump versions for affected crates"
+          title: "chore: automatic version bump"
+          branch: "auto-version-bump"
+          body: |
+            Automatic version bump for changed crates:
+            ${{ env.changed_crates }}
