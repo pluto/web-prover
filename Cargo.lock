@@ -6042,18 +6042,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tests"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "client",
- "notary",
- "serde_json",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7357,6 +7345,17 @@ dependencies = [
  "tracing",
  "url",
  "web-proof-circuits-witness-generator",
+]
+
+[[package]]
+name = "web-prover-tests"
+version = "0.1.0"
+dependencies = [
+ "client",
+ "notary",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

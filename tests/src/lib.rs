@@ -5,7 +5,6 @@ use std::{
   time::Duration,
 };
 
-use anyhow::{Context, Result};
 use tokio::time::sleep;
 
 struct TestSetup {
@@ -14,25 +13,20 @@ struct TestSetup {
 }
 
 impl TestSetup {
-  async fn new() -> Result<Self> {
+  async fn new() -> Self {
     // Find the workspace root directory
     let workspace_root = {
-      let output = Command::new("cargo")
-        .args(["metadata", "--format-version", "1"])
-        .output()
-        .context("Failed to run cargo metadata")?;
+      let output =
+        Command::new("cargo").args(["metadata", "--format-version", "1"]).output().unwrap();
 
       if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!("cargo metadata failed: {}", stderr);
+        panic!("cargo metadata failed: {}", stderr);
       }
 
-      let metadata: serde_json::Value =
-        serde_json::from_slice(&output.stdout).context("Failed to parse cargo metadata")?;
+      let metadata: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
 
-      PathBuf::from(
-        metadata["workspace_root"].as_str().context("workspace_root not found in metadata")?,
-      )
+      PathBuf::from(metadata["workspace_root"].as_str().unwrap())
     };
 
     println!("Workspace root: {:?}", workspace_root);
@@ -54,7 +48,7 @@ impl TestSetup {
       .stdout(Stdio::inherit())
       .stderr(Stdio::inherit())
       .spawn()
-      .with_context(|| format!("Failed to spawn notary with config {:?}", notary_config))?;
+      .unwrap();
 
     sleep(Duration::from_secs(2)).await;
 
@@ -68,9 +62,9 @@ impl TestSetup {
       .stdout(Stdio::piped())
       .stderr(Stdio::piped())
       .spawn()
-      .with_context(|| format!("Failed to spawn client with config {:?}", client_config))?;
+      .unwrap();
 
-    Ok(Self { notary, client })
+    Self { notary, client }
   }
 }
 
@@ -82,8 +76,8 @@ impl Drop for TestSetup {
 }
 
 #[tokio::test]
-async fn test_proving_successful() -> Result<()> {
-  let mut setup = TestSetup::new().await?;
+async fn test_proving_successful() {
+  let mut setup = TestSetup::new().await;
 
   let stdout = BufReader::new(setup.client.stdout.take().unwrap());
   let stderr = BufReader::new(setup.client.stderr.take().unwrap());
@@ -93,5 +87,4 @@ async fn test_proving_successful() -> Result<()> {
     stdout.lines().chain(stderr.lines()).any(|line| line.unwrap().contains("Proving Successful"));
 
   assert!(found, "Did not find 'Proving Successful' in output");
-  Ok(())
 }

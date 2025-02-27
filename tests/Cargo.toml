@@ -1,5 +1,5 @@
 [package]
-name   ="tests"
+name   ="web-prover-tests"
 version="0.1.0"
 edition="2021"
 
@@ -8,5 +8,4 @@ client    ={ workspace=true }
 notary    ={ workspace=true }
 tokio     ={ workspace=true }
 tracing   ={ workspace=true }
-anyhow    ={ version="1.0" }
 serde_json={ workspace=true }

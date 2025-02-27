@@ -1,7 +1,5 @@
 [workspace]
-members=["client", "client_ios", "client_wasm", "notary", "proofs", "web-prover-core"]
-# members =["client", "client_wasm", "proofs"] # config for wasm32 rust analyzer
-# members =["client", "client_ios"] # config for ios rust analyzer
+members =["client", "client_ios", "client_wasm", "notary", "proofs", "web-prover-core", "tests"]
 resolver="2"
 
 [workspace.metadata]
@@ -10,9 +8,9 @@ web_prover_circuits_version="0.10.0"
 
 [workspace.dependencies]
 # Local re-exporting
-client={ path="client" }
-proofs={ path="proofs" }
-notary={ path="notary" }
+client         ={ path="client" }
+proofs         ={ path="proofs" }
+notary         ={ path="notary" }
 web-prover-core={ path="web-prover-core" }
 # Serde
 serde     ={ version="1.0.204", features=["derive"] }
