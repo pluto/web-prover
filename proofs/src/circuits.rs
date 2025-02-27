@@ -73,33 +73,39 @@ pub const JSON_EXTRACTION_512B_GRAPH: &str = concat!(
   "/json_extraction_512b.bin"
 );
 
+/// Plaintext authentication 256b R1CS
 const PLAINTEXT_AUTHENTICATION_256B_R1CS: &str = concat!(
   "proofs/web_proof_circuits/circom-artifacts-256b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/plaintext_authentication_256b.r1cs"
 );
+/// Plaintext authentication 256b graph
 const PLAINTEXT_AUTHENTICATION_256B_GRAPH: &str = concat!(
   "proofs/web_proof_circuits/circom-artifacts-256b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/plaintext_authentication_256b.bin"
 );
 // Circuit 1
+/// HTTP verification 256b R1CS
 const HTTP_VERIFICATION_256B_R1CS: &str = concat!(
   "proofs/web_proof_circuits/circom-artifacts-256b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/http_verification_256b.r1cs"
 );
+/// HTTP verification 256b graph
 const HTTP_VERIFICATION_256B_GRAPH: &str = concat!(
   "proofs/web_proof_circuits/circom-artifacts-256b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/http_verification_256b.bin"
 );
 // Circuit 2
+/// JSON extraction 256b R1CS
 const JSON_EXTRACTION_256B_R1CS: &str = concat!(
   "proofs/web_proof_circuits/circom-artifacts-256b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
   "/json_extraction_256b.r1cs"
 );
+/// JSON extraction 256b graph
 const JSON_EXTRACTION_256B_GRAPH: &str = concat!(
   "proofs/web_proof_circuits/circom-artifacts-256b-v",
   env!("WEB_PROVER_CIRCUITS_VERSION"),
@@ -134,6 +140,7 @@ fn wasm_witness_generator_type_512b() -> [WitnessGeneratorType; 3] {
   ]
 }
 
+/// Loads artifact bytes from a given path relative to the workspace root
 pub fn load_artifact_bytes(path: &str) -> Result<Vec<u8>, std::io::Error> {
   let workspace_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
   let artifact_path = workspace_path.join(path);
