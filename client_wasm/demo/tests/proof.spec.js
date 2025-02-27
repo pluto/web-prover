@@ -1,6 +1,9 @@
 const { test, expect } = require('@playwright/test')
 
 test('should generate proof', async ({ page }) => {
+  // Set the mode on window before loading the page
+  await page.addInitScript(`window.MODE = '${process.env.MODE || 'tee'}'`);
+
   test.setTimeout(600000) // 10 min
 
   // Add page error handler

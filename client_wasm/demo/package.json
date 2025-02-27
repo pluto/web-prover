@@ -5,7 +5,7 @@
   "scripts": {
     "prestart": "node scripts/generate-config.js",
     "start": "webpack-dev-server --port 8090",
-    "test": "node scripts/generate-config.js && playwright test --browser=chromium"
+    "test": "node scripts/generate-config.js && node scripts/test.js"
   },
   "devDependencies": {
     "@wasm-tool/wasm-pack-plugin": "^1.7.0",

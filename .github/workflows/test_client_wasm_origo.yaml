@@ -62,4 +62,4 @@ jobs:
           (cd client_wasm/demo/static && rm -rf build && ln -s ../../../proofs/web_proof_circuits build)
 
           cd client_wasm/demo
-          npm test
+          npm test origo
