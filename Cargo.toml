@@ -65,6 +65,8 @@ ff         ={ version="0.13", default-features=false, features=["derive"] }
 tiny-keccak={ version="2.0.2", features=["keccak"] }
 url        ="2.5.4"
 
+tracing-test="0.2"
+
 [profile.dev]
 opt-level      =1
 split-debuginfo="unpacked"

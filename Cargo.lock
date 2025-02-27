@@ -7351,8 +7351,6 @@ dependencies = [
 name = "web-prover-tests"
 version = "0.1.0"
 dependencies = [
- "client",
- "notary",
  "serde_json",
  "tokio",
  "tracing",
