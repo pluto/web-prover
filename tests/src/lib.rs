@@ -36,16 +36,6 @@ impl TestSetup {
 
     println!("Workspace root: {:?}", workspace_root);
 
-    // Use relative paths that match the original workflow
-    let notary_config = "./fixture/notary-config.toml";
-    let client_config = "./fixture/client.tee_tcp_local.json";
-
-    println!("Checking if config files exist:");
-    println!("Notary config (workspace): {}", workspace_root.join(notary_config).exists());
-    println!("Client config (workspace): {}", workspace_root.join(client_config).exists());
-    println!("Notary config (relative): {}", PathBuf::from(notary_config).exists());
-    println!("Client config (relative): {}", PathBuf::from(client_config).exists());
-
     // Check for pre-built binaries in target/release
     let notary_bin = workspace_root.join("target/release/notary");
     let client_bin = workspace_root.join("target/release/client");
@@ -53,19 +43,39 @@ impl TestSetup {
     let use_prebuilt = notary_bin.exists() && client_bin.exists();
     println!("Using pre-built binaries: {}", use_prebuilt);
 
-    // Start notary with captured output
-    let mut notary = if use_prebuilt {
-      println!("Running notary from: {:?}", &notary_bin);
-      // Match the original workflow exactly - use relative paths
-      let mut cmd = Command::new(&notary_bin);
-      cmd.arg("--config").arg(notary_config);
-      cmd.env("RUST_LOG", "DEBUG").stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap()
+    // Print the config file content for debugging
+    let notary_config_path = workspace_root.join("fixture/notary-config.toml");
+    if notary_config_path.exists() {
+      match std::fs::read_to_string(&notary_config_path) {
+        Ok(content) => println!("Notary config content:\n{}", content),
+        Err(e) => println!("Error reading notary config: {}", e),
+      }
     } else {
-      let mut cmd = Command::new("cargo");
+      println!("Notary config file not found at {:?}", notary_config_path);
+    }
+
+    // This matches exactly what worked in your shell script
+    let mut notary = if use_prebuilt {
+      // Change directory to workspace root first
+      std::env::set_current_dir(&workspace_root).unwrap();
+      println!("Current directory: {:?}", std::env::current_dir().unwrap());
+
+      let cmd = Command::new("./target/release/notary")
+        .arg("--config")
+        .arg("./fixture/notary-config.toml")
+        .env("RUST_LOG", "DEBUG")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+      println!("Started notary with PID: {}", cmd.id());
       cmd
+    } else {
+      Command::new("cargo")
         .args(["run", "-p", "notary", "--release", "--"])
         .arg("--config")
-        .arg(workspace_root.join(notary_config))
+        .arg(notary_config_path)
         .env("RUST_LOG", "DEBUG")
         .current_dir(&workspace_root)
         .stdout(Stdio::piped())
@@ -98,35 +108,45 @@ impl TestSetup {
       }
     });
 
-    // Wait for notary to be ready with a timeout
+    // Wait for notary to be ready with a timeout, or sleep 10 seconds like the original workflow
     match timeout(Duration::from_secs(60), async {
       while !ready_flag.load(Ordering::SeqCst) {
         sleep(Duration::from_millis(100)).await;
       }
 
-      // Add extra delay to ensure the notary is fully ready
-      // This matches the 10 second sleep in the original workflow
-      sleep(Duration::from_secs(2)).await;
+      // Add extra delay to match original workflow
+      sleep(Duration::from_secs(5)).await;
     })
     .await
     {
       Ok(_) => println!("Notary is ready!"),
-      Err(_) => panic!("Timed out waiting for notary to be ready after 60 seconds"),
+      Err(_) => {
+        println!("Timeout waiting for notary ready message - sleeping 10 seconds anyway");
+        sleep(Duration::from_secs(10)).await;
+      },
     }
 
-    // Start client and capture its output
+    // Start client with exact same pattern as the working workflow
     let client = if use_prebuilt {
-      println!("Running client from: {:?}", &client_bin);
-      // Match the original workflow exactly - use relative paths
-      let mut cmd = Command::new(&client_bin);
-      cmd.arg("--config").arg(client_config);
-      cmd.env("RUST_LOG", "DEBUG").stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap()
-    } else {
-      let mut cmd = Command::new("cargo");
+      // We're already in workspace_root directory
+      println!("Current directory before client: {:?}", std::env::current_dir().unwrap());
+
+      let cmd = Command::new("./target/release/client")
+        .arg("--config")
+        .arg("./fixture/client.tee_tcp_local.json")
+        .env("RUST_LOG", "DEBUG")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+      println!("Started client with PID: {}", cmd.id());
       cmd
+    } else {
+      Command::new("cargo")
         .args(["run", "-p", "client", "--"])
         .arg("--config")
-        .arg(workspace_root.join(client_config))
+        .arg(workspace_root.join("fixture/client.tee_tcp_local.json"))
         .env("RUST_LOG", "DEBUG")
         .current_dir(&workspace_root)
         .stdout(Stdio::piped())
@@ -171,23 +191,6 @@ async fn test_proving_successful() {
         println!("Client stderr: {}", line);
         if line.contains("Proving Successful") {
           return true;
-        }
-        // If we see a file not found error, print more detailed info
-        if line.contains("NotFound") {
-          println!(
-            "File not found error detected. Current directory: {:?}",
-            std::env::current_dir().unwrap()
-          );
-          println!("Directory contents:");
-          for entry in std::fs::read_dir(".").unwrap() {
-            println!("  {:?}", entry.unwrap().path());
-          }
-          if let Ok(entries) = std::fs::read_dir("./fixture") {
-            println!("Fixture directory contents:");
-            for entry in entries {
-              println!("  {:?}", entry.unwrap().path());
-            }
-          }
         }
       }
 
