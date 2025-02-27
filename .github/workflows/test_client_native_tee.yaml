@@ -36,4 +36,4 @@ jobs:
       - run: chmod +x target/release/client
 
       - run: |
-          cargo run -p web-prover-tests
+          cargo test -p web-prover-tests

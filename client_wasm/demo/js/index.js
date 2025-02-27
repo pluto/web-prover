@@ -1,8 +1,8 @@
 import init, { setup_tracing, initThreadPool } from "../pkg/client_wasm.js";
-import { witness } from "./witness";
 import { WEB_PROVER_CIRCUITS_VERSION } from "./config";
 import teeConfig from "../../../fixture/client.tee_tcp_local.json";
 import origoConfig from "../../../fixture/client.origo_tcp_local.json";
+import { DEFAULT_MODE } from "../scripts/test.js";
 
 const numConcurrency = navigator.hardwareConcurrency;
 
@@ -67,7 +67,7 @@ const getByteParams = async function (setupFile) {
 
 start();
 
-const mode = window.MODE || 'tee'; // Get the mode from window object
+const mode = window.MODE || DEFAULT_MODE; // Get the mode from window object
 const proverConfig = mode === 'origo' ? origoConfig : teeConfig;
 
 console.log(`Using ${mode} mode`);
