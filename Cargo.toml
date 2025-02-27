@@ -1,3 +1,7 @@
+[workspace.package]
+name   ="webprover"
+edition="2021"
+
 [workspace]
 members =["client", "client_ios", "client_wasm", "notary", "proofs", "web-prover-core", "tests"]
 resolver="2"
@@ -60,29 +64,6 @@ num-bigint ="0.4"
 ff         ={ version="0.13", default-features=false, features=["derive"] }
 tiny-keccak={ version="2.0.2", features=["keccak"] }
 url        ="2.5.4"
-
-tracing-test="0.2.5"
-
-[package]
-name   ="webprover"
-edition="2021"
-
-[[bin]]
-name="mock_server"
-path="bin/mock_server.rs"
-
-[dependencies]
-# Dependancies for the binaries
-
-hyper         ={ workspace=true }
-hyper-util    ={ workspace=true }
-http-body-util={ workspace=true }
-pki-types     ={ package="rustls-pki-types", version="1.7" }
-rustls        ={ version="0.23.11", default-features=false, features=["logging", "tls12", "std", "ring"] }
-rustls-pemfile={ version="2.0.0" }
-tokio         ={ workspace=true }
-tokio-rustls  ={ workspace=true }
-serde_json    ={ workspace=true }
 
 [profile.dev]
 opt-level      =1

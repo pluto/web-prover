@@ -37,12 +37,20 @@ jobs:
           key: ${{ inputs.web-prover-circuits-cache-key }}
 
       - run: |
-          cargo +nightly-2024-10-28 build -p client --release
+          cargo build -p client --release
 
       - uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-latest'
         with:
           name: "client.linux.amd64"
+          path: "target/release/client"
+          retention-days: 7
+          if-no-files-found: "error"
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.os == 'macos-latest'
+        with:
+          name: "client.macos.arm64"
           path: "target/release/client"
           retention-days: 7
           if-no-files-found: "error"

@@ -32,7 +32,7 @@ If you have any questions, please reach out to any of Pluto's [team members](htt
 - `proofs`: contains all of our circom artifacts for the Origo proofs as well as a set of extractor proofs for selective disclosure over response data.
 
 ### Setup
-- Install rust nightly: `rustup install toolchain nightly-2024-10-28`
+- Install rust nightly: `rustup install toolchain nightly`
 - Run `make artifacts` to download circuit artifacts required for Web Prover proxy mode
 - Compilation errors? Have a look at [KNOWN_ISSUES.md](KNOWN_ISSUES.md)
 
