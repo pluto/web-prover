@@ -22,8 +22,8 @@ jobs:
 
       - name: Install WASM Rust components
         run: |
-          rustup target add aarch64-apple-ios-sim --toolchain nightly
-          rustup target add aarch64-apple-ios --toolchain nightly
+          rustup target add aarch64-apple-ios-sim --toolchain nightly-2025-02-20
+          rustup target add aarch64-apple-ios --toolchain nightly-2025-02-20
 
       - name: Fetch web-prover-circuits cache
         uses: actions/cache/restore@v4
