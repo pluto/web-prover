@@ -22,8 +22,8 @@ jobs:
 
       - name: Install WASM Rust components
         run: |
-          rustup target add aarch64-apple-ios-sim --toolchain nightly-2024-10-28
-          rustup target add aarch64-apple-ios --toolchain nightly-2024-10-28
+          rustup target add aarch64-apple-ios-sim --toolchain nightly
+          rustup target add aarch64-apple-ios --toolchain nightly
 
       - name: Fetch web-prover-circuits cache
         uses: actions/cache/restore@v4
@@ -33,17 +33,17 @@ jobs:
 
       - name: Build iOS lib
         run: |
-          export RUSTFLAGS="-C panic=unwind" 
+          export RUSTFLAGS="-C panic=unwind"
 
           rm -rf target/{sim,device}
           rm -rf target/PlutoProver.xcframework
           mkdir -p target/{sim,device}/headers
 
-          cargo +nightly-2024-10-28 build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
+          cargo build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
           cbindgen --lang c --crate client_ios --output target/sim/headers/Prover.h
           mv target/aarch64-apple-ios-sim/release/libclient_ios.a target/sim/libProver.a
 
-          cargo +nightly-2024-10-28  build -p client_ios --release --target aarch64-apple-ios # builds target/aarch64-apple-ios/release/libclient_ios.a
+          cargo build -p client_ios --release --target aarch64-apple-ios # builds target/aarch64-apple-ios/release/libclient_ios.a
           cbindgen --lang c --crate client_ios --output target/device/headers/Prover.h
           mv target/aarch64-apple-ios/release/libclient_ios.a target/device/libProver.a
 

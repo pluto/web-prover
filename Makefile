@@ -21,7 +21,7 @@ wasm: artifacts
 	LLVM_PATH=$$(dirname $$(command -v llvm-config)); \
 	PATH="$$LLVM_PATH:$$PATH"; \
 	cd client_wasm && \
-	  rustup run nightly-2024-10-28 ~/.cargo/bin/wasm-pack build --release --target web ./ -- \
+	  rustup run nightly ~/.cargo/bin/wasm-pack build --release --target web ./ -- \
 	    -Z build-std=panic_abort,std
 
 wasm-debug: check-llvm artifacts
@@ -31,20 +31,20 @@ wasm-debug: check-llvm artifacts
 	LLVM_PATH=$$(dirname $$(command -v llvm-config)); \
 	PATH="$$LLVM_PATH:$$PATH"; \
 	cd client_wasm && \
-	  rustup run nightly-2024-10-28 ~/.cargo/bin/wasm-pack build --debug --target web ./ -- \
+	  rustup run nightly ~/.cargo/bin/wasm-pack build --debug --target web ./ -- \
 	    -Z build-std=panic_abort,std
 
 ios: artifacts
 	-cargo install cbindgen
 	# Build simulator
-	rustup target add aarch64-apple-ios-sim --toolchain nightly-2024-10-28
-	RUSTFLAGS="-C panic=unwind" cargo +nightly-2024-10-28 build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
+	rustup target add aarch64-apple-ios-sim --toolchain nightly
+	RUSTFLAGS="-C panic=unwind" cargo  build -p client_ios --release --target aarch64-apple-ios-sim # builds target/aarch64-apple-ios-sim/release/libclient_ios.a
 	mkdir -p target/sim/headers
 	~/.cargo/bin/cbindgen --lang c --crate client_ios --output target/sim/headers/Prover.h
 	mv target/aarch64-apple-ios-sim/release/libclient_ios.a target/sim/libProver.a
 	# Build device
-	rustup target add aarch64-apple-ios --toolchain nightly-2024-10-28
-	RUSTFLAGS="-C panic=unwind" cargo +nightly-2024-10-28  build -p client_ios --release --target aarch64-apple-ios # builds target/aarch64-apple-ios/release/libclient_ios.a
+	rustup target add aarch64-apple-ios --toolchain nightly
+	RUSTFLAGS="-C panic=unwind" cargo   build -p client_ios --release --target aarch64-apple-ios # builds target/aarch64-apple-ios/release/libclient_ios.a
 	mkdir -p target/device/headers
 	~/.cargo/bin/cbindgen --lang c --crate client_ios --output target/device/headers/Prover.h
 	mv target/aarch64-apple-ios/release/libclient_ios.a target/device/libProver.a

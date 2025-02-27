@@ -3,10 +3,10 @@
 
 [toolchain]
 # what toolchain to use.
-channel="nightly"
+channel="nightly-2025-02-20"
 
 # option to specify a date to pin to a particular release
-# date = "2024-03-19"
+# date=2025-02-20
 
 # profiles are groups of components to download when installing a toolchain.
 # https://rust-lang.github.io/rustup/concepts/profiles.html
