@@ -25,12 +25,12 @@ pub async fn create_witness(input: JsValue, opcode: u64) -> Result<WitnessOutput
   let js_witnesses_output = create_witness_js(&input, opcode).await;
 
   // Call JavaScript function and await the Promise
-  info!("result: {:?}", js_witnesses_output);
+  info!("js_witnesses_output: {:?}", js_witnesses_output);
   let js_obj = js_sys::Object::from(js_witnesses_output);
   let data_value = js_sys::Reflect::get(&js_obj, &JsValue::from_str("data"))?;
   let array = js_sys::Array::from(&data_value);
   let data = js_sys::Uint8Array::new(&array);
 
-  debug!("data: {:?}", data);
+  debug!("js_witnesses_output as data: {:?}", data);
   Ok(WitnessOutput { data })
 }

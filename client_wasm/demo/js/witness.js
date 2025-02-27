@@ -62,7 +62,13 @@ export const witness = {
   createWitness: async (input, rom) => {
     console.log("createWitness", input);
     console.log("rom", rom);
-    var witnesses = await generateWitnessBytes(input, rom);
+    if (!input) {
+      throw new Error("Input is undefined");
+    }
+    if (!rom) {
+      throw new Error("ROM is undefined");
+    }
+    let witnesses = await generateWitnessBytes(input, rom);
     let witnesses_typed = new WitnessOutput(witnesses);
     console.log("witness", witnesses_typed);
     return witnesses_typed;

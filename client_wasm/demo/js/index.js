@@ -60,6 +60,9 @@ const getBytes = async function (file) {
   ).toString();
   const buffer = await fetch(ppUrl).then((r) => r.arrayBuffer());
   console.log("buffer.byteLength", buffer.byteLength);
+  if (buffer.byteLength === 0) {
+    throw new Error(`Failed to load ${file}`);
+  }
   return new Uint8Array(buffer); // Cast to a js-sys (WASM) friendly type
 };
 
