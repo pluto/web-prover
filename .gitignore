@@ -28,3 +28,6 @@ client_ios/demo/demo.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChec
 
 # artifacts zipfile
 *.zip
+
+# rust tools
+bacon.toml
