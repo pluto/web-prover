@@ -43,13 +43,30 @@ impl TestSetup {
     println!("Notary config exists: {}", notary_config.exists());
     println!("Client config exists: {}", client_config.exists());
 
+    // Check for pre-built binaries in target/release
+    let notary_bin = workspace_root.join("target/release/notary");
+    let client_bin = workspace_root.join("target/release/client");
+
+    let use_prebuilt = notary_bin.exists() && client_bin.exists();
+    println!("Using pre-built binaries: {}", use_prebuilt);
+
     // Start notary with captured output
-    let mut notary = Command::new("cargo")
-      .args(["run", "-p", "notary", "--release", "--"])
-      .arg("--config")
-      .arg(&notary_config)
+    let mut notary_command = if use_prebuilt {
+      let mut cmd = Command::new(&notary_bin);
+      cmd.arg("--config").arg(&notary_config);
+      cmd
+    } else {
+      let mut cmd = Command::new("cargo");
+      cmd
+        .args(["run", "-p", "notary", "--release", "--"])
+        .arg("--config")
+        .arg(&notary_config)
+        .current_dir(&workspace_root);
+      cmd
+    };
+
+    let mut notary = notary_command
       .env("RUST_LOG", "DEBUG")
-      .current_dir(&workspace_root)
       .stdout(Stdio::piped())
       .stderr(Stdio::piped())
       .spawn()
@@ -92,12 +109,22 @@ impl TestSetup {
     }
 
     // Start client and capture its output
-    let client = Command::new("cargo")
-      .args(["run", "-p", "client", "--"])
-      .arg("--config")
-      .arg(&client_config)
+    let mut client_command = if use_prebuilt {
+      let mut cmd = Command::new(&client_bin);
+      cmd.arg("--config").arg(&client_config);
+      cmd
+    } else {
+      let mut cmd = Command::new("cargo");
+      cmd
+        .args(["run", "-p", "client", "--"])
+        .arg("--config")
+        .arg(&client_config)
+        .current_dir(&workspace_root);
+      cmd
+    };
+
+    let mut client = client_command
       .env("RUST_LOG", "DEBUG")
-      .current_dir(&workspace_root)
       .stdout(Stdio::piped())
       .stderr(Stdio::piped())
       .spawn()
