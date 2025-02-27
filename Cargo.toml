@@ -1,6 +1,6 @@
 [workspace.package]
 name   ="webprover"
-edition="2021"
+edition="2024"
 
 [workspace]
 members=["client", "client_ios", "client_wasm", "notary", "proofs", "web-prover-core"]

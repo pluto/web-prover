@@ -37,7 +37,7 @@ use circom::CircomCircuit;
 use client_side_prover::{
   provider::GrumpkinEngine,
   spartan::batched::BatchedRelaxedR1CSSNARK,
-  supernova::{snark::CompressedSNARK, PublicParams, TrivialCircuit},
+  supernova::{PublicParams, TrivialCircuit, snark::CompressedSNARK},
   traits::{Engine, Group},
 };
 use ff::Field;

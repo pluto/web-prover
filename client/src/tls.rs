@@ -1,8 +1,8 @@
 // TODO many root_stores ... this could use some cleanup where possible
 use proofs::program::manifest::{EncryptionInput, TLSEncryption};
 use tls_client2::{
-  origo::{DecryptChunk, WitnessData},
   CipherSuite, CipherSuiteKey, Decrypter, ProtocolVersion,
+  origo::{DecryptChunk, WitnessData},
 };
 use tls_core::msgs::{base::Payload, enums::ContentType, message::OpaqueMessage};
 use tracing::debug;

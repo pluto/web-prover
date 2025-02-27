@@ -1,8 +1,8 @@
 [package]
-name   ="notary"
-version="0.6.0"
-edition="2021"
-build  ="build.rs"
+name             ="notary"
+version          ="0.6.0"
+build            ="build.rs"
+edition.workspace=true
 
 [features]
 default                                      =["tee-dummy-token-generator"]

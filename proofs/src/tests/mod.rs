@@ -11,17 +11,19 @@ use circuits::{
   PLAINTEXT_AUTHENTICATION_512B_R1CS,
 };
 use client_side_prover::supernova::RecursiveSNARK;
-use inputs::{
-  complex_manifest, complex_request_inputs, complex_response_inputs, simple_request_inputs,
-  simple_response_inputs,
-};
 use web_proof_circuits_witness_generator::polynomial_digest;
 
 use super::*;
-use crate::program::{
-  data::{CircuitData, NotExpanded, ProofParams, SetupParams, UninitializedSetup},
-  initialize_setup_data,
-  manifest::{InitialNIVCInputs, NIVCRom, NivcCircuitInputs, OrigoManifest},
+use crate::{
+  program::{
+    data::{CircuitData, NotExpanded, ProofParams, SetupParams, UninitializedSetup},
+    initialize_setup_data,
+    manifest::{InitialNIVCInputs, NIVCRom, NivcCircuitInputs, OrigoManifest},
+  },
+  tests::inputs::{
+    complex_manifest, complex_request_inputs, complex_response_inputs, simple_request_inputs,
+    simple_response_inputs,
+  },
 };
 
 pub(crate) mod inputs;

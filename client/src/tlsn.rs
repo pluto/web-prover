@@ -3,12 +3,12 @@
 use std::time::Duration;
 
 use http_body_util::BodyExt;
-use hyper::{body::Bytes, Request};
+use hyper::{Request, body::Bytes};
 use p256::pkcs8::DecodePublicKey;
 use serde::{Deserialize, Serialize};
 use tlsn_core::proof::SessionProof;
 pub use tlsn_core::proof::TlsProof;
-use tlsn_prover::tls::{state::Closed, Prover};
+use tlsn_prover::tls::{Prover, state::Closed};
 use tracing::debug;
 
 use crate::errors;

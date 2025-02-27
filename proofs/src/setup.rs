@@ -30,8 +30,8 @@ use client_side_prover::{
 };
 
 use crate::{
-  errors::ProofError, program, program::data::R1CSType, AuxParams, ProverKey, UninitializedSetup,
-  WitnessGeneratorType, E1, S1, S2,
+  AuxParams, E1, ProverKey, S1, S2, UninitializedSetup, WitnessGeneratorType, errors::ProofError,
+  program, program::data::R1CSType,
 };
 
 /// Proving parameters

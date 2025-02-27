@@ -6,21 +6,21 @@ use std::{
 };
 
 use axum::{
+  Router,
   extract::{Path, Request, State},
   http::StatusCode,
   response::IntoResponse,
   routing::{get, post},
-  Router,
 };
 use errors::NotaryServerError;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use p256::{ecdsa::SigningKey, elliptic_curve::rand_core, pkcs8::DecodePrivateKey};
 use rustls::{
-  pki_types::{CertificateDer, PrivateKeyDer},
   ServerConfig,
+  pki_types::{CertificateDer, PrivateKeyDer},
 };
-use rustls_acme::{caches::DirCache, AcmeConfig};
+use rustls_acme::{AcmeConfig, caches::DirCache};
 use tokio::{io::AsyncWriteExt, net::TcpListener};
 use tokio_rustls::{LazyConfigAcceptor, TlsAcceptor};
 use tokio_stream::StreamExt;

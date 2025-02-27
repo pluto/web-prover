@@ -6,9 +6,9 @@ use std::{
 
 use bytes::Bytes;
 use futures::{
+  AsyncRead, AsyncWrite, SinkExt,
   channel::mpsc::{Receiver, SendError, Sender},
   sink::SinkMapErr,
-  AsyncRead, AsyncWrite, SinkExt,
 };
 use tokio_util::{
   compat::{Compat, TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt},

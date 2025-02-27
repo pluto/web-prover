@@ -1,7 +1,8 @@
 use std::io::Cursor;
 
-use nom::{bytes::streaming::take, IResult};
+use nom::{IResult, bytes::streaming::take};
 use tls_client2::{
+  Certificate, CipherSuite, CipherSuiteKey,
   hash_hs::HandshakeHashBuffer,
   internal::msgs::hsjoiner::HandshakeJoiner,
   tls_core::{
@@ -16,11 +17,10 @@ use tls_client2::{
     },
     verify::{construct_tls13_server_verify_message, verify_tls13},
   },
-  Certificate, CipherSuite, CipherSuiteKey,
 };
 use tls_parser::{
-  parse_tls_message_handshake, ClientHello, TlsClientHelloContents, TlsMessage,
-  TlsMessageHandshake, TlsServerHelloContents,
+  ClientHello, TlsClientHelloContents, TlsMessage, TlsMessageHandshake, TlsServerHelloContents,
+  parse_tls_message_handshake,
 };
 use tracing::{debug, error, info, trace};
 

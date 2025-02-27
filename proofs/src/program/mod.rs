@@ -12,11 +12,11 @@
 
 use std::sync::Arc;
 
-use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
+use bellpepper_core::{ConstraintSystem, SynthesisError, num::AllocatedNum};
 use circom::{r1cs::R1CS, witness::generate_witness_from_generator_type};
 use client_side_prover::{
   supernova::{NonUniformCircuit, RecursiveSNARK, StepCircuit},
-  traits::{snark::default_ck_hint, Dual},
+  traits::{Dual, snark::default_ck_hint},
 };
 use data::{Expanded, InitializedSetup};
 use proof::FoldingProof;
@@ -192,7 +192,7 @@ pub async fn run(
   #[cfg(feature = "timing")]
   let time = std::time::Instant::now();
   for (idx, &op_code) in
-    resized_rom.iter().enumerate().take_while(|(_, &op_code)| op_code != u64::MAX)
+    resized_rom.iter().enumerate().take_while(|&(_, &op_code)| op_code != u64::MAX)
   {
     info!("Step {} of ROM", idx);
     debug!("Opcode = {:?}", op_code);

@@ -40,10 +40,10 @@
 //!
 //! ```
 //! use axum::{
+//!   Router,
 //!   extract::ws::{WebSocket, WebSocketUpgrade},
 //!   response::{IntoResponse, Response},
 //!   routing::get,
-//!   Router,
 //! };
 //!
 //! let app = Router::new().route("/ws", get(handler));
@@ -72,13 +72,13 @@
 //!
 //! ```
 //! use axum::{
+//!   Router,
 //!   extract::{
-//!     ws::{WebSocket, WebSocketUpgrade},
 //!     State,
+//!     ws::{WebSocket, WebSocketUpgrade},
 //!   },
 //!   response::Response,
 //!   routing::get,
-//!   Router,
 //! };
 //!
 //! #[derive(Clone)]
@@ -105,8 +105,8 @@
 //!
 //! ```rust,no_run
 //! use axum::{
-//!   extract::ws::{Message, WebSocket},
 //!   Error,
+//!   extract::ws::{Message, WebSocket},
 //! };
 //! use futures_util::{
 //!   sink::SinkExt,
@@ -140,25 +140,25 @@ use std::{
 };
 
 use async_trait::async_trait;
-use axum::{body::Bytes, extract::FromRequestParts, response::Response, Error};
+use axum::{Error, body::Bytes, extract::FromRequestParts, response::Response};
 use axum_core::body::Body;
 use futures_util::{
   sink::{Sink, SinkExt},
   stream::{Stream, StreamExt},
 };
 use http::{
+  Method, StatusCode,
   header::{self, HeaderMap, HeaderName, HeaderValue},
   request::Parts,
-  Method, StatusCode,
 };
 use hyper_util::rt::TokioIo;
 use sha1::{Digest, Sha1};
 use tokio_tungstenite::{
+  WebSocketStream,
   tungstenite::{
     self as ts,
     protocol::{self, WebSocketConfig},
   },
-  WebSocketStream,
 };
 use tracing::error;
 
@@ -257,10 +257,10 @@ impl<F> WebSocketUpgrade<F> {
   ///
   /// ```
   /// use axum::{
+  ///   Router,
   ///   extract::ws::{WebSocket, WebSocketUpgrade},
   ///   response::{IntoResponse, Response},
   ///   routing::get,
-  ///   Router,
   /// };
   ///
   /// let app = Router::new().route("/ws", get(handler));
@@ -457,10 +457,11 @@ where S: Send + Sync
 }
 
 fn header_contains(headers: &HeaderMap, key: HeaderName, value: &'static str) -> bool {
-  let header = if let Some(header) = headers.get(&key) {
-    header
-  } else {
-    return false;
+  let header = match headers.get(&key) {
+    Some(header) => header,
+    _ => {
+      return false;
+    },
   };
 
   if let Ok(header) = std::str::from_utf8(header.as_bytes()) {

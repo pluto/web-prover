@@ -6,10 +6,10 @@ use caratls_ekm_client::TeeTlsConnector;
 #[cfg(feature = "tee-google-confidential-space-token-verifier")]
 use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
 use futures::{
-  channel::oneshot, AsyncReadExt, AsyncWriteExt as FuturesWriteExt, SinkExt, StreamExt,
+  AsyncReadExt, AsyncWriteExt as FuturesWriteExt, SinkExt, StreamExt, channel::oneshot,
 };
 use http_body_util::{BodyExt, Full};
-use hyper::{body::Bytes, Request, StatusCode};
+use hyper::{Request, StatusCode, body::Bytes};
 use tls_client2::origo::OrigoConnection;
 use tokio::io::AsyncWriteExt;
 use tokio_util::{
@@ -19,11 +19,11 @@ use tokio_util::{
 use tracing::debug;
 
 use crate::{
+  TeeProof,
   config::{self, Config, NotaryMode},
   errors::ClientErrors,
   origo::OrigoSecrets,
   tls_client_async2::TlsConnection,
-  TeeProof,
 };
 
 // TODO: Can be refactored further with shared logic from origo_wasm32.rs

@@ -16,6 +16,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use tracing::debug;
 pub use web_proof_circuits_witness_generator::json::JsonKey;
 
@@ -684,7 +685,7 @@ pub mod tests {
   #[macro_export]
   macro_rules! request {
     // Match with optional parameters
-    ($($key:ident: $value:expr),* $(,)?) => {{
+    ($($key:ident: $value:expr_2021),* $(,)?) => {{
         let mut request = ManifestRequest {
             method: "GET".to_string(),
             url: "https://example.com".to_string(),

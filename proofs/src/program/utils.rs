@@ -6,8 +6,8 @@
 //!
 //! - `next_rom_index_and_pc`: Computes the next ROM index and program counter.
 use bellpepper_core::{
-  boolean::{AllocatedBit, Boolean},
   LinearCombination,
+  boolean::{AllocatedBit, Boolean},
 };
 use itertools::Itertools;
 use num_bigint::BigInt;

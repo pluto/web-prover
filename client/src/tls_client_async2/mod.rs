@@ -19,8 +19,8 @@ use std::{
 use bytes::{Buf, Bytes};
 pub use conn::TlsConnection;
 use futures::{
-  channel::mpsc, future::Fuse, select_biased, stream::Next, AsyncRead, AsyncReadExt, AsyncWrite,
-  AsyncWriteExt, Future, FutureExt, SinkExt, StreamExt,
+  AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, Future, FutureExt, SinkExt, StreamExt,
+  channel::mpsc, future::Fuse, select_biased, stream::Next,
 };
 use tls_client2::ClientConnection;
 use tracing::{debug, error, trace, warn};
@@ -192,7 +192,7 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
           // If we receive None from `TlsConnection`, it has closed, so we
           // send a close_notify to the server.
           data = &mut tx_recv_fut => {
-              if let Some(data) = data {
+              match data { Some(data) => {
                   debug!("writing {} plaintext bytes to client", data.len());
 
                   sent.extend(&data);
@@ -201,7 +201,7 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
                       .await?;
 
                   tx_recv_fut = tx_receiver.next().fuse();
-              } else {
+              } _ => {
                   if !server_closed {
                       if let Err(e) = send_close_notify(&mut client, &mut server_tx).await {
                           warn!("failed to send close_notify to server: {}", e);
@@ -211,7 +211,7 @@ pub fn bind_client<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
                   trace!("closing client and terminating receiving end.");
                   client_closed = true;
                   tx_recv_fut = Fuse::terminated();
-              }
+              }}
           }
           // Waits for a notification from the backend that it is ready to decrypt data.
           _ = &mut notify => {

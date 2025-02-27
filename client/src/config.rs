@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use base64::prelude::*;
 use http_body_util::Full;
 use hyper::{
+  Request,
   body::Bytes,
   header::{HeaderName, HeaderValue},
-  Request,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{

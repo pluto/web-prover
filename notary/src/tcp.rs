@@ -3,7 +3,7 @@ use std::future::Future;
 use async_trait::async_trait;
 use axum::{
   extract::FromRequestParts,
-  http::{header, request::Parts, HeaderValue, StatusCode},
+  http::{HeaderValue, StatusCode, header, request::Parts},
   response::Response,
 };
 use axum_core::body::Body;
@@ -75,9 +75,8 @@ impl TcpUpgrade {
 }
 
 pub fn header_eq(headers: &HeaderMap, key: HeaderName, value: &'static str) -> bool {
-  if let Some(header) = headers.get(&key) {
-    header.as_bytes().eq_ignore_ascii_case(value.as_bytes())
-  } else {
-    false
+  match headers.get(&key) {
+    Some(header) => header.as_bytes().eq_ignore_ascii_case(value.as_bytes()),
+    _ => false,
   }
 }

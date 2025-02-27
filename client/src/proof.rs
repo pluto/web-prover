@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use client_side_prover::supernova::PublicParams;
 use proofs::{
+  E1, F, G1, G2,
   program::{
     data::{InitializedSetup, InstanceParams, NotExpanded, Online, ProofParams, SetupParams},
     manifest::{EncryptionInput, NIVCRom, NivcCircuitInputs, OrigoManifest},
   },
-  E1, F, G1, G2,
 };
 use tracing::debug;
 

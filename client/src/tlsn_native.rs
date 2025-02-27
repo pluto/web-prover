@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use http_body_util::Full;
-use hyper::{body::Bytes, Request};
+use hyper::{Request, body::Bytes};
 use rustls::ClientConfig;
-use tlsn_prover::tls::{state::Closed, Prover, ProverConfig};
+use tlsn_prover::tls::{Prover, ProverConfig, state::Closed};
 use tokio_rustls::TlsConnector;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 

@@ -1,9 +1,9 @@
 [package]
-name   ="proofs"
-version="0.6.0"
-edition="2021"
-publish=false
-build  ="build.rs"
+name             ="proofs"
+version          ="0.6.0"
+publish          =false
+build            ="build.rs"
+edition.workspace=true
 
 [dependencies]
 serde      ={ workspace=true }

@@ -32,27 +32,27 @@ use derive_more::From;
 use ff::Field;
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tls_client2::CipherSuiteKey;
 use tracing::debug;
 use web_proof_circuits_witness_generator::{
-  data_hasher, field_element_to_base10_string,
+  ByteOrPad, data_hasher, field_element_to_base10_string,
   http::{
-    compute_http_witness, headers_to_bytes, parser::parse as http_parse, HttpMaskType,
-    RawHttpMachine,
+    HttpMaskType, RawHttpMachine, compute_http_witness, headers_to_bytes,
+    parser::parse as http_parse,
   },
-  json::{json_value_digest, parser::parse, JsonKey, RawJsonMachine},
-  polynomial_digest, poseidon, ByteOrPad,
+  json::{JsonKey, RawJsonMachine, json_value_digest, parser::parse},
+  polynomial_digest, poseidon,
 };
 use web_prover_core::{http::MAX_HTTP_HEADERS, manifest::Manifest};
 
 use crate::{
+  ProofError,
   circuits::MAX_STACK_HEIGHT,
   program::{
-    data::{CircuitData, FoldInput},
     F, G1,
+    data::{CircuitData, FoldInput},
   },
-  ProofError,
 };
 
 /// HTTP data signal name
@@ -490,8 +490,10 @@ fn build_plaintext_authentication_circuit_inputs<const CIRCUIT_SIZE: usize>(
         (String::from("plaintext"), pt_chunks[i].clone()),
         (
           String::from("ciphertext_digest"),
-          json!(BigInt::from_bytes_le(num_bigint::Sign::Plus, &polynomial_input.to_bytes())
-            .to_str_radix(10)),
+          json!(
+            BigInt::from_bytes_le(num_bigint::Sign::Plus, &polynomial_input.to_bytes())
+              .to_str_radix(10)
+          ),
         ),
       ]);
       private_inputs.push(private_input);

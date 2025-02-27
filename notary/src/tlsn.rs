@@ -18,10 +18,10 @@ use uuid::Uuid;
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
+  SharedState,
   axum_websocket::{WebSocket, WebSocketUpgrade},
   errors::NotaryServerError,
-  tcp::{header_eq, TcpUpgrade},
-  SharedState,
+  tcp::{TcpUpgrade, header_eq},
 };
 // TODO: use this place of our local file once this gets merged: https://github.com/tokio-rs/axum/issues/2848
 // use axum::extract::ws::{WebSocket, WebSocketUpgrade};

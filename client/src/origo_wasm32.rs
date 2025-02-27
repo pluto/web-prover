@@ -12,7 +12,7 @@ use caratls_ekm_client::DummyTokenVerifier;
 use caratls_ekm_client::TeeTlsConnector;
 #[cfg(feature = "tee-google-confidential-space-token-verifier")]
 use caratls_ekm_google_confidential_space_client::GoogleConfidentialSpaceTokenVerifier;
-use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt};
+use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, channel::oneshot};
 use hyper::StatusCode;
 use js_sys::{Function, Promise};
 use tls_client2::origo::OrigoConnection;
@@ -22,13 +22,13 @@ use tokio_util::{
 };
 use tracing::debug;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::{spawn_local, JsFuture};
+use wasm_bindgen_futures::{JsFuture, spawn_local};
 use web_sys::window;
 use ws_stream_wasm::WsMeta;
 
 use crate::{
-  config, config::NotaryMode, errors, errors::ClientErrors, origo::OrigoSecrets,
-  tls_client_async2::bind_client, TeeProof,
+  TeeProof, config, config::NotaryMode, errors, errors::ClientErrors, origo::OrigoSecrets,
+  tls_client_async2::bind_client,
 };
 
 async fn sleep(ms: u64) {

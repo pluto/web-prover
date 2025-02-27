@@ -5,9 +5,9 @@ use std::{
 
 use alloy_primitives::utils::keccak256;
 use axum::{
+  Json,
   extract::{self, Query, State},
   response::Response,
-  Json,
 };
 use client::origo::{SignBody, VerifyBody, VerifyReply};
 use hyper::upgrade::Upgraded;
@@ -16,11 +16,11 @@ use k256::{
   ecdsa::SigningKey as Secp256k1SigningKey, elliptic_curve::rand_core, pkcs8::DecodePrivateKey,
 };
 use proofs::{
+  F, G1, G2,
   circuits::{CIRCUIT_SIZE_512, MAX_STACK_HEIGHT},
   errors::ProofError,
-  program::manifest::{compute_ciphertext_digest, InitialNIVCInputs},
+  program::manifest::{InitialNIVCInputs, compute_ciphertext_digest},
   proof::FoldingProof,
-  F, G1, G2,
 };
 use rs_merkle::{Hasher, MerkleTree};
 use serde::{Deserialize, Serialize};
@@ -36,11 +36,12 @@ use web_prover_core::proof::SignedVerificationReply;
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
+  SharedState,
   axum_websocket::WebSocket,
   errors::{NotaryServerError, ProxyError},
   tls_parser::{Direction, Transcript, UnparsedMessage},
   tlsn::ProtocolUpgrade,
-  verifier, SharedState,
+  verifier,
 };
 
 pub struct OrigoSigningKey(pub(crate) Secp256k1SigningKey);

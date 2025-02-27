@@ -16,7 +16,7 @@ use hyper_util::rt::TokioIo;
 use serde::Deserialize;
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
-  time::{timeout, Duration},
+  time::{Duration, timeout},
 };
 use tokio_stream::StreamExt;
 use tokio_util::{
@@ -33,11 +33,11 @@ use web_prover_core::{
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
+  SharedState,
   axum_websocket::WebSocket,
   errors::NotaryServerError,
   origo::{proxy_service, sign_verification},
   tlsn::ProtocolUpgrade,
-  SharedState,
 };
 
 pub fn bytes_to_ascii(bytes: Vec<u8>) -> String {

@@ -1,8 +1,8 @@
 use std::{sync::Arc, time::Duration};
 
 use axum::{
-  extract::{self, Query, State},
   Json,
+  extract::{self, Query, State},
 };
 use reqwest::{Request, Response};
 use serde::Deserialize;
@@ -16,7 +16,7 @@ use web_prover_core::{
   proof::TeeProof,
 };
 
-use crate::{errors::NotaryServerError, tee::create_tee_proof, SharedState};
+use crate::{SharedState, errors::NotaryServerError, tee::create_tee_proof};
 
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
