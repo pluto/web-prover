@@ -1,18 +1,9 @@
 use std::sync::Arc;
 
 use alloy_primitives::utils::keccak256;
-use client::SignedVerificationReply;
-use proofs::program::manifest::Manifest;
 use rs_merkle::{Hasher, MerkleTree};
 use serde::{Deserialize, Serialize};
-use tracing::debug;
-
-use crate::errors::ProxyError;
-
-pub struct Verifier {
-  pub setup_params: SetupParams<Online>,
-  pub verifier_key: VerifierKey<E1, S1, S2>,
-}
+use web_prover_core::{manifest::Manifest, proof::SignedVerificationReply};
 
 use crate::{errors::NotaryServerError, SharedState, State};
 
@@ -26,13 +17,13 @@ impl Hasher for KeccakHasher {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct VerifyQuery<T: AsRef<[u8]>> {
+pub struct VerifyOutput<T: AsRef<[u8]>> {
   pub value:    T,
   pub manifest: Manifest,
 }
 
 pub fn sign_verification<T: AsRef<[u8]>>(
-  query: VerifyQuery<T>,
+  query: VerifyOutput<T>,
   State(state): State<Arc<SharedState>>,
 ) -> Result<SignedVerificationReply, NotaryServerError> {
   // TODO check OSCP and CT (maybe)

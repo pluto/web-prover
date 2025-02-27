@@ -8,7 +8,7 @@ use axum::{
   response::Response,
   Json,
 };
-use client::origo::{SignBody, VerifyBody, VerifyReply};
+use client::origo::{SignBody, VerifyBody};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use k256::{
@@ -39,7 +39,7 @@ use crate::{
   origo_verifier,
   tls_parser::{Direction, Transcript, UnparsedMessage},
   tlsn::ProtocolUpgrade,
-  verifier::VerifyQuery,
+  verifier::VerifyOutput,
   SharedState,
 };
 
@@ -308,7 +308,7 @@ pub async fn verify(
         // TODO: add the manifest digest?
         debug!("output from verifier: {output:?}");
         // This unwrap should be safe for now as the value will always be present
-        VerifyReply {
+        VerifyOutput {
           value:    payload.origo_proof.value.unwrap(),
           manifest: payload.manifest.into(),
         }

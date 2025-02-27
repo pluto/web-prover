@@ -2,7 +2,6 @@
 
 use http_body_util::BodyExt;
 use hyper::{body::Bytes, Request};
-use proofs::program::manifest::Manifest;
 use serde::{Deserialize, Serialize};
 use spansy::{
   http::Response,
@@ -19,6 +18,7 @@ use tlsn_prover::{state::Closed, Prover};
 use tracing::debug;
 use utils::range::{RangeSet, ToRangeSet};
 use web_proof_circuits_witness_generator::json::JsonKey;
+use web_prover_core::manifest::Manifest;
 
 use crate::{errors, SignedVerificationReply};
 

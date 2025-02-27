@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use proofs::{
   program::{
     data::{Offline, SetupParams, UninitializedSetup},
-    manifest::{EncryptionInput, OrigoManifest, TLSEncryption},
+    manifest::{EncryptionInput, NIVCRom, OrigoManifest, TLSEncryption},
   },
   proof::FoldingProof,
   F, G1, G2,
@@ -16,13 +16,12 @@ use web_proof_circuits_witness_generator::{
   http::{compute_http_witness, HttpMaskType},
   json::json_value_digest,
 };
-use web_prover_core::{manifest::Manifest, proof::SignedVerificationReply};
+use web_prover_core::proof::SignedVerificationReply;
 
 use crate::{
   config::{self},
   errors::ClientErrors,
   tls::decrypt_tls_ciphertext,
-  SignedVerificationReply,
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -209,10 +208,10 @@ mod tests {
   fn test_manifest_serialization() {
     let mut origo_conn = OrigoConnection::new();
     origo_conn.secret_map.insert("Handshake:server_iv".to_string(), vec![1, 2, 3]);
-    let origo_secrets = OrigoSecrets::from_origo_conn(&origo_conn);
+    let origo_secrets = &OrigoSecrets::from_origo_conn(&origo_conn);
 
     let serialized: Vec<u8> = origo_secrets.try_into().unwrap();
-    let deserialized: OrigoSecrets = OrigoSecrets::try_from(&serialized).unwrap();
-    assert_eq!(origo_secrets, deserialized);
+    let deserialized: OrigoSecrets = OrigoSecrets::try_from(serialized.as_ref()).unwrap();
+    assert_eq!(*origo_secrets, deserialized);
   }
 }

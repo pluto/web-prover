@@ -9,7 +9,7 @@ use caratls_ekm_google_confidential_space_server::GoogleConfidentialSpaceTokenGe
 #[cfg(feature = "tee-dummy-token-generator")]
 use caratls_ekm_server::DummyTokenGenerator;
 use caratls_ekm_server::TeeTlsAcceptor;
-use client::origo::{OrigoSecrets, VerifyReply};
+use client::origo::OrigoSecrets;
 use futures_util::SinkExt;
 use hyper::{body::Bytes, upgrade::Upgraded};
 use hyper_util::rt::TokioIo;
@@ -35,9 +35,9 @@ use ws_stream_tungstenite::WsStream;
 use crate::{
   axum_websocket::WebSocket,
   errors::NotaryServerError,
-  origo::{proxy_service, sign_verification},
+  origo::proxy_service,
   tlsn::ProtocolUpgrade,
-  verifier::VerifyQuery,
+  verifier::{sign_verification, VerifyOutput},
   SharedState,
 };
 
@@ -246,7 +246,7 @@ pub fn create_tee_proof(
   validate_notarization_legal(manifest, request, response)?;
 
   let manifest_hash = manifest.to_keccak_digest()?;
-  let to_sign = VerifyQuery {
+  let to_sign = VerifyOutput {
     // Using manifest hash as a value here since we are not exposing any values extracted
     // from the request or response
     value:    format!("0x{}", hex::encode(manifest_hash)),

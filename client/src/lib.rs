@@ -17,12 +17,6 @@ pub mod tls_client_async2;
 use std::collections::HashMap;
 
 use origo::OrigoProof;
-pub use proofs::program::data::UninitializedSetup;
-use proofs::{
-  circuits::{construct_setup_data_from_fs, CIRCUIT_SIZE_512},
-  program::manifest::{Manifest, NIVCRom},
-  proof::FoldingProof,
-};
 use serde::{Deserialize, Serialize};
 use tlsn::{TlsnProof, TlsnVerifyBody};
 use tlsn_common::config::ProtocolConfig;
@@ -42,17 +36,6 @@ pub enum Proof {
   Origo(OrigoProof),
   TEE(TeeProof),
   Proxy(TeeProof),
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SignedVerificationReply {
-  pub merkle_leaves: Vec<String>,
-  pub digest:        String,
-  pub signature:     String,
-  pub signature_r:   String,
-  pub signature_s:   String,
-  pub signature_v:   u8,
-  pub signer:        String,
 }
 
 pub fn get_web_prover_circuits_version() -> String {
@@ -139,7 +122,7 @@ pub async fn prover_inner_origo(
   let manifest = config.proving.manifest.clone().ok_or(ClientErrors::ManifestMissingError)?;
 
   debug!("sending proof to proxy for verification");
-  let verify_response = origo::verify(config, origo::VerifyBody {
+  let verify_response = verify(config, origo::VerifyBody {
     session_id,
     origo_proof: proof.clone(),
     manifest: manifest.into(),
@@ -214,4 +197,38 @@ pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, ClientE
   assert_eq!(response.status(), hyper::StatusCode::OK);
   let tee_proof = response.json::<TeeProof>().await?;
   Ok(Proof::Proxy(tee_proof))
+}
+
+pub async fn verify<T: Serialize>(
+  config: crate::config::Config,
+  verify_body: T,
+) -> Result<SignedVerificationReply, errors::ClientErrors> {
+  let url = format!(
+    "https://{}:{}/v1/{}/verify",
+    config.notary_host.clone(),
+    config.notary_port.clone(),
+    config.mode.to_string(),
+  );
+
+  // TODO reqwest uses browsers fetch API for WASM target? if true, can't add trust anchors
+  #[cfg(target_arch = "wasm32")]
+  let client = reqwest::ClientBuilder::new().build()?;
+
+  #[cfg(not(target_arch = "wasm32"))]
+  let client = {
+    let mut client_builder = reqwest::ClientBuilder::new().use_rustls_tls();
+    if let Some(cert) = config.notary_ca_cert {
+      client_builder =
+        client_builder.add_root_certificate(reqwest::tls::Certificate::from_der(&cert)?);
+    }
+    client_builder.build()?
+  };
+
+  let response = client.post(url).json(&verify_body).send().await?;
+  assert!(response.status() == hyper::StatusCode::OK, "response={:?}", response);
+  let verify_response = response.json::<SignedVerificationReply>().await?;
+
+  debug!("\n{:?}\n\n", verify_response.clone());
+
+  Ok(verify_response)
 }

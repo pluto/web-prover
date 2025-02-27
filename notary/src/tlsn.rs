@@ -7,7 +7,7 @@ use axum::{
   response::Response,
   Json,
 };
-use client::{tlsn::TlsnVerifyBody, SignedVerificationReply};
+use client::tlsn::TlsnVerifyBody;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use p256::ecdsa::SigningKey;
@@ -23,13 +23,14 @@ use tlsn_verifier::{Verifier, VerifierConfig};
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{debug, error, info};
 use uuid::Uuid;
+use web_prover_core::proof::SignedVerificationReply;
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
   axum_websocket::{WebSocket, WebSocketUpgrade},
   errors::NotaryServerError,
   tcp::{header_eq, TcpUpgrade},
-  verifier::VerifyQuery,
+  verifier::VerifyOutput,
   SharedState,
 };
 // TODO: use this place of our local file once this gets merged: https://github.com/tokio-rs/axum/issues/2848
@@ -206,7 +207,7 @@ pub async fn verify(
   partial_transcript.set_unauthed(b'X');
 
   crate::verifier::sign_verification(
-    VerifyQuery { manifest: verify_body.manifest, value: partial_transcript.received_unsafe() },
+    VerifyOutput { manifest: verify_body.manifest, value: partial_transcript.received_unsafe() },
     State(state),
   )
   .map(Json)
