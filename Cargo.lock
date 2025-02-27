@@ -7406,21 +7406,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "webprover"
-version = "0.0.0"
-dependencies = [
- "http-body-util",
- "hyper",
- "hyper-util",
- "rustls 0.23.19",
- "rustls-pemfile 2.2.0",
- "rustls-pki-types",
- "serde_json",
- "tokio",
- "tokio-rustls",
-]
-
-[[package]]
 name = "which"
 version = "4.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
