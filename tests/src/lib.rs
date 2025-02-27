@@ -36,12 +36,15 @@ impl TestSetup {
 
     println!("Workspace root: {:?}", workspace_root);
 
-    let notary_config = workspace_root.join("fixture/notary-config.toml");
-    let client_config = workspace_root.join("fixture/client.tee_tcp_local.json");
+    // Use relative paths that match the original workflow
+    let notary_config = "./fixture/notary-config.toml";
+    let client_config = "./fixture/client.tee_tcp_local.json";
 
     println!("Checking if config files exist:");
-    println!("Notary config exists: {}", notary_config.exists());
-    println!("Client config exists: {}", client_config.exists());
+    println!("Notary config (workspace): {}", workspace_root.join(notary_config).exists());
+    println!("Client config (workspace): {}", workspace_root.join(client_config).exists());
+    println!("Notary config (relative): {}", PathBuf::from(notary_config).exists());
+    println!("Client config (relative): {}", PathBuf::from(client_config).exists());
 
     // Check for pre-built binaries in target/release
     let notary_bin = workspace_root.join("target/release/notary");
@@ -51,26 +54,25 @@ impl TestSetup {
     println!("Using pre-built binaries: {}", use_prebuilt);
 
     // Start notary with captured output
-    let mut notary_command = if use_prebuilt {
+    let mut notary = if use_prebuilt {
+      println!("Running notary from: {:?}", &notary_bin);
+      // Match the original workflow exactly - use relative paths
       let mut cmd = Command::new(&notary_bin);
-      cmd.arg("--config").arg(&notary_config);
-      cmd
+      cmd.arg("--config").arg(notary_config);
+      cmd.env("RUST_LOG", "DEBUG").stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap()
     } else {
       let mut cmd = Command::new("cargo");
       cmd
         .args(["run", "-p", "notary", "--release", "--"])
         .arg("--config")
-        .arg(&notary_config)
-        .current_dir(&workspace_root);
-      cmd
+        .arg(workspace_root.join(notary_config))
+        .env("RUST_LOG", "DEBUG")
+        .current_dir(&workspace_root)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap()
     };
-
-    let mut notary = notary_command
-      .env("RUST_LOG", "DEBUG")
-      .stdout(Stdio::piped())
-      .stderr(Stdio::piped())
-      .spawn()
-      .unwrap();
 
     // Create a flag to indicate when the notary is ready
     let ready_flag = Arc::new(AtomicBool::new(false));
@@ -101,6 +103,10 @@ impl TestSetup {
       while !ready_flag.load(Ordering::SeqCst) {
         sleep(Duration::from_millis(100)).await;
       }
+
+      // Add extra delay to ensure the notary is fully ready
+      // This matches the 10 second sleep in the original workflow
+      sleep(Duration::from_secs(2)).await;
     })
     .await
     {
@@ -109,26 +115,25 @@ impl TestSetup {
     }
 
     // Start client and capture its output
-    let mut client_command = if use_prebuilt {
+    let client = if use_prebuilt {
+      println!("Running client from: {:?}", &client_bin);
+      // Match the original workflow exactly - use relative paths
       let mut cmd = Command::new(&client_bin);
-      cmd.arg("--config").arg(&client_config);
-      cmd
+      cmd.arg("--config").arg(client_config);
+      cmd.env("RUST_LOG", "DEBUG").stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap()
     } else {
       let mut cmd = Command::new("cargo");
       cmd
         .args(["run", "-p", "client", "--"])
         .arg("--config")
-        .arg(&client_config)
-        .current_dir(&workspace_root);
-      cmd
+        .arg(workspace_root.join(client_config))
+        .env("RUST_LOG", "DEBUG")
+        .current_dir(&workspace_root)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap()
     };
-
-    let mut client = client_command
-      .env("RUST_LOG", "DEBUG")
-      .stdout(Stdio::piped())
-      .stderr(Stdio::piped())
-      .spawn()
-      .unwrap();
 
     Self { notary, client }
   }
@@ -166,6 +171,23 @@ async fn test_proving_successful() {
         println!("Client stderr: {}", line);
         if line.contains("Proving Successful") {
           return true;
+        }
+        // If we see a file not found error, print more detailed info
+        if line.contains("NotFound") {
+          println!(
+            "File not found error detected. Current directory: {:?}",
+            std::env::current_dir().unwrap()
+          );
+          println!("Directory contents:");
+          for entry in std::fs::read_dir(".").unwrap() {
+            println!("  {:?}", entry.unwrap().path());
+          }
+          if let Ok(entries) = std::fs::read_dir("./fixture") {
+            println!("Fixture directory contents:");
+            for entry in entries {
+              println!("  {:?}", entry.unwrap().path());
+            }
+          }
         }
       }
 
