@@ -36,8 +36,4 @@ jobs:
       - run: chmod +x target/release/client
 
       - run: |
-          export RUST_LOG=DEBUG
-          ./target/release/notary --config ./fixture/notary-config.toml &
-          sleep 10
-
-          ./target/release/client --config ./fixture/client.tee_tcp_local.json
+          cargo test -p web-prover-tests

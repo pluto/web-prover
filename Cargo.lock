@@ -7348,6 +7348,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "web-prover-tests"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "web-sys"
 version = "0.3.70"
 source = "registry+https://github.com/rust-lang/crates.io-index"
