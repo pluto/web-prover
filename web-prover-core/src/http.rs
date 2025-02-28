@@ -403,13 +403,19 @@ impl ManifestResponse {
 /// Template variable type
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TemplateVar {
-  /// Regex for validation (if applicable)
-  pub regex:  Option<String>,
-  /// Length constraint (if applicable)
-  pub length: Option<usize>,
-  /// Type constraint (e.g., base64, hex)
-  pub r#type: Option<String>,
+  /// Optional description for the end user
+  pub description: Option<String>,
+  /// Indicates if the value is required
+  #[serde(default = "default_required")]
+  pub required:    bool,
+  /// A default value, must be set when `required` is false
+  pub default:     Option<String>,
+  /// Regex pattern for validation of user input
+  pub pattern:     Option<String>,
 }
+
+/// Default value for the required field is true
+fn default_required() -> bool { true }
 
 /// HTTP Request items required for circuits
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -466,7 +472,7 @@ impl ManifestRequest {
     Ok(())
   }
 
-  fn validate_vars(&self) -> Result<(), ManifestError> {
+  pub fn validate_vars(&self) -> Result<(), ManifestError> {
     let mut all_tokens = vec![];
 
     // Parse and validate tokens in the body
@@ -496,50 +502,50 @@ impl ManifestRequest {
       all_tokens.extend(header_tokens);
     }
 
-    for var_key in self.vars.keys() {
-      if !all_tokens.contains(var_key) {
-        return Err(ManifestError::InvalidManifest(format!(
-          "Token `<% {} %>` not declared in `body` or `headers`",
-          var_key
-        )));
-      }
-    }
-
     // Validate each `vars` entry
     for (key, var_def) in &self.vars {
-      // Validate regex (if defined)
-      if let Some(regex_pattern) = var_def.regex.as_ref() {
-        // Using `regress` crate for compatibility with ECMAScript regular expressions
-        let _regex = regress::Regex::new(regex_pattern).map_err(|_| {
-          ManifestError::InvalidManifest(format!("Invalid regex pattern for `{}`", key))
-        })?;
-        // TODO: It will definitely not match it here because it's a template variable, not an
-        // actual variable
-        // TODO: How does the Manifest receiver (notary) verifies this?
-        // if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
-        //   if regex.find(value.as_str().unwrap_or("")).is_none() {
-        //     return Err(ManifestError::InvalidManifest(format!(
-        //       "Value for token `<% {} %>` does not match regex",
-        //       key
-        //     )));
-        //   }
-        // }
+      // Check if the variable is used in the template
+      let is_used = all_tokens.contains(key);
+
+      // If the variable is required but not used, return an error
+      if var_def.required && !is_used {
+        return Err(ManifestError::InvalidManifest(format!(
+          "Required variable `{}` is not used in the template",
+          key
+        )));
       }
 
-      // Validate length (if applicable)
-      if let Some(length) = var_def.length {
-        if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
-          if value.as_str().unwrap_or("").len() != length {
+      // If the variable is not required, it must have a default value
+      if !var_def.required && var_def.default.is_none() {
+        return Err(ManifestError::InvalidManifest(format!(
+          "Non-required variable `{}` must have a default value",
+          key
+        )));
+      }
+
+      // Validate pattern (if defined)
+      if let Some(pattern) = var_def.pattern.as_ref() {
+        // Using `regress` crate for compatibility with ECMAScript regular expressions
+        let _regex = regress::Regex::new(pattern).map_err(|_| {
+          ManifestError::InvalidManifest(format!("Invalid regex pattern for `{}`", key))
+        })?;
+
+        // If there's a default value, validate it against the pattern
+        if let Some(default_value) = var_def.default.as_ref() {
+          let regex = regex::Regex::new(pattern).map_err(|_| {
+            ManifestError::InvalidManifest(format!("Invalid regex pattern for `{}`", key))
+          })?;
+
+          if !regex.is_match(default_value) {
             return Err(ManifestError::InvalidManifest(format!(
-              "Value for token `<% {} %>` does not meet length constraint",
+              "Default value for `{}` does not match the specified pattern",
               key
             )));
           }
         }
       }
-
-      // TODO: Validate the token "type" constraint
     }
+
     Ok(())
   }
 
@@ -697,9 +703,10 @@ pub mod tests {
             vars: std::collections::HashMap::from([(
                 "TOKEN".to_string(),
                 TemplateVar {
-                    regex: Some("^[A-Za-z0-9]+$".to_string()),
-                    length: Some(20),
-                    r#type: Some("base64".to_string()),
+                    description: Some("Authentication token".to_string()),
+                    required: true,
+                    default: None,
+                    pattern: Some("^[A-Za-z0-9]+$".to_string()),
                 },
             )]),
         };
@@ -1043,6 +1050,112 @@ pub mod tests {
       },
       _ => panic!("Expected missing token error"),
     }
+  }
+
+  #[test]
+  fn test_validate_vars_required_not_used() {
+    let header_bytes: &[u8] = b"POST /path HTTP/1.1\r\nContent-Type: application/json\r\n\r\n";
+    let body_bytes: &[u8] = br#"{"key": "value"}"#;
+
+    let mut request = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
+
+    // Add a required variable that is not used in the template
+    request.vars.insert("unused_var".to_string(), TemplateVar {
+      description: Some("This is a required variable".to_string()),
+      required:    true,
+      default:     None,
+      pattern:     None,
+    });
+
+    let result = request.validate_vars();
+    assert!(result.is_err());
+
+    match result {
+      Err(ManifestError::InvalidManifest(msg)) => {
+        assert!(msg.contains("Required variable `unused_var` is not used in the template"));
+      },
+      _ => panic!("Expected required variable not used error"),
+    }
+  }
+
+  #[test]
+  fn test_validate_vars_non_required_without_default() {
+    let header_bytes: &[u8] = b"POST /path HTTP/1.1\r\nX-Custom-Header: <% optional_var %>\r\n\r\n";
+    let body_bytes: &[u8] = br#"{"key": "value"}"#;
+
+    let mut request = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
+
+    // Add a non-required variable without a default value
+    request.vars.insert("optional_var".to_string(), TemplateVar {
+      description: Some("This is an optional variable".to_string()),
+      required:    false,
+      default:     None, // Missing default value
+      pattern:     None,
+    });
+
+    let result = request.validate_vars();
+    assert!(result.is_err());
+
+    match result {
+      Err(ManifestError::InvalidManifest(msg)) => {
+        assert!(msg.contains("Non-required variable `optional_var` must have a default value"));
+      },
+      _ => panic!("Expected non-required variable without default error"),
+    }
+  }
+
+  #[test]
+  fn test_validate_vars_default_not_matching_pattern() {
+    let header_bytes: &[u8] = b"POST /path HTTP/1.1\r\nX-Custom-Header: <% pattern_var %>\r\n\r\n";
+    let body_bytes: &[u8] = br#"{"key": "value"}"#;
+
+    let mut request = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
+
+    // Add a variable with a default value that doesn't match the pattern
+    request.vars.insert("pattern_var".to_string(), TemplateVar {
+      description: Some("This is a variable with a pattern".to_string()),
+      required:    false,
+      default:     Some("abc123".to_string()), // Doesn't match the pattern
+      pattern:     Some("^[0-9]+$".to_string()), // Only digits allowed
+    });
+
+    let result = request.validate_vars();
+    assert!(result.is_err());
+
+    match result {
+      Err(ManifestError::InvalidManifest(msg)) => {
+        assert!(
+          msg.contains("Default value for `pattern_var` does not match the specified pattern")
+        );
+      },
+      _ => panic!("Expected default value not matching pattern error"),
+    }
+  }
+
+  #[test]
+  fn test_validate_vars_valid() {
+    let header_bytes: &[u8] = b"POST /path HTTP/1.1\r\nX-Custom-Header: <% header_var %>\r\n\r\n";
+    let body_bytes: &[u8] = br#"{"key": "<% body_var %>"}"#;
+
+    let mut request = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
+
+    // Add valid variables
+    request.vars.insert("header_var".to_string(), TemplateVar {
+      description: Some("This is a header variable".to_string()),
+      required:    true,
+      default:     None,
+      pattern:     Some("^[A-Za-z0-9]+$".to_string()),
+    });
+
+    request.vars.insert("body_var".to_string(), TemplateVar {
+      description: Some("This is a body variable".to_string()),
+      required:    false,
+      default:     Some("default123".to_string()),
+      pattern:     Some("^[A-Za-z0-9]+$".to_string()),
+    });
+
+    let result = request.validate_vars();
+    assert!(result.is_ok());
   }
 
   #[test]

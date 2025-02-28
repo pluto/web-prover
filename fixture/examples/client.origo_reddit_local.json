@@ -32,8 +32,16 @@
           "authorization": "Bearer <% authToken %>"
         },
         "vars": {
-          "userId": {},
-          "authToken": {}
+          "userId": {
+            "description": "Reddit username",
+            "required": true,
+            "pattern": "^[A-Za-z0-9_-]{3,20}$"
+          },
+          "authToken": {
+            "description": "Reddit authentication token",
+            "required": true,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          }
         },
         "extra": {
           "headers": {

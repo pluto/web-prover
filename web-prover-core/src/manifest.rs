@@ -33,11 +33,9 @@ impl Manifest {
     self.request.validate()?;
     self.response.validate()?;
 
-    // TODO: Do we want to run this here instead of in Request::validate in order to cross-examine
-    //  Request and Response template vars?
-    // TODO: Commented out because it breaks when existing fixtures, i.e. tokens encoded in the
-    //  body of client.tee_tcp_local.json
-    // self.request.validate_vars()?;
+    // Validate template variables
+    self.request.validate_vars()?;
+
     Ok(())
   }
 
@@ -77,14 +75,13 @@ mod tests {
   use std::collections::HashMap;
 
   use crate::{
-    errors::ProofError,
-    program::{
-      http::{JsonKey, ManifestRequest, ManifestResponse, ManifestResponseBody, TemplateVar},
-      manifest::HTTP_1_1,
-      plain_manifest::Manifest,
+    errors::ManifestError,
+    http::{
+      JsonKey, ManifestRequest, ManifestResponse, ManifestResponseBody, TemplateVar, HTTP_1_1,
     },
+    manifest::Manifest,
     request, response,
-    tests::inputs::TEST_MANIFEST,
+    test_utils::TEST_MANIFEST,
   };
 
   macro_rules! create_manifest {
@@ -175,10 +172,17 @@ mod tests {
   fn test_parse_manifest_without_vars() {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST_WITHOUT_VARS).unwrap();
     let result = manifest.validate();
-    assert!(result.is_ok());
+    assert!(result.is_err());
 
     assert!(manifest.request.body.is_none()); // Optional field we omitted
     assert_eq!(manifest.request.vars, HashMap::new()); // Optional field we provide default for
+
+    // Check that the error is about the missing token
+    if let Err(ManifestError::InvalidManifest(message)) = result {
+      assert!(message.contains("Token `<% token %>` not declared in `vars`"));
+    } else {
+      panic!("Expected ManifestError::InvalidManifest about missing token");
+    }
   }
 
   #[test]
@@ -217,14 +221,14 @@ mod tests {
     }
   }
 
-  #[ignore] // TODO: Unignore after fixtures are fixed and token validation is re-enabled
   #[test]
   fn test_manifest_validation_missing_vars() {
     let mut vars = HashMap::new();
     vars.insert("TOKEN".to_string(), TemplateVar {
-      regex:  Some("^[A-Za-z0-9]+$".to_string()),
-      length: Some(20),
-      r#type: Some("base64".to_string()),
+      description: Some("Authentication token".to_string()),
+      required:    true,
+      default:     None,
+      pattern:     Some("^[A-Za-z0-9]+$".to_string()),
     });
     let manifest = create_manifest!(
       request!(
