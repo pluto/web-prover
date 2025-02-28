@@ -64,4 +64,9 @@ wasm-demo/node_modules:
 wasm-demo: wasm-demo/node_modules
 	cd client_wasm/demo && npm run start
 
-.PHONY: wasm wasm-debug wasm-demo ios
+coverage: artifacts
+	-cargo install cargo-tarpaulin
+	cargo tarpaulin --workspace --exclude client_wasm --timeout 360 --out Xml --out Html --output-dir coverage
+	@echo "Coverage report generated in coverage/tarpaulin-report.html"
+
+.PHONY: wasm wasm-debug wasm-demo ios coverage

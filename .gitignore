@@ -31,3 +31,8 @@ client_ios/demo/demo.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChec
 
 # rust tools
 bacon.toml
+
+# coverage reports
+coverage/
+cobertura.xml
+tarpaulin-report.html

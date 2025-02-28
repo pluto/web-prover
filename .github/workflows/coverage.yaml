@@ -1,0 +1,78 @@
+name: Code Coverage
+
+on:
+  workflow_call:
+    inputs:
+      web-prover-circuits-cache-key:
+        required: true
+        type: string
+    outputs:
+      coverage-report:
+        description: "Path to the coverage report"
+        value: ${{ jobs.coverage.outputs.coverage-report }}
+
+jobs:
+  coverage:
+    name: Generate code coverage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write  # Needed for coverage comments
+    outputs:
+      coverage-report: ${{ steps.upload-coverage.outputs.artifact-url }}
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Needed for coverage comparison in PRs
+
+      - uses: ./.github/actions/setup-rust-ubuntu
+        with:
+          rust-cache-key: coverage
+
+      - name: Fetch web-prover-circuits cache
+        uses: actions/cache/restore@v4
+        with:
+          path: proofs/web_proof_circuits
+          key: ${{ inputs.web-prover-circuits-cache-key }}
+          fail-on-error: true
+
+      - name: Install tarpaulin
+        run: cargo install cargo-tarpaulin --version "^0.27"  # Pin version for stability
+
+      - name: Run tarpaulin
+        id: run-tarpaulin
+        run: |
+          cargo tarpaulin --workspace \
+            --exclude client_wasm \
+            --timeout 360 \
+            --out Xml \
+            --out Html \
+            --output-dir coverage \
+            --exclude-files 'tests/*' \
+            --fail-under 70  # Fail if coverage drops below 70%
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/cobertura.xml
+          fail_ci_if_error: true  # Fail if upload fails
+          verbose: true  # Better debugging
+
+      - name: Upload coverage report
+        id: upload-coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+          if-no-files-found: error  # Fail if no coverage files generated
+
+      - name: Check coverage report exists
+        run: |
+          if [ ! -f coverage/tarpaulin-report.html ]; then
+            echo "Coverage report not generated"
+            exit 1
+          fi

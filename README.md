@@ -1,6 +1,7 @@
 # Web Prover
 
 [![web-prover workflow](https://github.com/pluto/web-prover/actions/workflows/web-prover.yaml/badge.svg)](https://github.com/pluto/web-prover/actions/workflows/web-prover.yaml)
+[![codecov](https://codecov.io/gh/pluto/web-prover/branch/main/graph/badge.svg)](https://codecov.io/gh/pluto/web-prover)
 [![docs](https://img.shields.io/badge/docs-e28f00)](https://docs.pluto.xyz)
 
 The Web Prover is infrastructure for generating Web Proofs. There are 3 components of the Web Prover — (1) the Client Crates, which run inside of the app or browser; (2) Notary Crate, which is a hosted service; and (3) the Proofs Crate, which handles running the circuits through the `client-side-prover`.

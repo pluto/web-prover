@@ -77,14 +77,11 @@ mod tests {
   use std::collections::HashMap;
 
   use crate::{
-    errors::ProofError,
-    program::{
-      http::{JsonKey, ManifestRequest, ManifestResponse, ManifestResponseBody, TemplateVar},
-      manifest::HTTP_1_1,
-      plain_manifest::Manifest,
-    },
+    errors::ManifestError,
+    http::{TemplateVar, HTTP_1_1},
+    manifest::Manifest,
     request, response,
-    tests::inputs::TEST_MANIFEST,
+    test_utils::TEST_MANIFEST,
   };
 
   macro_rules! create_manifest {
@@ -93,7 +90,7 @@ mod tests {
         $response:expr
         $(, $field:ident = $value:expr)* $(,)?
     ) => {{
-        Manifest {
+        crate::manifest::Manifest {
             // manifest_version: "1".to_string(),
             // id: "Default Manifest ID".to_string(),
             // title: "Default Manifest Title".to_string(),

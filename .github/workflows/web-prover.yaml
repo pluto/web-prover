@@ -20,6 +20,13 @@ jobs:
     with:
       web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
+  coverage:
+    needs: ["web-prover-circuits"]
+    uses: ./.github/workflows/coverage.yaml
+    with:
+      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
+    secrets: inherit
+
   build_notary:
     needs: ["web-prover-circuits"]
     uses: ./.github/workflows/build_notary.yaml
