@@ -42,7 +42,17 @@ pub struct VerifyResult {
   pub recv:        String,
 }
 
-fn compute_mask_range_set(
+/// compute range set for masking based on json path from manifest
+/// # Arguments
+/// - `response`: response from the server
+/// - `keys`: json path from manifest
+/// # Returns
+/// - range set for masking
+/// # Errors
+/// - if response body is missing
+/// - if content span is empty
+/// - if key is not found in response body
+fn compute_json_mask_range_set(
   response: &Response,
   keys: &[JsonKey],
 ) -> Result<Vec<RangeSet<usize>>, errors::ClientErrors> {
@@ -107,9 +117,9 @@ pub async fn notarize(
   DefaultHttpCommitter::default().commit_transcript(&mut builder, &transcript)?;
 
   let range_sets =
-    compute_mask_range_set(&transcript.responses[0], &manifest.response.body.json_path)?;
-  for range_set in range_sets {
-    builder.commit_recv(&range_set)?;
+    compute_json_mask_range_set(&transcript.responses[0], &manifest.response.body.json_path)?;
+  for range_set in range_sets.iter() {
+    builder.commit_recv(range_set)?;
   }
 
   prover.transcript_commit(builder.build()?);
@@ -118,7 +128,7 @@ pub async fn notarize(
   let config = RequestConfig::default();
   let (attestation, secrets) = prover.finalize(&config).await?;
 
-  let presentation = present(&Some(manifest.clone()), attestation, secrets).await?;
+  let presentation = present(&Some(manifest.clone()), attestation, secrets, &range_sets).await?;
   Ok(presentation)
 }
 
@@ -126,6 +136,7 @@ pub async fn present(
   manifest: &Option<Manifest>,
   attestation: Attestation,
   secrets: Secrets,
+  json_mask_range_set: &[RangeSet<usize>],
 ) -> Result<Presentation, errors::ClientErrors> {
   // get the manifest
   let manifest = match manifest {
@@ -165,10 +176,8 @@ pub async fn present(
     }
   }
 
-  let range_sets =
-    compute_mask_range_set(&transcript.responses[0], &manifest.response.body.json_path)?;
-  for range_set in range_sets {
-    builder.reveal_recv(&range_set)?;
+  for range_set in json_mask_range_set {
+    builder.reveal_recv(range_set)?;
   }
 
   let transcript_proof = builder.build()?;
@@ -211,7 +220,3 @@ async fn body_to_string(res: hyper::Response<hyper::body::Incoming>) -> String {
   let body_bytes = res.into_body().collect().await.unwrap().to_bytes();
   String::from_utf8(body_bytes.to_vec()).unwrap()
 }
-
-// fn get_notary_pubkey(pubkey: &str) -> p256::PublicKey {
-//   p256::PublicKey::from_public_key_pem(pubkey).unwrap()
-// }
