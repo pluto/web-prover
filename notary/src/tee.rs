@@ -245,7 +245,7 @@ pub fn create_tee_proof(
   State(state): State<Arc<SharedState>>,
 ) -> Result<TeeProof, NotaryServerError> {
   let values = get_legal_notarization_values(manifest, request, response)?;
-  // TODO: Use these values in the proof
+  // TODO(#543): Use these values in the proof
   debug!("Extracted values for notarization={:?}", values);
 
   let manifest_hash = manifest.to_keccak_digest()?;
