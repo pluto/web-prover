@@ -696,7 +696,7 @@ pub mod tests {
   use serde_json::json;
 
   use super::*;
-  use crate::http::{ManifestRequest, ManifestResponse};
+  use crate::http::{ManifestRequest};
 
   /// Creates a new HTTP request with optional parameters.
   #[macro_export]
@@ -705,7 +705,7 @@ pub mod tests {
     ($($key:ident: $value:expr),* $(,)?) => {{
         // Make clippy happy
         #[allow(unused_mut) ]
-        let mut request = ManifestRequest {
+        let mut request = crate::http::ManifestRequest {
           method: "GET".to_string(),
             url: "https://example.com".to_string(),
             version: "HTTP/1.1".to_string(),
@@ -739,18 +739,18 @@ pub mod tests {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
         #[allow(unused_mut)]
-        let mut response = ManifestResponse {
+        let mut response = crate::http::ManifestResponse {
             status: "200".to_string(),
             version: "HTTP/1.1".to_string(),
             message: "OK".to_string(),
             headers: std::collections::HashMap::from([
                 ("Content-Type".to_string(), "application/json".to_string())
             ]),
-            body: ManifestResponseBody {
+            body: crate::http::ManifestResponseBody {
                 json_path: vec![
-                    JsonKey::String("key1".to_string()),
-                    JsonKey::String("key2".to_string()),
-                    JsonKey::Num(3)
+                  crate::http::JsonKey::String("key1".to_string()),
+                  crate::http::JsonKey::String("key2".to_string()),
+                  crate::http::JsonKey::Num(3)
                 ]
             },
         };
