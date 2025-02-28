@@ -17,7 +17,7 @@ use client_side_prover::{fast_serde::FastSerde, supernova::get_circuit_shapes};
 use serde_json::json;
 
 use super::*;
-use crate::setup::ProvingParams;
+use crate::{circuits::MAX_ROM_LENGTH, setup::ProvingParams};
 
 /// Fold input for any circuit containing signals name and vector of values. Inputs are distributed
 /// evenly across folds after the ROM is finalised by the prover.
@@ -75,7 +75,7 @@ pub enum WitnessGeneratorType {
   /// Path to the witness generator
   Path(PathBuf),
   /// Raw bytes of the witness generator
-  #[serde(skip)]
+  // #[serde(skip)] // TODO: Breaks serialization of UninitializedSetup, why did we skip here?
   Raw(Vec<u8>), // TODO: Would prefer to not alloc here, but i got lifetime hell lol
 }
 
@@ -89,6 +89,34 @@ pub struct UninitializedSetup {
   pub witness_generator_types: Vec<WitnessGeneratorType>,
   /// NIVC max ROM length
   pub max_rom_length:          usize,
+}
+
+impl UninitializedSetup {
+  /// Creates an `UninitializedSetup` from bytes representing `R1CSType:Raw`
+  pub fn from_raw_r1cs_types_with_browser_witness(r1cs_types: Vec<Vec<u8>>) -> Self {
+    let r1cs_types: Vec<_> = r1cs_types.iter().map(|r1cs| R1CSType::Raw(r1cs.clone())).collect();
+    let witness_generator_types: Vec<_> = vec![WitnessGeneratorType::Browser; r1cs_types.len()];
+    Self {
+      r1cs_types,
+      witness_generator_types,
+      // TODO: Should this be hardcoded or a parameter?
+      max_rom_length: MAX_ROM_LENGTH,
+    }
+  }
+
+  /// Creates an `UninitializedSetup` from bytes representing `R1CSType:Raw` and
+  /// `WitnessGeneratorType::Raw`
+  pub fn from_raw_parts(r1cs_types: Vec<Vec<u8>>, witness_generator_types: Vec<Vec<u8>>) -> Self {
+    let r1cs_types = r1cs_types.iter().map(|r1cs| R1CSType::Raw(r1cs.clone())).collect();
+    let witness_generator_types =
+      witness_generator_types.iter().map(|wgt| WitnessGeneratorType::Raw(wgt.clone())).collect();
+    Self {
+      r1cs_types,
+      witness_generator_types,
+      // TODO: Should this be hardcoded or a parameter?
+      max_rom_length: MAX_ROM_LENGTH,
+    }
+  }
 }
 
 /// Initialized Circuit Setup data, in this configuration the R1CS objects have been
@@ -317,7 +345,7 @@ impl SetupParams<Offline> {
     let proving_params = ProvingParams::from_bytes(&self.public_params).unwrap();
 
     info!("init setup");
-    let initialized_setup = initialize_setup_data(&self.setup_data).unwrap();
+    let initialized_setup = initialize_setup_data(&self.setup_data)?;
 
     let circuits = initialize_circuit_list(&initialized_setup);
     let memory = Memory { circuits, rom: vec![0; self.setup_data.max_rom_length] };

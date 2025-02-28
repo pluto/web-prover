@@ -18,10 +18,13 @@ use inputs::{
 use web_proof_circuits_witness_generator::polynomial_digest;
 
 use super::*;
-use crate::program::{
-  data::{CircuitData, NotExpanded, ProofParams, SetupParams, UninitializedSetup},
-  initialize_setup_data,
-  manifest::{InitialNIVCInputs, NIVCRom, NivcCircuitInputs, OrigoManifest},
+use crate::{
+  circuits::load_artifact_bytes,
+  program::{
+    data::{CircuitData, NotExpanded, ProofParams, SetupParams, UninitializedSetup},
+    initialize_setup_data,
+    manifest::{InitialNIVCInputs, NIVCRom, NivcCircuitInputs, OrigoManifest},
+  },
 };
 
 pub(crate) mod inputs;
@@ -224,15 +227,15 @@ async fn test_end_to_end_proofs_post() {
 
   let setup_data = UninitializedSetup {
     r1cs_types:              vec![
-      R1CSType::Raw(PLAINTEXT_AUTHENTICATION_512B_R1CS.to_vec()),
-      R1CSType::Raw(HTTP_VERIFICATION_512B_R1CS.to_vec()),
-      R1CSType::Raw(JSON_EXTRACTION_512B_R1CS.to_vec()),
+      R1CSType::Raw(load_artifact_bytes(PLAINTEXT_AUTHENTICATION_512B_R1CS).unwrap()),
+      R1CSType::Raw(load_artifact_bytes(HTTP_VERIFICATION_512B_R1CS).unwrap()),
+      R1CSType::Raw(load_artifact_bytes(JSON_EXTRACTION_512B_R1CS).unwrap()),
     ],
     witness_generator_types: // wasm_witness_generator_type_512b().to_vec(),
     vec![
-      WitnessGeneratorType::Raw(PLAINTEXT_AUTHENTICATION_512B_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(HTTP_VERIFICATION_512B_GRAPH.to_vec()),
-      WitnessGeneratorType::Raw(JSON_EXTRACTION_512B_GRAPH.to_vec()),
+      WitnessGeneratorType::Raw(load_artifact_bytes(PLAINTEXT_AUTHENTICATION_512B_GRAPH).unwrap()),
+      WitnessGeneratorType::Raw(load_artifact_bytes(HTTP_VERIFICATION_512B_GRAPH).unwrap()),
+      WitnessGeneratorType::Raw(load_artifact_bytes(JSON_EXTRACTION_512B_GRAPH).unwrap()),
     ],
     max_rom_length:          MAX_ROM_LENGTH,
   };
