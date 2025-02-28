@@ -20,8 +20,8 @@ function startMemoryMonitoring(instance) {
 }
 // Create a WebAssembly.Memory object
 const sharedMemory = new WebAssembly.Memory({
-  initial: 16384, // 256 pages = 16MB
-  maximum: 40000, // 1024 pages = 64MB
+  initial: 16384, // 16,384 pages = 1GB
+  maximum: 49152, // 49,152 pages = 3GB
   shared: true, // Enable shared memory
 });
 
