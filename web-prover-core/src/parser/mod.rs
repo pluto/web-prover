@@ -5,6 +5,7 @@ mod config;
 mod errors;
 mod predicate;
 
+#[cfg(test)] mod test_fixtures;
 #[cfg(test)] mod test_utils;
 
 pub use config::{DataFormat, ExtractorConfig};
