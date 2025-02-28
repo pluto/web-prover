@@ -1,7 +1,8 @@
 use std::panic;
 
-use client::{config::Config, UninitializedSetup};
-use tlsn_core::{presentation::Presentation, proof::TlsProof};
+use client::config::Config;
+use proofs::program::data::UninitializedSetup;
+use tlsn_core::presentation::Presentation;
 use tracing::debug;
 use tracing_subscriber::{
   fmt::{format::Pretty, time::UtcTime},

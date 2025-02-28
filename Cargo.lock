@@ -1602,6 +1602,7 @@ dependencies = [
  "client",
  "console_error_panic_hook",
  "js-sys",
+ "proofs",
  "serde-wasm-bindgen",
  "serde_json",
  "time",

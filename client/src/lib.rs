@@ -17,6 +17,10 @@ pub mod tls_client_async2;
 use std::collections::HashMap;
 
 use origo::OrigoProof;
+use proofs::{
+  circuits::{construct_setup_data_from_fs, CIRCUIT_SIZE_512},
+  program::data::UninitializedSetup,
+};
 use serde::{Deserialize, Serialize};
 use tlsn::{TlsnProof, TlsnVerifyBody};
 use tlsn_common::config::ProtocolConfig;
@@ -110,7 +114,7 @@ pub async fn prover_inner_origo(
     Ok(setup_data)
   } else if !cfg!(target_os = "ios") && !cfg!(target_arch = "wasm32") {
     // TODO: How do we decide which CIRCUIT_SIZE_* to use here?
-    construct_setup_data_from_fs::<CIRCUIT_SIZE_512>()
+    construct_setup_data_from_fs::<{ CIRCUIT_SIZE_512 }>()
       .map_err(|e| ClientErrors::Other(e.to_string()))
   } else {
     Err(ClientErrors::MissingSetupData)
