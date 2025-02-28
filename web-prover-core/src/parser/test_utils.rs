@@ -2,7 +2,7 @@ use serde_json::{json, Value};
 
 use crate::parser::{
   extractor::ExtractionResult,
-  predicate::{Comparison, Predicate, PredicateType},
+  predicate::{Comparison, PredicateType},
   DataFormat, Extractor, ExtractorConfig, ExtractorType,
 };
 
@@ -10,32 +10,16 @@ pub fn create_json_config(extractors: Vec<Extractor>) -> ExtractorConfig {
   ExtractorConfig { format: DataFormat::Json, extractors }
 }
 
-pub fn create_extractor(
-  id: &str,
-  selector: Vec<String>,
-  extractor_type: ExtractorType,
-  predicates: Vec<Predicate>,
-) -> Extractor {
-  Extractor {
-    id: id.to_string(),
-    description: format!("Extract {}", id),
-    selector,
-    extractor_type,
-    required: true,
-    predicates,
-  }
-}
-
 #[macro_export]
 /// Creates a new Extractor with optional parameters.
 macro_rules! extractor {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
-        let mut extractor = crate::parser::extractor::Extractor {
+        let mut extractor = crate::parser::Extractor {
             id: String::new(),
             description: String::new(),
             selector: Vec::new(),
-            extractor_type: crate::parser::extractor::ExtractorType::String,
+            extractor_type: crate::parser::ExtractorType::String,
             required: true,
             predicates: Vec::new(),
         };

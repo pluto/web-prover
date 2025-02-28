@@ -195,7 +195,6 @@ mod tests {
                 "description": "Extract user's age",
                 "selector": ["user", "age"],
                 "type": "number",
-                "required": true,
                 "predicates": [
                     {
                         "type": "value",
@@ -215,6 +214,7 @@ mod tests {
     assert_eq!(extractor.id, "userAge");
     assert_eq!(extractor.selector, vec!["user", "age"]);
     assert_eq!(extractor.extractor_type, ExtractorType::Number);
+    assert_eq!(extractor.required, true);
 
     let predicate = &extractor.predicates[0];
     assert_eq!(predicate.predicate_type, PredicateType::Value);

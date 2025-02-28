@@ -154,7 +154,7 @@ impl NotaryResponse {
   /// Tests matching between notary response, `self`,  and client-designated response, `other`.
   /// Returns `Some(values)` if at least all values in `other` are also present in `self` and `None`
   /// otherwise.
-  pub fn matches_client_manifest(
+  pub fn match_and_extract(
     &self,
     other: &ManifestResponse,
   ) -> Result<Option<ExtractionValues>, ManifestError> {
@@ -542,9 +542,9 @@ pub mod tests {
   use serde_json::json;
 
   use super::*;
-  use crate::parser::{Extractor, ExtractorType};
+  use crate::{extractor, parser::ExtractorType};
 
-  /// Creates a new HTTP request with optional parameters.
+  /// Creates a new `ManifestRequest` with optional parameters.
   #[macro_export]
   macro_rules! request {
     // Match with optional parameters
@@ -579,7 +579,7 @@ pub mod tests {
     }};
   }
 
-  /// Creates a new HTTP response with optional parameters.
+  /// Creates a new `ManifestResponse` with optional parameters.
   #[macro_export]
   macro_rules! response {
     // Match with optional parameters
@@ -647,17 +647,15 @@ pub mod tests {
   fn test_notary_matches_other_response() {
     let response = response!(
         body: ManifestResponseBody(ExtractorConfig {
-          format: DataFormat::Json,
-          extractors: vec![Extractor {
-            id: "testKey".to_string(),
-            description: "Test key".to_string(),
-            selector: vec!["key1".to_string(), "key2".to_string()],
-            extractor_type: ExtractorType::Number, // Ensure `ExtractorType` is defined or imported
-            required: true,
-            predicates: vec![],
-          }],
-        }
-    ));
+            format: DataFormat::Json,
+            extractors: vec![extractor!(
+                id: "testKey".to_string(),
+                description: "Test key".to_string(),
+                selector: vec!["key1".to_string(), "key2".to_string()],
+                extractor_type: ExtractorType::Number,
+            )],
+        })
+    );
     let notary_response = notary_response!(
       response.clone(),
       json: Some(json!({
@@ -666,29 +664,27 @@ pub mod tests {
     );
 
     // Is a perfect match with itself
-    let matching_result = notary_response.matches_client_manifest(&response).unwrap();
+    let matching_result = notary_response.match_and_extract(&response).unwrap();
     assert!(matching_result.is_some());
     assert_eq!(matching_result.unwrap().get("testKey").unwrap(), &json!(3));
 
     // Fails if it doesn't match directly
     let non_matching_response = response!(status: "201".to_string());
-    assert!(notary_response.matches_client_manifest(&non_matching_response).unwrap().is_none());
+    assert!(notary_response.match_and_extract(&non_matching_response).unwrap().is_none());
 
     // Superset case
     let response_superset = {
       let mut res = notary_response.clone();
       res.response.headers.insert("extra".to_string(), "header".to_string());
-      res.response.body.0.extractors.push(Extractor {
-        id:             "extra".to_string(),
-        description:    "Extra".to_string(),
-        selector:       vec!["key1".to_string(), "key2".to_string()],
+      res.response.body.0.extractors.push(extractor!(
+        id: "extra".to_string(),
+        description: "Extra".to_string(),
+        selector: vec!["key1".to_string(), "key2".to_string()],
         extractor_type: ExtractorType::Number,
-        required:       true,
-        predicates:     vec![],
-      });
+      ));
       res
     };
-    assert!(response_superset.matches_client_manifest(&response).unwrap().is_some());
+    assert!(response_superset.match_and_extract(&response).unwrap().is_some());
   }
 
   #[test]
@@ -794,18 +790,16 @@ pub mod tests {
     let base_response = notary_response!(response!(),);
     let other_response = response!(
         body: ManifestResponseBody(ExtractorConfig {
-          format: DataFormat::Json,
-          extractors: vec![Extractor {
-            id: "testKey".to_string(),
-            description: "Test key".to_string(),
-            selector: vec!["missingKey".to_string()],
-            extractor_type: ExtractorType::String, // Ensure ExtractorType is defined and properly imported
-            required: true,
-            predicates: vec![],
-          }],
+            format: DataFormat::Json,
+            extractors: vec![extractor!(
+                id: "testKey".to_string(),
+                description: "Test key".to_string(),
+                selector: vec!["missingKey".to_string()],
+                extractor_type: ExtractorType::String,
+            )],
         })
     );
-    assert!(!base_response.matches_client_manifest(&other_response).unwrap().is_some());
+    assert!(!base_response.match_and_extract(&other_response).unwrap().is_some());
   }
 
   #[test]

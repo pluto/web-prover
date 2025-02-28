@@ -178,9 +178,7 @@ mod tests {
                     "id": "userInfo",
                     "description": "Extract user information",
                     "selector": ["hello"],
-                    "type": "string",
-                    "required": true,
-                    "predicates": []
+                    "type": "string"
                 }
             ]
         }

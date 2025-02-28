@@ -278,7 +278,7 @@ fn get_legal_notarization_values(
 
   // Check if response matches manifest and extract values
   response
-    .matches_client_manifest(&manifest.response)?
+    .match_and_extract(&manifest.response)?
     .filter(|values| !values.is_empty())
     .ok_or(NotaryServerError::ManifestResponseMismatch)
 }

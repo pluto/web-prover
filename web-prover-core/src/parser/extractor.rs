@@ -214,9 +214,7 @@ mod tests {
     extractor,
     parser::{
       predicate::{Comparison, PredicateType},
-      test_utils::{
-        assert_extraction_error, assert_extraction_success, create_extractor, create_json_config,
-      },
+      test_utils::{assert_extraction_error, assert_extraction_success, create_json_config},
       ExtractorType,
     },
     predicate,
@@ -278,11 +276,10 @@ mod tests {
         }
       });
 
-      let config = create_json_config(vec![create_extractor(
-        "invalid_key",
-        vec!["key1".to_string(), "invalid_key".to_string()],
-        ExtractorType::String,
-        vec![],
+      let config = create_json_config(vec![extractor!(
+        id: "invalid_key".to_string(),
+        selector: vec!["key1".to_string(), "invalid_key".to_string()],
+        extractor_type: ExtractorType::String,
       )]);
 
       let result = config.extract_and_validate(&json_data).unwrap();
@@ -298,11 +295,10 @@ mod tests {
         ]
       });
 
-      let config = create_json_config(vec![create_extractor(
-        "out_of_bounds",
-        vec!["key1".to_string(), "3".to_string()],
-        ExtractorType::String,
-        vec![],
+      let config = create_json_config(vec![extractor!(
+        id: "out_of_bounds".to_string(),
+        selector: vec!["key1".to_string(), "3".to_string()],
+        extractor_type: ExtractorType::String,
       )]);
 
       let result = config.extract_and_validate(&json_data).unwrap();
@@ -317,11 +313,10 @@ mod tests {
         }
       });
 
-      let config = create_json_config(vec![create_extractor(
-        "non_array_index",
-        vec!["key1".to_string(), "0".to_string()],
-        ExtractorType::String,
-        vec![],
+      let config = create_json_config(vec![extractor!(
+        id: "non_array_index".to_string(),
+        selector: vec!["key1".to_string(), "0".to_string()],
+        extractor_type: ExtractorType::String,
       )]);
 
       let result = config.extract_and_validate(&json_data).unwrap();

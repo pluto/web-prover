@@ -43,9 +43,7 @@ pub const TEST_MANIFEST: &str = r#"
                     "id": "userInfo",
                     "description": "Extract user information",
                     "selector": ["hello"],
-                    "type": "string",
-                    "required": true,
-                    "predicates": []
+                    "type": "string"
                 }
             ]
         }

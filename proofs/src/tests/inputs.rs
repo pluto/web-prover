@@ -3,10 +3,7 @@ use std::collections::HashMap;
 use web_prover_core::{
   http::{ManifestRequest, ManifestResponse, ManifestResponseBody},
   manifest::Manifest,
-  parser::{
-    config::{DataFormat, ExtractorConfig},
-    Extractor, ExtractorType,
-  },
+  parser::{DataFormat, Extractor, ExtractorConfig, ExtractorType},
 };
 
 use crate::program::manifest::{EncryptionInput, OrigoManifest};
