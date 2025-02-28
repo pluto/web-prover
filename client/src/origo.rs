@@ -4,8 +4,9 @@ use std::collections::HashMap;
 use proofs::{
   program::{
     data::{Offline, SetupParams, UninitializedSetup},
-    manifest::{EncryptionInput, OrigoManifest, TLSEncryption},
+    manifest::{EncryptionInput, NIVCRom, OrigoManifest, TLSEncryption},
   },
+  proof::FoldingProof,
   F, G1, G2,
 };
 use serde::{Deserialize, Serialize};
@@ -15,13 +16,12 @@ use web_proof_circuits_witness_generator::{
   http::{compute_http_witness, HttpMaskType},
   json::json_value_digest,
 };
-use web_prover_core::{manifest::Manifest, proof::SignedVerificationReply};
+use web_prover_core::proof::SignedVerificationReply;
 
 use crate::{
   config::{self},
   errors::ClientErrors,
   tls::decrypt_tls_ciphertext,
-  OrigoProof,
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -37,12 +37,13 @@ pub struct VerifyBody {
   pub manifest:    OrigoManifest,
 }
 
-// TODO: Okay, right now we just want to take what's in here and actually just produce a signature
-// as the reply instead. So pretend this is signed content for now and not actual raw values.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct VerifyReply {
-  pub value:    String,
-  pub manifest: Manifest,
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct OrigoProof {
+  pub proof:             FoldingProof<Vec<u8>, String>,
+  pub rom:               NIVCRom,
+  pub ciphertext_digest: [u8; 32],
+  pub sign_reply:        Option<SignedVerificationReply>,
+  pub value:             Option<String>,
 }
 
 pub async fn sign(
@@ -79,39 +80,6 @@ pub async fn sign(
   debug!("\n{}\n\n", String::from_utf8(sign_response.clone())?);
 
   Ok(sign_response)
-}
-
-pub async fn verify(
-  config: crate::config::Config,
-  verify_body: VerifyBody,
-) -> Result<SignedVerificationReply, crate::errors::ClientErrors> {
-  let url = format!(
-    "https://{}:{}/v1/origo/verify",
-    config.notary_host.clone(),
-    config.notary_port.clone(),
-  );
-
-  // TODO reqwest uses browsers fetch API for WASM target? if true, can't add trust anchors
-  #[cfg(target_arch = "wasm32")]
-  let client = reqwest::ClientBuilder::new().build()?;
-
-  #[cfg(not(target_arch = "wasm32"))]
-  let client = {
-    let mut client_builder = reqwest::ClientBuilder::new().use_rustls_tls();
-    if let Some(cert) = config.notary_ca_cert {
-      client_builder =
-        client_builder.add_root_certificate(reqwest::tls::Certificate::from_der(&cert)?);
-    }
-    client_builder.build()?
-  };
-
-  let response = client.post(url).json(&verify_body).send().await?;
-  assert_eq!(response.status(), hyper::StatusCode::OK, "response={:?}", response);
-  let verify_response = response.json::<SignedVerificationReply>().await?;
-
-  debug!("\n{:?}\n\n", verify_response.clone());
-
-  Ok(verify_response)
 }
 
 // TODO: We probably don't need to call this "proxy_and_sign" since we don't sign in here
@@ -194,8 +162,6 @@ pub(crate) async fn generate_proof(
     setup_params.setup_data,
   )
   .await
-
-  // return Ok(OrigoProof(proof));
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -242,10 +208,10 @@ mod tests {
   fn test_manifest_serialization() {
     let mut origo_conn = OrigoConnection::new();
     origo_conn.secret_map.insert("Handshake:server_iv".to_string(), vec![1, 2, 3]);
-    let origo_secrets = OrigoSecrets::from_origo_conn(&origo_conn);
+    let origo_secrets = &OrigoSecrets::from_origo_conn(&origo_conn);
 
     let serialized: Vec<u8> = origo_secrets.try_into().unwrap();
-    let deserialized: OrigoSecrets = OrigoSecrets::try_from(&serialized).unwrap();
-    assert_eq!(origo_secrets, deserialized);
+    let deserialized: OrigoSecrets = OrigoSecrets::try_from(serialized.as_ref()).unwrap();
+    assert_eq!(*origo_secrets, deserialized);
   }
 }

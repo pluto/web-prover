@@ -10,6 +10,7 @@ crate-type=["cdylib", "rlib"]
 
 [dependencies]
 client              ={ workspace=true, features=["websocket"] }
+proofs              ={ workspace=true }
 js-sys              ="0.3.64"
 serde-wasm-bindgen  ="0.6.1"
 serde_json          ={ workspace=true }

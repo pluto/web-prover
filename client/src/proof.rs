@@ -10,7 +10,7 @@ use proofs::{
 };
 use tracing::debug;
 
-use crate::{ClientErrors, OrigoProof};
+use crate::{origo::OrigoProof, ClientErrors};
 
 /// creates NIVC proof from TLS transcript and [`Manifest`] config
 ///

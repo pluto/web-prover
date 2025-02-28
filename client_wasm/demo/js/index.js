@@ -1,11 +1,13 @@
-import init, {setup_tracing, initThreadPool} from "../pkg/client_wasm.js";
+import init, { setup_tracing, initThreadPool } from "../pkg/client_wasm.js";
 import { witness } from "./witness"; // This is not unused, this is how we initialize window.witness
 import { WEB_PROVER_CIRCUITS_VERSION } from "./config";
 import teeConfig from "../../../fixture/client.tee_tcp_local.json";
 import origoConfig from "../../../fixture/client.origo_tcp_local.json";
-import { DEFAULT_MODE } from "../scripts/test.js";
+import tlsnConfig from "../../../fixture/client.tlsn_tcp_local.json";
 
 const numConcurrency = navigator.hardwareConcurrency;
+
+const DEFAULT_MODE = "tee";
 
 // Monitoring for WASM memory usage
 function checkWasmMemory(wasmMemory) {
@@ -72,7 +74,16 @@ const getBytes = async function (file) {
 start();
 
 const mode = window.MODE || DEFAULT_MODE; // Get the mode from window object
-const proverConfig = mode === 'origo' ? origoConfig : teeConfig;
+let proverConfig = {};
+if (mode === "tee") {
+  proverConfig = teeConfig;
+} else if (mode === "origo") {
+  proverConfig = origoConfig;
+} else if (mode === "tlsn") {
+  proverConfig = tlsnConfig;
+} else {
+  throw new Error(`Invalid mode: ${mode}`);
+}
 
 console.log(`Using ${mode} mode`);
 

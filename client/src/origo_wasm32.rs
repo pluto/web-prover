@@ -65,7 +65,7 @@ async fn handle_origo_mode(
     "wss://{}:{}/v1/{}?session_id={}&target_host={}&target_port={}",
     config.notary_host,
     config.notary_port,
-    if config.mode == NotaryMode::TEE { "tee" } else { "origo" },
+    config.mode.to_string(),
     session_id.clone(),
     config.target_host()?,
     config.target_port()?,

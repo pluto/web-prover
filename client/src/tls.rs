@@ -73,29 +73,6 @@ pub fn rustls_default_root_store(
   root_store
 }
 
-pub fn tls_client_default_root_store(
-  additional_trust_anchors: Option<Vec<Vec<u8>>>,
-) -> tls_client::RootCertStore {
-  let mut root_store = tls_client::RootCertStore::empty();
-  root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
-    tls_client::OwnedTrustAnchor::from_subject_spki_name_constraints(
-      ta.subject.as_ref(),
-      ta.subject_public_key_info.as_ref(),
-      ta.name_constraints.as_ref().map(|nc| nc.as_ref()),
-    )
-  }));
-
-  if let Some(trust_anchors) = additional_trust_anchors {
-    for trust_anchor in trust_anchors.iter() {
-      let certificate = pki_types::CertificateDer::from(trust_anchor.clone());
-      let (added, _) = root_store.add_parsable_certificates(&[certificate.to_vec()]); // TODO there is probably a nicer way
-      assert_eq!(added, 1); // TODO there is probably a better way
-    }
-  }
-
-  root_store
-}
-
 /// Decrypt plaintext from TLS transcript ciphertext using [`WitnessData`]
 pub(crate) fn decrypt_tls_ciphertext(witness: &WitnessData) -> Result<TLSEncryption, ClientErrors> {
   // DEBUG: Use this test case to pin the ciphertext, you must also update

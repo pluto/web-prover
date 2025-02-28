@@ -16,15 +16,16 @@ mod tls;
 pub mod tls_client_async2;
 use std::collections::HashMap;
 
-pub use proofs::program::data::UninitializedSetup;
+use origo::OrigoProof;
 use proofs::{
   circuits::{construct_setup_data_from_fs, CIRCUIT_SIZE_512},
-  program::manifest::NIVCRom,
-  proof::FoldingProof,
+  program::data::UninitializedSetup,
 };
 use serde::{Deserialize, Serialize};
-pub use tlsn_core::proof::TlsProof;
-use tlsn_prover::tls::ProverConfig;
+use tlsn::{TlsnProof, TlsnVerifyBody};
+use tlsn_common::config::ProtocolConfig;
+pub use tlsn_core::attestation::Attestation;
+use tlsn_prover::ProverConfig;
 use tracing::{debug, info};
 use web_prover_core::{
   manifest::Manifest,
@@ -33,18 +34,9 @@ use web_prover_core::{
 
 use crate::errors::ClientErrors;
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct OrigoProof {
-  pub proof:             FoldingProof<Vec<u8>, String>,
-  pub rom:               NIVCRom,
-  pub ciphertext_digest: [u8; 32],
-  pub sign_reply:        Option<SignedVerificationReply>,
-  pub value:             Option<String>,
-}
-
 #[derive(Debug, Serialize)]
 pub enum Proof {
-  TLSN(Box<TlsProof>),
+  Tlsn(TlsnProof),
   Origo(OrigoProof),
   TEE(TeeProof),
   Proxy(TeeProof),
@@ -69,9 +61,6 @@ pub async fn prover_inner(
 }
 
 pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, ClientErrors> {
-  let root_store =
-    tls::tls_client_default_root_store(config.notary_ca_cert.clone().map(|c| vec![c]));
-
   let max_sent_data = config
     .max_sent_data
     .ok_or_else(|| ClientErrors::Other("max_sent_data is missing".to_string()))?;
@@ -80,12 +69,14 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, Clie
     .ok_or_else(|| ClientErrors::Other("max_recv_data is missing".to_string()))?;
 
   let prover_config = ProverConfig::builder()
-    .id(config.session_id.clone())
-    .root_cert_store(root_store)
-    .server_dns(config.target_host()?)
-    .max_transcript_size(max_sent_data + max_recv_data)
-    .build()
-    .map_err(|e| ClientErrors::Other(e.to_string()))?;
+    .server_name(config.target_host()?.as_str())
+    .protocol_config(
+      ProtocolConfig::builder()
+        .max_sent_data(max_sent_data)
+        .max_recv_data(max_recv_data)
+        .build()?,
+    )
+    .build()?;
 
   #[cfg(target_arch = "wasm32")]
   let prover = tlsn_wasm32::setup_connection(&mut config, prover_config).await?;
@@ -97,8 +88,18 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, Clie
     tlsn_native::setup_tcp_connection(&mut config, prover_config).await
   };
 
-  let p = tlsn::notarize(prover).await?;
-  Ok(Proof::TLSN(Box::new(p)))
+  let manifest = match config.proving.manifest.clone() {
+    Some(m) => m,
+    None => return Err(errors::ClientErrors::ManifestMissingError),
+  };
+
+  let p = tlsn::notarize(prover, &manifest).await?;
+
+  let verify_response = verify(config, TlsnVerifyBody { manifest, proof: p.clone() }).await?;
+
+  debug!("proof.verify_reply: {:?}", verify_response);
+
+  Ok(Proof::Tlsn(TlsnProof { proof: p, sign_reply: Some(verify_response) }))
 }
 
 #[allow(unused_variables)]
@@ -113,7 +114,7 @@ pub async fn prover_inner_origo(
     Ok(setup_data)
   } else if !cfg!(target_os = "ios") && !cfg!(target_arch = "wasm32") {
     // TODO: How do we decide which CIRCUIT_SIZE_* to use here?
-    construct_setup_data_from_fs::<CIRCUIT_SIZE_512>()
+    construct_setup_data_from_fs::<{ CIRCUIT_SIZE_512 }>()
       .map_err(|e| ClientErrors::Other(e.to_string()))
   } else {
     Err(ClientErrors::MissingSetupData)
@@ -125,7 +126,7 @@ pub async fn prover_inner_origo(
   let manifest = config.proving.manifest.clone().ok_or(ClientErrors::ManifestMissingError)?;
 
   debug!("sending proof to proxy for verification");
-  let verify_response = origo::verify(config, origo::VerifyBody {
+  let verify_response = verify(config, origo::VerifyBody {
     session_id,
     origo_proof: proof.clone(),
     manifest: manifest.into(),
@@ -200,4 +201,38 @@ pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, ClientE
   assert_eq!(response.status(), hyper::StatusCode::OK);
   let tee_proof = response.json::<TeeProof>().await?;
   Ok(Proof::Proxy(tee_proof))
+}
+
+pub async fn verify<T: Serialize>(
+  config: crate::config::Config,
+  verify_body: T,
+) -> Result<SignedVerificationReply, errors::ClientErrors> {
+  let url = format!(
+    "https://{}:{}/v1/{}/verify",
+    config.notary_host.clone(),
+    config.notary_port.clone(),
+    config.mode.to_string(),
+  );
+
+  // TODO reqwest uses browsers fetch API for WASM target? if true, can't add trust anchors
+  #[cfg(target_arch = "wasm32")]
+  let client = reqwest::ClientBuilder::new().build()?;
+
+  #[cfg(not(target_arch = "wasm32"))]
+  let client = {
+    let mut client_builder = reqwest::ClientBuilder::new().use_rustls_tls();
+    if let Some(cert) = config.notary_ca_cert {
+      client_builder =
+        client_builder.add_root_certificate(reqwest::tls::Certificate::from_der(&cert)?);
+    }
+    client_builder.build()?
+  };
+
+  let response = client.post(url).json(&verify_body).send().await?;
+  assert!(response.status() == hyper::StatusCode::OK, "response={:?}", response);
+  let verify_response = response.json::<SignedVerificationReply>().await?;
+
+  debug!("\n{:?}\n\n", verify_response.clone());
+
+  Ok(verify_response)
 }

@@ -10,6 +10,10 @@ tee-dummy-token-generator                    =[]
 tee-google-confidential-space-token-generator=[]
 
 [dependencies]
+tlsn-core  ={ workspace=true }
+tlsn-common={ workspace=true }
+chrono     ={ workspace=true }
+
 client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="8e7eb839e901dcee416179116bb0f9c4f7ae683c" }
 proofs={ workspace=true }
 client={ workspace=true }
@@ -30,6 +34,7 @@ tower-http={ version="0.5.2", features=["cors"] }
 tower-service="0.3.2"
 rustls-pemfile="2.1.2"
 tlsn-verifier={ workspace=true }
+notary-server={ workspace=true }
 tokio-tungstenite={ version="0.23.1", features=["stream"] }
 ws_stream_tungstenite={ git="https://github.com/pluto/ws_stream_tungstenite.git", branch="latest", features=[
   "tokio",

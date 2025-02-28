@@ -1,26 +1,36 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use axum::{
-  extract::{FromRequestParts, Query, State},
+  extract::{self, FromRequestParts, Query, State},
   http::{header, request::Parts},
   response::Response,
+  Json,
 };
+use client::tlsn::TlsnVerifyBody;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
-use p256::ecdsa::{Signature, SigningKey};
+use p256::ecdsa::SigningKey;
 use serde::Deserialize;
-use tlsn_verifier::tls::{Verifier, VerifierConfig};
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
+use tlsn_common::config::ProtocolConfigValidator;
+use tlsn_core::{
+  attestation::AttestationConfig,
+  presentation::PresentationOutput,
+  signing::{SignatureAlgId, VerifyingKey},
+  CryptoProvider,
+};
+use tlsn_verifier::{Verifier, VerifierConfig};
+use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{debug, error, info};
 use uuid::Uuid;
+use web_prover_core::proof::SignedVerificationReply;
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
   axum_websocket::{WebSocket, WebSocketUpgrade},
   errors::NotaryServerError,
   tcp::{header_eq, TcpUpgrade},
+  verifier::VerifyOutput,
   SharedState,
 };
 // TODO: use this place of our local file once this gets merged: https://github.com/tokio-rs/axum/issues/2848
@@ -61,7 +71,9 @@ where S: Send + Sync
   }
 }
 
-pub async fn notary_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
+pub async fn notary_service<
+  S: futures_util::AsyncWrite + futures_util::AsyncRead + Send + Unpin + 'static,
+>(
   socket: S,
   signing_key: &SigningKey,
   session_id: &str,
@@ -70,16 +82,29 @@ pub async fn notary_service<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 ) -> Result<(), NotaryServerError> {
   debug!(?session_id, "Starting notarization...");
 
-  let mut config_builder = VerifierConfig::builder();
+  let mut provider = CryptoProvider::default();
+  provider.signer.set_secp256k1(&signing_key.to_bytes()).unwrap();
 
-  config_builder = config_builder
-    .id(session_id)
-    .max_transcript_size(max_sent_data.unwrap() + max_recv_data.unwrap()); // TODO unwrap, probably shouldn't be Option in the first place
+  // Setup the config. Normally a different ID would be generated
+  // for each notarization.
+  let config_validator = ProtocolConfigValidator::builder()
+    .max_sent_data(max_sent_data.unwrap())
+    .max_recv_data(max_recv_data.unwrap())
+    .build()
+    .unwrap();
 
-  let config = config_builder.build()?;
+  let config = VerifierConfig::builder()
+    .protocol_config_validator(config_validator)
+    .crypto_provider(provider)
+    .build()
+    .unwrap();
 
-  Verifier::new(config).notarize::<_, Signature>(socket.compat(), signing_key).await?;
+  let attestation_config = AttestationConfig::builder()
+    .supported_signature_algs(vec![SignatureAlgId::SECP256K1])
+    .build()
+    .unwrap();
 
+  Verifier::new(config).notarize(socket, &attestation_config).await.unwrap();
   Ok(())
 }
 
@@ -120,7 +145,7 @@ pub async fn websocket_notarize(
   max_recv_data: Option<usize>,
 ) {
   debug!("Upgraded to websocket connection");
-  let stream = WsStream::new(socket.into_inner()).compat();
+  let stream = WsStream::new(socket.into_inner());
   match notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data).await
   {
     Ok(_) => {
@@ -140,7 +165,14 @@ pub async fn tcp_notarize(
   max_recv_data: Option<usize>,
 ) {
   debug!("Upgraded to tcp connection");
-  match notary_service(stream, &notary_signing_key, &session_id, max_sent_data, max_recv_data).await
+  match notary_service(
+    stream.compat(),
+    &notary_signing_key,
+    &session_id,
+    max_sent_data,
+    max_recv_data,
+  )
+  .await
   {
     Ok(_) => {
       info!(?session_id, "Successful notarization using tcp!");
@@ -149,4 +181,34 @@ pub async fn tcp_notarize(
       error!(?session_id, "Failed notarization using tcp: {err}");
     },
   }
+}
+
+pub async fn verify(
+  State(state): State<Arc<SharedState>>,
+  extract::Json(verify_body): extract::Json<TlsnVerifyBody>,
+) -> Result<Json<SignedVerificationReply>, NotaryServerError> {
+  let provider = CryptoProvider::default();
+
+  let VerifyingKey { alg, data: key_data } = verify_body.proof.verifying_key();
+
+  println!("Verifying presentation with {alg} key: {}", hex::encode(key_data));
+
+  // Verify the presentation.
+  let PresentationOutput { server_name, connection_info, transcript, .. } =
+    verify_body.proof.verify(&provider).unwrap();
+
+  // TODO: how should notary sign these fields? Should these be combined with a domain separator?
+  // The time at which the connection was started.
+  let _time = chrono::DateTime::UNIX_EPOCH + Duration::from_secs(connection_info.time);
+  let _server_name = server_name.unwrap();
+
+  // Set the unauthenticated bytes so they are distinguishable.
+  let mut partial_transcript = transcript.unwrap();
+  partial_transcript.set_unauthed(b'X');
+
+  crate::verifier::sign_verification(
+    VerifyOutput { manifest: verify_body.manifest, value: partial_transcript.received_unsafe() },
+    State(state),
+  )
+  .map(Json)
 }

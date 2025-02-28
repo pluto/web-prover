@@ -31,6 +31,17 @@ pub enum NotaryMode {
   Proxy,
 }
 
+impl std::fmt::Display for NotaryMode {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      NotaryMode::Origo => write!(f, "origo"),
+      NotaryMode::TLSN => write!(f, "tlsnotary"),
+      NotaryMode::TEE => write!(f, "tee"),
+      NotaryMode::Proxy => write!(f, "proxy"),
+    }
+  }
+}
+
 /// Proving data containing [`Manifest`] and serialized witnesses used for WASM
 #[derive(Deserialize, Clone, Debug)]
 pub struct ProvingData {

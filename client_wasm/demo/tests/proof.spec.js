@@ -9,6 +9,7 @@ test('should generate proof', async ({ page }) => {
   // Add page error handler
   page.on('pageerror', (error) => {
     console.error('pageerror:', error.message)
+    throw new Error(`Page error caused test failure: ${error.message}`);
   })
 
   // Add more detailed console logging
