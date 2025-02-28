@@ -66,4 +66,4 @@ jobs:
           cp fixture/client.tlsn_tcp_local.json fixture/client.origo_tcp_local.json
 
           cd client_wasm/demo
-          npm test
+          npm test tlsn

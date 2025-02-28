@@ -65,7 +65,7 @@ export const witness = {
     if (!input) {
       throw new Error("Input is undefined");
     }
-    if (!rom) {
+    if (rom === undefined) {
       throw new Error("ROM is undefined");
     }
     let witnesses = await generateWitnessBytes(input, rom);
