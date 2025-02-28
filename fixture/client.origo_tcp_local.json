@@ -51,12 +51,11 @@
               "head",
               "status"
             ],
-            "type": "string",
-            "required": true,
-            "predicates": []
-          }
-        ]
-      }
-    }
-  }
+            "type": "string"
+						}
+					]
+				}
+			}
+		}
+
 }

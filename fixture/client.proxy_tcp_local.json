@@ -48,12 +48,11 @@
             "selector": [
               "hello"
             ],
-            "type": "string",
-            "required": true,
-            "predicates": []
-          }
-        ]
-      }
-    }
-  }
+            "type": "string"
+						}
+					]
+				}
+			}
+		}
+
 }
