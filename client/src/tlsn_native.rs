@@ -54,7 +54,7 @@ pub async fn setup_tcp_connection(
       "https://{}:{}/v1/{}?session_id={}",
       config.notary_host.clone(),
       config.notary_port.clone(),
-      config.mode.to_string(),
+      config.mode,
       session_id.clone(),
     ))
     .method("GET")

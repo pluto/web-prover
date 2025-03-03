@@ -211,7 +211,7 @@ pub async fn verify<T: Serialize>(
     "https://{}:{}/v1/{}/verify",
     config.notary_host.clone(),
     config.notary_port.clone(),
-    config.mode.to_string(),
+    config.mode,
   );
 
   // TODO reqwest uses browsers fetch API for WASM target? if true, can't add trust anchors

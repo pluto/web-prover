@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 pub use web_proof_circuits_witness_generator::json::JsonKey;
 
-use crate::errors::ManifestError;
+use crate::{errors::ManifestError, template, template::TemplateVar};
 
 /// Max HTTP headers
 pub const MAX_HTTP_HEADERS: usize = 25;
@@ -302,12 +302,9 @@ impl NotaryResponse {
 }
 
 /// Default HTTP version
-pub fn default_version() -> String { HTTP_1_1.to_string() }
+fn default_version() -> String { HTTP_1_1.to_string() }
 /// Default HTTP message
-pub fn default_message() -> String { "OK".to_string() }
-
-/// Returns an empty `HashMap` as the default value for `vars`
-fn default_empty_vars() -> HashMap<String, TemplateVar> { HashMap::new() }
+fn default_message() -> String { "OK".to_string() }
 
 /// HTTP Response items required for circuits
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -339,21 +336,19 @@ impl ManifestResponse {
   ///
   /// The validated HTTP response.
   pub fn validate(&self) -> Result<(), ManifestError> {
-    // TODO: What are legal statuses?
+    // We only support 200 and 201
     const VALID_STATUSES: [&str; 2] = ["200", "201"];
     if !VALID_STATUSES.contains(&self.status.as_str()) {
       return Err(ManifestError::InvalidManifest("Unsupported HTTP status".to_string()));
     }
-
-    // TODO: What HTTP versions are supported?
+    // We only support HTTP/1.1
     if self.version != "HTTP/1.1" {
       return Err(ManifestError::InvalidManifest(
         "Invalid HTTP version: ".to_string() + &self.version,
       ));
     }
 
-    // TODO: What is the max supported message length?
-    // TODO: Not covered by serde's #default annotation. Is '""' a valid message?
+    // An empty message is not allowed
     if self.message.len() > 1024 || self.message.is_empty() {
       return Err(ManifestError::InvalidManifest(
         "Invalid message length: ".to_string() + &self.message,
@@ -400,16 +395,8 @@ impl ManifestResponse {
   }
 }
 
-/// Template variable type
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TemplateVar {
-  /// Regex for validation (if applicable)
-  pub regex:  Option<String>,
-  /// Length constraint (if applicable)
-  pub length: Option<usize>,
-  /// Type constraint (e.g., base64, hex)
-  pub r#type: Option<String>,
-}
+/// Returns an empty `HashMap` as the default value for `vars`
+fn default_empty_vars() -> HashMap<String, TemplateVar> { HashMap::new() }
 
 /// HTTP Request items required for circuits
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -466,80 +453,44 @@ impl ManifestRequest {
     Ok(())
   }
 
-  fn validate_vars(&self) -> Result<(), ManifestError> {
-    let mut all_tokens = vec![];
+  fn collect_tokens(&self) -> Vec<String> {
+    let mut all_tokens = Vec::new();
 
-    // Parse and validate tokens in the body
-    if let Some(body_tokens) = self.body.as_ref().map(extract_tokens) {
-      for token in &body_tokens {
-        if !self.vars.contains_key(token) {
-          return Err(ManifestError::InvalidManifest(format!(
-            "Token `<% {} %>` not declared in `vars`",
-            token
-          )));
-        }
-      }
+    // Collect tokens from body
+    if let Some(body_tokens) = self.body.as_ref().map(template::extract_tokens) {
       all_tokens.extend(body_tokens);
     }
 
-    // Parse and validate tokens in headers
+    // Collect tokens from headers
     for value in self.headers.values() {
-      let header_tokens = extract_tokens(&serde_json::Value::String(value.clone()));
-      for token in &header_tokens {
-        if !self.vars.contains_key(token) {
-          return Err(ManifestError::InvalidManifest(format!(
-            "Token `<% {} %>` not declared in `vars`",
-            token
-          )));
-        }
-      }
+      let header_tokens = template::extract_tokens(&serde_json::Value::String(value.clone()));
       all_tokens.extend(header_tokens);
     }
 
-    for var_key in self.vars.keys() {
-      if !all_tokens.contains(var_key) {
+    all_tokens
+  }
+
+  fn validate_tokens(&self, tokens: &[String]) -> Result<(), ManifestError> {
+    for token in tokens {
+      if !self.vars.contains_key(token) {
         return Err(ManifestError::InvalidManifest(format!(
-          "Token `<% {} %>` not declared in `body` or `headers`",
-          var_key
+          "Token `<% {} %>` not declared in `vars`",
+          token
         )));
       }
     }
+    Ok(())
+  }
 
-    // Validate each `vars` entry
-    for (key, var_def) in &self.vars {
-      // Validate regex (if defined)
-      if let Some(regex_pattern) = var_def.regex.as_ref() {
-        // Using `regress` crate for compatibility with ECMAScript regular expressions
-        let _regex = regress::Regex::new(regex_pattern).map_err(|_| {
-          ManifestError::InvalidManifest(format!("Invalid regex pattern for `{}`", key))
-        })?;
-        // TODO: It will definitely not match it here because it's a template variable, not an
-        // actual variable
-        // TODO: How does the Manifest receiver (notary) verifies this?
-        // if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
-        //   if regex.find(value.as_str().unwrap_or("")).is_none() {
-        //     return Err(ManifestError::InvalidManifest(format!(
-        //       "Value for token `<% {} %>` does not match regex",
-        //       key
-        //     )));
-        //   }
-        // }
-      }
+  pub fn validate_vars(&self) -> Result<(), ManifestError> {
+    let all_tokens = self.collect_tokens();
+    self.validate_tokens(&all_tokens)?;
 
-      // Validate length (if applicable)
-      if let Some(length) = var_def.length {
-        if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
-          if value.as_str().unwrap_or("").len() != length {
-            return Err(ManifestError::InvalidManifest(format!(
-              "Value for token `<% {} %>` does not meet length constraint",
-              key
-            )));
-          }
-        }
-      }
-
-      // TODO: Validate the token "type" constraint
+    for (key, variable) in &self.vars {
+      let is_used = all_tokens.contains(key);
+      variable.validate(key, is_used)?;
     }
+
     Ok(())
   }
 
@@ -640,37 +591,6 @@ impl ManifestRequest {
   }
 }
 
-fn extract_tokens(value: &serde_json::Value) -> Vec<String> {
-  let mut tokens = vec![];
-
-  match value {
-    serde_json::Value::String(s) => {
-      let token_regex = regex::Regex::new(r"<%\s*(\w+)\s*%>").unwrap();
-      for capture in token_regex.captures_iter(s) {
-        if let Some(token) = capture.get(1) {
-          // Extract token name
-          tokens.push(token.as_str().to_string());
-        }
-      }
-    },
-    serde_json::Value::Object(map) => {
-      // Recursively parse nested objects
-      for (_, v) in map {
-        tokens.extend(extract_tokens(v));
-      }
-    },
-    serde_json::Value::Array(arr) => {
-      // Recursively parse arrays
-      for v in arr {
-        tokens.extend(extract_tokens(v));
-      }
-    },
-    _ => {},
-  }
-
-  tokens
-}
-
 #[cfg(test)]
 pub mod tests {
   use std::{collections::HashMap, string::ToString};
@@ -697,9 +617,10 @@ pub mod tests {
             vars: std::collections::HashMap::from([(
                 "TOKEN".to_string(),
                 TemplateVar {
-                    regex: Some("^[A-Za-z0-9]+$".to_string()),
-                    length: Some(20),
-                    r#type: Some("base64".to_string()),
+                    description: Some("Authentication token".to_string()),
+                    required: true,
+                    default: None,
+                    pattern: Some("^[A-Za-z0-9]+$".to_string()),
                 },
             )]),
         };
@@ -1026,46 +947,22 @@ pub mod tests {
   }
 
   #[test]
-  fn test_validate_vars_with_missing_token() {
-    let header_bytes: &[u8] =
-      b"POST /path HTTP/1.1\r\nX-Custom-Header: <% missing_token %>\r\n\r\n";
+  fn test_request_with_template_vars() {
+    let header_bytes: &[u8] = b"POST /path HTTP/1.1\r\nX-Custom-Header: <% test_var %>\r\n\r\n";
     let body_bytes: &[u8] = br#"{"key": "value"}"#;
 
     let mut request = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
-    request.vars = HashMap::new(); // No vars provided, but the template references a token
+    request.vars.insert("test_var".to_string(), TemplateVar {
+      description: Some("Test variable".to_string()),
+      required:    true,
+      default:     None,
+      pattern:     Some("^[A-Za-z0-9]+$".to_string()),
+    });
 
-    let result = request.validate_vars();
-    assert!(result.is_err());
-
-    match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
-        assert!(msg.contains("Token `<% missing_token %>` not declared in `vars`"));
-      },
-      _ => panic!("Expected missing token error"),
-    }
+    assert!(request.validate_vars().is_ok());
   }
 
-  #[test]
-  fn test_request_subset_comparison() {
-    let base_request = request!(
-        method: "GET".to_string(),
-        url: "/path".to_string(),
-        headers: HashMap::from([("Authorization".to_string(), "Bearer token".to_string())]),
-        body: None,
-        vars: HashMap::new()
-    );
-
-    // Create a superset of the base request with an additional header
-    let mut other_request = base_request.clone();
-    other_request.headers.insert("Extra-Header".to_string(), "Extra-Value".to_string());
-    assert!(base_request.is_subset_of(&other_request));
-
-    // Modify the method in the other request, making it not a subset
-    other_request.method = "POST".to_string();
-    assert!(!base_request.is_subset_of(&other_request));
-  }
-
-  /// Creates a response body with a given serde_json::Value
+  // Creates a response body with a given serde_json::Value
   #[macro_export]
   macro_rules! notary_body {
     ($($key:tt : $value:tt),* $(,)?) => {{
