@@ -4,11 +4,9 @@
 //! Template variables are used to parameterize manifest fields and are identified
 //! by the pattern `<% variable_name %>`.
 
-use regex;
-use regress;
 use serde::{Deserialize, Serialize};
 
-use crate::errors::ManifestError;
+use crate::errors::TemplateError;
 
 /// Regular expression for matching template variables in text.
 ///
@@ -36,45 +34,35 @@ pub struct TemplateVar {
 
 impl TemplateVar {
   /// Validates the template variable
-  pub fn validate(&self, key: &str, is_used: bool) -> Result<(), ManifestError> {
+  pub fn validate(&self, key: &str, is_used: bool) -> Result<(), TemplateError> {
     // Check required variable usage
     if self.required && !is_used {
-      return Err(ManifestError::InvalidManifest(format!(
-        "Required variable `{}` is not used in the template",
-        key
-      )));
+      return Err(TemplateError::UnusedRequiredVariable(key.to_string()));
     }
 
     // Check non-required variable default value
     if !self.required && self.default.is_none() {
-      return Err(ManifestError::InvalidManifest(format!(
-        "Non-required variable `{}` must have a default value",
-        key
-      )));
+      return Err(TemplateError::MissingDefaultValue(key.to_string()));
     }
+
     // Validate pattern if present
     if let Some(pattern) = self.pattern.as_ref() {
       // Check for empty pattern
       if pattern.is_empty() {
-        return Err(ManifestError::InvalidManifest(format!("Invalid regex pattern for `{}`", key)));
+        return Err(TemplateError::EmptyRegexPattern(key.to_string()));
       }
 
       // Using `regress` crate for compatibility with ECMAScript regular expressions
-      let _regex = regress::Regex::new(pattern).map_err(|_| {
-        ManifestError::InvalidManifest(format!("Invalid regex pattern for `{}`", key))
-      })?;
+      let _regex = regress::Regex::new(pattern)
+        .map_err(|_| TemplateError::InvalidRegexPattern(key.to_string()))?;
 
       // Validate default value against pattern if present
       if let Some(default_value) = self.default.as_ref() {
-        let regex = regex::Regex::new(pattern).map_err(|_| {
-          ManifestError::InvalidManifest(format!("Invalid regex pattern for `{}`", key))
-        })?;
+        let regex = regex::Regex::new(pattern)
+          .map_err(|_| TemplateError::InvalidRegexPattern(key.to_string()))?;
 
         if !regex.is_match(default_value) {
-          return Err(ManifestError::InvalidManifest(format!(
-            "Default value for `{}` does not match the specified pattern",
-            key
-          )));
+          return Err(TemplateError::DefaultValuePatternMismatch(key.to_string()));
         }
       }
     }
@@ -150,9 +138,11 @@ mod tests {
 
     let result = var.validate("missing_token", false);
     assert!(result.is_err());
-    assert!(
-      matches!(result, Err(ManifestError::InvalidManifest(msg)) if msg.contains("Required variable `missing_token` is not used in the template"))
-    );
+    assert!(matches!(
+      result,
+      Err(TemplateError::UnusedRequiredVariable(token))
+      if token == "missing_token"
+    ));
   }
 
   #[test]
@@ -166,9 +156,11 @@ mod tests {
 
     let result = var.validate("unused_var", false);
     assert!(result.is_err());
-    assert!(
-      matches!(result, Err(ManifestError::InvalidManifest(msg)) if msg.contains("Required variable `unused_var` is not used in the template"))
-    );
+    assert!(matches!(
+      result,
+      Err(TemplateError::UnusedRequiredVariable(var))
+      if var == "unused_var"
+    ));
   }
 
   #[test]
@@ -182,9 +174,11 @@ mod tests {
 
     let result = var.validate("optional_var", true);
     assert!(result.is_err());
-    assert!(
-      matches!(result, Err(ManifestError::InvalidManifest(msg)) if msg.contains("Non-required variable `optional_var` must have a default value"))
-    );
+    assert!(matches!(
+      result,
+      Err(TemplateError::MissingDefaultValue(var))
+      if var == "optional_var"
+    ));
   }
 
   #[test]
@@ -193,9 +187,11 @@ mod tests {
 
     let result = var.validate("pattern_var", true);
     assert!(result.is_err());
-    assert!(
-      matches!(result, Err(ManifestError::InvalidManifest(msg)) if msg.contains("Default value for `pattern_var` does not match the specified pattern"))
-    );
+    assert!(matches!(
+      result,
+      Err(TemplateError::DefaultValuePatternMismatch(var))
+      if var == "pattern_var"
+    ));
   }
 
   #[test]
@@ -220,7 +216,7 @@ mod tests {
 
   #[test]
   fn test_extract_tokens() {
-    let json = serde_json::json!({
+    let json = json!({
         "string": "Hello <% token1 %> World <% token2 %>",
         "nested": {
             "array": ["<% token3 %>", "plain text"],
@@ -247,14 +243,16 @@ mod tests {
 
     let result = var.validate("invalid_pattern", true);
     assert!(result.is_err());
-    assert!(
-      matches!(result, Err(ManifestError::InvalidManifest(msg)) if msg.contains("Invalid regex pattern"))
-    );
+    assert!(matches!(
+      result,
+      Err(TemplateError::InvalidRegexPattern(var))
+      if var == "invalid_pattern"
+    ));
   }
 
   #[test]
   fn test_extract_tokens_empty_values() {
-    let json = serde_json::json!({
+    let json = json!({
         "empty_string": "",
         "null": null,
         "number": 42,
@@ -276,9 +274,11 @@ mod tests {
 
     let result = var.validate("empty_pattern", true);
     assert!(result.is_err());
-    assert!(
-      matches!(result, Err(ManifestError::InvalidManifest(msg)) if msg.contains("Invalid regex pattern"))
-    );
+    assert!(matches!(
+      result,
+      Err(TemplateError::EmptyRegexPattern(var))
+      if var == "empty_pattern"
+    ));
   }
 
   #[test]
