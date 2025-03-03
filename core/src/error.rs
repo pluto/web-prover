@@ -12,4 +12,32 @@ pub enum WebProverCoreError {
   /// Serde operation failed
   #[error("Serde error occurred: {0}")]
   SerdeError(#[from] serde_json::Error),
+
+  /// Template-specific errors
+  #[error("Template error: {0}")]
+  Template(#[from] TemplateError),
+}
+
+/// Represents specific error conditions related to template handling
+#[derive(Debug, Error)]
+pub enum TemplateError {
+  /// Required template variable is not used in the template
+  #[error("Required variable `{0}` is not used in the template")]
+  UnusedRequiredVariable(String),
+
+  /// Non-required variable is missing a default value
+  #[error("Non-required variable `{0}` must have a default value")]
+  MissingDefaultValue(String),
+
+  /// Invalid regex pattern
+  #[error("Invalid regex pattern for `{0}`")]
+  InvalidRegexPattern(String),
+
+  /// Default value doesn't match the specified pattern
+  #[error("Default value for `{0}` does not match the specified pattern")]
+  DefaultValuePatternMismatch(String),
+
+  /// Empty regex pattern
+  #[error("Empty regex pattern for `{0}`")]
+  EmptyRegexPattern(String),
 }

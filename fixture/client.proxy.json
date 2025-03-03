@@ -24,11 +24,15 @@
 				},
 				"vars": {
 					"userId": {
-						"regex": "[a-z]{,20}+"
+						"description": "User ID for authentication",
+						"required": true,
+						"pattern": "[a-z]{,20}+"
 					},
 					"token": {
-						"type": "base64",
-						"length": 32
+						"description": "Authentication token",
+						"required": false,
+						"default": "abcdef1234567890abcdef1234567890",
+						"pattern": "^[A-Za-z0-9]{32}$"
 					}
 				}
 			},
