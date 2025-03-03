@@ -76,11 +76,10 @@ mod tests {
 
   use crate::{
     errors::ManifestError,
-    http::{
-      JsonKey, ManifestRequest, ManifestResponse, ManifestResponseBody, TemplateVar, HTTP_1_1,
-    },
+    http::{JsonKey, ManifestRequest, ManifestResponse, ManifestResponseBody, HTTP_1_1},
     manifest::Manifest,
     request, response,
+    template::TemplateVar,
     test_utils::TEST_MANIFEST,
   };
 
