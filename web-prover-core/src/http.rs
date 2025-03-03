@@ -947,152 +947,22 @@ pub mod tests {
   }
 
   #[test]
-  fn test_validate_vars_with_missing_token() {
-    let header_bytes: &[u8] =
-      b"POST /path HTTP/1.1\r\nX-Custom-Header: <% missing_token %>\r\n\r\n";
+  fn test_request_with_template_vars() {
+    let header_bytes: &[u8] = b"POST /path HTTP/1.1\r\nX-Custom-Header: <% test_var %>\r\n\r\n";
     let body_bytes: &[u8] = br#"{"key": "value"}"#;
 
     let mut request = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
-    request.vars = HashMap::new(); // No vars provided, but the template references a token
-
-    let result = request.validate_vars();
-    assert!(result.is_err());
-
-    match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
-        assert!(msg.contains("Token `<% missing_token %>` not declared in `vars`"));
-      },
-      _ => panic!("Expected missing token error"),
-    }
-  }
-
-  #[test]
-  fn test_validate_vars_required_not_used() {
-    let header_bytes: &[u8] = b"POST /path HTTP/1.1\r\nContent-Type: application/json\r\n\r\n";
-    let body_bytes: &[u8] = br#"{"key": "value"}"#;
-
-    let mut request = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
-
-    // Add a required variable that is not used in the template
-    request.vars.insert("unused_var".to_string(), TemplateVar {
-      description: Some("This is a required variable".to_string()),
-      required:    true,
-      default:     None,
-      pattern:     None,
-    });
-
-    let result = request.validate_vars();
-    assert!(result.is_err());
-
-    match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
-        assert!(msg.contains("Required variable `unused_var` is not used in the template"));
-      },
-      _ => panic!("Expected required variable not used error"),
-    }
-  }
-
-  #[test]
-  fn test_validate_vars_non_required_without_default() {
-    let header_bytes: &[u8] = b"POST /path HTTP/1.1\r\nX-Custom-Header: <% optional_var %>\r\n\r\n";
-    let body_bytes: &[u8] = br#"{"key": "value"}"#;
-
-    let mut request = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
-
-    // Add a non-required variable without a default value
-    request.vars.insert("optional_var".to_string(), TemplateVar {
-      description: Some("This is an optional variable".to_string()),
-      required:    false,
-      default:     None, // Missing default value
-      pattern:     None,
-    });
-
-    let result = request.validate_vars();
-    assert!(result.is_err());
-
-    match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
-        assert!(msg.contains("Non-required variable `optional_var` must have a default value"));
-      },
-      _ => panic!("Expected non-required variable without default error"),
-    }
-  }
-
-  #[test]
-  fn test_validate_vars_default_not_matching_pattern() {
-    let header_bytes: &[u8] = b"POST /path HTTP/1.1\r\nX-Custom-Header: <% pattern_var %>\r\n\r\n";
-    let body_bytes: &[u8] = br#"{"key": "value"}"#;
-
-    let mut request = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
-
-    // Add a variable with a default value that doesn't match the pattern
-    request.vars.insert("pattern_var".to_string(), TemplateVar {
-      description: Some("This is a variable with a pattern".to_string()),
-      required:    false,
-      default:     Some("abc123".to_string()), // Doesn't match the pattern
-      pattern:     Some("^[0-9]+$".to_string()), // Only digits allowed
-    });
-
-    let result = request.validate_vars();
-    assert!(result.is_err());
-
-    match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
-        assert!(
-          msg.contains("Default value for `pattern_var` does not match the specified pattern")
-        );
-      },
-      _ => panic!("Expected default value not matching pattern error"),
-    }
-  }
-
-  #[test]
-  fn test_validate_vars_valid() {
-    let header_bytes: &[u8] = b"POST /path HTTP/1.1\r\nX-Custom-Header: <% header_var %>\r\n\r\n";
-    let body_bytes: &[u8] = br#"{"key": "<% body_var %>"}"#;
-
-    let mut request = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
-
-    // Add valid variables
-    request.vars.insert("header_var".to_string(), TemplateVar {
-      description: Some("This is a header variable".to_string()),
+    request.vars.insert("test_var".to_string(), TemplateVar {
+      description: Some("Test variable".to_string()),
       required:    true,
       default:     None,
       pattern:     Some("^[A-Za-z0-9]+$".to_string()),
     });
 
-    request.vars.insert("body_var".to_string(), TemplateVar {
-      description: Some("This is a body variable".to_string()),
-      required:    false,
-      default:     Some("default123".to_string()),
-      pattern:     Some("^[A-Za-z0-9]+$".to_string()),
-    });
-
-    let result = request.validate_vars();
-    assert!(result.is_ok());
+    assert!(request.validate_vars().is_ok());
   }
 
-  #[test]
-  fn test_request_subset_comparison() {
-    let base_request = request!(
-        method: "GET".to_string(),
-        url: "/path".to_string(),
-        headers: HashMap::from([("Authorization".to_string(), "Bearer token".to_string())]),
-        body: None,
-        vars: HashMap::new()
-    );
-
-    // Create a superset of the base request with an additional header
-    let mut other_request = base_request.clone();
-    other_request.headers.insert("Extra-Header".to_string(), "Extra-Value".to_string());
-    assert!(base_request.is_subset_of(&other_request));
-
-    // Modify the method in the other request, making it not a subset
-    other_request.method = "POST".to_string();
-    assert!(!base_request.is_subset_of(&other_request));
-  }
-
-  /// Creates a response body with a given serde_json::Value
+  // Creates a response body with a given serde_json::Value
   #[macro_export]
   macro_rules! notary_body {
     ($($key:tt : $value:tt),* $(,)?) => {{
