@@ -83,7 +83,7 @@ async fn from_reqwest_response(response: Response) -> NotaryResponse {
       // TODO: This makes me think that perhaps this should be an optional field or something else
       body: ManifestResponseBody::default(),
     },
-    notary_response_body: NotaryResponseBody { json },
+    notary_response_body: NotaryResponseBody { body: json },
   }
 }
 

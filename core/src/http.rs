@@ -61,8 +61,8 @@ impl ManifestResponseBody {
 /// by the client.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NotaryResponseBody {
-  /// Raw JSON value returned by a notary.
-  pub json: Option<serde_json::Value>,
+  /// Raw response body from the notary
+  pub body: Option<Vec<u8>>,
 }
 
 impl TryFrom<&[u8]> for NotaryResponseBody {
@@ -70,13 +70,10 @@ impl TryFrom<&[u8]> for NotaryResponseBody {
 
   fn try_from(body_bytes: &[u8]) -> Result<Self, Self::Error> {
     if body_bytes.is_empty() {
-      return Ok(Self { json: None });
+      return Ok(Self { body: None });
     }
-    // Attempt to parse the body as JSON.
-    let json: serde_json::Value = serde_json::from_slice(body_bytes).map_err(|_| {
-      WebProverCoreError::InvalidManifest("Failed to parse body as valid JSON".to_string())
-    })?;
-    Ok(Self { json: Some(json) })
+
+    Ok(Self { body: Some(body_bytes.to_vec()) })
   }
 }
 
@@ -218,12 +215,12 @@ impl NotaryResponse {
     &self,
     other: &ManifestResponse,
   ) -> Result<Option<ExtractionValues>, ManifestError> {
-    match &self.notary_response_body.json {
-      Some(json) => {
-        let result = other.body.0.extract_and_validate(json)?;
+    match &self.notary_response_body.body {
+      Some(body) => {
+        let result = other.body.0.extract_and_validate(body)?;
 
         if !result.errors.is_empty() {
-          debug!("JSON path does not match: {:?}", result.errors);
+          debug!("Response body does not match: {:?}", result.errors);
           return Ok(None);
         }
 
@@ -236,12 +233,12 @@ impl NotaryResponse {
         Ok(Some(result.values))
       },
       None if other.body.0.extractors.is_empty() => {
-        // If we get here, there was a match but no JSON data to extract
-        debug!("Client response matches (no JSON data)");
+        // If we get here, there was a match but no data
+        debug!("Client response matches (no data in response body)");
         Ok(Some(HashMap::new()))
       },
       None => {
-        debug!("No JSON data to match against");
+        debug!("No data to match against");
         Ok(None)
       },
     }
@@ -316,8 +313,9 @@ impl ManifestResponse {
     }
     let content_type = content_type.unwrap();
 
-    const VALID_CONTENT_TYPES: [&str; 2] = ["application/json", "text/plain"];
+    const VALID_CONTENT_TYPES: [&str; 3] = ["application/json", "text/plain", "text/html"];
     let is_valid_content_type = VALID_CONTENT_TYPES.iter().any(|&legal_type| {
+      let content_type = content_type.to_lowercase();
       content_type == legal_type || content_type.starts_with(&format!("{};", legal_type))
     });
     if !is_valid_content_type {
@@ -628,7 +626,7 @@ pub mod tests {
     ($response:expr, $($key:ident: $value:expr),* $(,)?) => {{
         #[allow(unused_mut)]
         let mut notary_response_body = NotaryResponseBody {
-            json: Some(json!({})), // Default to empty JSON
+            body: Some(json!({}).to_string().into_bytes().to_vec()), // Default to empty JSON
         };
 
         // Apply custom key-value overrides for NotaryResponseBody
@@ -649,14 +647,15 @@ pub mod tests {
     let header_bytes: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
     let body = json!({"key1": { "key2": 3 }});
     let response =
-      NotaryResponse::from_payload(&[header_bytes, body.to_string().as_bytes()].concat()).unwrap();
+      NotaryResponse::from_payload(&[header_bytes, &body.to_string().into_bytes()].concat())
+        .unwrap();
     assert_eq!(response.response.status, "200");
     assert_eq!(response.response.version, "HTTP/1.1");
     assert_eq!(response.response.message, "OK");
     assert_eq!(response.response.headers.len(), 1);
     assert_eq!(response.response.headers.get("Content-Type").unwrap(), "application/json");
     assert_eq!(response.response.body, ManifestResponseBody::default());
-    assert_eq!(response.notary_response_body.json, Some(body));
+    assert_eq!(response.notary_response_body.body, Some(body.to_string().into_bytes().to_vec()));
   }
 
   #[test]
@@ -674,9 +673,9 @@ pub mod tests {
     );
     let notary_response = notary_response!(
       response.clone(),
-      json: Some(json!({
+      body: Some(json!({
             "key1": {"key2": 3},
-        })),
+        }).to_string().into_bytes().to_vec()),
     );
 
     // Is a perfect match with itself
@@ -715,25 +714,10 @@ pub mod tests {
         headers: HashMap::from([("Content-Type".to_string(), "text/plain".to_string())]),
         body: ManifestResponseBody::default(),
       ),
-      notary_response_body: NotaryResponseBody { json: None },
+      notary_response_body: NotaryResponseBody { body: None },
     };
 
     assert_eq!(actual, expected);
-  }
-
-  #[test]
-  fn test_invalid_body_parsing() {
-    let header_bytes: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
-    let invalid_body_bytes: &[u8] = br#"This is not JSON"#;
-
-    let result = NotaryResponse::from_payload(&[header_bytes, invalid_body_bytes].concat());
-    assert!(result.is_err());
-
-    if let Err(WebProverCoreError::InvalidManifest(msg)) = result {
-      assert!(msg.contains("Failed to parse body as valid JSON"));
-    } else {
-      panic!("Expected an invalid manifest error for body parsing");
-    }
   }
 
   #[test]
@@ -783,7 +767,7 @@ pub mod tests {
     );
     let expected_response = notary_response!(
         manifest_response,
-        json: Some(json!({"key1": "value1"}))
+        body: Some(body_bytes.to_vec())
     );
 
     assert_eq!(response, expected_response);
@@ -798,7 +782,10 @@ pub mod tests {
       NotaryResponse::from_payload(&[header_bytes, empty_body_bytes].concat()).unwrap();
 
     assert_eq!(notary_response.response.body, ManifestResponseBody::default());
-    assert_eq!(notary_response.notary_response_body.json, Some(json!({})));
+    assert_eq!(
+      notary_response.notary_response_body.body,
+      Some(json!({}).to_string().into_bytes().to_vec())
+    );
   }
 
   #[test]
