@@ -130,6 +130,16 @@ mod tests {
     pub fn optional(description: &str, default: &str, pattern: Option<&str>) -> Self {
       Self::new(Some(description), false, Some(default), pattern)
     }
+
+    /// Creates a new optional template variable without a default value.
+    pub fn optional_without_default(description: &str, pattern: Option<&str>) -> Self {
+      Self::new(Some(description), false, None, pattern)
+    }
+
+    /// Creates a new required template variable with a default value.
+    pub fn required_with_default(description: &str, default: &str, pattern: Option<&str>) -> Self {
+      Self::new(Some(description), true, Some(default), pattern)
+    }
   }
 
   #[test]
@@ -147,12 +157,7 @@ mod tests {
 
   #[test]
   fn test_validate_vars_required_not_used() {
-    let var = TemplateVar {
-      description: Some("This is a required variable".to_string()),
-      required:    true,
-      default:     None,
-      pattern:     None,
-    };
+    let var = TemplateVar::required("This is a required variable", None);
 
     let result = var.validate("unused_var", false);
     assert!(result.is_err());
@@ -165,12 +170,7 @@ mod tests {
 
   #[test]
   fn test_validate_vars_non_required_without_default() {
-    let var = TemplateVar {
-      description: Some("This is an optional variable".to_string()),
-      required:    false,
-      default:     None,
-      pattern:     None,
-    };
+    let var = TemplateVar::optional_without_default("This is an optional variable", None);
 
     let result = var.validate("optional_var", true);
     assert!(result.is_err());
@@ -196,19 +196,9 @@ mod tests {
 
   #[test]
   fn test_validate_vars_valid() {
-    let var1 = TemplateVar {
-      description: Some("This is a header variable".to_string()),
-      required:    true,
-      default:     None,
-      pattern:     Some("^[A-Za-z0-9]+$".to_string()),
-    };
-
-    let var2 = TemplateVar {
-      description: Some("This is a body variable".to_string()),
-      required:    false,
-      default:     Some("default123".to_string()),
-      pattern:     Some("^[A-Za-z0-9]+$".to_string()),
-    };
+    let var1 = TemplateVar::required("This is a header variable", Some("^[A-Za-z0-9]+$"));
+    let var2 =
+      TemplateVar::optional("This is a body variable", "default123", Some("^[A-Za-z0-9]+$"));
 
     assert!(var1.validate("header_var", true).is_ok());
     assert!(var2.validate("body_var", true).is_ok());
