@@ -20,10 +20,17 @@
           "userId": "<% userId %>"
         },
         "vars": {
-          "description": "Authentication token",
-          "required": false,
-          "default": "abcdef1234567890abcdef1234567890",
-          "pattern": "^[A-Za-z0-9]{32}$"
+          "userId": {
+            "description": "Reddit username",
+            "required": true,
+            "pattern": "^[A-Za-z0-9_-]{3,20}$"
+          },
+          "authToken": {
+            "description": "Authentication token",
+            "required": false,
+            "default": "abcdef1234567890abcdef1234567890",
+            "pattern": "^[A-Za-z0-9]{32}$"
+          }
         },
         "extra": {
           "headers": {
