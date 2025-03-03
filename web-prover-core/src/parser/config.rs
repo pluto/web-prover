@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::parser::{errors::ExtractorError, extractor, extractor::ExtractionResult, Extractor};
+use crate::parser::{errors::ExtractorError, extractor, extractor::ExtractionResult, Extractor, common::get_value_type};
 
 /// The format of the data to extract from
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -10,6 +10,8 @@ pub enum DataFormat {
   /// JSON format
   #[default]
   Json,
+  /// HTML format
+  Html,
 }
 
 /// The root configuration for data extractors
@@ -26,6 +28,17 @@ impl ExtractorConfig {
   pub fn extract_and_validate(&self, data: &Value) -> Result<ExtractionResult, ExtractorError> {
     match self.format {
       DataFormat::Json => extractor::extract_json(data, self),
+      DataFormat::Html => {
+        // For HTML, we expect the data to be a string value
+        if let Value::String(html_str) = data {
+          extractor::extract_html(html_str, self)
+        } else {
+          Err(ExtractorError::TypeMismatch {
+            expected: "string".to_string(),
+            actual: get_value_type(data).to_string(),
+          })
+        }
+      }
     }
   }
 }
@@ -220,5 +233,170 @@ mod tests {
     assert_eq!(predicate.predicate_type, PredicateType::Value);
     assert_eq!(predicate.comparison, Comparison::GreaterThanOrEqual);
     assert_eq!(predicate.value, json!(18));
+  }
+
+  #[test]
+  fn test_extract_and_validate_html() {
+    let html = r#"
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Test Page</title>
+      </head>
+      <body>
+        <div class="user-info">
+          <h1 id="username">John Doe</h1>
+          <p class="age">30</p>
+          <p class="active">true</p>
+          <ul class="tags">
+            <li>developer</li>
+            <li>rust</li>
+            <li>web</li>
+          </ul>
+        </div>
+        <a href="https://example.com" class="link">Visit Website</a>
+      </body>
+      </html>
+    "#;
+
+    let config = ExtractorConfig {
+      format: DataFormat::Html,
+      extractors: vec![
+        Extractor {
+          id: "username".to_string(),
+          description: "User's name".to_string(),
+          selector: vec!["#username".to_string()],
+          extractor_type: extractor::ExtractorType::String,
+          required: true,
+          predicates: vec![],
+        },
+        Extractor {
+          id: "age".to_string(),
+          description: "User's age".to_string(),
+          selector: vec![".age".to_string()],
+          extractor_type: extractor::ExtractorType::String,
+          required: true,
+          predicates: vec![],
+        },
+        Extractor {
+          id: "active".to_string(),
+          description: "User's active status".to_string(),
+          selector: vec![".active".to_string()],
+          extractor_type: extractor::ExtractorType::String,
+          required: true,
+          predicates: vec![],
+        },
+        Extractor {
+          id: "tags".to_string(),
+          description: "User's tags".to_string(),
+          selector: vec![".tags li".to_string()],
+          extractor_type: extractor::ExtractorType::Array,
+          required: true,
+          predicates: vec![],
+        },
+        Extractor {
+          id: "link_href".to_string(),
+          description: "Link URL".to_string(),
+          selector: vec![".link".to_string(), "attr".to_string(), "href".to_string()],
+          extractor_type: extractor::ExtractorType::String,
+          required: true,
+          predicates: vec![],
+        },
+      ],
+    };
+
+    let result = config.extract_and_validate(&json!(html)).unwrap();
+    
+    assert_eq!(result.errors.len(), 0);
+    assert_eq!(result.values.len(), 5);
+    
+    assert_eq!(result.values["username"], json!("John Doe"));
+    assert_eq!(result.values["age"], json!("30"));
+    assert_eq!(result.values["active"], json!("true"));
+    assert_eq!(
+      result.values["tags"],
+      json!(["developer", "rust", "web"])
+    );
+    assert_eq!(result.values["link_href"], json!("https://example.com"));
+  }
+
+  #[test]
+  fn test_extract_and_validate_html_with_failures() {
+    let html = r#"
+      <!DOCTYPE html>
+      <html>
+      <body>
+        <div class="user-info">
+          <h1 id="username">John Doe</h1>
+        </div>
+      </body>
+      </html>
+    "#;
+
+    let config = ExtractorConfig {
+      format: DataFormat::Html,
+      extractors: vec![
+        Extractor {
+          id: "username".to_string(),
+          description: "User's name".to_string(),
+          selector: vec!["#username".to_string()],
+          extractor_type: extractor::ExtractorType::String,
+          required: true,
+          predicates: vec![],
+        },
+        Extractor {
+          id: "missing_element".to_string(),
+          description: "Missing element".to_string(),
+          selector: vec![".non-existent".to_string()],
+          extractor_type: extractor::ExtractorType::String,
+          required: true,
+          predicates: vec![],
+        },
+        Extractor {
+          id: "optional_missing".to_string(),
+          description: "Optional missing element".to_string(),
+          selector: vec![".optional".to_string()],
+          extractor_type: extractor::ExtractorType::String,
+          required: false,
+          predicates: vec![],
+        },
+      ],
+    };
+
+    let result = config.extract_and_validate(&json!(html)).unwrap();
+    
+    assert_eq!(result.errors.len(), 1);
+    assert_eq!(result.values.len(), 1);
+    
+    assert_eq!(result.values["username"], json!("John Doe"));
+    assert!(result.errors[0].contains("No elements found for selector"));
+  }
+
+  #[test]
+  fn test_extract_and_validate_html_with_invalid_input() {
+    let config = ExtractorConfig {
+      format: DataFormat::Html,
+      extractors: vec![
+        Extractor {
+          id: "username".to_string(),
+          description: "User's name".to_string(),
+          selector: vec!["#username".to_string()],
+          extractor_type: extractor::ExtractorType::String,
+          required: true,
+          predicates: vec![],
+        },
+      ],
+    };
+
+    // Test with non-string input
+    let result = config.extract_and_validate(&json!(42));
+    assert!(result.is_err());
+    
+    if let Err(ExtractorError::TypeMismatch { expected, actual }) = result {
+      assert_eq!(expected, "string");
+      assert_eq!(actual, "number");
+    } else {
+      panic!("Expected TypeMismatch error");
+    }
   }
 }
