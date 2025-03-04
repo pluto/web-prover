@@ -113,7 +113,7 @@ pub(crate) async fn proxy_and_sign_and_generate_proof(
     decrypt_tls_ciphertext(&witness)?;
 
   // generate NIVC proofs for request and response
-  let manifest = config.proving.manifest.unwrap();
+  let manifest = config.manifest;
 
   let mut proof = generate_proof(
     &manifest.clone().into(),
