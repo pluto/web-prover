@@ -77,6 +77,7 @@ mod tests {
   use crate::{
     error::WebProverCoreError,
     extractor,
+    extractor,
     http::{ManifestResponseBody, HTTP_1_1},
     manifest::{Manifest, ManifestRequest, ManifestResponse},
     parser::{DataFormat, ExtractorConfig, ExtractorType},
