@@ -2,7 +2,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::parser::{
-  common::get_value_type, errors::ExtractorError, extractor, extractor::ExtractionResult, Extractor,
+  common::get_value_type,
+  errors::ExtractorError,
+  extractors,
+  extractors::{extract_html, ExtractionResult, Extractor},
 };
 
 /// The format of the data to extract from
@@ -32,7 +35,7 @@ impl ExtractorConfig {
       DataFormat::Json => {
         // For JSON, we expect the data to be an object or array
         match data {
-          Value::Object(_) | Value::Array(_) => extractor::extract_json(data, self),
+          Value::Object(_) | Value::Array(_) => extractors::extract_json(data, self),
           _ => Err(ExtractorError::TypeMismatch {
             expected: "object or array".to_string(),
             actual:   get_value_type(data).to_string(),
@@ -42,7 +45,7 @@ impl ExtractorConfig {
       DataFormat::Html => {
         // For HTML, we expect the data to be a string value
         if let Value::String(html_str) = data {
-          extractor::extract_html(html_str, self)
+          extract_html(html_str, self)
         } else {
           Err(ExtractorError::TypeMismatch {
             expected: "string".to_string(),
@@ -62,9 +65,9 @@ mod tests {
   use crate::{
     extractor,
     parser::{
-      extractor::ExtractorType,
       predicate::{Comparison, PredicateType},
       test_utils::{active_extractor, age_extractor, name_extractor, tags_extractor},
+      ExtractorType,
     },
   };
 
@@ -278,32 +281,32 @@ mod tests {
             id: "username".to_string(),
             description: "User's name".to_string(),
             selector: vec!["#username".to_string()],
-            extractor_type: extractor::ExtractorType::String
+            extractor_type: extractors::ExtractorType::String
         ),
         extractor!(
             id: "age".to_string(),
             description: "User's age".to_string(),
             selector: vec![".age".to_string()],
-            extractor_type: extractor::ExtractorType::String
+            extractor_type: ExtractorType::String
         ),
         extractor!(
             id: "active".to_string(),
             description: "User's active status".to_string(),
             selector: vec![".active".to_string()],
-            extractor_type: extractor::ExtractorType::String
+            extractor_type: ExtractorType::String
         ),
         extractor!(
             id: "tags".to_string(),
             description: "User's tags".to_string(),
             selector: vec!["li".to_string()],
-            extractor_type: extractor::ExtractorType::Array
+            extractor_type: ExtractorType::Array
         ),
         extractor!(
             id: "link_href".to_string(),
             description: "Link URL".to_string(),
             selector: vec![".link".to_string()],
             attribute: Some("href".to_string()),
-            extractor_type: extractor::ExtractorType::String
+            extractor_type: ExtractorType::String
         ),
       ],
     };
@@ -343,19 +346,19 @@ mod tests {
             id: "username".to_string(),
             description: "User's name".to_string(),
             selector: vec!["#username".to_string()],
-            extractor_type: extractor::ExtractorType::String
+            extractor_type: ExtractorType::String
         ),
         extractor!(
             id: "missing_element".to_string(),
             description: "Missing element".to_string(),
             selector: vec![".non-existent".to_string()],
-            extractor_type: extractor::ExtractorType::String
+            extractor_type: ExtractorType::String
         ),
         extractor!(
             id: "optional_missing".to_string(),
             description: "Optional missing element".to_string(),
             selector: vec![".optional".to_string()],
-            extractor_type: extractor::ExtractorType::String,
+            extractor_type: ExtractorType::String,
             required: false
         ),
       ],
