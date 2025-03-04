@@ -113,9 +113,6 @@ fn query_selector(
     .into_iter()
     .filter(|_| true) // Ensure non-empty
     .collect::<Vec<_>>()
-    .into_iter()
-    .filter(|_| true)
-    .collect::<Vec<_>>()
     .is_empty()
     .then(|| Err(ExtractorError::MissingField(format!(
       "No elements found for selector '{}' at position {}",
@@ -267,19 +264,13 @@ fn extract_with_single_selector(
     let values: Vec<Value> = elements
       .iter()
       .filter_map(|el| {
-        el.get(dom.parser()).map(|node| {
-          if let Some(attr) = &extractor.attribute {
-            if let Some(tag) = node.as_tag() {
-              if let Some(attr_value) = tag.attributes().get(attr.as_str()) {
-                if let Some(value) = attr_value {
-                  return Value::String(value.as_utf8_str().to_string());
-                }
-              }
-            }
-            Value::String("".to_string()) // Return empty string if attribute not found
-          } else {
-            Value::String(node.inner_text(dom.parser()).to_string())
-          }
+        el.get(dom.parser()).and_then(|node| match &extractor.attribute {
+          Some(attr) => node
+            .as_tag()
+            .and_then(|tag| tag.attributes().get(attr.as_str()))
+            .and_then(|attr_value| attr_value.map(|value| value.as_utf8_str().to_string()))
+            .map(Value::String),
+          None => Some(Value::String(node.inner_text(dom.parser()).to_string())),
         })
       })
       .collect();
@@ -290,28 +281,17 @@ fn extract_with_single_selector(
   let element = &elements[0];
 
   // Extract the raw value (either attribute or text content)
-  let raw_value = if let Some(attr) = &extractor.attribute {
-    if let Some(node) = element.get(dom.parser()) {
-      if let Some(tag) = node.as_tag() {
-        if let Some(attr_value) = tag.attributes().get(attr.as_str()) {
-          if let Some(value) = attr_value {
-            value.as_utf8_str().to_string()
-          } else {
-            "".to_string()
-          }
-        } else {
-          "".to_string()
-        }
-      } else {
-        "".to_string()
-      }
-    } else {
-      "".to_string()
-    }
-  } else if let Some(node) = element.get(dom.parser()) {
-    node.inner_text(dom.parser()).to_string()
-  } else {
-    "".to_string()
+  let raw_value = match &extractor.attribute {
+    Some(attr) => element
+      .get(dom.parser())
+      .and_then(|node| node.as_tag())
+      .and_then(|tag| tag.attributes().get(attr.as_str()))
+      .and_then(|attr_value| attr_value.map(|value| value.as_utf8_str().to_string()))
+      .unwrap_or_default(),
+    None => element
+      .get(dom.parser())
+      .map(|node| node.inner_text(dom.parser()).to_string())
+      .unwrap_or_default(),
   };
 
   // Convert the raw value to the appropriate type
