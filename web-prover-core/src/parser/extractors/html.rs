@@ -3,10 +3,11 @@ use std::collections::HashMap;
 use serde_json::Value;
 use tl::{Node, NodeHandle, Parser, ParserOptions, VDom};
 
-use crate::parser::{
-  extractors::extractor, predicate, DataFormat, ExtractionResult, Extractor, ExtractorConfig,
-  ExtractorError, ExtractorType,
+use super::{
+  types::{ExtractionResult, Extractor, ExtractorType},
+  utils,
 };
+use crate::parser::{predicate, DataFormat, ExtractorConfig, ExtractorError};
 
 /// Extracts data from HTML using CSS selectors
 pub fn extract_html(
@@ -27,7 +28,7 @@ pub fn extract_html(
     match extract_html_value(&dom, &extractor.selector, extractor) {
       Ok(value) => {
         // Validate the type
-        if let Err(type_err) = extractor::validate_type(&value, &extractor.extractor_type) {
+        if let Err(type_err) = utils::validate_type(&value, &extractor.extractor_type) {
           if extractor.required {
             match &type_err {
               ExtractorError::TypeMismatch { expected, actual } => {
@@ -354,7 +355,7 @@ mod tests {
     extractor,
     parser::{
       extractors::html::{extract_html, extract_html_value},
-      DataFormat, Extractor, ExtractorConfig, ExtractorError, ExtractorType,
+      DataFormat, ExtractorConfig, ExtractorError, ExtractorType,
     },
   };
 
@@ -478,60 +479,68 @@ mod tests {
       format:     DataFormat::Html,
       extractors: vec![
         // Single selector extractors
-        create_test_extractor("page_title", vec!["title".to_string()], ExtractorType::String, None),
-        create_test_extractor(
-          "meta_description",
-          vec!["meta[name='description']".to_string()],
-          ExtractorType::String,
-          Some("content".to_string()),
+        extractor!(
+          id: "page_title".to_string(),
+          description: "Test extractor for page_title".to_string(),
+          selector: vec!["title".to_string()],
+          extractor_type: ExtractorType::String
+        ),
+        extractor!(
+          id: "meta_description".to_string(),
+          description: "Test extractor for meta_description".to_string(),
+          selector: vec!["meta[name='description']".to_string()],
+          extractor_type: ExtractorType::String,
+          attribute: Some("content".to_string())
         ),
         // Multi-selector extractors
-        create_test_extractor(
-          "hero_title",
-          vec!["main".to_string(), "section.hero-section".to_string(), "h1.hero-title".to_string()],
-          ExtractorType::String,
-          None,
+        extractor!(
+          id: "hero_title".to_string(),
+          description: "Test extractor for hero_title".to_string(),
+          selector: vec!["main".to_string(), "section.hero-section".to_string(), "h1.hero-title".to_string()],
+          extractor_type: ExtractorType::String
         ),
         // Array extractors
-        create_test_extractor(
-          "feature_titles",
-          vec![
+        extractor!(
+          id: "feature_titles".to_string(),
+          description: "Test extractor for feature_titles".to_string(),
+          selector: vec![
             "main".to_string(),
             "section.features-section".to_string(),
             "div.features-grid".to_string(),
             "article.feature-card".to_string(),
-            "h3.feature-title".to_string(),
+            "h3.feature-title".to_string()
           ],
-          ExtractorType::Array,
-          None,
+          extractor_type: ExtractorType::Array
         ),
         // Attribute extractors
-        create_test_extractor(
-          "feature_ratings",
-          vec![
+        extractor!(
+          id: "feature_ratings".to_string(),
+          description: "Test extractor for feature_ratings".to_string(),
+          selector: vec![
             "main".to_string(),
             "section.features-section".to_string(),
             "div.features-grid".to_string(),
             "article.feature-card".to_string(),
             "div.feature-meta".to_string(),
-            "span.feature-rating".to_string(),
+            "span.feature-rating".to_string()
           ],
-          ExtractorType::Array,
-          Some("data-rating".to_string()),
+          extractor_type: ExtractorType::Array,
+          attribute: Some("data-rating".to_string())
         ),
         // Numeric extractors
-        create_test_extractor(
-          "first_rating",
-          vec![
+        extractor!(
+          id: "first_rating".to_string(),
+          description: "Test extractor for first_rating".to_string(),
+          selector: vec![
             "main".to_string(),
             "section.features-section".to_string(),
             "div.features-grid".to_string(),
             "article#feature-1".to_string(),
             "div.feature-meta".to_string(),
-            "span.feature-rating".to_string(),
+            "span.feature-rating".to_string()
           ],
-          ExtractorType::Number,
-          Some("data-rating".to_string()),
+          extractor_type: ExtractorType::Number,
+          attribute: Some("data-rating".to_string())
         ),
       ],
     };
@@ -764,24 +773,6 @@ mod tests {
     tl::parse(html, ParserOptions::default()).expect("Failed to parse complex HTML")
   }
 
-  // Helper function to create an extractor with common defaults
-  fn create_test_extractor(
-    id: &str,
-    selector_path: Vec<String>,
-    extractor_type: ExtractorType,
-    attribute: Option<String>,
-  ) -> Extractor {
-    Extractor {
-      id: id.to_string(),
-      description: format!("Test extractor for {}", id),
-      selector: selector_path,
-      extractor_type,
-      required: true,
-      predicates: vec![],
-      attribute,
-    }
-  }
-
   // Helper function to test extraction and assert the result
   fn assert_html_extraction(
     dom: &VDom,
@@ -790,8 +781,13 @@ mod tests {
     attribute: Option<String>,
     expected_value: Value,
   ) {
-    let extractor =
-      create_test_extractor("test", selector_path.to_vec(), extractor_type, attribute);
+    let extractor = extractor!(
+      id: "test".to_string(),
+      description: "Test extractor".to_string(),
+      selector: selector_path.to_vec(),
+      extractor_type: extractor_type,
+      attribute: attribute
+    );
     let result = extract_html_value(dom, selector_path, &extractor);
     assert!(result.is_ok(), "Extraction failed: {:?}", result.err());
     assert_eq!(result.unwrap(), expected_value);
@@ -805,8 +801,13 @@ mod tests {
     attribute: Option<String>,
     expected_error_type: fn(ExtractorError) -> bool,
   ) {
-    let extractor =
-      create_test_extractor("test", selector_path.to_vec(), extractor_type, attribute);
+    let extractor = extractor!(
+      id: "test".to_string(),
+      description: "Test extractor".to_string(),
+      selector: selector_path.to_vec(),
+      extractor_type: extractor_type,
+      attribute: attribute
+    );
     let result = extract_html_value(dom, selector_path, &extractor);
     assert!(result.is_err(), "Expected error but got: {:?}", result.ok());
     let err = result.err().unwrap();
@@ -850,17 +851,17 @@ mod tests {
     );
 
     // Test 3: Extract all feature titles as an array
-    let extractor = create_test_extractor(
-      "feature_titles",
-      vec![
+    let extractor = extractor!(
+      id: "feature_titles".to_string(),
+      description: "Test extractor for feature_titles".to_string(),
+      selector: vec![
         "main".to_string(),
         "section.features-section".to_string(),
         "div.features-grid".to_string(),
         "article.feature-card".to_string(),
         "h3.feature-title".to_string(),
       ],
-      ExtractorType::Array,
-      None,
+      extractor_type: ExtractorType::Array
     );
 
     let result = extract_html_value(
@@ -883,9 +884,10 @@ mod tests {
     assert!(titles.contains(&json!("Infinitely Scalable")));
 
     // Test 4: Extract all feature ratings as numbers
-    let extractor = create_test_extractor(
-      "feature_ratings",
-      vec![
+    let extractor = extractor!(
+      id: "feature_ratings".to_string(),
+      description: "Test extractor for feature_ratings".to_string(),
+      selector: vec![
         "main".to_string(),
         "section.features-section".to_string(),
         "div.features-grid".to_string(),
@@ -893,8 +895,8 @@ mod tests {
         "div.feature-meta".to_string(),
         "span.feature-rating".to_string(),
       ],
-      ExtractorType::Array,
-      Some("data-rating".to_string()),
+      extractor_type: ExtractorType::Array,
+      attribute: Some("data-rating".to_string())
     );
 
     let result = extract_html_value(
@@ -924,11 +926,12 @@ mod tests {
     let dom = parse_complex_test_html(&html);
 
     // Test 1: Extract meta tags with property attributes
-    let extractor = create_test_extractor(
-      "og_title",
-      vec!["head".to_string(), "meta[property='og:title']".to_string()],
-      ExtractorType::String,
-      Some("content".to_string()),
+    let extractor = extractor!(
+      id: "og_title".to_string(),
+      description: "Test extractor for og_title".to_string(),
+      selector: vec!["head".to_string(), "meta[property='og:title']".to_string()],
+      extractor_type: ExtractorType::String,
+      attribute: Some("content".to_string())
     );
 
     let result = extract_html_value(
@@ -941,11 +944,12 @@ mod tests {
     assert_eq!(result, json!("Complex Test Page"));
 
     // Test 2: Extract elements with data attributes
-    let extractor = create_test_extractor(
-      "active_nav",
-      vec!["nav.main-nav".to_string(), "a.active".to_string()],
-      ExtractorType::String,
-      Some("data-section".to_string()),
+    let extractor = extractor!(
+      id: "active_nav".to_string(),
+      description: "Test extractor for active_nav".to_string(),
+      selector: vec!["nav.main-nav".to_string(), "a.active".to_string()],
+      extractor_type: ExtractorType::String,
+      attribute: Some("data-section".to_string())
     );
 
     let result =
