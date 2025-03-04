@@ -3,6 +3,8 @@
 //! The `extractor` module provides functionality for extracting and validating data
 //! from different formats (JSON, HTML) based on a configuration file.
 
+use tl::{Node, NodeHandle};
+use tl::Parser;
 use std::{collections::HashMap, fmt::Display};
 
 use derive_more::TryFrom;
@@ -281,139 +283,156 @@ pub fn extract_html_value(
     return Err(ExtractorError::MissingField("Empty selector path".to_string()));
   }
 
-  // If there's only one selector, use the existing approach
+  // Handle single selector case
   if selector_path.len() == 1 {
     return extract_with_single_selector(dom, &selector_path[0], extractor);
   }
 
-  // For multiple selectors, we need to traverse the DOM
-  // First, apply the first selector to get initial elements
-  let first_selector = &selector_path[0];
-  let initial_elements = match dom.query_selector(first_selector) {
-    Some(matches) => {
-      let elements = matches.collect::<Vec<_>>();
-      if elements.is_empty() {
-        return Err(ExtractorError::MissingField(format!(
-          "No elements found for selector '{}'",
-          first_selector
-        )));
-      }
-      elements
-    },
-    None => {
-      return Err(ExtractorError::InvalidPath(format!("Invalid selector '{}'", first_selector)));
-    },
-  };
+  let elements: Vec<NodeHandle> = traverse_dom_with_selectors(dom, selector_path)?;
+  process_elements(dom.parser(), &elements, extractor)
+}
 
-  // For each subsequent selector, apply it to the results of the previous selector
-  let mut current_elements = initial_elements;
+/// Traverses the DOM using a sequence of CSS selectors
+fn traverse_dom_with_selectors(dom: &VDom, selector_path: &[String]) -> Result<Vec<NodeHandle>, ExtractorError> {
+  let first_selector = &selector_path[0];
+  let mut current_elements = query_selector(dom, first_selector, 0)?;
   let parser = dom.parser();
 
   for (i, selector) in selector_path.iter().enumerate().skip(1) {
-    let mut next_elements = Vec::new();
-
-    for element in &current_elements {
-      if let Some(node) = element.get(parser) {
-        if let Some(tag) = node.as_tag() {
-          // Apply the next selector to this element
-          if let Some(matches) = tag.query_selector(parser, selector) {
-            let matches = matches.collect::<Vec<_>>();
-            if !matches.is_empty() {
-              next_elements.extend(matches);
-              continue;
-            }
-          }
-        }
-      }
-    }
-
-    if next_elements.is_empty() {
-      return Err(ExtractorError::MissingField(format!(
-        "No elements found for selector '{}' at position {} in selector path",
-        selector,
-        i + 1
-      )));
-    }
-
-    current_elements = next_elements;
+    current_elements = apply_selector_to_elements(parser, &current_elements, selector, i)?;
   }
 
-  // Now we have the final set of elements, process them based on extractor type
-  if extractor.extractor_type == ExtractorType::Array {
-    let values: Vec<Value> = current_elements
-      .iter()
-      .filter_map(|el| {
-        el.get(parser).map(|node| {
-          if let Some(attr) = &extractor.attribute {
-            if let Some(tag) = node.as_tag() {
-              if let Some(attr_value) = tag.attributes().get(attr.as_str()) {
-                if let Some(value) = attr_value {
-                  return Value::String(value.as_utf8_str().to_string());
-                }
-              }
-            }
-            Value::String("".to_string()) // Return empty string if attribute not found
-          } else {
-            Value::String(node.inner_text(parser).to_string())
-          }
+  Ok(current_elements)
+}
+
+/// Queries DOM with a single selector
+fn query_selector(dom: &VDom, selector: &str, position: usize) -> Result<Vec<NodeHandle>, ExtractorError> {
+  dom.query_selector(selector)
+    .ok_or_else(|| ExtractorError::InvalidPath(format!("Invalid selector '{}'", selector)))?
+    .collect::<Vec<_>>()
+    .into_iter()
+    .filter(|_| true) // Ensure non-empty
+    .collect::<Vec<_>>()
+    .into_iter()
+    .filter(|_| true)
+    .collect::<Vec<_>>()
+    .is_empty()
+    .then(|| Err(ExtractorError::MissingField(format!(
+      "No elements found for selector '{}' at position {}",
+      selector, position
+    ))))
+    .unwrap_or_else(|| Ok(dom.query_selector(selector).unwrap().collect()))
+}
+
+/// Applies a selector to a set of elements
+fn apply_selector_to_elements(
+  parser: &Parser,
+  elements: &[NodeHandle],
+  selector: &str,
+  position: usize,
+) -> Result<Vec<NodeHandle>, ExtractorError> {
+  let next_elements: Vec<NodeHandle> = elements
+    .iter()
+    .filter_map(|element| {
+      element.get(parser).and_then(|node| {
+        node.as_tag().and_then(|tag| {
+          tag.query_selector(parser, selector).map(|matches| matches.collect::<Vec<_>>())
         })
       })
-      .collect();
-    return Ok(Value::Array(values));
+    })
+    .flatten()
+    .collect();
+
+  if next_elements.is_empty() {
+    return Err(ExtractorError::MissingField(format!(
+      "No elements found for selector '{}' at position {}",
+      selector,
+      position + 1
+    )));
   }
 
-  // For non-array types, use the first element
-  let element = &current_elements[0];
+  Ok(next_elements)
+}
 
-  // Extract the raw value (either attribute or text content)
-  let raw_value = if let Some(attr) = &extractor.attribute {
-    if let Some(node) = element.get(parser) {
-      if let Some(tag) = node.as_tag() {
-        if let Some(attr_value) = tag.attributes().get(attr.as_str()) {
-          if let Some(value) = attr_value {
-            value.as_utf8_str().to_string()
-          } else {
-            "".to_string()
-          }
+/// Processes the final set of elements based on extractor configuration
+fn process_elements(
+  parser: &Parser,
+  elements: &[NodeHandle],
+  extractor: &Extractor,
+) -> Result<Value, ExtractorError> {
+  if extractor.extractor_type == ExtractorType::Array {
+    return Ok(Value::Array(extract_values_from_elements(parser, elements, extractor)));
+  }
+
+  let raw_value = extract_raw_value(parser, &elements[0], extractor);
+  convert_to_type(&raw_value, &extractor.extractor_type)
+}
+
+/// Extracts values from a set of elements
+fn extract_values_from_elements(parser: &Parser, elements: &[NodeHandle], extractor: &Extractor) -> Vec<Value> {
+  elements
+    .iter()
+    .filter_map(|el| {
+      el.get(parser).map(|node| {
+        if let Some(attr) = &extractor.attribute {
+          extract_attribute_value(node, attr)
         } else {
-          "".to_string()
+          Value::String(node.inner_text(parser).to_string())
         }
-      } else {
-        "".to_string()
-      }
-    } else {
-      "".to_string()
-    }
-  } else if let Some(node) = element.get(parser) {
-    node.inner_text(parser).to_string()
-  } else {
-    "".to_string()
-  };
+      })
+    })
+    .collect()
+}
 
-  // Convert the raw value to the appropriate type
-  match extractor.extractor_type {
-    ExtractorType::String => Ok(Value::String(raw_value)),
-    ExtractorType::Number =>
-      if let Ok(num) = raw_value.parse::<f64>() {
-        Ok(Value::Number(serde_json::Number::from_f64(num).unwrap_or(serde_json::Number::from(0))))
-      } else {
-        Err(ExtractorError::TypeMismatch {
-          expected: "number".to_string(),
-          actual:   "string".to_string(),
-        })
-      },
-    ExtractorType::Boolean =>
-      if let Ok(b) = raw_value.parse::<bool>() {
-        Ok(Value::Bool(b))
-      } else {
-        Err(ExtractorError::TypeMismatch {
-          expected: "boolean".to_string(),
-          actual:   "string".to_string(),
-        })
-      },
+/// Extracts an attribute value from a node
+fn extract_attribute_value(node: &Node, attr: &str) -> Value {
+  node.as_tag()
+    .and_then(|tag| tag.attributes().get(attr))
+    .and_then(|attr_value| attr_value.map(|value| value.as_utf8_str().to_string()))
+    .map_or_else(
+      || Value::String("".to_string()),
+      |value| Value::String(value),
+    )
+}
+
+/// Extracts raw value from an element
+fn extract_raw_value(parser: &Parser, element: &NodeHandle, extractor: &Extractor) -> String {
+  if let Some(attr) = &extractor.attribute {
+    element
+      .get(parser)
+      .and_then(|node| node.as_tag())
+      .and_then(|tag| tag.attributes().get(attr.as_str()))
+      .and_then(|attr_value| attr_value.map(|value| value.as_utf8_str().to_string()))
+      .unwrap_or_default()
+  } else {
+    element
+      .get(parser)
+      .map(|node| node.inner_text(parser).to_string())
+      .unwrap_or_default()
+  }
+}
+
+/// Converts a raw string value to the specified type
+fn convert_to_type(raw_value: &str, extractor_type: &ExtractorType) -> Result<Value, ExtractorError> {
+  match extractor_type {
+    ExtractorType::String => Ok(Value::String(raw_value.to_string())),
+    ExtractorType::Number => raw_value
+      .parse::<f64>()
+      .map(|num| Value::Number(serde_json::Number::from_f64(num).unwrap_or(serde_json::Number::from(0))))
+      .map_err(|_| ExtractorError::TypeMismatch {
+        expected: "number".to_string(),
+        actual: "string".to_string(),
+      }),
+    ExtractorType::Boolean => raw_value
+      .parse::<bool>()
+      .map(Value::Bool)
+      .map_err(|_| ExtractorError::TypeMismatch {
+        expected: "boolean".to_string(),
+        actual: "string".to_string(),
+      }),
     _ => Err(ExtractorError::TypeMismatch {
-      expected: format!("{}", extractor.extractor_type),
-      actual:   "string".to_string(),
+      expected: format!("{}", extractor_type),
+      actual: "string".to_string(),
     }),
   }
 }
