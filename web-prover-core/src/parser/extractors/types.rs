@@ -7,7 +7,7 @@ use std::{collections::HashMap, fmt::Display};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::parser::{errors::ExtractorError, predicate::Predicate};
+use crate::parser::{common::get_value_type, errors::ExtractorError, predicate::Predicate};
 
 /// The type of data being extracted
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -23,6 +23,22 @@ pub enum ExtractorType {
   Array,
   /// Object type
   Object,
+}
+
+impl ExtractorType {
+  pub fn is_valid_type(&self, value: &Value) -> Result<(), ExtractorError> {
+    let actual_type = get_value_type(value);
+    let expected_type_str = self.to_string();
+
+    if actual_type != expected_type_str {
+      return Err(ExtractorError::TypeMismatch {
+        expected: expected_type_str,
+        actual:   actual_type.to_string(),
+      });
+    }
+
+    Ok(())
+  }
 }
 
 impl TryFrom<&str> for ExtractorType {

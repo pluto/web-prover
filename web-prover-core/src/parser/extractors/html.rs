@@ -3,10 +3,7 @@ use std::collections::HashMap;
 use serde_json::Value;
 use tl::{Node, NodeHandle, Parser, ParserOptions, VDom};
 
-use super::{
-  types::{ExtractionResult, Extractor, ExtractorType},
-  utils,
-};
+use super::types::{ExtractionResult, Extractor, ExtractorType};
 use crate::parser::{predicate, DataFormat, ExtractorConfig, ExtractorError};
 
 /// Extracts data from HTML using CSS selectors
@@ -28,7 +25,7 @@ pub fn extract_html(
     match extract_html_value(&dom, &extractor.selector, extractor) {
       Ok(value) => {
         // Validate the type
-        if let Err(type_err) = utils::validate_type(&value, &extractor.extractor_type) {
+        if let Err(type_err) = extractor.extractor_type.is_valid_type(&value) {
           if extractor.required {
             match &type_err {
               ExtractorError::TypeMismatch { expected, actual } => {

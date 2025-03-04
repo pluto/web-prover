@@ -4,8 +4,7 @@ use serde_json::Value;
 use crate::parser::{
   common::get_value_type,
   errors::ExtractorError,
-  extractors,
-  extractors::{html::extract_html, ExtractionResult, Extractor},
+  extractors::{extract_html, extract_json, ExtractionResult, Extractor},
 };
 
 /// The format of the data to extract from
@@ -35,7 +34,7 @@ impl ExtractorConfig {
       DataFormat::Json => {
         // For JSON, we expect the data to be an object or array
         match data {
-          Value::Object(_) | Value::Array(_) => extractors::extract_json(data, self),
+          Value::Object(_) | Value::Array(_) => extract_json(data, self),
           _ => Err(ExtractorError::TypeMismatch {
             expected: "object or array".to_string(),
             actual:   get_value_type(data).to_string(),
@@ -281,7 +280,7 @@ mod tests {
             id: "username".to_string(),
             description: "User's name".to_string(),
             selector: vec!["#username".to_string()],
-            extractor_type: extractors::ExtractorType::String
+            extractor_type: ExtractorType::String
         ),
         extractor!(
             id: "age".to_string(),

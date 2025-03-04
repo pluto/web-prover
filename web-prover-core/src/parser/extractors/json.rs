@@ -2,10 +2,7 @@ use std::collections::HashMap;
 
 use serde_json::Value;
 
-use super::{
-  types::{ExtractionResult, ExtractorType},
-  utils,
-};
+use super::types::ExtractionResult;
 use crate::parser::{
   common::get_value_type, errors::ExtractorError, predicate, DataFormat, ExtractorConfig,
 };
@@ -25,7 +22,7 @@ pub fn extract_json(
     match extract_json_value(json, &extractor.selector) {
       Ok(value) => {
         // Validate the type
-        if let Err(type_err) = utils::validate_type(&value, &extractor.extractor_type) {
+        if let Err(type_err) = extractor.extractor_type.is_valid_type(&value) {
           if extractor.required {
             match &type_err {
               ExtractorError::TypeMismatch { expected, actual } => {
@@ -109,18 +106,19 @@ fn extract_json_value(json: &Value, path: &[String]) -> Result<Value, ExtractorE
 mod tests {
   use serde_json::json;
 
-  use super::*;
   use crate::{
     extractor,
     parser::{
       predicate::{Comparison, PredicateType},
       test_utils::{assert_extraction_error, assert_extraction_success, create_json_config},
+      ExtractorType,
     },
     predicate,
   };
 
   mod basic_extraction {
     use super::*;
+    use crate::parser::ExtractorType;
 
     #[test]
     fn simple_object_extraction() {
@@ -166,6 +164,7 @@ mod tests {
 
   mod error_handling {
     use super::*;
+    use crate::parser::ExtractorType;
 
     #[test]
     fn invalid_key() {
@@ -258,6 +257,7 @@ mod tests {
 
   mod complex_structures {
     use super::*;
+    use crate::parser::ExtractorType;
 
     #[test]
     fn nested_arrays() {
