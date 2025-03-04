@@ -22,6 +22,7 @@ macro_rules! extractor {
             extractor_type: crate::parser::ExtractorType::String,
             required: true,
             predicates: Vec::new(),
+            attribute: None,
         };
 
         // Override default fields with provided arguments
