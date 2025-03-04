@@ -5,7 +5,7 @@ use crate::parser::{
   common::get_value_type,
   errors::ExtractorError,
   extractors,
-  extractors::{extract_html, ExtractionResult, Extractor},
+  extractors::{html::extract_html, ExtractionResult, Extractor},
 };
 
 /// The format of the data to extract from
