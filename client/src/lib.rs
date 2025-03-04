@@ -88,11 +88,7 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, Clie
     tlsn_native::setup_tcp_connection(&mut config, prover_config).await
   };
 
-  let manifest = match config.proving.manifest.clone() {
-    Some(m) => m,
-    None => return Err(errors::ClientErrors::ManifestMissingError),
-  };
-
+  let manifest = config.manifest.clone();
   let p = tlsn::notarize(prover, &manifest).await?;
 
   let verify_response = verify(config, TlsnVerifyBody { manifest, proof: p.clone() }).await?;
@@ -123,7 +119,7 @@ pub async fn prover_inner_origo(
   let mut proof =
     origo::proxy_and_sign_and_generate_proof(config.clone(), proving_params, setup_data).await?;
 
-  let manifest = config.proving.manifest.clone().ok_or(ClientErrors::ManifestMissingError)?;
+  let manifest = config.manifest.clone();
 
   debug!("sending proof to proxy for verification");
   let verify_response = verify(config, origo::VerifyBody {
@@ -176,11 +172,11 @@ pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, ClientE
   );
 
   let proxy_config = ProxyConfig {
-    target_method:  config.target_method,
-    target_url:     config.target_url,
-    target_headers: config.target_headers,
+    target_method:  config.manifest.request.method.clone(),
+    target_url:     config.manifest.request.url.clone(),
+    target_headers: config.manifest.request.headers.clone(),
     target_body:    config.target_body,
-    manifest:       config.proving.manifest.unwrap(),
+    manifest:       config.manifest,
   };
 
   // TODO reqwest uses browsers fetch API for WASM target? if true, can't add trust anchors
