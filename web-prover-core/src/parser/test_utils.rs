@@ -1,7 +1,7 @@
 use serde_json::{json, Value};
 
 use crate::parser::{
-  extractor::ExtractionResult,
+  extractors::ExtractionResult,
   predicate::{Comparison, PredicateType},
   DataFormat, Extractor, ExtractorConfig, ExtractorType,
 };

@@ -3,14 +3,12 @@
 //! The `extractor` module provides functionality for extracting and validating data
 //! from different formats (JSON, HTML) based on a configuration file.
 
-use tl::{Node, NodeHandle};
-use tl::Parser;
 use std::{collections::HashMap, fmt::Display};
 
 use derive_more::TryFrom;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tl::{ParserOptions, VDom};
+use tl::{Node, NodeHandle, Parser, ParserOptions, VDom};
 
 use crate::parser::{
   common::get_value_type,
@@ -293,7 +291,10 @@ pub fn extract_html_value(
 }
 
 /// Traverses the DOM using a sequence of CSS selectors
-fn traverse_dom_with_selectors(dom: &VDom, selector_path: &[String]) -> Result<Vec<NodeHandle>, ExtractorError> {
+fn traverse_dom_with_selectors(
+  dom: &VDom,
+  selector_path: &[String],
+) -> Result<Vec<NodeHandle>, ExtractorError> {
   let first_selector = &selector_path[0];
   let mut current_elements = query_selector(dom, first_selector, 0)?;
   let parser = dom.parser();
@@ -306,7 +307,11 @@ fn traverse_dom_with_selectors(dom: &VDom, selector_path: &[String]) -> Result<V
 }
 
 /// Queries DOM with a single selector
-fn query_selector(dom: &VDom, selector: &str, position: usize) -> Result<Vec<NodeHandle>, ExtractorError> {
+fn query_selector(
+  dom: &VDom,
+  selector: &str,
+  position: usize,
+) -> Result<Vec<NodeHandle>, ExtractorError> {
   dom.query_selector(selector)
     .ok_or_else(|| ExtractorError::InvalidPath(format!("Invalid selector '{}'", selector)))?
     .collect::<Vec<_>>()
@@ -369,7 +374,11 @@ fn process_elements(
 }
 
 /// Extracts values from a set of elements
-fn extract_values_from_elements(parser: &Parser, elements: &[NodeHandle], extractor: &Extractor) -> Vec<Value> {
+fn extract_values_from_elements(
+  parser: &Parser,
+  elements: &[NodeHandle],
+  extractor: &Extractor,
+) -> Vec<Value> {
   elements
     .iter()
     .filter_map(|el| {
@@ -386,13 +395,11 @@ fn extract_values_from_elements(parser: &Parser, elements: &[NodeHandle], extrac
 
 /// Extracts an attribute value from a node
 fn extract_attribute_value(node: &Node, attr: &str) -> Value {
-  node.as_tag()
+  node
+    .as_tag()
     .and_then(|tag| tag.attributes().get(attr))
     .and_then(|attr_value| attr_value.map(|value| value.as_utf8_str().to_string()))
-    .map_or_else(
-      || Value::String("".to_string()),
-      |value| Value::String(value),
-    )
+    .map_or_else(|| Value::String("".to_string()), |value| Value::String(value))
 }
 
 /// Extracts raw value from an element
@@ -405,34 +412,34 @@ fn extract_raw_value(parser: &Parser, element: &NodeHandle, extractor: &Extracto
       .and_then(|attr_value| attr_value.map(|value| value.as_utf8_str().to_string()))
       .unwrap_or_default()
   } else {
-    element
-      .get(parser)
-      .map(|node| node.inner_text(parser).to_string())
-      .unwrap_or_default()
+    element.get(parser).map(|node| node.inner_text(parser).to_string()).unwrap_or_default()
   }
 }
 
 /// Converts a raw string value to the specified type
-fn convert_to_type(raw_value: &str, extractor_type: &ExtractorType) -> Result<Value, ExtractorError> {
+fn convert_to_type(
+  raw_value: &str,
+  extractor_type: &ExtractorType,
+) -> Result<Value, ExtractorError> {
   match extractor_type {
     ExtractorType::String => Ok(Value::String(raw_value.to_string())),
     ExtractorType::Number => raw_value
       .parse::<f64>()
-      .map(|num| Value::Number(serde_json::Number::from_f64(num).unwrap_or(serde_json::Number::from(0))))
+      .map(|num| {
+        Value::Number(serde_json::Number::from_f64(num).unwrap_or(serde_json::Number::from(0)))
+      })
       .map_err(|_| ExtractorError::TypeMismatch {
         expected: "number".to_string(),
-        actual: "string".to_string(),
+        actual:   "string".to_string(),
       }),
-    ExtractorType::Boolean => raw_value
-      .parse::<bool>()
-      .map(Value::Bool)
-      .map_err(|_| ExtractorError::TypeMismatch {
+    ExtractorType::Boolean =>
+      raw_value.parse::<bool>().map(Value::Bool).map_err(|_| ExtractorError::TypeMismatch {
         expected: "boolean".to_string(),
-        actual: "string".to_string(),
+        actual:   "string".to_string(),
       }),
     _ => Err(ExtractorError::TypeMismatch {
       expected: format!("{}", extractor_type),
-      actual: "string".to_string(),
+      actual:   "string".to_string(),
     }),
   }
 }
@@ -853,7 +860,7 @@ mod tests {
 
     use super::*;
     use crate::parser::{
-      extractor::{extract_html, extract_html_value},
+      extractors::{extract_html, extractor::extract_html_value},
       DataFormat, Extractor, ExtractorConfig, ExtractorError, ExtractorType,
     };
 
