@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use serde_json::Value;
 use tl::{Node, NodeHandle, Parser, ParserOptions, VDom};
 
@@ -15,7 +13,7 @@ pub fn extract_html(
     return Err(ExtractorError::InvalidFormat("HTML".to_string()));
   }
 
-  let mut result = ExtractionResult { values: HashMap::new(), errors: Vec::new() };
+  let mut result = ExtractionResult::default();
 
   // Parse the HTML document
   let dom = tl::parse(html_str, ParserOptions::default())
@@ -327,7 +325,6 @@ mod tests {
   use serde_json::{json, Value};
   use tl::{ParserOptions, VDom};
 
-  use super::*;
   use crate::{
     extractor,
     parser::{

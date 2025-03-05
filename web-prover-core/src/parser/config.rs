@@ -2,9 +2,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::parser::{
-  common::get_value_type,
   errors::ExtractorError,
-  extractors::{extract_html, extract_json, ExtractionResult, Extractor},
+  extractors::{extract_html, extract_json, get_value_type, ExtractionResult, Extractor},
 };
 
 /// The format of the data to extract from

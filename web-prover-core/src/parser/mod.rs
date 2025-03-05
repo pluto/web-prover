@@ -1,4 +1,3 @@
-mod common;
 mod config;
 mod errors;
 mod predicate;
