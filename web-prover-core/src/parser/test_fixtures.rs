@@ -1,18 +1,17 @@
-use serde_json::json;
 use std::fs;
 
-use serde_json::Value;
+use serde_json::{json, Value};
 
 use crate::parser::config::ExtractorConfig;
 
 #[test]
 fn test_coinbase_extraction() {
-    let json_data: Value =
-        serde_json::from_str(&fs::read_to_string("../web-prover-core/fixtures/coinbase.json").unwrap())
-            .unwrap();
+  let json_data: Value =
+    serde_json::from_str(&fs::read_to_string("../web-prover-core/fixtures/coinbase.json").unwrap())
+      .unwrap();
 
-    // Create extractor config for Ethereum data
-    let eth_config = serde_json::from_value::<ExtractorConfig>(json!({
+  // Create extractor config for Ethereum data
+  let eth_config = serde_json::from_value::<ExtractorConfig>(json!({
     "format": "json",
     "extractors": [
       {
@@ -47,8 +46,8 @@ fn test_coinbase_extraction() {
     ]
   })).unwrap();
 
-    // Create extractor config for USDC data
-    let usdc_config = serde_json::from_value::<ExtractorConfig>(json!({
+  // Create extractor config for USDC data
+  let usdc_config = serde_json::from_value::<ExtractorConfig>(json!({
     "format": "json",
     "extractors": [
       {
@@ -83,26 +82,32 @@ fn test_coinbase_extraction() {
     ]
   })).unwrap();
 
-    // Extract data using the configs
-    let eth_result = eth_config.extract_and_validate(&json_data).unwrap();
-    let usdc_result = usdc_config.extract_and_validate(&json_data).unwrap();
+  // Extract data using the configs
+  let eth_result = eth_config.extract_and_validate(&json_data).unwrap();
+  let usdc_result = usdc_config.extract_and_validate(&json_data).unwrap();
 
-    // Verify Ethereum extraction
-    assert_eq!(eth_result.errors.len(), 0);
-    assert_eq!(eth_result.values.len(), 4);
-    assert_eq!(eth_result.values.get("eth_name").unwrap().as_str().unwrap(), "Ethereum");
-    assert_eq!(eth_result.values.get("eth_price").unwrap().as_str().unwrap(), "8.405987856750084");
-    assert_eq!(eth_result.values.get("eth_balance").unwrap().as_str().unwrap(), "0.000523067532462");
-    assert_eq!(
-        eth_result.values.get("eth_balance_fiat").unwrap().as_str().unwrap(),
-        "1.21843089477932049"
-    );
+  // Verify Ethereum extraction
+  assert_eq!(eth_result.errors.len(), 0);
+  assert_eq!(eth_result.values.len(), 4);
+  assert_eq!(eth_result.values.get("eth_name").unwrap().as_str().unwrap(), "Ethereum");
+  assert_eq!(eth_result.values.get("eth_price").unwrap().as_str().unwrap(), "8.405987856750084");
+  assert_eq!(eth_result.values.get("eth_balance").unwrap().as_str().unwrap(), "0.000523067532462");
+  assert_eq!(
+    eth_result.values.get("eth_balance_fiat").unwrap().as_str().unwrap(),
+    "1.21843089477932049"
+  );
 
-    // Verify USDC extraction
-    assert_eq!(usdc_result.errors.len(), 0);
-    assert_eq!(usdc_result.values.len(), 4);
-    assert_eq!(usdc_result.values.get("usdc_name").unwrap().as_str().unwrap(), "USDC");
-    assert_eq!(usdc_result.values.get("usdc_price").unwrap().as_str().unwrap(), "1");
-    assert_eq!(usdc_result.values.get("usdc_balance").unwrap().as_str().unwrap(), "8.967465955899945");
-    assert_eq!(usdc_result.values.get("usdc_balance_fiat").unwrap().as_str().unwrap(), "8.967465955899945");
+  // Verify USDC extraction
+  assert_eq!(usdc_result.errors.len(), 0);
+  assert_eq!(usdc_result.values.len(), 4);
+  assert_eq!(usdc_result.values.get("usdc_name").unwrap().as_str().unwrap(), "USDC");
+  assert_eq!(usdc_result.values.get("usdc_price").unwrap().as_str().unwrap(), "1");
+  assert_eq!(
+    usdc_result.values.get("usdc_balance").unwrap().as_str().unwrap(),
+    "8.967465955899945"
+  );
+  assert_eq!(
+    usdc_result.values.get("usdc_balance_fiat").unwrap().as_str().unwrap(),
+    "8.967465955899945"
+  );
 }
