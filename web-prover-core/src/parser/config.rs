@@ -6,7 +6,7 @@ use serde_json::Value;
 use crate::parser::{
   errors::ExtractorError,
   extractors::{ExtractionResult, Extractor},
-  format::{FormatExtractor, HtmlExtractor, JsonExtractor},
+  DocumentExtractor, HtmlDocumentExtractor, JsonDocumentExtractor,
 };
 
 /// The format of the data to extract from
@@ -39,10 +39,11 @@ pub struct ExtractorConfig {
 }
 
 impl ExtractorConfig {
+  /// Use document-specific extractors to extract and validate data
   pub fn extract_and_validate(&self, data: &Value) -> Result<ExtractionResult, ExtractorError> {
-    let extractor: Box<dyn FormatExtractor> = match self.format {
-      DataFormat::Json => Box::new(JsonExtractor),
-      DataFormat::Html => Box::new(HtmlExtractor),
+    let extractor: Box<dyn DocumentExtractor> = match self.format {
+      DataFormat::Json => Box::new(JsonDocumentExtractor),
+      DataFormat::Html => Box::new(HtmlDocumentExtractor),
     };
 
     extractor.validate_input(data)?;

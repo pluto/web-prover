@@ -8,8 +8,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::parser::{
-  extractors::get_value_type, predicate, predicate::Predicate, DataFormat, ExtractorError,
+  extractors::get_value_type, predicate, predicate::Predicate, DataFormat, ExtractorConfig,
+  ExtractorError,
 };
+
+/// Trait for extracting data from a document
+pub trait DocumentExtractor {
+  fn validate_input(&self, data: &Value) -> Result<(), ExtractorError>;
+  fn extract(
+    &self,
+    data: &Value,
+    config: &ExtractorConfig,
+  ) -> Result<ExtractionResult, ExtractorError>;
+}
 
 /// The type of data being extracted
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -112,26 +123,12 @@ pub struct ExtractionResult {
   pub errors: Vec<String>,
 }
 
-pub enum ExtractedValue {
-  Json(Value),
-  Html(Value),
-}
-
-impl ExtractedValue {
-  pub fn into_value(self) -> Value {
-    match self {
-      ExtractedValue::Json(v) | ExtractedValue::Html(v) => v,
-    }
-  }
-}
-
-pub trait RawDocument {
-  fn extract_value(&self, extractor: &Extractor) -> Result<ExtractedValue, ExtractorError>;
-  fn validate_format(&self, format: &DataFormat) -> Result<(), ExtractorError>;
-}
-
 impl ExtractionResult {
-  pub fn process_value(
+  /// Processes the extracted value based on the extractor configuration.
+  /// If the extraction is required and fails, the error is added to the result.
+  /// If the extraction is not required, the error is ignored.
+  /// If the extraction is successful, the value is added to the result.
+  pub fn process_extraction(
     &mut self,
     value: Result<ExtractedValue, ExtractorError>,
     extractor: &Extractor,
@@ -171,4 +168,24 @@ impl ExtractionResult {
   fn add_error(&mut self, extractor: &Extractor, error: ExtractorError) {
     self.errors.push(format!("Extractor '{}': {}", extractor.id, error));
   }
+}
+
+/// The value extracted from the raw document
+pub enum ExtractedValue {
+  Json(Value),
+  Html(Value),
+}
+
+impl ExtractedValue {
+  pub fn into_value(self) -> Value {
+    match self {
+      ExtractedValue::Json(v) | ExtractedValue::Html(v) => v,
+    }
+  }
+}
+
+/// Trait for raw document, providing methods to extract values and validate format
+pub trait RawDocument {
+  fn extract_value(&self, extractor: &Extractor) -> Result<ExtractedValue, ExtractorError>;
+  fn validate_format(&self, format: &DataFormat) -> Result<(), ExtractorError>;
 }

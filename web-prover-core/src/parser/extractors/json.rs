@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use super::types::{ExtractedValue, ExtractionResult, RawDocument};
+use super::types::{DocumentExtractor, ExtractedValue, ExtractionResult, RawDocument};
 use crate::parser::{errors::ExtractorError, DataFormat, Extractor, ExtractorConfig};
 
 /// Helper function to get the type of serde_json::Value as a string
@@ -32,6 +32,28 @@ impl RawDocument for RawJsonHandle {
   }
 }
 
+pub struct JsonDocumentExtractor;
+
+impl DocumentExtractor for JsonDocumentExtractor {
+  fn validate_input(&self, data: &Value) -> Result<(), ExtractorError> {
+    if !matches!(data, Value::Object(_) | Value::Array(_)) {
+      return Err(ExtractorError::TypeMismatch {
+        expected: "object or array".to_string(),
+        actual:   get_value_type(data).to_string(),
+      });
+    }
+    Ok(())
+  }
+
+  fn extract(
+    &self,
+    data: &Value,
+    config: &ExtractorConfig,
+  ) -> Result<ExtractionResult, ExtractorError> {
+    extract_json(data, config)
+  }
+}
+
 /// Extracts data from a JSON value using the provided extractor configuration
 pub fn extract_json(
   json: &Value,
@@ -43,7 +65,7 @@ pub fn extract_json(
   let mut result = ExtractionResult::default();
   for extractor in &config.extractors {
     let value = handle.extract_value(&extractor);
-    result.process_value(value, extractor);
+    result.process_extraction(value, extractor);
   }
 
   Ok(result)

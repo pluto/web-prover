@@ -1,14 +1,16 @@
 use serde_json::Value;
 use tl::{Node, NodeHandle, Parser, ParserOptions, VDom};
 
-use super::types::{ExtractedValue, ExtractionResult, RawDocument};
-use crate::parser::{DataFormat, Extractor, ExtractorConfig, ExtractorError, ExtractorType};
+use super::types::{DocumentExtractor, ExtractedValue, ExtractionResult, RawDocument};
+use crate::parser::{
+  extractors::get_value_type, DataFormat, Extractor, ExtractorConfig, ExtractorError, ExtractorType,
+};
 
-pub struct RawHtmlValue<'a> {
+pub struct RawHtmlDocument<'a> {
   dom: &'a VDom<'a>,
 }
 
-impl RawDocument for RawHtmlValue<'_> {
+impl RawDocument for RawHtmlDocument<'_> {
   fn extract_value(&self, extractor: &Extractor) -> Result<ExtractedValue, ExtractorError> {
     extract_html_value(self.dom, &extractor.selector, extractor).map(ExtractedValue::Html)
   }
@@ -21,28 +23,50 @@ impl RawDocument for RawHtmlValue<'_> {
   }
 }
 
-pub fn extract_html(
+pub struct HtmlDocumentExtractor;
+
+impl DocumentExtractor for HtmlDocumentExtractor {
+  fn validate_input(&self, data: &Value) -> Result<(), ExtractorError> {
+    if !matches!(data, Value::String(_)) {
+      return Err(ExtractorError::TypeMismatch {
+        expected: "string".to_string(),
+        actual:   get_value_type(data).to_string(),
+      });
+    }
+    Ok(())
+  }
+
+  fn extract(
+    &self,
+    data: &Value,
+    config: &ExtractorConfig,
+  ) -> Result<ExtractionResult, ExtractorError> {
+    data.as_str().map(|s| extract_html(s, config)).unwrap_or_else(|| unreachable!())
+  }
+}
+
+fn extract_html(
   html_str: &str,
   config: &ExtractorConfig,
 ) -> Result<ExtractionResult, ExtractorError> {
   let dom = tl::parse(html_str, ParserOptions::default())
     .map_err(|err| ExtractorError::InvalidHtml(err.to_string()))?;
 
-  let raw_html = RawHtmlValue { dom: &dom };
+  let raw_html = RawHtmlDocument { dom: &dom };
   raw_html.validate_format(&config.format)?;
 
   let mut result = ExtractionResult::default();
 
   for extractor in &config.extractors {
     let value = raw_html.extract_value(extractor);
-    result.process_value(value, extractor);
+    result.process_extraction(value, extractor);
   }
 
   Ok(result)
 }
 
 /// Extracts a value from an HTML document using CSS selectors
-pub fn extract_html_value(
+fn extract_html_value(
   dom: &VDom,
   selector_path: &[String],
   extractor: &Extractor,
