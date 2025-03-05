@@ -1,9 +1,12 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::parser::{
   errors::ExtractorError,
-  extractors::{extract_html, extract_json, get_value_type, ExtractionResult, Extractor},
+  extractors::{ExtractionResult, Extractor},
+  format::{FormatExtractor, HtmlExtractor, JsonExtractor},
 };
 
 /// The format of the data to extract from
@@ -27,31 +30,14 @@ pub struct ExtractorConfig {
 }
 
 impl ExtractorConfig {
-  /// Extracts and validates data using this extractor configuration
   pub fn extract_and_validate(&self, data: &Value) -> Result<ExtractionResult, ExtractorError> {
-    match self.format {
-      DataFormat::Json => {
-        // For JSON, we expect the data to be an object or array
-        match data {
-          Value::Object(_) | Value::Array(_) => extract_json(data, self),
-          _ => Err(ExtractorError::TypeMismatch {
-            expected: "object or array".to_string(),
-            actual:   get_value_type(data).to_string(),
-          }),
-        }
-      },
-      DataFormat::Html => {
-        // For HTML, we expect the data to be a string value
-        if let Value::String(html_str) = data {
-          extract_html(html_str, self)
-        } else {
-          Err(ExtractorError::TypeMismatch {
-            expected: "string".to_string(),
-            actual:   get_value_type(data).to_string(),
-          })
-        }
-      },
-    }
+    let extractor: Box<dyn FormatExtractor> = match self.format {
+      DataFormat::Json => Box::new(JsonExtractor),
+      DataFormat::Html => Box::new(HtmlExtractor),
+    };
+
+    extractor.validate_input(data)?;
+    extractor.extract(data, self)
   }
 }
 

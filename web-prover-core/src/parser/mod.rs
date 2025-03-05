@@ -3,6 +3,7 @@ mod errors;
 mod predicate;
 
 mod extractors;
+pub(crate) mod format;
 #[cfg(test)] mod test_fixtures;
 #[cfg(test)] mod test_utils;
 
