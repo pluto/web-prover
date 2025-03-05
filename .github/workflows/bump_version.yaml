@@ -11,24 +11,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  verify-permissions:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check Token Permissions
-        run: |
-          # Test repository write access
-          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-               -H "Accept: application/vnd.github.v3+json" \
-               "https://api.github.com/repos/${{ github.repository }}" | \
-          jq -e '.permissions.push == true and .permissions.pull_requests == true' || {
-            echo "Error: Token does not have required permissions (push and pull_request)"
-            echo "Please ensure the workflow has 'contents: write' and 'pull-requests: write' permissions"
-            exit 1
-          }
-          echo "✓ Token permissions verified successfully"
-
   version-bump:
-    needs: verify-permissions
     if: ${{ !contains(github.event.head_commit.message, 'bump version') }}
     runs-on: ubuntu-latest
     steps:
@@ -37,11 +20,9 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
           
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
+      - uses: ./.github/actions/setup-rust-ubuntu
         with:
-          profile: minimal
-          toolchain: stable
+          rust-cache-key: version-bump
           
       - name: Cache cargo-edit
         uses: actions/cache@v3
