@@ -217,7 +217,7 @@ impl NotaryResponse {
   fn body_matches(
     &self,
     other: &ManifestResponse,
-  ) -> Result<Option<ExtractionValues>, WebProverCoreError> {
+  ) -> Result<Option<ExtractionValues>, ManifestError> {
     match &self.notary_response_body.json {
       Some(json) => {
         let result = other.body.0.extract_and_validate(json)?;
@@ -1165,6 +1165,18 @@ pub mod tests {
         });
       }
 
-    assert!(request.validate_vars().is_ok());
+      let json = NotaryResponseBody { json: Some(json_value) };
+
+      // Build the path
+      let mut path = Vec::new();
+      for i in 0..depth {
+        path.push(JsonKey::String(format!("level{}", i)));
+      }
+      path.push(JsonKey::String("value".to_string()));
+
+      // Test the path
+      let result = json.matches_path(&path);
+      assert!(result, "Failed to match path at depth {}: {:?}", depth, path);
+    }
   }
 }
