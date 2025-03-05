@@ -10,7 +10,7 @@ crate-type=["staticlib"]
 
 [dependencies]
 # Local
-client={ workspace=true }
+client={ workspace=true, features=["tlsn"] }
 # Serde
 serde     ={ workspace=true }
 serde_json={ workspace=true }
