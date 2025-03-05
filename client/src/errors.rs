@@ -11,19 +11,32 @@ pub enum ClientErrors {
   #[error(transparent)]
   RustTls(#[from] rustls::Error),
 
+  #[cfg(feature = "tlsn")]
   #[error(transparent)]
   SpansyError(#[from] spansy::ParseError),
-
+  #[cfg(feature = "tlsn")]
   #[error(transparent)]
   HttpCommitError(#[from] tlsn_formats::http::HttpCommitError),
-
+  #[cfg(feature = "tlsn")]
   #[error(transparent)]
   TranscriptCommitConfigBuilderError(
     #[from] tlsn_core::transcript::TranscriptCommitConfigBuilderError,
   ),
-
+  #[cfg(feature = "tlsn")]
   #[error(transparent)]
   ProtocolConfigBuilder(#[from] tlsn_common::config::ProtocolConfigBuilderError),
+  #[cfg(feature = "tlsn")]
+  #[error(transparent)]
+  ProverError(#[from] tlsn_prover::ProverError),
+  #[cfg(feature = "tlsn")]
+  #[error(transparent)]
+  ProverConfigBuilder(#[from] tlsn_prover::ProverConfigBuilderError),
+  #[cfg(feature = "tlsn")]
+  #[error(transparent)]
+  TranscriptProofBuilderError(#[from] tlsn_core::transcript::TranscriptProofBuilderError),
+  #[cfg(feature = "tlsn")]
+  #[error(transparent)]
+  PresentationBuilderError(#[from] tlsn_core::presentation::PresentationBuilderError),
 
   #[error(transparent)]
   FromUtf8(#[from] std::string::FromUtf8Error),
@@ -67,17 +80,6 @@ pub enum ClientErrors {
   #[error(transparent)]
   UrlParse(#[from] url::ParseError),
 
-  #[error(transparent)]
-  ProverError(#[from] tlsn_prover::ProverError),
-
-  #[error(transparent)]
-  ProverConfigBuilder(#[from] tlsn_prover::ProverConfigBuilderError),
-
-  #[error(transparent)]
-  TranscriptProofBuilderError(#[from] tlsn_core::transcript::TranscriptProofBuilderError),
-
-  #[error(transparent)]
-  PresentationBuilderError(#[from] tlsn_core::presentation::PresentationBuilderError),
   #[error(transparent)]
   InvalidHeaderName(#[from] hyper::header::InvalidHeaderName),
 

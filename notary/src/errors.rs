@@ -5,7 +5,6 @@ use axum::{
 use eyre::Report;
 use proofs::errors::ProofError;
 use thiserror::Error;
-use tlsn_verifier::{VerifierConfigBuilderError, VerifierError};
 use tracing::error;
 use web_prover_core::errors::ManifestError;
 
@@ -111,12 +110,16 @@ pub enum NotaryServerError {
   ManifestError(#[from] ManifestError),
 }
 
-impl From<VerifierError> for NotaryServerError {
-  fn from(error: VerifierError) -> Self { Self::Notarization(Box::new(error)) }
+#[cfg(feature = "tlsn")]
+impl From<tlsn_verifier::VerifierError> for NotaryServerError {
+  fn from(error: tlsn_verifier::VerifierError) -> Self { Self::Notarization(Box::new(error)) }
 }
 
-impl From<VerifierConfigBuilderError> for NotaryServerError {
-  fn from(error: VerifierConfigBuilderError) -> Self { Self::Notarization(Box::new(error)) }
+#[cfg(feature = "tlsn")]
+impl From<tlsn_verifier::VerifierConfigBuilderError> for NotaryServerError {
+  fn from(error: tlsn_verifier::VerifierConfigBuilderError) -> Self {
+    Self::Notarization(Box::new(error))
+  }
 }
 
 /// Trait implementation to convert this error into an axum http response

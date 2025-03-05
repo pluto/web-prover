@@ -36,7 +36,7 @@ use crate::{
   axum_websocket::WebSocket,
   errors::NotaryServerError,
   origo::proxy_service,
-  tlsn::ProtocolUpgrade,
+  tcp::ProtocolUpgrade,
   verifier::{sign_verification, VerifyOutput},
   SharedState,
 };

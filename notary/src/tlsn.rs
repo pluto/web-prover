@@ -29,47 +29,13 @@ use ws_stream_tungstenite::WsStream;
 use crate::{
   axum_websocket::{WebSocket, WebSocketUpgrade},
   errors::NotaryServerError,
+  net::ProtocolUpgrade,
   tcp::{header_eq, TcpUpgrade},
   verifier::VerifyOutput,
   SharedState,
 };
 // TODO: use this place of our local file once this gets merged: https://github.com/tokio-rs/axum/issues/2848
 // use axum::extract::ws::{WebSocket, WebSocketUpgrade};
-
-/// A wrapper enum to facilitate extracting TCP connection for either WebSocket or TCP clients,
-/// so that we can use a single endpoint and handler for notarization for both types of clients
-pub enum ProtocolUpgrade {
-  Tcp(TcpUpgrade),
-  Ws(WebSocketUpgrade),
-}
-
-#[async_trait]
-impl<S> FromRequestParts<S> for ProtocolUpgrade
-where S: Send + Sync
-{
-  type Rejection = NotaryServerError;
-
-  async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-    info!("from_request_parts");
-    // Extract tcp connection for websocket client
-    if header_eq(&parts.headers, header::UPGRADE, "websocket") {
-      let extractor = WebSocketUpgrade::from_request_parts(parts, state)
-        .await
-        .map_err(|err| NotaryServerError::BadProverRequest(err.to_string()))?;
-      return Ok(Self::Ws(extractor));
-    // Extract tcp connection for tcp client
-    } else if header_eq(&parts.headers, header::UPGRADE, "tcp") {
-      let extractor = TcpUpgrade::from_request_parts(parts, state)
-        .await
-        .map_err(|err| NotaryServerError::BadProverRequest(err.to_string()))?;
-      return Ok(Self::Tcp(extractor));
-    } else {
-      return Err(NotaryServerError::BadProverRequest(
-        "Upgrade header is not set for client".to_string(),
-      ));
-    }
-  }
-}
 
 pub async fn notary_service<
   S: futures_util::AsyncWrite + futures_util::AsyncRead + Send + Unpin + 'static,

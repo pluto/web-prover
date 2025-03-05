@@ -40,9 +40,9 @@ mod proxy;
 mod tcp;
 mod tee;
 mod tls_parser;
-mod tlsn;
+#[cfg(feature = "tlsn")] mod tlsn;
 mod verifier;
-mod websocket_proxy;
+#[cfg(feature = "tlsn")] mod websocket_proxy;
 
 struct SharedState {
   notary_signing_key: SigningKey,
@@ -111,24 +111,31 @@ async fn main() -> Result<(), NotaryServerError> {
     verifier:           origo_verifier::initialize_verifier().unwrap(),
   });
 
-  let router = Router::new()
-    .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
-    .route("/v1/tlsnotary", get(tlsn::notarize))
-    .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
-    .route("/v1/tlsnotary/verify", post(tlsn::verify))
+  let mut router =
+    Router::new().route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }));
+
+  #[cfg(feature = "tlsn")]
+  {
+    router = router
+      .route("/v1/tlsnotary", get(tlsn::notarize))
+      .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
+      .route("/v1/tlsnotary/verify", post(tlsn::verify));
+  }
+
+  router = router
     .route("/v1/origo", get(origo::proxy))
     .route("/v1/tee", get(tee::proxy))
     .route("/v1/origo/sign", post(origo::sign))
     .route("/v1/origo/verify", post(origo::verify))
     .route("/v1/proxy", post(proxy::proxy))
     .route("/v1/meta/keys/:key", get(meta_keys))
-    .layer(CorsLayer::permissive())
-    .with_state(shared_state);
+    .layer(CorsLayer::permissive());
 
   if !c.server_cert.is_empty() || !c.server_key.is_empty() {
-    let _ = listen(listener, router, &c.server_cert, &c.server_key).await;
+    let _ = listen(listener, router.with_state(shared_state), &c.server_cert, &c.server_key).await;
   } else {
-    let _ = acme_listen(listener, router, &c.acme_domain, &c.acme_email).await;
+    let _ =
+      acme_listen(listener, router.with_state(shared_state), &c.acme_domain, &c.acme_email).await;
   }
   Ok(())
 }

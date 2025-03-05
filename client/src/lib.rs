@@ -1,8 +1,10 @@
 extern crate core;
 
-pub mod tlsn;
-#[cfg(not(target_arch = "wasm32"))] mod tlsn_native;
-#[cfg(target_arch = "wasm32")] mod tlsn_wasm32;
+#[cfg(feature = "tlsn")] pub mod tlsn;
+#[cfg(all(feature = "tlsn", not(target_arch = "wasm32")))]
+mod tlsn_native;
+#[cfg(all(feature = "tlsn", target_arch = "wasm32"))]
+mod tlsn_wasm32;
 
 pub mod origo;
 #[cfg(not(target_arch = "wasm32"))] mod origo_native;
@@ -22,10 +24,13 @@ use proofs::{
   program::data::UninitializedSetup,
 };
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "tlsn")]
 use tlsn::{TlsnProof, TlsnVerifyBody};
+#[cfg(feature = "tlsn")]
 use tlsn_common::config::ProtocolConfig;
+#[cfg(feature = "tlsn")]
 pub use tlsn_core::attestation::Attestation;
-use tlsn_prover::ProverConfig;
+#[cfg(feature = "tlsn")] use tlsn_prover::ProverConfig;
 use tracing::{debug, info};
 use web_prover_core::{
   manifest::Manifest,
@@ -36,6 +41,7 @@ use crate::errors::ClientErrors;
 
 #[derive(Debug, Serialize)]
 pub enum Proof {
+  #[cfg(feature = "tlsn")]
   Tlsn(TlsnProof),
   Origo(OrigoProof),
   TEE(TeeProof),
@@ -53,13 +59,15 @@ pub async fn prover_inner(
 ) -> Result<Proof, ClientErrors> {
   info!("GIT_HASH: {}", env!("GIT_HASH"));
   match config.mode {
-    config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
+    #[cfg(feature = "tlsn")]
+    config::NotaryMode::Tlsn => prover_inner_tlsn(config).await,
     config::NotaryMode::Origo => prover_inner_origo(config, proving_params, setup_data).await,
     config::NotaryMode::TEE => prover_inner_tee(config).await,
     config::NotaryMode::Proxy => prover_inner_proxy(config).await,
   }
 }
 
+#[cfg(feature = "tlsn")]
 pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, ClientErrors> {
   let max_sent_data = config
     .max_sent_data

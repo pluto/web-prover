@@ -10,9 +10,44 @@ use axum_core::body::Body;
 use http::header::{HeaderMap, HeaderName};
 use hyper::upgrade::{OnUpgrade, Upgraded};
 use hyper_util::rt::TokioIo;
-use tracing::error;
+use tracing::{error, info};
 
-use crate::errors::NotaryServerError;
+use crate::{axum_websocket::WebSocketUpgrade, errors::NotaryServerError};
+
+/// A wrapper enum to facilitate extracting TCP connection for either WebSocket or TCP clients,
+/// so that we can use a single endpoint and handler for notarization for both types of clients
+pub enum ProtocolUpgrade {
+  Tcp(TcpUpgrade),
+  Ws(WebSocketUpgrade),
+}
+
+#[async_trait]
+impl<S> FromRequestParts<S> for ProtocolUpgrade
+where S: Send + Sync
+{
+  type Rejection = NotaryServerError;
+
+  async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+    info!("from_request_parts");
+    // Extract tcp connection for websocket client
+    if header_eq(&parts.headers, header::UPGRADE, "websocket") {
+      let extractor = WebSocketUpgrade::from_request_parts(parts, state)
+        .await
+        .map_err(|err| NotaryServerError::BadProverRequest(err.to_string()))?;
+      return Ok(Self::Ws(extractor));
+    // Extract tcp connection for tcp client
+    } else if header_eq(&parts.headers, header::UPGRADE, "tcp") {
+      let extractor = TcpUpgrade::from_request_parts(parts, state)
+        .await
+        .map_err(|err| NotaryServerError::BadProverRequest(err.to_string()))?;
+      return Ok(Self::Tcp(extractor));
+    } else {
+      return Err(NotaryServerError::BadProverRequest(
+        "Upgrade header is not set for client".to_string(),
+      ));
+    }
+  }
+}
 
 /// Custom extractor used to extract underlying TCP connection for TCP client — using the same
 /// upgrade primitives used by the WebSocket implementation where the underlying TCP connection

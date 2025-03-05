@@ -8,33 +8,34 @@ build  ="build.rs"
 default                                      =["tee-dummy-token-generator"]
 tee-dummy-token-generator                    =[]
 tee-google-confidential-space-token-generator=[]
+tlsn                                         =["client/tlsn", "dep:tlsn-core", "dep:tlsn-common", "dep:tlsn-verifier", "dep:chrono"]
 
 [dependencies]
-tlsn-core  ={ workspace=true }
-tlsn-common={ workspace=true }
-chrono     ={ workspace=true }
+tlsn-core    ={ workspace=true, optional=true }
+tlsn-common  ={ workspace=true, optional=true }
+tlsn-verifier={ workspace=true, optional=true }
+chrono       ={ workspace=true, optional=true }
 
 client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="8e7eb839e901dcee416179116bb0f9c4f7ae683c" }
-proofs={ workspace=true }
-client={ workspace=true }
-web-prover-core={ workspace=true }
-hyper={ workspace=true, features=["client", "http1", "server"] }
-hyper-util={ workspace=true }
-serde={ workspace=true }
-serde_json={ workspace=true }
-rustls={ version="0.23.11", default-features=false, features=["logging", "tls12", "std", "ring"] }
-tokio={ workspace=true }
-tokio-util={ workspace=true, features=["compat"] }
-tracing={ workspace=true }
+proofs            ={ workspace=true }
+client            ={ workspace=true }
+web-prover-core   ={ workspace=true }
+hyper             ={ workspace=true, features=["client", "http1", "server"] }
+hyper-util        ={ workspace=true }
+serde             ={ workspace=true }
+serde_json        ={ workspace=true }
+rustls            ={ version="0.23.11", default-features=false, features=["logging", "tls12", "std", "ring"] }
+tokio             ={ workspace=true }
+tokio-util        ={ workspace=true, features=["compat"] }
+tracing           ={ workspace=true }
 tracing-subscriber={ workspace=true }
-futures={ workspace=true }
-futures-util="0.3.30"
-tokio-rustls={ workspace=true, features=["ring"] }
-tower-http={ version="0.5.2", features=["cors"] }
-tower-service="0.3.2"
-rustls-pemfile="2.1.2"
-tlsn-verifier={ workspace=true }
-notary-server={ workspace=true }
+futures           ={ workspace=true }
+futures-util      ="0.3.30"
+tokio-rustls      ={ workspace=true, features=["ring"] }
+tower-http        ={ version="0.5.2", features=["cors"] }
+tower-service     ="0.3.2"
+rustls-pemfile    ="2.1.2"
+
 tokio-tungstenite={ version="0.23.1", features=["stream"] }
 ws_stream_tungstenite={ git="https://github.com/pluto/ws_stream_tungstenite.git", branch="latest", features=[
   "tokio",
