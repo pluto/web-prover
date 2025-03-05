@@ -1,9 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
-use async_trait::async_trait;
 use axum::{
-  extract::{self, FromRequestParts, Query, State},
-  http::{header, request::Parts},
+  extract::{self, Query, State},
   response::Response,
   Json,
 };
@@ -27,12 +25,8 @@ use web_prover_core::proof::SignedVerificationReply;
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
-  axum_websocket::{WebSocket, WebSocketUpgrade},
-  errors::NotaryServerError,
-  net::ProtocolUpgrade,
-  tcp::{header_eq, TcpUpgrade},
-  verifier::VerifyOutput,
-  SharedState,
+  axum_websocket::WebSocket, errors::NotaryServerError, tcp::ProtocolUpgrade,
+  verifier::VerifyOutput, SharedState,
 };
 // TODO: use this place of our local file once this gets merged: https://github.com/tokio-rs/axum/issues/2848
 // use axum::extract::ws::{WebSocket, WebSocketUpgrade};

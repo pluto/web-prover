@@ -41,11 +41,11 @@ proofs                              ={ workspace=true }
 web-proof-circuits-witness-generator={ workspace=true }
 
 # TLSN
-tlsn-utils  ={ workspace=true, optional=true }
+tlsn-core   ={ workspace=true, optional=true }
+tlsn-prover ={ workspace=true, optional=true }
 tlsn-common ={ workspace=true, optional=true }
 tlsn-formats={ workspace=true, optional=true }
-tlsn-prover ={ workspace=true, optional=true }
-tlsn-core   ={ workspace=true, optional=true }
+tlsn-utils  ={ workspace=true, optional=true }
 spansy      ={ workspace=true, optional=true }
 
 # TEE
