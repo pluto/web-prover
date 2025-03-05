@@ -76,8 +76,9 @@ mod tests {
 
   use crate::{
     error::WebProverCoreError,
-    http::{JsonKey, ManifestRequest, ManifestResponse, ManifestResponseBody, HTTP_1_1},
-    manifest::Manifest,
+    http::{ManifestResponseBody, HTTP_1_1},
+    manifest::{Manifest, ManifestRequest, ManifestResponse},
+    parser::{DataFormat, Extractor, ExtractorConfig, ExtractorType},
     request, response,
     template::TemplateVar,
     test_utils::TEST_MANIFEST,
@@ -104,7 +105,7 @@ mod tests {
   }
 
   #[test]
-  fn test_serialize() {
+  fn test_deserialize_from_string() {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
     // verify defaults are working
     assert_eq!(manifest.request.version, HTTP_1_1);
@@ -117,7 +118,19 @@ mod tests {
     assert_eq!(manifest.response.version, HTTP_1_1);
     assert_eq!(manifest.response.headers.len(), 2);
     assert_eq!(manifest.response.headers.get("Content-Type").unwrap(), "text/plain; charset=utf-8");
-    assert_eq!(manifest.response.body.json_path.len(), 1);
+
+    let expected_body = ManifestResponseBody(ExtractorConfig {
+      format:     DataFormat::Json,
+      extractors: vec![Extractor {
+        id:             "userInfo".to_string(),
+        description:    "Extract user information".to_string(),
+        selector:       vec!["hello".to_string()],
+        extractor_type: ExtractorType::String,
+        required:       true,
+        predicates:     vec![],
+      }],
+    });
+    assert_eq!(manifest.response.body, expected_body);
   }
 
   #[test]
@@ -159,8 +172,14 @@ mod tests {
             "Content-Length": "22"
         },
         "body": {
-            "json": [
-                "hello"
+            "format": "json",
+            "extractors": [
+                {
+                    "id": "userInfo",
+                    "description": "Extract user information",
+                    "selector": ["hello"],
+                    "type": "string"
+                }
             ]
         }
     }
@@ -192,7 +211,7 @@ mod tests {
     if let Err(WebProverCoreError::InvalidManifest(message)) = result {
       assert_eq!(message, "Invalid HTTP method");
     } else {
-      panic!("Expected ManifestError::InvalidManifest");
+      panic!("Expected WebProverCoreError::InvalidManifest");
     }
   }
 
@@ -204,7 +223,7 @@ mod tests {
     if let Err(WebProverCoreError::InvalidManifest(message)) = result {
       assert_eq!(message, "Only HTTPS URLs are allowed");
     } else {
-      panic!("Expected ManifestError::InvalidManifest");
+      panic!("Expected WebProverCoreError::InvalidManifest");
     }
   }
 
@@ -216,7 +235,7 @@ mod tests {
     if let Err(WebProverCoreError::InvalidManifest(message)) = result {
       assert_eq!(message, "Unsupported HTTP status");
     } else {
-      panic!("Expected ManifestError::InvalidManifest");
+      panic!("Expected WebProverCoreError::InvalidManifest");
     }
   }
 
@@ -253,7 +272,7 @@ mod tests {
     if let Err(WebProverCoreError::InvalidManifest(message)) = result {
       assert_eq!(message, "Invalid Content-Type header: invalid/type");
     } else {
-      panic!("Expected ManifestError::InvalidManifest");
+      panic!("Expected WebProverCoreError::InvalidManifest");
     }
   }
 }

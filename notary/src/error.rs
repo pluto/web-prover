@@ -48,15 +48,11 @@ pub enum NotaryServerError {
   #[error("Manifest-request mismatch")]
   ManifestRequestMismatch,
 
-  // TODO: Update to contain feedback
-  #[error("Manifest-response mismatch")]
-  ManifestResponseMismatch,
-
   #[error(transparent)]
   ProxyError(#[from] ProxyError),
 
   #[error(transparent)]
-  ManifestError(#[from] WebProverCoreError),
+  WebProverCoreError(#[from] WebProverCoreError),
 }
 
 /// Trait implementation to convert this error into an axum http response

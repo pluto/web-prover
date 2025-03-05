@@ -37,10 +37,15 @@ pub const TEST_MANIFEST: &str = r#"
             "Content-Length": "22"
         },
         "body": {
-            "json": [
-                "hello"
-            ],
-            "contains": "this_string_exists_in_body"
+            "format": "json",
+            "extractors": [
+                {
+                    "id": "userInfo",
+                    "description": "Extract user information",
+                    "selector": ["hello"],
+                    "type": "string"
+                }
+            ]
         }
     }
 }
