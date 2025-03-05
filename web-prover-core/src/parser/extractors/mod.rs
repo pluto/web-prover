@@ -2,6 +2,6 @@ mod html;
 mod json;
 mod types;
 
-pub use html::extract_html;
-pub use json::{extract_json, get_value_type};
-pub use types::{ExtractionResult, ExtractionValues, Extractor, ExtractorType};
+pub use html::HtmlDocumentExtractor;
+pub use json::{get_value_type, JsonDocumentExtractor};
+pub use types::{DocumentExtractor, ExtractionResult, ExtractionValues, Extractor, ExtractorType};
