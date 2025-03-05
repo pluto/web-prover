@@ -1,67 +1,41 @@
 use serde_json::Value;
 use tl::{Node, NodeHandle, Parser, ParserOptions, VDom};
 
-use super::types::{ExtractionResult, Extractor, ExtractorType};
-use crate::parser::{predicate, DataFormat, ExtractorConfig, ExtractorError};
+use super::types::{ExtractedValue, ExtractionResult, RawDocument};
+use crate::parser::{DataFormat, Extractor, ExtractorConfig, ExtractorError, ExtractorType};
 
-/// Extracts data from HTML using CSS selectors
+pub struct RawHtmlValue<'a> {
+  dom: &'a VDom<'a>,
+}
+
+impl RawDocument for RawHtmlValue<'_> {
+  fn extract_value(&self, extractor: &Extractor) -> Result<ExtractedValue, ExtractorError> {
+    extract_html_value(self.dom, &extractor.selector, extractor).map(ExtractedValue::Html)
+  }
+
+  fn validate_format(&self, format: &DataFormat) -> Result<(), ExtractorError> {
+    if *format != DataFormat::Html {
+      return Err(ExtractorError::InvalidFormat(format!("Expected HTML format, got {}", format)));
+    }
+    Ok(())
+  }
+}
+
 pub fn extract_html(
   html_str: &str,
   config: &ExtractorConfig,
 ) -> Result<ExtractionResult, ExtractorError> {
-  if config.format != DataFormat::Html {
-    return Err(ExtractorError::InvalidFormat(format!(
-      "Expected HTML format, got {}",
-      config.format
-    )));
-  }
-
-  let mut result = ExtractionResult::default();
-
-  // Parse the HTML document
   let dom = tl::parse(html_str, ParserOptions::default())
     .map_err(|err| ExtractorError::InvalidHtml(err.to_string()))?;
 
+  let raw_html = RawHtmlValue { dom: &dom };
+  raw_html.validate_format(&config.format)?;
+
+  let mut result = ExtractionResult::default();
+
   for extractor in &config.extractors {
-    match extract_html_value(&dom, &extractor.selector, extractor) {
-      Ok(value) => {
-        // Validate the type
-        if let Err(type_err) = extractor.extractor_type.is_valid_type(&value) {
-          if extractor.required {
-            match &type_err {
-              ExtractorError::TypeMismatch { expected, actual } => {
-                result.errors.push(format!(
-                  "Extractor '{}': Expected {}, got {}",
-                  extractor.id, expected, actual
-                ));
-              },
-              _ => result.errors.push(format!("Extractor '{}': {}", extractor.id, type_err)),
-            }
-          }
-          continue;
-        }
-
-        // Validate predicates
-        let mut predicate_valid = true;
-        for predicate in &extractor.predicates {
-          if let Err(pred_err) = predicate::validate_predicate(&value, predicate) {
-            if extractor.required {
-              result.errors.push(format!("Extractor '{}': {}", extractor.id, pred_err));
-            }
-            predicate_valid = false;
-            break;
-          }
-        }
-
-        if predicate_valid {
-          result.values.insert(extractor.id.clone(), value);
-        }
-      },
-      Err(err) =>
-        if extractor.required {
-          result.errors.push(format!("Extractor '{}': {}", extractor.id, err));
-        },
-    }
+    let value = raw_html.extract_value(extractor);
+    result.process_value(value, extractor);
   }
 
   Ok(result)

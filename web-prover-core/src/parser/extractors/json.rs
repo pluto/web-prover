@@ -1,7 +1,7 @@
 use serde_json::Value;
 
-use super::types::ExtractionResult;
-use crate::parser::{errors::ExtractorError, predicate, DataFormat, ExtractorConfig};
+use super::types::{ExtractedValue, ExtractionResult, RawDocument};
+use crate::parser::{errors::ExtractorError, DataFormat, Extractor, ExtractorConfig};
 
 /// Helper function to get the type of serde_json::Value as a string
 pub fn get_value_type(value: &Value) -> &'static str {
@@ -15,60 +15,35 @@ pub fn get_value_type(value: &Value) -> &'static str {
   }
 }
 
+pub struct RawJsonHandle {
+  json: Value,
+}
+
+impl RawDocument for RawJsonHandle {
+  fn extract_value(&self, extractor: &Extractor) -> Result<ExtractedValue, ExtractorError> {
+    extract_json_value(&self.json, &extractor.selector).map(ExtractedValue::Json)
+  }
+
+  fn validate_format(&self, format: &DataFormat) -> Result<(), ExtractorError> {
+    if *format != DataFormat::Json {
+      return Err(ExtractorError::InvalidFormat(format!("Expected JSON format, got {}", format)));
+    }
+    Ok(())
+  }
+}
+
 /// Extracts data from a JSON value using the provided extractor configuration
 pub fn extract_json(
   json: &Value,
   config: &ExtractorConfig,
 ) -> Result<ExtractionResult, ExtractorError> {
-  if config.format != DataFormat::Json {
-    return Err(ExtractorError::InvalidFormat(format!(
-      "Expected JSON format, got {}",
-      config.format
-    )));
-  }
+  let handle = RawJsonHandle { json: json.clone() };
+  handle.validate_format(&config.format)?;
 
   let mut result = ExtractionResult::default();
-
   for extractor in &config.extractors {
-    match extract_json_value(json, &extractor.selector) {
-      Ok(value) => {
-        // Validate the type
-        if let Err(type_err) = extractor.extractor_type.is_valid_type(&value) {
-          if extractor.required {
-            match &type_err {
-              ExtractorError::TypeMismatch { expected, actual } => {
-                result.errors.push(format!(
-                  "Extractor '{}': Expected {}, got {}",
-                  extractor.id, expected, actual
-                ));
-              },
-              _ => result.errors.push(format!("Extractor '{}': {}", extractor.id, type_err)),
-            }
-          }
-          continue;
-        }
-
-        // Validate predicates
-        let mut predicate_valid = true;
-        for predicate in &extractor.predicates {
-          if let Err(pred_err) = predicate::validate_predicate(&value, predicate) {
-            if extractor.required {
-              result.errors.push(format!("Extractor '{}': {}", extractor.id, pred_err));
-            }
-            predicate_valid = false;
-            break;
-          }
-        }
-
-        if predicate_valid {
-          result.values.insert(extractor.id.clone(), value);
-        }
-      },
-      Err(err) =>
-        if extractor.required {
-          result.errors.push(format!("Extractor '{}': {}", extractor.id, err));
-        },
-    }
+    let value = handle.extract_value(&extractor);
+    result.process_value(value, extractor);
   }
 
   Ok(result)
