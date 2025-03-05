@@ -189,7 +189,7 @@ fn extract_attribute_value(node: &Node, attr: &str) -> Value {
     .as_tag()
     .and_then(|tag| tag.attributes().get(attr))
     .and_then(|attr_value| attr_value.map(|value| value.as_utf8_str().to_string()))
-    .map_or_else(|| Value::String("".to_string()), |value| Value::String(value))
+    .map_or_else(|| Value::String("".to_string()), Value::String)
 }
 
 /// Extracts raw value from an element
@@ -323,234 +323,67 @@ fn extract_with_single_selector(
 #[cfg(test)]
 mod tests {
   use serde_json::{json, Value};
-  use tl::{ParserOptions, VDom};
+  use tl::VDom;
 
   use crate::{
     extractor,
     parser::{
       extractors::html::{extract_html, extract_html_value},
       test_utils::{create_complex_test_html, parse_html},
-      DataFormat, ExtractorConfig, ExtractorError, ExtractorType,
+      DataFormat, Extractor, ExtractorConfig, ExtractorError, ExtractorType,
     },
   };
 
-  fn create_test_html() -> String {
-    r#"
-        <!DOCTYPE html>
-        <html>
-        <head>
+  const BASIC_HTML: &str = r#"
+      <!DOCTYPE html>
+      <html>
+      <head>
           <title>Test Page</title>
           <meta name="description" content="A test page for HTML extraction">
-        </head>
-        <body>
+      </head>
+      <body>
           <div class="container">
-            <header>
-              <h1 id="main-title">Hello, World!</h1>
-              <nav>
-                <ul>
-                  <li><a href="/">Home</a></li>
-                  <li><a href="/about">About</a></li>
-                  <li><a href="/contact">Contact</a></li>
-                </ul>
-              </nav>
-            </header>
-            <main>
-              <section class="content">
-                <article>
-                  <h2>Article Title</h2>
-                  <p class="summary">This is a summary of the article.</p>
-                  <div class="tags">
-                    <span>tag1</span>
-                    <span>tag2</span>
-                    <span>tag3</span>
-                  </div>
-                </article>
-              </section>
-              <aside>
-                <div class="widget">
-                  <h3>Related Links</h3>
-                  <ul>
-                    <li><a href="/link1">Link 1</a></li>
-                    <li><a href="/link2">Link 2</a></li>
-                  </ul>
-                </div>
-              </aside>
-            </main>
-            <footer>
-              <p>&copy; 2023 Test Company</p>
-            </footer>
+              <header>
+                  <h1 id="main-title">Hello, World!</h1>
+                  <nav>
+                      <ul>
+                          <li><a href="/">Home</a></li>
+                          <li><a href="/about">About</a></li>
+                          <li><a href="/contact">Contact</a></li>
+                      </ul>
+                  </nav>
+              </header>
+              <main>
+                  <section class="content">
+                      <article>
+                          <h2>Article Title</h2>
+                          <p class="summary">This is a summary of the article.</p>
+                          <div class="tags">
+                              <span>tag1</span>
+                              <span>tag2</span>
+                              <span>tag3</span>
+                          </div>
+                      </article>
+                  </section>
+                  <aside>
+                      <div class="widget">
+                          <h3>Related Links</h3>
+                          <ul>
+                              <li><a href="/link1">Link 1</a></li>
+                              <li><a href="/link2">Link 2</a></li>
+                          </ul>
+                      </div>
+                  </aside>
+              </main>
+              <footer>
+                  <p>&copy; 2023 Test Company</p>
+              </footer>
           </div>
-        </body>
-        </html>
-      "#
-    .to_string()
-  }
+      </body>
+      </html>
+  "#;
 
-  fn parse_test_html(html: &str) -> VDom {
-    tl::parse(html, ParserOptions::default()).expect("Failed to parse HTML")
-  }
-
-  #[test]
-  fn test_html_extract_basic_text() {
-    let html = create_test_html();
-    let dom = parse_test_html(&html);
-
-    let extractor = extractor!(
-        id: "title".to_string(),
-        description: "Main title".to_string(),
-        selector: vec!["#main-title".to_string()],
-        extractor_type: ExtractorType::String
-    );
-    let result = extract_html_value(&dom, &["#main-title".to_string()], &extractor).unwrap();
-    assert_eq!(result, json!("Hello, World!"));
-  }
-
-  #[test]
-  fn test_html_extraction_errors() {
-    let html = create_test_html();
-    let dom = parse_test_html(&html);
-
-    let basic_extractor = extractor!(
-      id: "test".to_string(),
-      description: "Test extractor".to_string(),
-      extractor_type: ExtractorType::String
-    );
-
-    // Test invalid CSS selector
-    let result = extract_html_value(&dom, &["#[invalid".to_string()], &basic_extractor);
-    assert!(result.is_err());
-    assert!(matches!(result, Err(ExtractorError::InvalidPath(_))));
-
-    // Test non-existent element
-    let result = extract_html_value(&dom, &["#non-existent".to_string()], &basic_extractor);
-    assert!(result.is_err());
-    assert!(matches!(result, Err(ExtractorError::MissingField(_))));
-
-    // Test empty selector path
-    let result = extract_html_value(&dom, &[], &basic_extractor);
-    assert!(result.is_err());
-    assert!(matches!(result, Err(ExtractorError::MissingField(_))));
-
-    // Test attribute extraction error
-    let attr_extractor = extractor!(
-      id: "test".to_string(),
-      description: "Test extractor".to_string(),
-      selector: vec!["#main-title".to_string()],
-      extractor_type: ExtractorType::String,
-      attribute: Some("non-existent".to_string())
-    );
-    let result = extract_html_value(&dom, &["#main-title".to_string()], &attr_extractor);
-    // With our new implementation, missing attributes return an empty string instead of an error
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap(), json!(""));
-  }
-
-  #[test]
-  fn test_extract_html_with_multiple_extractors() {
-    let html = create_complex_test_html();
-
-    // Create a config with multiple extractors using different selector paths
-    let config = ExtractorConfig {
-      format:     DataFormat::Html,
-      extractors: vec![
-        // Single selector extractors
-        extractor!(
-          id: "page_title".to_string(),
-          description: "Test extractor for page_title".to_string(),
-          selector: vec!["title".to_string()],
-          extractor_type: ExtractorType::String
-        ),
-        extractor!(
-          id: "meta_description".to_string(),
-          description: "Test extractor for meta_description".to_string(),
-          selector: vec!["meta[name='description']".to_string()],
-          extractor_type: ExtractorType::String,
-          attribute: Some("content".to_string())
-        ),
-        // Multi-selector extractors
-        extractor!(
-          id: "hero_title".to_string(),
-          description: "Test extractor for hero_title".to_string(),
-          selector: vec!["main".to_string(), "section.hero-section".to_string(), "h1.hero-title".to_string()],
-          extractor_type: ExtractorType::String
-        ),
-        // Array extractors
-        extractor!(
-          id: "feature_titles".to_string(),
-          description: "Test extractor for feature_titles".to_string(),
-          selector: vec![
-            "main".to_string(),
-            "section.features-section".to_string(),
-            "div.features-grid".to_string(),
-            "article.feature-card".to_string(),
-            "h3.feature-title".to_string()
-          ],
-          extractor_type: ExtractorType::Array
-        ),
-        // Attribute extractors
-        extractor!(
-          id: "feature_ratings".to_string(),
-          description: "Test extractor for feature_ratings".to_string(),
-          selector: vec![
-            "main".to_string(),
-            "section.features-section".to_string(),
-            "div.features-grid".to_string(),
-            "article.feature-card".to_string(),
-            "div.feature-meta".to_string(),
-            "span.feature-rating".to_string()
-          ],
-          extractor_type: ExtractorType::Array,
-          attribute: Some("data-rating".to_string())
-        ),
-        // Numeric extractors
-        extractor!(
-          id: "first_rating".to_string(),
-          description: "Test extractor for first_rating".to_string(),
-          selector: vec![
-            "main".to_string(),
-            "section.features-section".to_string(),
-            "div.features-grid".to_string(),
-            "article#feature-1".to_string(),
-            "div.feature-meta".to_string(),
-            "span.feature-rating".to_string()
-          ],
-          extractor_type: ExtractorType::Number,
-          attribute: Some("data-rating".to_string())
-        ),
-      ],
-    };
-
-    // Extract all values
-    let result = extract_html(&html, &config).unwrap();
-
-    // Verify all extractions were successful
-    assert_eq!(result.errors.len(), 0);
-    assert_eq!(result.values.len(), 6);
-
-    // Check individual values
-    assert_eq!(result.values["page_title"], json!("Complex Test Page"));
-    assert_eq!(result.values["meta_description"], json!("A complex test page for HTML extraction"));
-    assert_eq!(result.values["hero_title"], json!("Welcome to Our Complex Test Page"));
-
-    // Check array values
-    let feature_titles = result.values["feature_titles"].as_array().unwrap();
-    assert_eq!(feature_titles.len(), 3);
-    assert!(feature_titles.contains(&json!("Lightning Fast")));
-    assert!(feature_titles.contains(&json!("Highly Secure")));
-    assert!(feature_titles.contains(&json!("Infinitely Scalable")));
-
-    // Check attribute array values
-    let feature_ratings = result.values["feature_ratings"].as_array().unwrap();
-    assert_eq!(feature_ratings.len(), 3);
-    assert!(feature_ratings.contains(&json!("4.8")));
-    assert!(feature_ratings.contains(&json!("4.9")));
-    assert!(feature_ratings.contains(&json!("4.7")));
-
-    // Check numeric value
-    assert_eq!(result.values["first_rating"], json!(4.8));
-  }
-
-  // Helper function to test extraction and assert the result
+  // Test helper for common extraction assertions
   fn assert_html_extraction(
     dom: &VDom,
     selector_path: &[String],
@@ -568,6 +401,144 @@ mod tests {
     let result = extract_html_value(dom, selector_path, &extractor);
     assert!(result.is_ok(), "Extraction failed: {:?}", result.err());
     assert_eq!(result.unwrap(), expected_value);
+  }
+
+  #[test]
+  fn test_html_extract_basic_text() {
+    let dom = parse_html(&BASIC_HTML);
+    assert_html_extraction(
+      &dom,
+      &["#main-title".to_string()],
+      ExtractorType::String,
+      None,
+      json!("Hello, World!"),
+    );
+  }
+
+  #[test]
+  fn test_html_extraction_errors() {
+    let dom = parse_html(&BASIC_HTML);
+    let basic_extractor = extractor!(
+      id: "test".to_string(),
+      description: "Test extractor".to_string(),
+      selector: vec![],
+      extractor_type: ExtractorType::String,
+      attribute: None
+    );
+
+    // Test invalid CSS selector
+    let result = extract_html_value(&dom, &["#[invalid".to_string()], &basic_extractor);
+    assert!(matches!(result, Err(ExtractorError::InvalidPath(_))));
+
+    // Test non-existent element
+    let result = extract_html_value(&dom, &["#non-existent".to_string()], &basic_extractor);
+    assert!(matches!(result, Err(ExtractorError::MissingField(_))));
+
+    // Test empty selector path
+    let result = extract_html_value(&dom, &[], &basic_extractor);
+    assert!(matches!(result, Err(ExtractorError::MissingField(_))));
+  }
+
+  fn page_title_extractor() -> Extractor {
+    extractor!(
+      id: "page_title".to_string(),
+      description: "Test extractor for page_title".to_string(),
+      selector: vec!["title".to_string()],
+      extractor_type: ExtractorType::String
+    )
+  }
+
+  fn meta_description_extractor() -> Extractor {
+    extractor!(
+      id: "meta_description".to_string(),
+      description: "Test extractor for meta_description".to_string(),
+      selector: vec!["meta[name='description']".to_string()],
+      extractor_type: ExtractorType::String,
+      attribute: Some("content".to_string())
+    )
+  }
+
+  fn hero_title_extractor() -> Extractor {
+    extractor!(
+      id: "hero_title".to_string(),
+      description: "Test extractor for hero_title".to_string(),
+      selector: vec!["main".to_string(), "section.hero-section".to_string(), "h1.hero-title".to_string()],
+      extractor_type: ExtractorType::String
+    )
+  }
+
+  fn feature_titles_extractor() -> Extractor {
+    extractor!(
+      id: "feature_titles".to_string(),
+      description: "Test extractor for feature_titles".to_string(),
+      selector: vec!["main".to_string(), "section.features-section".to_string(), "div.features-grid".to_string(), "article.feature-card".to_string(), "h3.feature-title".to_string()],
+      extractor_type: ExtractorType::Array
+    )
+  }
+
+  fn feature_ratings_extractor() -> Extractor {
+    extractor!(
+      id: "feature_ratings".to_string(),
+      description: "Test extractor for feature_ratings".to_string(),
+      selector: vec!["main".to_string(), "section.features-section".to_string(), "div.features-grid".to_string(), "article.feature-card".to_string(), "div.feature-meta".to_string(), "span.feature-rating".to_string()],
+      extractor_type: ExtractorType::Array,
+      attribute: Some("data-rating".to_string())
+    )
+  }
+
+  fn first_rating_extractor() -> Extractor {
+    extractor!(
+      id: "first_rating".to_string(),
+      description: "Test extractor for first_rating".to_string(),
+      selector: vec!["main".to_string(), "section.features-section".to_string(), "div.features-grid".to_string(), "article#feature-1".to_string(), "div.feature-meta".to_string(), "span.feature-rating".to_string()],
+      extractor_type: ExtractorType::Number,
+      attribute: Some("data-rating".to_string())
+    )
+  }
+
+  fn create_complex_config() -> ExtractorConfig {
+    ExtractorConfig {
+      format:     DataFormat::Html,
+      extractors: vec![
+        page_title_extractor(),
+        meta_description_extractor(),
+        hero_title_extractor(),
+        feature_titles_extractor(),
+        feature_ratings_extractor(),
+        first_rating_extractor(),
+      ],
+    }
+  }
+
+  #[test]
+  fn test_extract_html_with_multiple_extractors() {
+    let html = create_complex_test_html();
+    let config = create_complex_config();
+
+    let result = extract_html(&html, &config).unwrap();
+
+    assert_eq!(result.errors.len(), 0);
+    assert_eq!(result.values.len(), 6);
+
+    // Check individual values
+    assert_eq!(result.values["page_title"], json!("Complex Test Page"));
+    assert_eq!(result.values["meta_description"], json!("A complex test page for HTML extraction"));
+    assert_eq!(result.values["hero_title"], json!("Welcome to Our Complex Test Page"));
+
+    // Check array values
+    let feature_titles = result.values["feature_titles"].as_array().unwrap();
+    assert_eq!(feature_titles.len(), 3);
+    assert!(feature_titles.contains(&json!("Lightning Fast")));
+    assert!(feature_titles.contains(&json!("Highly Secure")));
+    assert!(feature_titles.contains(&json!("Infinitely Scalable")));
+
+    let feature_ratings = result.values["feature_ratings"].as_array().unwrap();
+    assert_eq!(feature_ratings.len(), 3);
+    assert!(feature_ratings.contains(&json!("4.8")));
+    assert!(feature_ratings.contains(&json!("4.9")));
+    assert!(feature_ratings.contains(&json!("4.7")));
+
+    assert_eq!(result.values["first_rating"], json!(4.8));
   }
 
   // Helper function to test extraction errors
@@ -596,7 +567,7 @@ mod tests {
     let html = create_complex_test_html();
     let dom = parse_html(&html);
 
-    // Test 1: Extract feature title with a long selector path
+    // Extract feature title with a long selector path
     assert_html_extraction(
       &dom,
       &[
@@ -611,7 +582,7 @@ mod tests {
       json!("Lightning Fast"),
     );
 
-    // Test 2: Extract feature rating with attribute
+    // Extract feature rating with attribute
     assert_html_extraction(
       &dom,
       &[
@@ -627,19 +598,8 @@ mod tests {
       json!("4.8"),
     );
 
-    // Test 3: Extract all feature titles as an array
-    let extractor = extractor!(
-      id: "feature_titles".to_string(),
-      description: "Test extractor for feature_titles".to_string(),
-      selector: vec![
-        "main".to_string(),
-        "section.features-section".to_string(),
-        "div.features-grid".to_string(),
-        "article.feature-card".to_string(),
-        "h3.feature-title".to_string(),
-      ],
-      extractor_type: ExtractorType::Array
-    );
+    // Extract all feature titles as an array
+    let extractor = feature_titles_extractor();
 
     let result = extract_html_value(
       &dom,
@@ -660,21 +620,8 @@ mod tests {
     assert!(titles.contains(&json!("Highly Secure")));
     assert!(titles.contains(&json!("Infinitely Scalable")));
 
-    // Test 4: Extract all feature ratings as numbers
-    let extractor = extractor!(
-      id: "feature_ratings".to_string(),
-      description: "Test extractor for feature_ratings".to_string(),
-      selector: vec![
-        "main".to_string(),
-        "section.features-section".to_string(),
-        "div.features-grid".to_string(),
-        "article.feature-card".to_string(),
-        "div.feature-meta".to_string(),
-        "span.feature-rating".to_string(),
-      ],
-      extractor_type: ExtractorType::Array,
-      attribute: Some("data-rating".to_string())
-    );
+    // Extract all feature ratings as numbers
+    let extractor = feature_ratings_extractor();
 
     let result = extract_html_value(
       &dom,
@@ -702,7 +649,7 @@ mod tests {
     let html = create_complex_test_html();
     let dom = parse_html(&html);
 
-    // Test 1: Extract meta tags with property attributes
+    // Extract meta tags with property attributes
     let extractor = extractor!(
       id: "og_title".to_string(),
       description: "Test extractor for og_title".to_string(),
@@ -720,7 +667,7 @@ mod tests {
 
     assert_eq!(result, json!("Complex Test Page"));
 
-    // Test 2: Extract elements with data attributes
+    // Extract elements with data attributes
     let extractor = extractor!(
       id: "active_nav".to_string(),
       description: "Test extractor for active_nav".to_string(),
@@ -735,7 +682,7 @@ mod tests {
 
     assert_eq!(result, json!("home"));
 
-    // Test 3: Extract deeply nested elements with multiple class selectors
+    // Extract deeply nested elements with multiple class selectors
     assert_html_extraction(
       &dom,
       &[
@@ -750,7 +697,7 @@ mod tests {
       json!(["Jane Doe", "John Smith"]),
     );
 
-    // Test 4: Extract elements with numeric conversion
+    // Extract elements with numeric conversion
     assert_html_extraction(
       &dom,
       &[
@@ -772,7 +719,7 @@ mod tests {
     let html = create_complex_test_html();
     let dom = parse_html(&html);
 
-    // Test 1: Non-existent element in the middle of the selector path
+    // Non-existent element in the middle of the selector path
     assert_html_extraction_error(
       &dom,
       &["main".to_string(), "section.non-existent".to_string(), "div.features-grid".to_string()],
@@ -781,8 +728,7 @@ mod tests {
       |err| matches!(err, ExtractorError::MissingField(_)),
     );
 
-    // Test 2: Invalid selector syntax - Note: The HTML parser treats invalid selectors as not
-    // found
+    // Invalid selector syntax - Note: The HTML parser treats invalid selectors as not found
     assert_html_extraction_error(
       &dom,
       &["main".to_string(), "section[invalid=".to_string()],
@@ -791,7 +737,7 @@ mod tests {
       |err| matches!(err, ExtractorError::MissingField(_)),
     );
 
-    // Test 3: Type mismatch when converting to number
+    // Type mismatch when converting to number
     assert_html_extraction_error(
       &dom,
       &["main".to_string(), "section.hero-section".to_string(), "h1.hero-title".to_string()],
@@ -800,7 +746,7 @@ mod tests {
       |err| matches!(err, ExtractorError::TypeMismatch { .. }),
     );
 
-    // Test 4: Empty selector path
+    // Empty selector path
     assert_html_extraction_error(&dom, &[], ExtractorType::String, None, |err| {
       matches!(err, ExtractorError::MissingField(_))
     });
