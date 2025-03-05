@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::parser::{
-  errors::ExtractorError, extractors::get_value_type, predicate, predicate::Predicate,
+  extractors::get_value_type, predicate, predicate::Predicate, DataFormat, ExtractorError,
 };
 
 /// The type of data being extracted
@@ -98,9 +98,7 @@ pub struct Extractor {
   pub attribute:      Option<String>,
 }
 
-impl Extractor {
-
-}
+impl Extractor {}
 
 /// The extracted values, keyed by extractor ID
 pub type ExtractionValues = HashMap<String, Value>;
@@ -114,13 +112,63 @@ pub struct ExtractionResult {
   pub errors: Vec<String>,
 }
 
-impl ExtractionResult {
-    pub fn add_processed_value(&mut self, result: (Option<(String, Value)>, Option<String>)) {
-        if let Some((id, value)) = result.0 {
-            self.values.insert(id, value);
-        }
-        if let Some(error) = result.1 {
-            self.errors.push(error);
-        }
+pub enum ExtractedValue {
+  Json(Value),
+  Html(Value),
+}
+
+impl ExtractedValue {
+  pub fn into_value(self) -> Value {
+    match self {
+      ExtractedValue::Json(v) | ExtractedValue::Html(v) => v,
     }
+  }
+}
+
+pub trait RawDocument {
+  fn extract_value(&self, extractor: &Extractor) -> Result<ExtractedValue, ExtractorError>;
+  fn validate_format(&self, format: &DataFormat) -> Result<(), ExtractorError>;
+}
+
+impl ExtractionResult {
+  pub fn process_value(
+    &mut self,
+    value: Result<ExtractedValue, ExtractorError>,
+    extractor: &Extractor,
+  ) {
+    match value {
+      Ok(extracted) => {
+        let value = extracted.into_value();
+        if let Err(type_err) = extractor.extractor_type.is_valid_type(&value) {
+          if extractor.required {
+            self.add_error(extractor, type_err);
+          }
+          return;
+        }
+
+        let mut predicate_valid = true;
+        for predicate in &extractor.predicates {
+          if let Err(pred_err) = predicate::validate_predicate(&value, predicate) {
+            if extractor.required {
+              self.add_error(extractor, ExtractorError::PredicateError(pred_err));
+            }
+            predicate_valid = false;
+            break;
+          }
+        }
+
+        if predicate_valid {
+          self.values.insert(extractor.id.clone(), value);
+        }
+      },
+      Err(err) if extractor.required => {
+        self.add_error(extractor, err);
+      },
+      _ => {},
+    }
+  }
+
+  fn add_error(&mut self, extractor: &Extractor, error: ExtractorError) {
+    self.errors.push(format!("Extractor '{}': {}", extractor.id, error));
+  }
 }
