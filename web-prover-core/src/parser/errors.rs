@@ -66,6 +66,10 @@ pub enum ExtractorError {
   // TODO: Should this be a standalone error?
   #[error(transparent)]
   PredicateError(#[from] PredicateError),
+
+  /// Error when HTML parsing fails
+  #[error("Invalid HTML document: {0}")]
+  InvalidHtml(String),
 }
 
 /// Errors that can occur during predicate validation

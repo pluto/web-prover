@@ -21,7 +21,10 @@ pub fn extract_json(
   config: &ExtractorConfig,
 ) -> Result<ExtractionResult, ExtractorError> {
   if config.format != DataFormat::Json {
-    return Err(ExtractorError::InvalidFormat("JSON".to_string()));
+    return Err(ExtractorError::InvalidFormat(format!(
+      "Expected JSON format, got {}",
+      config.format
+    )));
   }
 
   let mut result = ExtractionResult::default();
