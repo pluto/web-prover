@@ -1,4 +1,7 @@
+use std::fs;
+
 use serde_json::{json, Value};
+use tl::{ParserOptions, VDom};
 
 use crate::parser::{
   extractors::ExtractionResult,
@@ -140,4 +143,12 @@ pub fn tags_extractor() -> Extractor {
       value: json!(1)
     )]
   )
+}
+
+pub fn create_complex_test_html() -> String {
+  fs::read_to_string("../web-prover-core/fixtures/website.html").unwrap()
+}
+
+pub fn parse_html(html: &str) -> VDom {
+  tl::parse(html, ParserOptions::default()).expect("Failed to parse HTML")
 }

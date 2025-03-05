@@ -332,6 +332,7 @@ mod tests {
     extractor,
     parser::{
       extractors::html::{extract_html, extract_html_value},
+      test_utils::{create_complex_test_html, parse_html},
       DataFormat, ExtractorConfig, ExtractorError, ExtractorType,
     },
   };
@@ -552,204 +553,6 @@ mod tests {
     assert_eq!(result.values["first_rating"], json!(4.8));
   }
 
-  fn create_complex_test_html() -> String {
-    r#"
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Complex Test Page</title>
-          <meta name="description" content="A complex test page for HTML extraction">
-          <meta property="og:title" content="Complex Test Page">
-          <meta property="og:description" content="Testing complex HTML extraction">
-        </head>
-        <body>
-          <div class="container">
-            <header class="main-header">
-              <div class="logo-wrapper">
-                <a href="/" class="logo">
-                  <img src="/logo.png" alt="Logo" width="100" height="50" data-test="logo-image">
-                </a>
-              </div>
-              <nav class="main-nav">
-                <ul class="nav-list">
-                  <li class="nav-item"><a href="/" class="nav-link active" data-section="home">Home</a></li>
-                  <li class="nav-item"><a href="/products" class="nav-link" data-section="products">Products</a></li>
-                  <li class="nav-item dropdown">
-                    <a href="/services" class="nav-link" data-section="services">Services</a>
-                    <ul class="dropdown-menu">
-                      <li class="dropdown-item"><a href="/services/consulting">Consulting</a></li>
-                      <li class="dropdown-item"><a href="/services/development">Development</a></li>
-                      <li class="dropdown-item"><a href="/services/training">Training</a></li>
-                    </ul>
-                  </li>
-                  <li class="nav-item"><a href="/about" class="nav-link" data-section="about">About</a></li>
-                  <li class="nav-item"><a href="/contact" class="nav-link" data-section="contact">Contact</a></li>
-                </ul>
-              </nav>
-              <div class="search-wrapper">
-                <form class="search-form" action="/search" method="get">
-                  <input type="text" name="q" placeholder="Search..." class="search-input">
-                  <button type="submit" class="search-button">Search</button>
-                </form>
-              </div>
-            </header>
-
-            <main class="main-content">
-              <section class="hero-section">
-                <h1 class="hero-title">Welcome to Our Complex Test Page</h1>
-                <p class="hero-subtitle">Testing nested selectors and complex HTML structures</p>
-                <div class="cta-container">
-                  <a href="/signup" class="cta-button primary">Sign Up</a>
-                  <a href="/learn-more" class="cta-button secondary">Learn More</a>
-                </div>
-              </section>
-
-              <section class="features-section">
-                <h2 class="section-title">Features</h2>
-                <div class="features-grid">
-                  <article class="feature-card" id="feature-1">
-                    <div class="feature-icon">
-                      <i class="icon icon-speed"></i>
-                    </div>
-                    <h3 class="feature-title">Lightning Fast</h3>
-                    <p class="feature-description">Our solution is optimized for maximum performance.</p>
-                    <a href="/features/speed" class="feature-link">Learn more about speed</a>
-                    <div class="feature-meta">
-                      <span class="feature-rating" data-rating="4.8">4.8</span>
-                      <span class="feature-category">Performance</span>
-                    </div>
-                  </article>
-
-                  <article class="feature-card" id="feature-2">
-                    <div class="feature-icon">
-                      <i class="icon icon-secure"></i>
-                    </div>
-                    <h3 class="feature-title">Highly Secure</h3>
-                    <p class="feature-description">Enterprise-grade security for your peace of mind.</p>
-                    <a href="/features/security" class="feature-link">Learn more about security</a>
-                    <div class="feature-meta">
-                      <span class="feature-rating" data-rating="4.9">4.9</span>
-                      <span class="feature-category">Security</span>
-                    </div>
-                  </article>
-
-                  <article class="feature-card" id="feature-3">
-                    <div class="feature-icon">
-                      <i class="icon icon-scale"></i>
-                    </div>
-                    <h3 class="feature-title">Infinitely Scalable</h3>
-                    <p class="feature-description">Grows with your business without compromises.</p>
-                    <a href="/features/scalability" class="feature-link">Learn more about scalability</a>
-                    <div class="feature-meta">
-                      <span class="feature-rating" data-rating="4.7">4.7</span>
-                      <span class="feature-category">Scalability</span>
-                    </div>
-                  </article>
-                </div>
-              </section>
-
-              <section class="testimonials-section">
-                <h2 class="section-title">What Our Customers Say</h2>
-                <div class="testimonials-slider">
-                  <div class="testimonial-slide" id="testimonial-1">
-                    <blockquote class="testimonial-quote">
-                      <p>This product has completely transformed our business operations.</p>
-                    </blockquote>
-                    <div class="testimonial-author">
-                      <img src="/avatars/jane.jpg" alt="Jane Doe" class="testimonial-avatar">
-                      <div class="testimonial-info">
-                        <cite class="testimonial-name">Jane Doe</cite>
-                        <span class="testimonial-position">CEO, Example Corp</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="testimonial-slide" id="testimonial-2">
-                    <blockquote class="testimonial-quote">
-                      <p>The best solution we've found after trying dozens of alternatives.</p>
-                    </blockquote>
-                    <div class="testimonial-author">
-                      <img src="/avatars/john.jpg" alt="John Smith" class="testimonial-avatar">
-                      <div class="testimonial-info">
-                        <cite class="testimonial-name">John Smith</cite>
-                        <span class="testimonial-position">CTO, Another Company</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            </main>
-
-            <footer class="main-footer">
-              <div class="footer-columns">
-                <div class="footer-column">
-                  <h4 class="footer-title">Company</h4>
-                  <ul class="footer-links">
-                    <li><a href="/about">About Us</a></li>
-                    <li><a href="/careers">Careers</a></li>
-                    <li><a href="/press">Press</a></li>
-                  </ul>
-                </div>
-
-                <div class="footer-column">
-                  <h4 class="footer-title">Resources</h4>
-                  <ul class="footer-links">
-                    <li><a href="/blog">Blog</a></li>
-                    <li><a href="/guides">Guides</a></li>
-                    <li><a href="/webinars">Webinars</a></li>
-                  </ul>
-                </div>
-
-                <div class="footer-column">
-                  <h4 class="footer-title">Legal</h4>
-                  <ul class="footer-links">
-                    <li><a href="/terms">Terms of Service</a></li>
-                    <li><a href="/privacy">Privacy Policy</a></li>
-                    <li><a href="/cookies">Cookie Policy</a></li>
-                  </ul>
-                </div>
-
-                <div class="footer-column">
-                  <h4 class="footer-title">Connect</h4>
-                  <div class="social-links">
-                    <a href="https://twitter.com/example" class="social-link" aria-label="Twitter">
-                      <i class="icon icon-twitter"></i>
-                    </a>
-                    <a href="https://facebook.com/example" class="social-link" aria-label="Facebook">
-                      <i class="icon icon-facebook"></i>
-                    </a>
-                    <a href="https://linkedin.com/company/example" class="social-link" aria-label="LinkedIn">
-                      <i class="icon icon-linkedin"></i>
-                    </a>
-                  </div>
-                </div>
-              </div>
-
-              <div class="footer-bottom">
-                <p class="copyright">&copy; 2023 Example Company. All rights reserved.</p>
-                <div class="language-selector">
-                  <select name="language" id="language-select">
-                    <option value="en">English</option>
-                    <option value="es">Español</option>
-                    <option value="fr">Français</option>
-                    <option value="de">Deutsch</option>
-                  </select>
-                </div>
-              </div>
-            </footer>
-          </div>
-        </body>
-        </html>
-      "#
-            .to_string()
-  }
-
-  fn parse_complex_test_html(html: &str) -> VDom {
-    tl::parse(html, ParserOptions::default()).expect("Failed to parse complex HTML")
-  }
-
   // Helper function to test extraction and assert the result
   fn assert_html_extraction(
     dom: &VDom,
@@ -794,7 +597,7 @@ mod tests {
   #[test]
   fn test_complex_html_with_long_selectors() {
     let html = create_complex_test_html();
-    let dom = parse_complex_test_html(&html);
+    let dom = parse_html(&html);
 
     // Test 1: Extract feature title with a long selector path
     assert_html_extraction(
@@ -900,7 +703,7 @@ mod tests {
   #[test]
   fn test_complex_html_edge_cases() {
     let html = create_complex_test_html();
-    let dom = parse_complex_test_html(&html);
+    let dom = parse_html(&html);
 
     // Test 1: Extract meta tags with property attributes
     let extractor = extractor!(
@@ -970,7 +773,7 @@ mod tests {
   #[test]
   fn test_complex_html_error_cases() {
     let html = create_complex_test_html();
-    let dom = parse_complex_test_html(&html);
+    let dom = parse_html(&html);
 
     // Test 1: Non-existent element in the middle of the selector path
     assert_html_extraction_error(

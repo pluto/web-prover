@@ -111,3 +111,104 @@ fn test_coinbase_extraction() {
     "8.967465955899945"
   );
 }
+
+#[test]
+fn test_website_extraction() {
+  let html_data = fs::read_to_string("../web-prover-core/fixtures/website.html").unwrap();
+
+  // Create extractor config for main content
+  let main_config = serde_json::from_value::<ExtractorConfig>(json!({
+      "format": "html",
+      "extractors": [
+          {
+              "id": "page_title",
+              "description": "Extract page title",
+              "selector": ["head", "title"],
+              "type": "string"
+          },
+          {
+              "id": "meta_description",
+              "description": "Extract meta description",
+              "selector": ["head", "meta[name='description']"],
+              "type": "string",
+              "attribute": "content"
+          },
+          {
+              "id": "hero_title",
+              "description": "Extract hero title",
+              "selector": ["main", "section.hero-section", "h1"],
+              "type": "string"
+          },
+          {
+              "id": "feature_titles",
+              "description": "Extract all feature titles",
+              "selector": [
+                  "main",
+                  "section.features-section",
+                  "div.features-grid",
+                  "article.feature-card",
+                  "h3.feature-title"
+              ],
+              "type": "array"
+          },
+          {
+              "id": "feature_ratings",
+              "description": "Extract all feature ratings",
+              "selector": [
+                  "main",
+                  "section.features-section",
+                  "div.features-grid",
+                  "article.feature-card",
+                  "div.feature-meta",
+                  "span.feature-rating"
+              ],
+              "type": "array",
+              "attribute": "data-rating"
+          },
+          {
+              "id": "first_rating",
+              "description": "Extract first feature rating",
+              "selector": [
+                  "main",
+                  "section.features-section",
+                  "div.features-grid",
+                  "article#feature-1",
+                  "div.feature-meta",
+                  "span.feature-rating"
+              ],
+              "type": "number",
+              "attribute": "data-rating"
+          }
+      ]
+  }))
+  .unwrap();
+
+  // Extract data using the config
+  let result = main_config.extract_and_validate(&json!(html_data)).unwrap();
+
+  // Verify extraction
+  assert_eq!(result.errors.len(), 0);
+  assert_eq!(result.values.len(), 6);
+
+  // Check individual values
+  assert_eq!(result.values["page_title"], json!("Complex Test Page"));
+  assert_eq!(result.values["meta_description"], json!("A complex test page for HTML extraction"));
+  assert_eq!(result.values["hero_title"], json!("Welcome to Our Complex Test Page"));
+
+  // Check array values
+  let feature_titles = result.values["feature_titles"].as_array().unwrap();
+  assert_eq!(feature_titles.len(), 3);
+  assert!(feature_titles.contains(&json!("Lightning Fast")));
+  assert!(feature_titles.contains(&json!("Highly Secure")));
+  assert!(feature_titles.contains(&json!("Infinitely Scalable")));
+
+  // Check feature ratings array
+  let feature_ratings = result.values["feature_ratings"].as_array().unwrap();
+  assert_eq!(feature_ratings.len(), 3);
+  assert!(feature_ratings.contains(&json!("4.8")));
+  assert!(feature_ratings.contains(&json!("4.9")));
+  assert!(feature_ratings.contains(&json!("4.7")));
+
+  // Check numeric value
+  assert_eq!(result.values["first_rating"], json!(4.8));
+}
