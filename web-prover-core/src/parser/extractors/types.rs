@@ -7,7 +7,7 @@ use std::{collections::HashMap, fmt::Display};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::parser::{common::get_value_type, errors::ExtractorError, predicate::Predicate};
+use crate::parser::{errors::ExtractorError, extractors::get_value_type, predicate::Predicate};
 
 /// The type of data being extracted
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -100,7 +100,7 @@ pub struct Extractor {
 pub type ExtractionValues = HashMap<String, Value>;
 
 /// The result of an extraction operation
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, PartialEq)]
 pub struct ExtractionResult {
   /// The extracted values, keyed by extractor ID
   pub values: ExtractionValues,

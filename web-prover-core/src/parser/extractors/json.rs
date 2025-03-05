@@ -1,11 +1,19 @@
-use std::collections::HashMap;
-
 use serde_json::Value;
 
 use super::types::ExtractionResult;
-use crate::parser::{
-  common::get_value_type, errors::ExtractorError, predicate, DataFormat, ExtractorConfig,
-};
+use crate::parser::{errors::ExtractorError, predicate, DataFormat, ExtractorConfig};
+
+/// Helper function to get the type of serde_json::Value as a string
+pub fn get_value_type(value: &Value) -> &'static str {
+  match value {
+    Value::Null => "null",
+    Value::Bool(_) => "boolean",
+    Value::Number(_) => "number",
+    Value::String(_) => "string",
+    Value::Array(_) => "array",
+    Value::Object(_) => "object",
+  }
+}
 
 /// Extracts data from a JSON value using the provided extractor configuration
 pub fn extract_json(
@@ -16,7 +24,7 @@ pub fn extract_json(
     return Err(ExtractorError::InvalidFormat("JSON".to_string()));
   }
 
-  let mut result = ExtractionResult { values: HashMap::new(), errors: Vec::new() };
+  let mut result = ExtractionResult::default();
 
   for extractor in &config.extractors {
     match extract_json_value(json, &extractor.selector) {
