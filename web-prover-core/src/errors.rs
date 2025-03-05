@@ -13,6 +13,10 @@ pub enum ManifestError {
   #[error("Serde error occurred: {0}")]
   SerdeError(#[from] serde_json::Error),
 
+  /// Extractor error
+  #[error("Extractor error: {0}")]
+  ExtractorError(#[from] crate::parser::ExtractorError),
+
   /// Template-specific errors
   #[error("Template error: {0}")]
   Template(#[from] TemplateError),

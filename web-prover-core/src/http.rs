@@ -19,7 +19,12 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 pub use web_proof_circuits_witness_generator::json::JsonKey;
 
-use crate::{errors::ManifestError, template, template::TemplateVar};
+use crate::{
+  errors::ManifestError,
+  parser::{DataFormat, ExtractionValues, ExtractorConfig},
+  template,
+  template::TemplateVar,
+};
 
 /// Max HTTP headers
 pub const MAX_HTTP_HEADERS: usize = 25;
@@ -28,24 +33,19 @@ pub const HTTP_1_1: &str = "HTTP/1.1";
 
 /// A type of response body used to describe conditions in the client `Manifest`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-pub struct ManifestResponseBody {
-  /// JSON Path containing expected traversal keys and expected value
-  #[serde(rename = "json")] // TODO: Remove after migrating to a JSON DSL
-  pub json_path: Vec<JsonKey>,
-}
+pub struct ManifestResponseBody(pub ExtractorConfig);
 
-impl TryFrom<&[u8]> for ManifestResponseBody {
-  type Error = ManifestError;
-
-  fn try_from(body_bytes: &[u8]) -> Result<Self, Self::Error> {
-    if body_bytes.is_empty() {
-      return Ok(Self { json_path: vec![] });
-    }
-    // Attempt to parse the body as JSON path.
-    let json_path: Vec<JsonKey> = serde_json::from_slice(body_bytes).map_err(|_| {
-      ManifestError::InvalidManifest("Failed to parse body as valid JSON".to_string())
-    })?;
-    Ok(Self { json_path })
+impl ManifestResponseBody {
+  // TODO: A workaround for backwards-compatibility with JsonKey
+  // TODO: It doesn't afford any security
+  /// Returns the IDs of all extractors in the configuration
+  pub fn json_path(&self) -> Vec<JsonKey> {
+    self
+      .0
+      .extractors
+      .iter()
+      .flat_map(|extractor| extractor.selector.iter().map(|s| JsonKey::String(s.clone())))
+      .collect()
   }
 }
 
@@ -69,113 +69,6 @@ impl TryFrom<&[u8]> for NotaryResponseBody {
       ManifestError::InvalidManifest("Failed to parse body as valid JSON".to_string())
     })?;
     Ok(Self { json: Some(json) })
-  }
-}
-
-impl NotaryResponseBody {
-  /// Verifies if the notary's JSON response matches the client-provided `json_path`.
-  ///
-  /// The `json_path` defines a sequence of keys for traversing the JSON structure.
-  /// Each key specifies either:
-  /// - A string to look for in a JSON object.
-  /// - An index to access an element in a JSON array.
-  /// - A concrete value at the end of the path.
-  ///
-  /// The function traverses the JSON step-by-step, returning `true` if all keys match,
-  /// or `false` otherwise.
-  fn matches_path(&self, json_path: &[JsonKey]) -> bool {
-    if json_path.is_empty() {
-      debug!("Invalid json_path: Path is empty");
-      return false;
-    }
-    let Some(json) = &self.json else {
-      debug!("No JSON data to match against");
-      return false;
-    };
-    self.traverse_json_path(json, json_path)
-  }
-
-  /// Traverses a JSON value using a specified path of keys and verifies if it matches the given
-  /// sequence.
-  ///
-  /// # Arguments
-  /// * `initial_value` - The root JSON value to start traversal from.
-  /// * `json_path` - A sequence of `JsonKey` elements defining the traversal path.
-  ///
-  /// # Returns
-  /// `true` if the traversal successfully matches the sequence or reaches the expected value;
-  /// `false` otherwise.
-  fn traverse_json_path(&self, initial_value: &serde_json::Value, json_path: &[JsonKey]) -> bool {
-    let mut current = initial_value;
-
-    for (i, key) in json_path.iter().enumerate() {
-      // If the element is last, we return true because we've reached the end of the path
-      let is_last = i == json_path.len() - 1;
-
-      match key {
-        JsonKey::String(expected) => {
-          if !self.handle_string_key(current, expected, is_last) {
-            return false;
-          }
-          if is_last {
-            return true;
-          }
-          current = current.as_object().and_then(|obj| obj.get(expected)).unwrap();
-        },
-        JsonKey::Num(expected) => {
-          if !self.handle_numeric_key(current, expected, is_last) {
-            return false;
-          }
-          if is_last {
-            return true;
-          }
-          current = current.as_array().and_then(|arr| arr.get(*expected)).unwrap();
-        },
-      }
-    }
-
-    false
-  }
-
-  fn handle_string_key(&self, current: &serde_json::Value, expected: &str, is_last: bool) -> bool {
-    match current {
-      serde_json::Value::String(actual) => is_last && actual == expected,
-      serde_json::Value::Object(obj) => obj.contains_key(expected),
-      _ => {
-        debug!("Expected string or object, found: {:?}", current);
-        false
-      },
-    }
-  }
-
-  fn handle_numeric_key(
-    &self,
-    current: &serde_json::Value,
-    expected: &usize,
-    is_last: bool,
-  ) -> bool {
-    match current {
-      serde_json::Value::Number(actual) => {
-        if !is_last {
-          return false;
-        }
-        if let Some(n) = actual.as_u64() {
-          return n == (*expected as u64);
-        }
-        if let Some(n) = actual.as_i64() {
-          return n == (*expected as i64);
-        }
-        if let Some(n) = actual.as_f64() {
-          return (n - (*expected as f64)).abs() < f64::EPSILON;
-        }
-        false
-      },
-      serde_json::Value::Array(arr) => expected >= &0 && *expected < arr.len(),
-      _ => {
-        debug!("Expected number or array, found: {:?}", current);
-        false
-      },
-    }
   }
 }
 
@@ -259,45 +152,88 @@ impl NotaryResponse {
   }
 
   /// Tests matching between notary response, `self`,  and client-designated response, `other`.
-  /// Returns true if at least all values in `other` are also present in `self`.
-  pub fn matches_client_manifest(&self, other: &ManifestResponse) -> bool {
+  /// Returns `Some(values)` if at least all values in `other` are also present in `self` and `None`
+  /// otherwise.
+  pub fn match_and_extract(
+    &self,
+    other: &ManifestResponse,
+  ) -> Result<Option<ExtractionValues>, ManifestError> {
+    // Check basic response properties
     if self.response.status != other.status
       || self.response.version != other.version
       || self.response.message != other.message
     {
       debug!("Exact matches for status, version, or message do not match");
-      return false;
+      return Ok(None);
     }
 
-    // Ensure all headers in `other` are present in `self`
+    // Check headers
+    if !self.headers_match(other) {
+      return Ok(None);
+    }
+
+    // Check body
+    self.body_matches(other)
+  }
+
+  /// Helper method to check if headers match
+  fn headers_match(&self, other: &ManifestResponse) -> bool {
     for (key, other_value) in &other.headers {
-      let value =
-        self.response.headers.get(key).or_else(|| self.response.headers.get(&key.to_lowercase()));
-      if let Some(actual_value) = value {
-        if actual_value != other_value {
+      match self
+        .response
+        .headers
+        .get(key)
+        .or_else(|| self.response.headers.get(&key.to_lowercase()))
+      {
+        Some(actual_value) if actual_value == other_value => continue,
+        Some(actual_value) => {
           debug!(
             "Header mismatch for key: {}: expected={}, actual={}",
             key, other_value, actual_value
           );
           return false;
-        }
-      } else {
-        debug!("Header key not present in self: {}", key);
-        return false;
+        },
+        None => {
+          debug!("Header key not present in self: {}", key);
+          return false;
+        },
       }
     }
-
-    // Check if the `body` of `other` matches the `json_path` within `self`.
-    if !self.notary_response_body.matches_path(&other.body.json_path) {
-      debug!(
-        "JSON path does not match. notary_response_body={:?}, json_path={:?}",
-        self.notary_response_body, other.body.json_path,
-      );
-      return false;
-    }
-
-    debug!("Client response matches");
     true
+  }
+
+  /// Helper method to check if body matches and extract values
+  fn body_matches(
+    &self,
+    other: &ManifestResponse,
+  ) -> Result<Option<ExtractionValues>, ManifestError> {
+    match &self.notary_response_body.json {
+      Some(json) => {
+        let result = other.body.0.extract_and_validate(json)?;
+
+        if !result.errors.is_empty() {
+          debug!("JSON path does not match: {:?}", result.errors);
+          return Ok(None);
+        }
+
+        if result.values.len() != other.body.0.extractors.len() {
+          debug!("Not all extractors were matched");
+          return Ok(None);
+        }
+
+        debug!("Client response matches");
+        Ok(Some(result.values))
+      },
+      None if other.body.0.extractors.is_empty() => {
+        // If we get here, there was a match but no JSON data to extract
+        debug!("Client response matches (no JSON data)");
+        Ok(Some(HashMap::new()))
+      },
+      None => {
+        debug!("No JSON data to match against");
+        Ok(None)
+      },
+    }
   }
 }
 
@@ -380,15 +316,21 @@ impl ManifestResponse {
     }
 
     // When Content-Type is application/json, we expect at least one JSON item
-    if content_type == "application/json" && self.body.json_path.is_empty() {
-      return Err(ManifestError::InvalidManifest("Expected at least one JSON item".to_string()));
-    }
+    if content_type == "application/json" {
+      if self.body.0.format != DataFormat::Json {
+        return Err(ManifestError::InvalidManifest("Expected JSON format".to_string()));
+      }
 
-    const MAX_JSON_PATH_LENGTH: usize = 100;
-    if self.body.json_path.len() > MAX_JSON_PATH_LENGTH {
-      return Err(ManifestError::InvalidManifest(
-        "Invalid JSON path length: ".to_string() + &self.body.json_path.len().to_string(),
-      ));
+      if self.body.0.extractors.is_empty() {
+        return Err(ManifestError::InvalidManifest("Expected at least one JSON item".to_string()));
+      }
+    }
+    const MAX_EXTRACTORS: usize = 100;
+    if self.body.0.extractors.len() > MAX_EXTRACTORS {
+      return Err(ManifestError::InvalidManifest(format!(
+        "Invalid extractors length: {}",
+        self.body.0.extractors.len()
+      )));
     }
 
     Ok(())
@@ -453,6 +395,8 @@ impl ManifestRequest {
     Ok(())
   }
 
+  // TODO(#517)
+  #[allow(unused)]
   fn collect_tokens(&self) -> Vec<String> {
     let mut all_tokens = Vec::new();
 
@@ -598,13 +542,14 @@ pub mod tests {
   use serde_json::json;
 
   use super::*;
-  use crate::http::{ManifestRequest, ManifestResponse};
+  use crate::{extractor, parser::ExtractorType};
 
-  /// Creates a new HTTP request with optional parameters.
+  /// Creates a new `ManifestRequest` with optional parameters.
   #[macro_export]
   macro_rules! request {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
+        #[allow(unused_mut)]
         let mut request = ManifestRequest {
             method: "GET".to_string(),
             url: "https://example.com".to_string(),
@@ -634,7 +579,7 @@ pub mod tests {
     }};
   }
 
-  /// Creates a new HTTP response with optional parameters.
+  /// Creates a new `ManifestResponse` with optional parameters.
   #[macro_export]
   macro_rules! response {
     // Match with optional parameters
@@ -647,13 +592,7 @@ pub mod tests {
             headers: std::collections::HashMap::from([
                 ("Content-Type".to_string(), "application/json".to_string())
             ]),
-            body: ManifestResponseBody {
-                json_path: vec![
-                    JsonKey::String("key1".to_string()),
-                    JsonKey::String("key2".to_string()),
-                    JsonKey::Num(3)
-                ]
-            },
+            body: ManifestResponseBody::default(),
         };
 
         // Override default fields with provided arguments
@@ -700,13 +639,23 @@ pub mod tests {
     assert_eq!(response.response.message, "OK");
     assert_eq!(response.response.headers.len(), 1);
     assert_eq!(response.response.headers.get("Content-Type").unwrap(), "application/json");
-    assert_eq!(response.response.body.json_path.len(), 0);
+    assert_eq!(response.response.body, ManifestResponseBody::default());
     assert_eq!(response.notary_response_body.json, Some(body));
   }
 
   #[test]
   fn test_notary_matches_other_response() {
-    let response = response!();
+    let response = response!(
+        body: ManifestResponseBody(ExtractorConfig {
+            format: DataFormat::Json,
+            extractors: vec![extractor!(
+                id: "testKey".to_string(),
+                description: "Test key".to_string(),
+                selector: vec!["key1".to_string(), "key2".to_string()],
+                extractor_type: ExtractorType::Number,
+            )],
+        })
+    );
     let notary_response = notary_response!(
       response.clone(),
       json: Some(json!({
@@ -715,22 +664,27 @@ pub mod tests {
     );
 
     // Is a perfect match with itself
-    assert!(notary_response.matches_client_manifest(&response));
-    assert!(notary_response.matches_client_manifest(&notary_response.response));
+    let matching_result = notary_response.match_and_extract(&response).unwrap();
+    assert!(matching_result.is_some());
+    assert_eq!(matching_result.unwrap().get("testKey").unwrap(), &json!(3));
 
     // Fails if it doesn't match directly
     let non_matching_response = response!(status: "201".to_string());
-    assert!(!notary_response.matches_client_manifest(&non_matching_response));
+    assert!(notary_response.match_and_extract(&non_matching_response).unwrap().is_none());
 
     // Superset case
     let response_superset = {
       let mut res = notary_response.clone();
       res.response.headers.insert("extra".to_string(), "header".to_string());
-      res.response.body.json_path = notary_response.response.body.json_path.clone();
-      res.response.body.json_path.push(JsonKey::Num(3));
+      res.response.body.0.extractors.push(extractor!(
+        id: "extra".to_string(),
+        description: "Extra".to_string(),
+        selector: vec!["key1".to_string(), "key2".to_string()],
+        extractor_type: ExtractorType::Number,
+      ));
       res
     };
-    assert!(response_superset.matches_client_manifest(&response));
+    assert!(response_superset.match_and_extract(&response).unwrap().is_some());
   }
 
   #[test]
@@ -743,7 +697,7 @@ pub mod tests {
     let expected = NotaryResponse {
       response:             response!(
         headers: HashMap::from([("Content-Type".to_string(), "text/plain".to_string())]),
-        body: ManifestResponseBody { json_path: vec![] }
+        body: ManifestResponseBody::default(),
       ),
       notary_response_body: NotaryResponseBody { json: None },
     };
@@ -809,9 +763,7 @@ pub mod tests {
         headers: std::collections::HashMap::from([
             ("Content-Type".to_string(), "application/json".to_string())
         ]),
-        body: ManifestResponseBody {
-            json_path: vec![],
-        }
+        body: ManifestResponseBody::default()
     );
     let expected_response = notary_response!(
         manifest_response,
@@ -829,7 +781,7 @@ pub mod tests {
     let notary_response =
       NotaryResponse::from_payload(&[header_bytes, empty_body_bytes].concat()).unwrap();
 
-    assert_eq!(notary_response.response.body.json_path.len(), 0);
+    assert_eq!(notary_response.response.body, ManifestResponseBody::default());
     assert_eq!(notary_response.notary_response_body.json, Some(json!({})));
   }
 
@@ -837,11 +789,17 @@ pub mod tests {
   fn test_subset_with_missing_key_in_other() {
     let base_response = notary_response!(response!(),);
     let other_response = response!(
-        body: ManifestResponseBody {
-            json_path: vec![JsonKey::String("key1".to_string())],
-        }
+        body: ManifestResponseBody(ExtractorConfig {
+            format: DataFormat::Json,
+            extractors: vec![extractor!(
+                id: "testKey".to_string(),
+                description: "Test key".to_string(),
+                selector: vec!["missingKey".to_string()],
+                extractor_type: ExtractorType::String,
+            )],
+        })
     );
-    assert!(!base_response.matches_client_manifest(&other_response));
+    assert!(!base_response.match_and_extract(&other_response).unwrap().is_some());
   }
 
   #[test]
@@ -960,249 +918,5 @@ pub mod tests {
     });
 
     assert!(request.validate_vars().is_ok());
-  }
-
-  // Creates a response body with a given serde_json::Value
-  #[macro_export]
-  macro_rules! notary_body {
-    ($($key:tt : $value:tt),* $(,)?) => {{
-        NotaryResponseBody {
-            json: Some(json!({
-                $(
-                    $key: $value
-                ),*
-            }))
-        }
-    }};
-}
-
-  #[test]
-  fn test_json_contains_path_valid_object_path() {
-    let json = notary_body!(
-        "key1": {
-            "key2": {
-                "key3": "value"
-            }
-        }
-    );
-    // ["key1", "key2", "key3"]
-    let path = vec![
-      JsonKey::String("key1".to_string()),
-      JsonKey::String("key2".to_string()),
-      JsonKey::String("key3".to_string()),
-    ];
-    assert!(json.matches_path(&path));
-
-    // ["key1", "key2", "key3", "value"]
-    let mut path_with_value = path.clone();
-    path_with_value.push(JsonKey::String("value".to_string()));
-    assert!(json.matches_path(&path_with_value));
-
-    // ["key1", "key2", "key3", "value", "invalid"]
-    let mut path_with_invalid_value = path.clone();
-    path_with_invalid_value.push(JsonKey::String("invalid_value".to_string()));
-    assert!(!json.matches_path(&path_with_invalid_value));
-  }
-
-  #[test]
-  fn test_json_contains_path_valid_array_path() {
-    let json = notary_body!(
-        "key1": [
-            {
-                "key2": "value1"
-            },
-            {
-                "key3": "value2"
-            }
-        ]
-    );
-    let path = vec![
-      JsonKey::String("key1".to_string()),
-      JsonKey::Num(1),
-      JsonKey::String("key3".to_string()),
-      JsonKey::String("value2".to_string()),
-    ];
-    assert!(json.matches_path(&path));
-  }
-
-  #[test]
-  fn test_json_contains_path_invalid_key() {
-    let json = notary_body!(
-        "key1": {
-            "key2": "value"
-        }
-    );
-    let path =
-      vec![JsonKey::String("key1".to_string()), JsonKey::String("invalid_key".to_string())];
-    assert!(!json.matches_path(&path));
-  }
-
-  #[test]
-  fn test_json_contains_path_invalid_array_index() {
-    let json = notary_body!(
-        "key1": [
-            "value1",
-            "value2"
-        ]
-    );
-    let path = vec![
-      JsonKey::String("key1".to_string()),
-      JsonKey::Num(3), // Out of bounds
-    ];
-    assert!(!json.matches_path(&path));
-  }
-
-  #[test]
-  fn test_json_contains_path_index_on_non_array() {
-    let json = notary_body!(
-        "key1": {
-            "key2": "value"
-        }
-    );
-    let path = vec![
-      JsonKey::String("key1".to_string()),
-      JsonKey::Num(0), // Applying index on a non-array
-    ];
-    assert!(!&json.matches_path(&path));
-  }
-
-  #[test]
-  fn test_empty_path() {
-    let json = notary_body!(
-        "key1": {
-            "key2": {
-                "key3": "value"
-            }
-        }
-    );
-    let path: Vec<JsonKey> = vec![];
-    assert!(!json.matches_path(&path));
-  }
-
-  #[test]
-  fn test_empty_body() {
-    let json = notary_body!();
-    let mut path: Vec<JsonKey> = vec![];
-    assert!(!json.matches_path(&path));
-
-    path.push(JsonKey::String("key1".to_string()));
-    assert!(!json.matches_path(&path));
-  }
-
-  #[test]
-  fn test_number_matching() {
-    let test_cases = vec![
-      // Unsigned integers
-      (json!({"val": 42u64}), 42, true),
-      // Signed integers
-      (json!({"val": -42}), -42, true),
-      // Floating point
-      (json!({"val": 42.0}), 42, true),
-      // Large numbers
-      (json!({"val": u64::MAX}), u64::MAX as i64, true),
-      // Mismatched types
-      (json!({"val": "42"}), 42, false),
-      // Edge cases
-      (json!({"val": 42.000001}), 42, false),
-    ];
-
-    for (json, expected, should_match) in test_cases {
-      let body = NotaryResponseBody { json: Some(json.clone()) };
-      assert_eq!(
-        body.matches_path(&[JsonKey::String("val".to_string()), JsonKey::Num(expected as usize)]),
-        should_match,
-        "Failed for value: {:?}, expected: {}",
-        json,
-        expected
-      );
-    }
-  }
-
-  #[test]
-  fn test_nested_array_path() {
-    let json = notary_body!(
-        "data": [
-            [1, 2, 3],
-            [4, 5, 6]
-        ]
-    );
-    assert!(json.matches_path(&[
-      JsonKey::String("data".to_string()),
-      JsonKey::Num(1),
-      JsonKey::Num(1),
-      JsonKey::Num(5),
-    ]));
-  }
-
-  #[test]
-  fn test_mixed_types_in_array() {
-    let json = notary_body!(
-        "mixed": [
-            42,
-            "string",
-            { "key": "value" },
-            [1, 2, 3]
-        ]
-    );
-    assert!(json.matches_path(&[
-      JsonKey::String("mixed".to_string()),
-      JsonKey::Num(0),
-      JsonKey::Num(42),
-    ]));
-    assert!(json.matches_path(&[
-      JsonKey::String("mixed".to_string()),
-      JsonKey::Num(1),
-      JsonKey::String("string".to_string()),
-    ]));
-    assert!(json.matches_path(&[
-      JsonKey::String("mixed".to_string()),
-      JsonKey::Num(2),
-      JsonKey::String("key".to_string()),
-      JsonKey::String("value".to_string()),
-    ]));
-  }
-
-  #[test]
-  fn test_empty_string_keys_and_values() {
-    let json = notary_body!(
-        "": {
-            "empty": ""
-        }
-    );
-    // Test empty string keys and values
-    assert!(json.matches_path(&[
-      JsonKey::String("".to_string()),
-      JsonKey::String("empty".to_string()),
-      JsonKey::String("".to_string()),
-    ]));
-  }
-
-  #[test]
-  fn test_very_deep_nesting() {
-    // Test different depths: 5, 25, and 100 levels
-    let depths = vec![5, 25, 100];
-
-    for depth in depths {
-      // Build nested JSON structure
-      let mut json_value = json!("value");
-      for i in (0..depth).rev() {
-        json_value = json!({
-            format!("level{}", i): json_value
-        });
-      }
-
-      let json = NotaryResponseBody { json: Some(json_value) };
-
-      // Build the path
-      let mut path = Vec::new();
-      for i in 0..depth {
-        path.push(JsonKey::String(format!("level{}", i)));
-      }
-      path.push(JsonKey::String("value".to_string()));
-
-      // Test the path
-      let result = json.matches_path(&path);
-      assert!(result, "Failed to match path at depth {}: {:?}", depth, path);
-    }
   }
 }
