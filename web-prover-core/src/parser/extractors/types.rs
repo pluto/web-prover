@@ -7,7 +7,9 @@ use std::{collections::HashMap, fmt::Display};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::parser::{errors::ExtractorError, extractors::get_value_type, predicate::Predicate};
+use crate::parser::{
+  errors::ExtractorError, extractors::get_value_type, predicate, predicate::Predicate,
+};
 
 /// The type of data being extracted
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -96,6 +98,10 @@ pub struct Extractor {
   pub attribute:      Option<String>,
 }
 
+impl Extractor {
+
+}
+
 /// The extracted values, keyed by extractor ID
 pub type ExtractionValues = HashMap<String, Value>;
 
@@ -106,4 +112,15 @@ pub struct ExtractionResult {
   pub values: ExtractionValues,
   /// Any errors that occurred during extraction
   pub errors: Vec<String>,
+}
+
+impl ExtractionResult {
+    pub fn add_processed_value(&mut self, result: (Option<(String, Value)>, Option<String>)) {
+        if let Some((id, value)) = result.0 {
+            self.values.insert(id, value);
+        }
+        if let Some(error) = result.1 {
+            self.errors.push(error);
+        }
+    }
 }

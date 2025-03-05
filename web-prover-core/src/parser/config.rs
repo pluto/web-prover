@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -16,6 +18,15 @@ pub enum DataFormat {
   Json,
   /// HTML format
   Html,
+}
+
+impl Display for DataFormat {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      DataFormat::Json => write!(f, "JSON"),
+      DataFormat::Html => write!(f, "HTML"),
+    }
+  }
 }
 
 /// The root configuration for data extractors

@@ -10,14 +10,17 @@ pub fn extract_html(
   config: &ExtractorConfig,
 ) -> Result<ExtractionResult, ExtractorError> {
   if config.format != DataFormat::Html {
-    return Err(ExtractorError::InvalidFormat("HTML".to_string()));
+    return Err(ExtractorError::InvalidFormat(format!(
+      "Expected HTML format, got {}",
+      config.format
+    )));
   }
 
   let mut result = ExtractionResult::default();
 
   // Parse the HTML document
   let dom = tl::parse(html_str, ParserOptions::default())
-    .map_err(|_| ExtractorError::InvalidFormat("Failed to parse HTML".to_string()))?;
+    .map_err(|err| ExtractorError::InvalidHtml(err.to_string()))?;
 
   for extractor in &config.extractors {
     match extract_html_value(&dom, &extractor.selector, extractor) {
