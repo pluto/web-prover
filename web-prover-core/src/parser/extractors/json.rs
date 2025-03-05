@@ -73,9 +73,8 @@ pub fn extract_json(
 
 /// Extracts a value from a JSON object using a path selector
 fn extract_json_value(json: &Value, path: &[String]) -> Result<Value, ExtractorError> {
-  // Special case: if the path is empty, we should not extract anything
   if path.is_empty() {
-    return Err(ExtractorError::MissingField("Empty selector path".to_string()));
+    return Err(ExtractorError::EmptySelector);
   }
 
   let mut current = json;
@@ -246,7 +245,7 @@ mod tests {
       )]);
 
       let result = config.extract_and_validate(&json_data).unwrap();
-      assert_extraction_error(&result, 1, &["Empty selector path"]);
+      assert_extraction_error(&result, 1, &["Empty selector"]);
     }
 
     #[test]

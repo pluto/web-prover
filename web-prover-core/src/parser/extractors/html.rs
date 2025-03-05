@@ -41,7 +41,10 @@ impl DocumentExtractor for HtmlDocumentExtractor {
     data: &Value,
     config: &ExtractorConfig,
   ) -> Result<ExtractionResult, ExtractorError> {
-    data.as_str().map(|s| extract_html(s, config)).unwrap_or_else(|| unreachable!())
+    data
+      .as_str()
+      .map(|s| extract_html(s, config))
+      .unwrap_or_else(|| Err(ExtractorError::InvalidHtml("Expected string input".to_string())))
   }
 }
 
@@ -56,7 +59,6 @@ fn extract_html(
   raw_html.validate_format(&config.format)?;
 
   let mut result = ExtractionResult::default();
-
   for extractor in &config.extractors {
     let value = raw_html.extract_value(extractor);
     result.process_extraction(value, extractor);
@@ -72,7 +74,7 @@ fn extract_html_value(
   extractor: &Extractor,
 ) -> Result<Value, ExtractorError> {
   if selector_path.is_empty() {
-    return Err(ExtractorError::MissingField("Empty selector path".to_string()));
+    return Err(ExtractorError::EmptySelector);
   }
 
   // Handle single selector case
@@ -107,13 +109,13 @@ fn query_selector(
   position: usize,
 ) -> Result<Vec<NodeHandle>, ExtractorError> {
   dom.query_selector(selector)
-    .ok_or_else(|| ExtractorError::InvalidPath(format!("Invalid selector '{}'", selector)))?
+    .ok_or_else(|| ExtractorError::SelectorFailed(format!("Invalid selector '{}'", selector)))?
     .collect::<Vec<_>>()
     .into_iter()
     .filter(|_| true) // Ensure non-empty
     .collect::<Vec<_>>()
     .is_empty()
-    .then(|| Err(ExtractorError::MissingField(format!(
+    .then(|| Err(ExtractorError::SelectorFailed(format!(
       "No elements found for selector '{}' at position {}",
       selector, position
     ))))
@@ -140,7 +142,7 @@ fn apply_selector_to_elements(
     .collect();
 
   if next_elements.is_empty() {
-    return Err(ExtractorError::MissingField(format!(
+    return Err(ExtractorError::SelectorFailed(format!(
       "No elements found for selector '{}' at position {}",
       selector,
       position + 1
@@ -157,7 +159,7 @@ fn process_elements(
   extractor: &Extractor,
 ) -> Result<Value, ExtractorError> {
   if extractor.extractor_type == ExtractorType::Array {
-    return Ok(Value::Array(extract_values_from_elements(parser, elements, extractor)));
+    return Ok(Value::Array(extract_values_from_elements(parser, elements, extractor)?));
   }
 
   let raw_value = extract_raw_value(parser, &elements[0], extractor);
@@ -169,7 +171,7 @@ fn extract_values_from_elements(
   parser: &Parser,
   elements: &[NodeHandle],
   extractor: &Extractor,
-) -> Vec<Value> {
+) -> Result<Vec<Value>, ExtractorError> {
   elements
     .iter()
     .filter_map(|el| {
@@ -177,7 +179,7 @@ fn extract_values_from_elements(
         if let Some(attr) = &extractor.attribute {
           extract_attribute_value(node, attr)
         } else {
-          Value::String(node.inner_text(parser).to_string())
+          Ok(Value::String(node.inner_text(parser).to_string()))
         }
       })
     })
@@ -185,12 +187,15 @@ fn extract_values_from_elements(
 }
 
 /// Extracts an attribute value from a node
-fn extract_attribute_value(node: &Node, attr: &str) -> Value {
+fn extract_attribute_value(node: &Node, attr: &str) -> Result<Value, ExtractorError> {
   node
     .as_tag()
     .and_then(|tag| tag.attributes().get(attr))
-    .and_then(|attr_value| attr_value.map(|value| value.as_utf8_str().to_string()))
-    .map_or_else(|| Value::String("".to_string()), Value::String)
+    .and_then(|attr_value| attr_value.map(|value| Value::String(value.as_utf8_str().to_string())))
+    .ok_or_else(|| ExtractorError::MissingField(format!(
+      "Attribute '{}' not found",
+      attr
+    )))
 }
 
 /// Extracts raw value from an element
@@ -246,7 +251,7 @@ fn extract_with_single_selector(
     Some(matches) => {
       let elements = matches.collect::<Vec<_>>();
       if elements.is_empty() {
-        return Err(ExtractorError::MissingField(format!(
+        return Err(ExtractorError::SelectorFailed(format!(
           "No elements found for selector '{}'",
           selector
         )));
@@ -254,7 +259,7 @@ fn extract_with_single_selector(
       elements
     },
     None => {
-      return Err(ExtractorError::InvalidPath(format!("Invalid selector '{}'", selector)));
+      return Err(ExtractorError::SelectorFailed(format!("Invalid selector '{}'", selector)));
     },
   };
 
@@ -429,15 +434,15 @@ mod tests {
 
     // Test invalid CSS selector
     let result = extract_html_value(&dom, &["#[invalid".to_string()], &basic_extractor);
-    assert!(matches!(result, Err(ExtractorError::InvalidPath(_))));
+    assert!(matches!(result, Err(ExtractorError::SelectorFailed(_))));
 
     // Test non-existent element
     let result = extract_html_value(&dom, &["#non-existent".to_string()], &basic_extractor);
-    assert!(matches!(result, Err(ExtractorError::MissingField(_))));
+    assert!(matches!(result, Err(ExtractorError::SelectorFailed(_))));
 
     // Test empty selector path
     let result = extract_html_value(&dom, &[], &basic_extractor);
-    assert!(matches!(result, Err(ExtractorError::MissingField(_))));
+    assert!(matches!(result, Err(ExtractorError::EmptySelector)));
   }
 
   fn page_title_extractor() -> Extractor {
@@ -548,7 +553,7 @@ mod tests {
     selector_path: &[String],
     extractor_type: ExtractorType,
     attribute: Option<String>,
-    expected_error_type: fn(ExtractorError) -> bool,
+    expected_error_type: fn(&ExtractorError) -> bool,
   ) {
     let extractor = extractor!(
       id: "test".to_string(),
@@ -560,7 +565,7 @@ mod tests {
     let result = extract_html_value(dom, selector_path, &extractor);
     assert!(result.is_err(), "Expected error but got: {:?}", result.ok());
     let err = result.err().unwrap();
-    assert!(expected_error_type(err), "Unexpected error type");
+    assert!(expected_error_type(&err), "Unexpected error type: {:?}", err);
   }
 
   #[test]
@@ -726,7 +731,7 @@ mod tests {
       &["main".to_string(), "section.non-existent".to_string(), "div.features-grid".to_string()],
       ExtractorType::String,
       None,
-      |err| matches!(err, ExtractorError::MissingField(_)),
+      |err| matches!(err, ExtractorError::SelectorFailed(_)),
     );
 
     // Invalid selector syntax - Note: The HTML parser treats invalid selectors as not found
@@ -735,7 +740,7 @@ mod tests {
       &["main".to_string(), "section[invalid=".to_string()],
       ExtractorType::String,
       None,
-      |err| matches!(err, ExtractorError::MissingField(_)),
+      |err| matches!(err, ExtractorError::SelectorFailed(_)),
     );
 
     // Type mismatch when converting to number
@@ -747,9 +752,9 @@ mod tests {
       |err| matches!(err, ExtractorError::TypeMismatch { .. }),
     );
 
-    // Empty selector path
+    // Empty selector
     assert_html_extraction_error(&dom, &[], ExtractorType::String, None, |err| {
-      matches!(err, ExtractorError::MissingField(_))
+      matches!(err, ExtractorError::EmptySelector)
     });
   }
 }
