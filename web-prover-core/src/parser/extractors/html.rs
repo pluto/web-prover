@@ -2,9 +2,7 @@ use serde_json::Value;
 use tl::{Node, NodeHandle, Parser, ParserOptions, VDom};
 
 use super::types::{DocumentExtractor, ExtractedValue, ExtractionResult, RawDocument};
-use crate::parser::{
-  extractors::get_value_type, DataFormat, Extractor, ExtractorConfig, ExtractorError, ExtractorType,
-};
+use crate::parser::{DataFormat, Extractor, ExtractorConfig, ExtractorError, ExtractorType};
 
 pub struct RawHtmlDocument<'a> {
   dom: &'a VDom<'a>,
@@ -26,25 +24,26 @@ impl RawDocument for RawHtmlDocument<'_> {
 pub struct HtmlDocumentExtractor;
 
 impl DocumentExtractor for HtmlDocumentExtractor {
-  fn validate_input(&self, data: &Value) -> Result<(), ExtractorError> {
-    if !matches!(data, Value::String(_)) {
-      return Err(ExtractorError::TypeMismatch {
-        expected: "string".to_string(),
-        actual:   get_value_type(data).to_string(),
-      });
-    }
+  fn validate_input(&self, data: &[u8]) -> Result<(), ExtractorError> {
+    // First try to convert bytes to string
+    let html_str = std::str::from_utf8(data)
+      .map_err(|_| ExtractorError::InvalidHtml("Invalid UTF-8 encoding".to_string()))?;
+
+    // Try parsing the HTML
+    tl::parse(html_str, ParserOptions::default())
+      .map_err(|err| ExtractorError::InvalidHtml(format!("Failed to parse HTML: {}", err)))?;
+
     Ok(())
   }
 
   fn extract(
     &self,
-    data: &Value,
+    data: &[u8],
     config: &ExtractorConfig,
   ) -> Result<ExtractionResult, ExtractorError> {
-    data
-      .as_str()
-      .map(|s| extract_html(s, config))
-      .unwrap_or_else(|| Err(ExtractorError::InvalidHtml("Expected string input".to_string())))
+    let html_str = std::str::from_utf8(data)
+      .map_err(|_| ExtractorError::InvalidHtml("Invalid UTF-8 encoding".to_string()))?;
+    extract_html(html_str, config)
   }
 }
 
@@ -192,10 +191,7 @@ fn extract_attribute_value(node: &Node, attr: &str) -> Result<Value, ExtractorEr
     .as_tag()
     .and_then(|tag| tag.attributes().get(attr))
     .and_then(|attr_value| attr_value.map(|value| Value::String(value.as_utf8_str().to_string())))
-    .ok_or_else(|| ExtractorError::MissingField(format!(
-      "Attribute '{}' not found",
-      attr
-    )))
+    .ok_or_else(|| ExtractorError::MissingField(format!("Attribute '{}' not found", attr)))
 }
 
 /// Extracts raw value from an element

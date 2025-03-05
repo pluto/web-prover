@@ -513,7 +513,7 @@ impl DecryptWrapper {
         },
         Err(_) => None,
       },
-      SupportedSuites::ChachaPoly => match self.inner.decrypt_tls13_chacha20(&msg, self.seq) {
+      SupportedSuites::ChachaPoly => match self.inner.decrypt_tls13_chacha20(msg, self.seq) {
         Ok((plain_message, _)) => {
           self.seq += 1;
           Some(plain_message)

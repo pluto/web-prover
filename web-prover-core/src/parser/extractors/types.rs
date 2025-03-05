@@ -6,6 +6,7 @@ use std::{collections::HashMap, fmt::Display};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tracing::debug;
 
 use crate::parser::{
   extractors::get_value_type, predicate, predicate::Predicate, DataFormat, ExtractorConfig,
@@ -14,10 +15,10 @@ use crate::parser::{
 
 /// Trait for extracting data from a document
 pub trait DocumentExtractor {
-  fn validate_input(&self, data: &Value) -> Result<(), ExtractorError>;
+  fn validate_input(&self, data: &[u8]) -> Result<(), ExtractorError>;
   fn extract(
     &self,
-    data: &Value,
+    data: &[u8],
     config: &ExtractorConfig,
   ) -> Result<ExtractionResult, ExtractorError>;
 }
@@ -155,7 +156,10 @@ impl ExtractionResult {
         }
 
         if predicate_valid {
+          debug!("Predicate {} valid for extractor {}", predicate_valid, extractor.id);
           self.values.insert(extractor.id.clone(), value);
+        } else {
+          debug!("Predicate {} invalid for extractor {}", predicate_valid, extractor.id);
         }
       },
       Err(err) if extractor.required => {

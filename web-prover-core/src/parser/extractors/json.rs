@@ -35,11 +35,12 @@ impl RawDocument for RawJsonHandle {
 pub struct JsonDocumentExtractor;
 
 impl DocumentExtractor for JsonDocumentExtractor {
-  fn validate_input(&self, data: &Value) -> Result<(), ExtractorError> {
-    if !matches!(data, Value::Object(_) | Value::Array(_)) {
+  fn validate_input(&self, data: &[u8]) -> Result<(), ExtractorError> {
+    let value = serde_json::from_slice::<Value>(data)?;
+    if !matches!(value, Value::Object(_) | Value::Array(_)) {
       return Err(ExtractorError::TypeMismatch {
         expected: "object or array".to_string(),
-        actual:   get_value_type(data).to_string(),
+        actual:   get_value_type(&value).to_string(),
       });
     }
     Ok(())
@@ -47,10 +48,11 @@ impl DocumentExtractor for JsonDocumentExtractor {
 
   fn extract(
     &self,
-    data: &Value,
+    data: &[u8],
     config: &ExtractorConfig,
   ) -> Result<ExtractionResult, ExtractorError> {
-    extract_json(data, config)
+    let data = serde_json::from_slice::<Value>(data)?;
+    extract_json(&data, config)
   }
 }
 
@@ -64,7 +66,7 @@ pub fn extract_json(
 
   let mut result = ExtractionResult::default();
   for extractor in &config.extractors {
-    let value = handle.extract_value(&extractor);
+    let value = handle.extract_value(extractor);
     result.process_extraction(value, extractor);
   }
 
@@ -133,7 +135,9 @@ mod tests {
         "key1": {
           "key2": "value"
         }
-      });
+      })
+      .to_string()
+      .into_bytes();
 
       let config = create_json_config(vec![extractor!(
         id: "simple".to_string(),
@@ -156,7 +160,9 @@ mod tests {
             "key3": "value2"
           }
         ]
-      });
+      })
+      .to_string()
+      .into_bytes();
 
       let config = create_json_config(vec![extractor!(
         id: "array_value".to_string(),
@@ -179,7 +185,9 @@ mod tests {
         "key1": {
           "key2": "value"
         }
-      });
+      })
+      .to_string()
+      .into_bytes();
 
       let config = create_json_config(vec![extractor!(
         id: "invalid_key".to_string(),
@@ -198,7 +206,9 @@ mod tests {
           "value1",
           "value2"
         ]
-      });
+      })
+      .to_string()
+      .into_bytes();
 
       let config = create_json_config(vec![extractor!(
         id: "out_of_bounds".to_string(),
@@ -216,7 +226,9 @@ mod tests {
         "key1": {
           "key2": "value"
         }
-      });
+      })
+      .to_string()
+      .into_bytes();
 
       let config = create_json_config(vec![extractor!(
         id: "non_array_index".to_string(),
@@ -236,7 +248,9 @@ mod tests {
             "key3": "value"
           }
         }
-      });
+      })
+      .to_string()
+      .into_bytes();
 
       let config = create_json_config(vec![extractor!(
         id: "empty_path".to_string(),
@@ -250,7 +264,7 @@ mod tests {
 
     #[test]
     fn empty_body() {
-      let json_data = json!({});
+      let json_data = json!({}).to_string().into_bytes();
       let config = create_json_config(vec![extractor!(
         id: "empty_body".to_string(),
         selector: vec!["key1".to_string()],
@@ -273,7 +287,9 @@ mod tests {
           [1, 2, 3],
           [4, 5, 6]
         ]
-      });
+      })
+      .to_string()
+      .into_bytes();
 
       let config = create_json_config(vec![extractor!(
         id: "nested_array_value".to_string(),
@@ -299,7 +315,9 @@ mod tests {
           { "key": "value" },
           [1, 2, 3]
         ]
-      });
+      })
+      .to_string()
+      .into_bytes();
 
       let config = create_json_config(vec![
         extractor!(
@@ -337,7 +355,9 @@ mod tests {
         "": {
           "empty": ""
         }
-      });
+      })
+      .to_string()
+      .into_bytes();
 
       let config = create_json_config(vec![extractor!(
         id: "empty_key_value".to_string(),
@@ -359,7 +379,9 @@ mod tests {
       let json_data = json!({
         "nullable_field": null,
         "valid_field": "value"
-      });
+      })
+      .to_string()
+      .into_bytes();
 
       let config = create_json_config(vec![
         extractor!(
@@ -393,6 +415,7 @@ mod tests {
             format!("level{}", i): json_value
         });
       }
+      let json_value = json_value.to_string().into_bytes();
 
       // Build the selector path
       let mut selector = Vec::new();

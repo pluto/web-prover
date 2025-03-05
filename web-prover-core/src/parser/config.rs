@@ -1,7 +1,6 @@
 use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use crate::parser::{
   errors::ExtractorError,
@@ -40,7 +39,7 @@ pub struct ExtractorConfig {
 
 impl ExtractorConfig {
   /// Use document-specific extractors to extract and validate data
-  pub fn extract_and_validate(&self, data: &Value) -> Result<ExtractionResult, ExtractorError> {
+  pub fn extract_and_validate(&self, data: &[u8]) -> Result<ExtractionResult, ExtractorError> {
     let extractor: Box<dyn DocumentExtractor> = match self.format {
       DataFormat::Json => Box::new(JsonDocumentExtractor),
       DataFormat::Html => Box::new(HtmlDocumentExtractor),
@@ -74,7 +73,9 @@ mod tests {
             "active": true,
             "tags": ["developer", "rust"]
         }
-    });
+    })
+    .to_string()
+    .into_bytes();
     let config = ExtractorConfig {
       format:     DataFormat::Json,
       extractors: vec![name_extractor(), age_extractor(), active_extractor(), tags_extractor()],
@@ -98,7 +99,9 @@ mod tests {
             "active": false,
             "tags": []    // Empty array
         }
-    });
+    })
+    .to_string()
+    .into_bytes();
     let config = ExtractorConfig {
       format:     DataFormat::Json,
       extractors: vec![name_extractor(), age_extractor(), active_extractor(), tags_extractor()],
@@ -124,7 +127,9 @@ mod tests {
             "name": "John Doe"
             // Missing age and active fields
         }
-    });
+    })
+    .to_string()
+    .into_bytes();
     let config = ExtractorConfig {
       format:     DataFormat::Json,
       extractors: vec![
@@ -266,7 +271,9 @@ mod tests {
         <a href="https://example.com" class="link">Visit Website</a>
       </body>
       </html>
-    "#;
+    "#
+    .to_string()
+    .into_bytes();
 
     let config = ExtractorConfig {
       format:     DataFormat::Html,
@@ -305,7 +312,7 @@ mod tests {
       ],
     };
 
-    let result = config.extract_and_validate(&json!(html)).unwrap();
+    let result = config.extract_and_validate(&html).unwrap();
 
     assert_eq!(result.errors.len(), 0);
     assert_eq!(result.values.len(), 5);
@@ -331,7 +338,9 @@ mod tests {
         </div>
       </body>
       </html>
-    "#;
+    "#
+    .to_string()
+    .into_bytes();
 
     let config = ExtractorConfig {
       format:     DataFormat::Html,
@@ -358,7 +367,7 @@ mod tests {
       ],
     };
 
-    let result = config.extract_and_validate(&json!(html)).unwrap();
+    let result = config.extract_and_validate(&html).unwrap();
 
     assert_eq!(result.errors.len(), 1);
     assert_eq!(result.values.len(), 1);
@@ -379,16 +388,10 @@ mod tests {
       }],
     };
 
-    // Test with non-string input
-    let result = config.extract_and_validate(&json!(42));
-    assert!(result.is_err());
-
-    if let Err(ExtractorError::TypeMismatch { expected, actual }) = result {
-      assert_eq!(expected, "string");
-      assert_eq!(actual, "number");
-    } else {
-      panic!("Expected TypeMismatch error");
-    }
+    // Test with non-UTF-8 bytes
+    let bad_input = b"\xFF\xFEInvalid UTF-8".to_vec();
+    let result = config.extract_and_validate(&bad_input);
+    assert!(matches!(result, Err(ExtractorError::InvalidHtml(_))));
   }
 
   #[test]
@@ -397,7 +400,8 @@ mod tests {
       ExtractorConfig { format: DataFormat::Json, extractors: vec![name_extractor()] };
 
     // Test with string instead of JSON object
-    let invalid_data = Value::String("not a json object".to_string());
+    let invalid_data =
+      serde_json::Value::String("not a json object".to_string()).to_string().into_bytes();
     let result = config.extract_and_validate(&invalid_data);
     assert!(matches!(
         result,
@@ -410,11 +414,13 @@ mod tests {
         "user": {
             "name": "John Doe"
         }
-    });
+    })
+    .to_string()
+    .into_bytes();
     assert!(config.extract_and_validate(&valid_data).is_ok());
 
     // Test with valid JSON array
-    let valid_array = json!([{"user": {"name": "John Doe"}}]);
+    let valid_array = json!([{"user": {"name": "John Doe"}}]).to_string().into_bytes();
     assert!(config.extract_and_validate(&valid_array).is_ok());
   }
 }

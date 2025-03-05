@@ -9,6 +9,7 @@ fn test_coinbase_extraction() {
   let json_data: Value =
     serde_json::from_str(&fs::read_to_string("../web-prover-core/fixtures/coinbase.json").unwrap())
       .unwrap();
+  let json_data = json_data.to_string().into_bytes();
 
   // Create extractor config for Ethereum data
   let eth_config = serde_json::from_value::<ExtractorConfig>(json!({
@@ -114,7 +115,8 @@ fn test_coinbase_extraction() {
 
 #[test]
 fn test_website_extraction() {
-  let html_data = fs::read_to_string("../web-prover-core/fixtures/website.html").unwrap();
+  let html_data =
+    fs::read_to_string("../web-prover-core/fixtures/website.html").unwrap().into_bytes();
 
   // Create extractor config for main content
   let main_config = serde_json::from_value::<ExtractorConfig>(json!({
@@ -184,7 +186,7 @@ fn test_website_extraction() {
   .unwrap();
 
   // Extract data using the config
-  let result = main_config.extract_and_validate(&json!(html_data)).unwrap();
+  let result = main_config.extract_and_validate(&html_data).unwrap();
 
   // Verify extraction
   assert_eq!(result.errors.len(), 0);
@@ -211,4 +213,98 @@ fn test_website_extraction() {
 
   // Check numeric value
   assert_eq!(result.values["first_rating"], json!(4.8));
+}
+
+#[test]
+fn test_wikipedia_shannon_extraction() {
+  let html_data =
+    fs::read_to_string("../web-prover-core/fixtures/claude_shannon.html").unwrap().into_bytes();
+
+  // Create extractor config for Wikipedia content
+  let wiki_config = serde_json::from_value::<ExtractorConfig>(json!({
+      "format": "html",
+      "extractors": [
+          {
+              "id": "pageTitle",
+              "description": "Extract the page title",
+              "selector": ["title"],
+              "type": "string",
+              "predicates": [{
+                  "type": "value",
+                  "comparison": "contains",
+                  "value": "Claude Shannon",
+                  "case_sensitive": true
+              }]
+          },
+          {
+              "id": "roles",
+              "description": "Extract his professional roles",
+              "selector": ["div#mw-content-text", "div.mw-parser-output", "p", "a"],
+              "type": "array",
+              "predicates": [
+                  {
+                      "type": "value",
+                      "comparison": "contains",
+                      "value": "mathematician",
+                      "case_sensitive": false
+                  },
+                  {
+                      "type": "value",
+                      "comparison": "contains",
+                      "value": "electrical engineer",
+                      "case_sensitive": false
+                  },
+                  {
+                      "type": "value",
+                      "comparison": "contains",
+                      "value": "cryptographer",
+                      "case_sensitive": false
+                  }
+              ]
+          }
+      ]
+  }))
+  .unwrap();
+
+  // Extract data using the config
+  let result = wiki_config.extract_and_validate(&html_data).unwrap();
+
+  // Verify extraction
+  assert_eq!(result.errors.len(), 0, "Expected no errors but got: {:?}", result.errors);
+  assert_eq!(result.values.len(), 2, "Expected exactly 2 extracted values");
+
+  // Check page title
+  let page_title = result.values["pageTitle"].as_str().expect("pageTitle should be a string");
+  assert!(
+    page_title.contains("Claude Shannon"),
+    "Page title '{}' should contain 'Claude Shannon'",
+    page_title
+  );
+
+  // Check roles array
+  let roles = result.values["roles"].as_array().expect("roles should be an array");
+
+  // Helper function to check if roles contain a specific profession
+  let contains_role = |role: &str| {
+    roles
+      .iter()
+      .any(|r| r.as_str().map(|s| s.to_lowercase().contains(&role.to_lowercase())).unwrap_or(false))
+  };
+
+  // Assert each required role is present
+  assert!(
+    contains_role("mathematician"),
+    "Roles should contain 'mathematician'. Found roles: {:?}",
+    roles
+  );
+  assert!(
+    contains_role("electrical engineer"),
+    "Roles should contain 'electrical engineer'. Found roles: {:?}",
+    roles
+  );
+  assert!(
+    contains_role("cryptographer"),
+    "Roles should contain 'cryptographer'. Found roles: {:?}",
+    roles
+  );
 }
