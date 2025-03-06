@@ -16,6 +16,8 @@ use errors::NotaryServerError;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use k256::{ecdsa::SigningKey, elliptic_curve::rand_core, pkcs8::DecodePrivateKey};
+
+// use k256::{ecdsa::SigningKey, elliptic_curve::rand_core, pkcs8::DecodePrivateKey};
 // use p256::{ecdsa::SigningKey, elliptic_curve::rand_core, pkcs8::DecodePrivateKey};
 use rustls::{
   pki_types::{CertificateDer, PrivateKeyDer},
@@ -350,7 +352,7 @@ pub fn load_notary_signing_key(private_key_pem_path: &str) -> SigningKey {
     ephemeral_notary_signing_key()
   } else {
     info!("Using notary signing key: {}", private_key_pem_path);
-    SigningKey::read_pkcs8_der_file(private_key_pem_path).unwrap()
+    SigningKey::read_pkcs8_pem_file(private_key_pem_path).unwrap()
   }
 }
 

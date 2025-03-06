@@ -39,7 +39,7 @@ thiserror       ={ workspace=true }
 hex             ="0.4"
 rs_merkle       ="1.4.2"
 alloy-primitives={ version="0.8.2", features=["k256"] }
-k256            ={ version="0.13.3", features=["ecdsa"] }
+k256            ={ version="0.13.3", features=["ecdsa", "pem"] }
 reqwest         ={ version="0.12", features=["json"] }
 uuid            ={ workspace=true }
 
