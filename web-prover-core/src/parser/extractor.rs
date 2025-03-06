@@ -5,6 +5,7 @@
 
 use std::{collections::HashMap, fmt::Display};
 
+use derive_more::TryFrom;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -17,7 +18,7 @@ use crate::parser::{
 };
 
 /// The type of data being extracted
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TryFrom)]
 #[serde(rename_all = "lowercase")]
 pub enum ExtractorType {
   /// String type
@@ -30,21 +31,6 @@ pub enum ExtractorType {
   Array,
   /// Object type
   Object,
-}
-
-impl TryFrom<&str> for ExtractorType {
-  type Error = ExtractorError;
-
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
-    match value {
-      "string" => Ok(ExtractorType::String),
-      "number" => Ok(ExtractorType::Number),
-      "boolean" => Ok(ExtractorType::Boolean),
-      "array" => Ok(ExtractorType::Array),
-      "object" => Ok(ExtractorType::Object),
-      _ => Err(ExtractorError::UnsupportedExtractorType(value.to_string())),
-    }
-  }
 }
 
 impl Display for ExtractorType {
