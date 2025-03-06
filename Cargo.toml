@@ -8,8 +8,9 @@ resolver="2"
 
 [workspace.dependencies]
 # Local re-exporting
-client={ path="client" }
-notary={ path="notary" }
+client         ={ path="client" }
+notary         ={ path="notary" }
+web-prover-core={ path="web-prover-core" }
 # Serde
 serde     ={ version="1.0.204", features=["derive"] }
 serde_json="1.0.120"
@@ -17,14 +18,7 @@ serde_json="1.0.120"
 tracing           ="0.1.40"
 tracing-subscriber={ version="0.3.18", features=["env-filter"] }
 rayon             ="1.10.0"
-wasm-bindgen-rayon="=1.2.1"
 futures           ="0.3"
-
-web-prover-core={ path="web-prover-core" }
-
-caratls_ekm_server                          ={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
-caratls_ekm_client                          ={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
-caratls_ekm_google_confidential_space_client={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
 
 # CLI
 clap={ version="4.5.13", features=["derive"] }
@@ -43,9 +37,6 @@ tokio-rustls={ version="0.26.0", default-features=false, features=["logging", "t
 
 uuid       ={ version="1.10.0", default-features=false, features=["v4", "serde"] }
 derive_more={ version="2.0.1", features=["full"] }
-num-bigint ="0.4"
-ff         ={ version="0.13", default-features=false, features=["derive"] }
-tiny-keccak={ version="2.0.2", features=["keccak"] }
 url        ="2.5.4"
 chrono     ="0.4"
 

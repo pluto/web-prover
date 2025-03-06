@@ -6,24 +6,18 @@ build  ="build.rs"
 publish=false
 
 [features]
-default=["tee-dummy-token-verifier"]
-
+default  =[]
 websocket=[]
 tracing  =[]
-
 # used to disable cert verification, useful for development
 unsafe_skip_cert_verification=[]
 
-tee-dummy-token-verifier                    =[]
-tee-google-confidential-space-token-verifier=[]
-
 # Shared dependencies for all targets
 [dependencies]
-caratls_ekm_client={ workspace=true }
-web-prover-core   ={ workspace=true }
-bytes="1"
-webpki-roots="0.26.1"
-pki-types   ={ package="rustls-pki-types", version="1.7" }
+web-prover-core={ workspace=true }
+bytes          ="1"
+webpki-roots   ="0.26.1"
+pki-types      ={ package="rustls-pki-types", version="1.7" }
 # Serde
 serde     ={ workspace=true }
 serde_json={ workspace=true }

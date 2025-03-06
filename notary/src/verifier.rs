@@ -38,16 +38,19 @@ pub fn sign_verification<T: AsRef<[u8]>>(
 
   // need secp256k1 here for Solidity
   let (signature, recover_id) =
-    state.origo_signing_key.0.sign_prehash_recoverable(&merkle_root).unwrap();
+    state.notary_signing_key.sign_prehash_recoverable(&merkle_root).unwrap();
 
   let signer_address =
-    alloy_primitives::Address::from_public_key(state.origo_signing_key.0.verifying_key());
+    alloy_primitives::Address::from_public_key(state.notary_signing_key.verifying_key());
 
   let verifying_key =
     k256::ecdsa::VerifyingKey::recover_from_prehash(&merkle_root.clone(), &signature, recover_id)
       .unwrap();
 
-  assert_eq!(state.origo_signing_key.0.verifying_key(), &verifying_key);
+  assert_eq!(
+    state.notary_signing_key.verifying_key().to_sec1_bytes(),
+    verifying_key.to_sec1_bytes()
+  );
 
   // TODO is this right? we need lower form S for sure though
   let s = if signature.normalize_s().is_some() {

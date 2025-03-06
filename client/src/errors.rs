@@ -21,10 +21,6 @@ pub enum ClientErrors {
   Io(#[from] std::io::Error),
 
   #[error(transparent)]
-  TeeTlsConnectorError(#[from] caratls_ekm_client::TeeTlsConnectorError),
-
-
-  #[error(transparent)]
   SerdeJson(#[from] serde_json::Error),
 
   #[error(transparent)]
@@ -57,7 +53,6 @@ pub enum ClientErrors {
   #[error(transparent)]
   InvalidDnsNameError(#[from] rustls::pki_types::InvalidDnsNameError),
 
-
   #[error(transparent)]
   Canceled(#[from] futures::channel::oneshot::Canceled),
 
@@ -70,4 +65,3 @@ pub enum ClientErrors {
   #[error("TEE proof missing")]
   TeeProofMissing,
 }
-

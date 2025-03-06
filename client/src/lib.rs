@@ -2,6 +2,7 @@ extern crate core;
 pub mod config;
 pub mod errors;
 use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 use web_prover_core::{
@@ -10,7 +11,6 @@ use web_prover_core::{
 };
 
 use crate::errors::ClientErrors;
-
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProxyConfig {

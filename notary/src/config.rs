@@ -16,13 +16,8 @@ pub struct Config {
   pub server_key:         String,
   pub listen:             String,
   pub notary_signing_key: String,
-  pub origo_signing_key:  String,
-
-  pub tlsn_max_sent_data: usize,
-  pub tlsn_max_recv_data: usize,
-
-  pub acme_email:  String,
-  pub acme_domain: String,
+  pub acme_email:         String,
+  pub acme_domain:        String,
 }
 
 // TODO read_config should not use unwrap
@@ -35,7 +30,6 @@ pub fn read_config() -> Config {
     .set_default("server_cert", "").unwrap()
     .set_default("server_key", "").unwrap()
     .set_default("notary_signing_key", "").unwrap()
-    .set_default("origo_signing_key", "").unwrap()
     .set_default("acme_email", "").unwrap()
     .set_default("acme_domain", "").unwrap();
 

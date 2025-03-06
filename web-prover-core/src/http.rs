@@ -17,7 +17,15 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use tracing::debug;
-pub use web_proof_circuits_witness_generator::json::JsonKey;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum JsonKey {
+  /// Object key
+  String(String),
+  /// Array index
+  Num(usize),
+}
 
 use crate::errors::ManifestError;
 

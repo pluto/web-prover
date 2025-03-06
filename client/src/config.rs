@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+
 use serde::Deserialize;
 use serde_with::{
   base64::{Base64, Standard},
@@ -19,19 +20,19 @@ pub struct ProvingData {
 #[serde_as]
 #[derive(Deserialize, Clone, Debug)]
 pub struct Config {
-  pub notary_host:         String,
-  pub notary_port:         u16,
+  pub notary_host:    String,
+  pub notary_port:    u16,
   // optionally pass notary's ca cert to be trusted,
   // this is helpful for local debugging with self-signed certs
   #[serde_as(as = "Option<Base64<Standard, Padded>>")]
-  pub notary_ca_cert:      Option<Vec<u8>>,
-  pub target_method:       String,
-  pub target_url:          String,
-  pub target_headers:      HashMap<String, String>,
-  pub target_body:         String,
-  pub proving: ProvingData,
+  pub notary_ca_cert: Option<Vec<u8>>,
+  pub target_method:  String,
+  pub target_url:     String,
+  pub target_headers: HashMap<String, String>,
+  pub target_body:    String,
+  pub proving:        ProvingData,
   #[serde(skip)]
-  pub session_id: String,
+  pub session_id:     String,
 }
 
 impl Config {
