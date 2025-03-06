@@ -35,7 +35,6 @@ pub enum ProxyError {
   #[error("Error occurred during Sign: {0}")]
   Sign(Box<dyn std::error::Error + Send + 'static>),
 
-
   #[error("Session ID Error: {0}")]
   InvalidSessionId(String),
 

@@ -68,7 +68,7 @@ pub async fn proxy(
   query: Query<NotarizeQuery>,
   State(state): State<Arc<SharedState>>,
 ) -> Response {
-  let session_id = query.session_id.to_string();
+    let session_id = query.session_id.to_string();
 
   info!("Starting notarize with ID: {}", session_id);
 
@@ -137,7 +137,7 @@ static TEE_TLS_ACCEPTOR_LOCK: OnceLock<TeeTlsAcceptor<GoogleConfidentialSpaceTok
 #[cfg(feature = "tee-google-confidential-space-token-generator")]
 fn tee_tls_acceptor() -> &'static TeeTlsAcceptor<GoogleConfidentialSpaceTokenGenerator> {
   TEE_TLS_ACCEPTOR_LOCK.get_or_init(|| {
-    let token_generator = GoogleConfidentialSpaceTokenGenerator::new("dummy".to_string());
+    let token_generator = GoogleConfidentialSpaceTokenGenerator::new(&"dummy".to_string());
     TeeTlsAcceptor::new_with_ephemeral_cert(token_generator, "example.com") // TODO example.com
   })
 }

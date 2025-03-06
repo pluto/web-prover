@@ -10,9 +10,8 @@ use futures::{
 };
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, StatusCode};
-// use tls_client2::origo::OrigoConnection;
 use rustls::pki_types::ServerName;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_util::{
   codec::{Framed, LengthDelimitedCodec},
   compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt},
@@ -22,8 +21,6 @@ use tracing::debug;
 use crate::{
   config::{self, Config, NotaryMode},
   errors::ClientErrors,
-  origo::OrigoSecrets,
-  tls_client_async2::TlsConnection,
   TeeProof,
 };
 
@@ -37,7 +34,6 @@ pub(crate) async fn proxy(
 ) -> Result<TeeProof, ClientErrors> {
   handle_tee_mode(config, session_id).await
 }
-
 
 async fn handle_tee_mode(
   config: config::Config,
@@ -61,6 +57,14 @@ async fn handle_tee_mode(
       ))
       .with_no_client_auth()
   };
+
+  let client_config =
+    rustls::ClientConfig::builder().with_root_certificates(root_store).with_no_client_auth();
+
+  let client = rustls::ClientConnection::new(
+    Arc::new(client_config),
+    rustls::ServerName::try_from(config.target_host()?.as_str()).unwrap(),
+  )?;
 
   let notary_connector =
     tokio_rustls::TlsConnector::from(std::sync::Arc::new(client_notary_config));
@@ -110,21 +114,29 @@ async fn handle_tee_mode(
   let token_verifier = DummyTokenVerifier { expect_token: "dummy".to_string() };
 
   let tee_tls_connector = TeeTlsConnector::new(token_verifier, "example.com"); // TODO example.com
-  let notary_tls_stream = tee_tls_connector.connect(notary_tls_socket).await?;
-  let (client_tls_conn, client_tls_fut) =
-    tls_client::bind_client(notary_tls_stream.compat(), client);
+  let tee_tls_stream = tee_tls_connector.connect(notary_tls_socket).await?;
+
+  // todo; I need to find a way to do this with rustls, so we are not using tls_client_async2. 
+  // perhapse we don't even need to manually do this
+  // Update ## 09:11 2025-03-06: I there is logic in tlsn we can use for the time being.
+  // let (client_tls_conn, client_tls_fut) =
+  //   tls_client_async::bind_client(tee_tls_stream.compat(), client);
+
+
+  // let client_tls_conn = rustls::ConnectionCommon::from(client);
 
   // start client tls connection
   let tls_fut_task = tokio::spawn(client_tls_fut);
 
-  client_handshake(&config, client_tls_conn).await?;
+  // client_handshake(&config, client_tls_conn).await?;
 
-  // wait for tls connection
-  let (_, mut reunited_socket) = tls_fut_task.await?.unwrap();
+  // // wait for tls connection
+  // let (_, mut reunited_socket) = tls_fut_task.await?.unwrap();
+
 
   let mut buffer = [0u8; 1];
   loop {
-    reunited_socket.read_exact(&mut buffer).await?;
+    tee_tls_stream.read_exact(&mut buffer).await?;
     if buffer.len() == 1 && buffer[0] == 0xAA {
       debug!("Magic byte 0xAA received, server is ready");
       break;
@@ -133,38 +145,38 @@ async fn handle_tee_mode(
     debug!("Waiting for magic byte, received: {:?}", buffer[0]);
   }
 
-  let mut framed_reunited_socket =
-    Framed::new(reunited_socket.compat(), LengthDelimitedCodec::new());
+  // let mut framed_reunited_socket =
+  //   Framed::new(tee_tls_stream.compat(), LengthDelimitedCodec::new());
 
   let manifest_bytes: Vec<u8> = config.proving.manifest.unwrap().try_into()?;
-  framed_reunited_socket.send(Bytes::from(manifest_bytes)).await?;
 
-  framed_reunited_socket.flush().await?;
+  tee_tls_stream.write_all_plaintext(&manifest_bytes).await?;
+  tee_tls_stream.flush().await?;
 
-  let tee_proof_frame =
-    framed_reunited_socket.next().await.ok_or_else(|| ClientErrors::TeeProofMissing)??;
-  let tee_proof = TeeProof::try_from(tee_proof_frame.as_ref())?;
+  let tee_thing = tee_tls_stream.read().unwrap();
+
+  let tee_proof = TeeProof::try_from(tee_thing.as_ref())?;
   debug!("TeeProof: {:?}", tee_proof);
 
   Ok(tee_proof)
 }
 
 /// Perform an HTTP handshake on client TLS connection and sends request
-async fn client_handshake(
-  config: &Config,
-  client_tls_conn: TlsConnection,
-) -> Result<(), ClientErrors> {
-  let client_tls_conn = hyper_util::rt::TokioIo::new(client_tls_conn.compat());
-  let (mut request_sender, connection) =
-    hyper::client::conn::http1::handshake(client_tls_conn).await?;
-  let connection_task = tokio::spawn(connection.without_shutdown());
-  let response = request_sender.send_request(config.to_request()?).await?;
+// async fn client_handshake(
+//   config: &Config,
+//   client_tls_conn: TlsConnection,
+// ) -> Result<(), ClientErrors> {
+//   let client_tls_conn = hyper_util::rt::TokioIo::new(client_tls_conn.compat());
+//   let (mut request_sender, connection) =
+//     hyper::client::conn::http1::handshake(client_tls_conn).await?;
+//   let connection_task = tokio::spawn(connection.without_shutdown());
+//   let response = request_sender.send_request(config.to_request()?).await?;
 
-  assert_eq!(response.status(), StatusCode::OK);
+//   assert_eq!(response.status(), StatusCode::OK);
 
-  let payload = response.into_body().collect().await?.to_bytes();
-  debug!("Response: {:?}", payload);
+//   let payload = response.into_body().collect().await?.to_bytes();
+//   debug!("Response: {:?}", payload);
 
-  let hyper::client::conn::http1::Parts { io: _client_tls_conn, .. } = connection_task.await??;
-  Ok(())
-}
+//   let hyper::client::conn::http1::Parts { io: _client_tls_conn, .. } = connection_task.await??;
+//   Ok(())
+// }

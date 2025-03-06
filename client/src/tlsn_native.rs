@@ -24,8 +24,10 @@ pub async fn setup_tcp_connection(
   prover_config: ProverConfig,
 ) -> Prover<Closed> {
   let session_id = config.set_session_id();
+
+  let cert = rustls::pki_types::CertificateDer::from_slice(config.notary_ca_cert.clone().map(|c| vec![c]));
   let root_store =
-    crate::tls::rustls_default_root_store(config.notary_ca_cert.clone().map(|c| vec![c]));
+    rustls::RootCertStore::from(cert);
 
   let client_notary_config =
     ClientConfig::builder().with_root_certificates(root_store).with_no_client_auth();

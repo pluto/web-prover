@@ -71,7 +71,6 @@ pub struct VerifierInputs {
   response_messages: Vec<Vec<u8>>,
 }
 
-
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
   session_id:  Uuid,
@@ -214,8 +213,8 @@ fn find_ciphertext_permutation<const CIRCUIT_SIZE: usize>(
 //             0,
 //           )
 //         );
-//         return Err(ProofError::VerifyFailed(String::from("inccorect final circuit value")).into());
-//       } else {
+//         return Err(ProofError::VerifyFailed(String::from("inccorect final circuit
+// value")).into());       } else {
 //         // TODO: add the manifest digest?
 //         debug!("output from verifier: {output:?}");
 //         // This unwrap should be safe for now as the value will always be present

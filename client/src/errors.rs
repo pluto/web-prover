@@ -103,7 +103,6 @@ pub enum ClientErrors {
   #[error("Manifest missing")]
   ManifestMissingError,
 
-
   #[error("TEE proof missing")]
   TeeProofMissing,
 }
