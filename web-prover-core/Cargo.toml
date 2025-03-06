@@ -9,7 +9,6 @@ serde_json                          ={ workspace=true }
 tracing                             ={ workspace=true }
 thiserror                           ={ workspace=true }
 tiny-keccak                         ={ workspace=true }
-web-proof-circuits-witness-generator={ workspace=true }
 url                                 ={ workspace=true }
 derive_more                         ={ workspace=true }
 # Using `regress` crate for compatibility with ECMAScript regular expressions in Manifest validation

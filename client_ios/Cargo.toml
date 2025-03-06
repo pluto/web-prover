@@ -19,7 +19,7 @@ tracing           ={ workspace=true }
 tracing-subscriber={ workspace=true }
 # Async
 tokio ={ workspace=true }
-proofs={ workspace=true }
+# proofs={ workspace=true }
 
 [build-dependencies]
 cargo_metadata="0.19.1"

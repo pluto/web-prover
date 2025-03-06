@@ -22,26 +22,13 @@ cargo_metadata="0.19.1"
 
 # Shared dependencies for all targets
 [dependencies]
-# TLS
-tls-client        ={ workspace=true }
-tls-client2       ={ workspace=true }
-tls-core          ={ workspace=true }
-tlsn-common       ={ workspace=true }
-tlsn-utils        ={ workspace=true }
-tlsn-formats      ={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.7" }
-client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="8e7eb839e901dcee416179116bb0f9c4f7ae683c" }
-web-prover-core   ={ workspace=true }
-
-# TLSN
-tlsn-prover={ workspace=true }
-tlsn-core  ={ workspace=true }
 
 caratls_ekm_client                          ={ workspace=true }
 caratls_ekm_google_confidential_space_client={ workspace=true }
 
 bytes                               ="1"
-proofs                              ={ workspace=true }
-web-proof-circuits-witness-generator={ workspace=true }
+tls-client   ={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.7", package="tlsn-tls-client" }
+
 
 serde-wasm-bindgen="0.6.5"
 
@@ -50,7 +37,6 @@ pki-types   ={ package="rustls-pki-types", version="1.7" }
 # Serde
 serde     ={ workspace=true }
 serde_json={ workspace=true }
-spansy    ={ git="https://github.com/tlsnotary/tlsn-utils", rev="e7b2db6" }
 # Web
 hex           ="0.4"
 url           ="2.5"

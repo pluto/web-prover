@@ -51,7 +51,6 @@ struct SharedState {
   tlsn_max_recv_data: usize,
   origo_sessions:     Arc<Mutex<HashMap<String, tls_parser::Transcript<tls_parser::Raw>>>>,
   verifier_sessions:  Arc<Mutex<HashMap<String, origo::VerifierInputs>>>,
-  verifier:           origo_verifier::Verifier,
 }
 
 /// Main entry point for the notary server application.
@@ -108,18 +107,13 @@ async fn main() -> Result<(), NotaryServerError> {
     tlsn_max_recv_data: c.tlsn_max_recv_data,
     origo_sessions:     Default::default(),
     verifier_sessions:  Default::default(),
-    verifier:           origo_verifier::initialize_verifier().unwrap(),
   });
 
   let router = Router::new()
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
-    .route("/v1/tlsnotary", get(tlsn::notarize))
     .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
     .route("/v1/tlsnotary/verify", post(tlsn::verify))
-    .route("/v1/origo", get(origo::proxy))
     .route("/v1/tee", get(tee::proxy))
-    .route("/v1/origo/sign", post(origo::sign))
-    .route("/v1/origo/verify", post(origo::verify))
     .route("/v1/proxy", post(proxy::proxy))
     .route("/v1/meta/keys/:key", get(meta_keys))
     .layer(CorsLayer::permissive())

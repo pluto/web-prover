@@ -35,8 +35,6 @@ pub enum ProxyError {
   #[error("Error occurred during Sign: {0}")]
   Sign(Box<dyn std::error::Error + Send + 'static>),
 
-  #[error("transparent")]
-  SuperNovaError(#[from] client_side_prover::supernova::error::SuperNovaError),
 
   #[error("Session ID Error: {0}")]
   InvalidSessionId(String),

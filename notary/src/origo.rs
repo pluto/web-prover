@@ -71,101 +71,12 @@ pub struct VerifierInputs {
   response_messages: Vec<Vec<u8>>,
 }
 
-// TODO: Don't need this method? But can use the logic to do the signature.
-pub async fn sign(
-  query: Query<SignQuery>,
-  State(state): State<Arc<SharedState>>,
-  extract::Json(payload): extract::Json<SignBody>,
-) -> Result<(), ProxyError> {
-  let transcript =
-    state.origo_sessions.lock().unwrap().get(&query.session_id.to_string()).cloned().unwrap();
-
-  let handshake_server_key = hex::decode(payload.handshake_server_key).unwrap();
-  let handshake_server_iv = hex::decode(payload.handshake_server_iv).unwrap();
-
-  let r = transcript.into_flattened()?.into_parsed(
-    &handshake_server_key,
-    &handshake_server_iv,
-    None,
-    None,
-    None,
-    None,
-  );
-  let parsed_transcript = match r {
-    Ok(p) => p,
-    Err(e) => {
-      error!("error parsing transcript: {:?}", e);
-      return Err(e);
-    },
-  };
-
-  // Ensure the TLS certificate is valid and we're communicating with the correct server.
-  match parsed_transcript.verify_certificate_sig() {
-    Ok(_) => (),
-    Err(e) => {
-      error!("error verifying certificate sig: {:?}", e);
-      return Err(e);
-    },
-  }
-
-  // Determine possible request hash and response hash
-  let (request_messages, response_messages) = parsed_transcript.get_ciphertext_hashes();
-
-  // Log a verifier session for public inputs
-  debug!("inserting with session_id={:?}", query.session_id);
-  state
-    .verifier_sessions
-    .lock()
-    .unwrap()
-    .insert(query.session_id.to_string(), VerifierInputs { request_messages, response_messages });
-
-  Ok(())
-}
 
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
   session_id:  Uuid,
   target_host: String,
   target_port: u16,
-}
-
-/// Handles protocol upgrade requests for notarization sessions.
-///
-/// This function serves as an entry point for both WebSocket and TCP protocol upgrades,
-/// routing the connection to the appropriate notarization handler based on the upgrade type.
-///
-/// # Arguments
-///
-/// * `protocol_upgrade` - The protocol upgrade request (WebSocket or TCP)
-/// * `query` - Query parameters containing notarization session details
-/// * `state` - Shared application state wrapped in an Arc
-///
-/// # Returns
-///
-/// Returns an axum [`Response`] that will handle the protocol upgrade
-///
-/// # Notes
-///
-/// - For WebSocket upgrades, forwards to `websocket_notarize`
-/// - For TCP upgrades, forwards to `tcp_notarize`
-/// - Session ID is logged at the start of each connection
-pub async fn proxy(
-  protocol_upgrade: ProtocolUpgrade,
-  query: Query<NotarizeQuery>,
-  State(state): State<Arc<SharedState>>,
-) -> Response {
-  let session_id = query.session_id.to_string();
-
-  info!("Starting notarize with ID: {}", session_id);
-
-  match protocol_upgrade {
-    ProtocolUpgrade::Ws(ws) => ws.on_upgrade(move |socket| {
-      websocket_notarize(socket, session_id, query.target_host.clone(), query.target_port, state)
-    }),
-    ProtocolUpgrade::Tcp(tcp) => tcp.on_upgrade(move |stream| {
-      tcp_notarize(stream, session_id, query.target_host.clone(), query.target_port, state)
-    }),
-  }
 }
 
 fn find_ciphertext_permutation<const CIRCUIT_SIZE: usize>(
@@ -215,113 +126,113 @@ fn find_ciphertext_permutation<const CIRCUIT_SIZE: usize>(
   panic!("Ciphertext not found in any permutation");
 }
 
-pub async fn verify(
-  State(state): State<Arc<SharedState>>,
-  extract::Json(payload): extract::Json<VerifyBody>,
-) -> Result<Json<SignedVerificationReply>, NotaryServerError> {
-  let proof = FoldingProof {
-    proof:           payload.origo_proof.proof.proof.clone(),
-    verifier_digest: payload.origo_proof.proof.verifier_digest.clone(),
-  }
-  .deserialize()?;
+// pub async fn verify(
+//   State(state): State<Arc<SharedState>>,
+//   extract::Json(payload): extract::Json<VerifyBody>,
+// ) -> Result<Json<SignedVerificationReply>, NotaryServerError> {
+//   let proof = FoldingProof {
+//     proof:           payload.origo_proof.proof.proof.clone(),
+//     verifier_digest: payload.origo_proof.proof.verifier_digest.clone(),
+//   }
+//   .deserialize()?;
 
-  debug!("verifier_digest: {:?}", proof.verifier_digest.clone());
+//   debug!("verifier_digest: {:?}", proof.verifier_digest.clone());
 
-  // Form verifier inputs
-  let verifier_inputs =
-    state.verifier_sessions.lock().unwrap().get(&payload.session_id).cloned().unwrap();
+//   // Form verifier inputs
+//   let verifier_inputs =
+//     state.verifier_sessions.lock().unwrap().get(&payload.session_id).cloned().unwrap();
 
-  // TODO: might be incorrect to check ciphertext in this manner, but for now, we play along
-  // Find the correct ciphertext from permutation of the ciphertexts
-  let expected_ciphertext_digest =
-    F::<G1>::from_bytes(&payload.origo_proof.ciphertext_digest).unwrap();
-  let response_messages = find_ciphertext_permutation::<CIRCUIT_SIZE_512>(
-    expected_ciphertext_digest,
-    verifier_inputs.request_messages.clone(),
-    verifier_inputs.response_messages.clone(),
-  );
+//   // TODO: might be incorrect to check ciphertext in this manner, but for now, we play along
+//   // Find the correct ciphertext from permutation of the ciphertexts
+//   let expected_ciphertext_digest =
+//     F::<G1>::from_bytes(&payload.origo_proof.ciphertext_digest).unwrap();
+//   let response_messages = find_ciphertext_permutation::<CIRCUIT_SIZE_512>(
+//     expected_ciphertext_digest,
+//     verifier_inputs.request_messages.clone(),
+//     verifier_inputs.response_messages.clone(),
+//   );
 
-  // DEBUG: Use this digest to pin the proving behavior. You must also override
-  // `client/src/tls.rs#decrypt_tls_ciphertext`
-  //
-  // let ciphertext_digest = F::<G1>::from_bytes(&hex::decode(
-  //   "66ab857c95c11767913c36e9341dbe4d46915616a67a5f47379e06848411b32b"
-  // ).unwrap().try_into().unwrap()).unwrap();
+//   // DEBUG: Use this digest to pin the proving behavior. You must also override
+//   // `client/src/tls.rs#decrypt_tls_ciphertext`
+//   //
+//   // let ciphertext_digest = F::<G1>::from_bytes(&hex::decode(
+//   //   "66ab857c95c11767913c36e9341dbe4d46915616a67a5f47379e06848411b32b"
+//   // ).unwrap().try_into().unwrap()).unwrap();
 
-  debug!("circuits {:?}", payload.origo_proof.rom.circuit_data);
-  debug!("rom {:?}", payload.origo_proof.rom.rom);
-  let verifier = &state.verifier;
+//   debug!("circuits {:?}", payload.origo_proof.rom.circuit_data);
+//   debug!("rom {:?}", payload.origo_proof.rom.rom);
+//   let verifier = &state.verifier;
 
-  let InitialNIVCInputs { initial_nivc_input, ciphertext_digest, .. } =
-    payload.manifest.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE_512>(
-      &verifier_inputs.request_messages,
-      &response_messages,
-    )?;
-  assert_eq!(ciphertext_digest, expected_ciphertext_digest);
+//   let InitialNIVCInputs { initial_nivc_input, ciphertext_digest, .. } =
+//     payload.manifest.initial_inputs::<MAX_STACK_HEIGHT, CIRCUIT_SIZE_512>(
+//       &verifier_inputs.request_messages,
+//       &response_messages,
+//     )?;
+//   assert_eq!(ciphertext_digest, expected_ciphertext_digest);
 
-  let (z0_primary, _) = verifier.setup_params.extend_public_inputs(
-    &origo_verifier::flatten_rom(payload.origo_proof.rom.rom),
-    &initial_nivc_input.to_vec(),
-  )?;
-  let z0_secondary = vec![F::<G2>::from(0)];
+//   let (z0_primary, _) = verifier.setup_params.extend_public_inputs(
+//     &origo_verifier::flatten_rom(payload.origo_proof.rom.rom),
+//     &initial_nivc_input.to_vec(),
+//   )?;
+//   let z0_secondary = vec![F::<G2>::from(0)];
 
-  let verify_output = match proof.proof.verify(
-    &verifier.setup_params.public_params,
-    &verifier.verifier_key,
-    &z0_primary,
-    &z0_secondary,
-  ) {
-    Ok((output, _)) => {
-      // TODO: We should also check that the full extended ROM was correct? Although maybe that's
-      // implicit in this.
-      if output[5] != F::<G1>::from(0) {
-        debug!("HTTP header match: {:?}", output[5]);
-        return Err(ProofError::VerifyFailed(String::from("HTTP header match failed")).into());
-      } else if output[8] != F::<G1>::from(0) {
-        debug!("JSON final state: {:?}", output[8]);
-        return Err(ProofError::VerifyFailed(String::from("JSON final state invalid")).into());
-      } else if output[10] != ciphertext_digest {
-        debug!("expected ciphertext_digest: {:?}", ciphertext_digest);
-        debug!("calculated ciphertext digest {:?}", output[10]);
-        return Err(
-          ProofError::VerifyFailed(String::from("invalid calculated ciphertext digest")).into(),
-        );
-      } else if output[0]
-        != polynomial_digest(
-          payload.origo_proof.value.clone().unwrap().as_bytes(),
-          ciphertext_digest,
-          0,
-        )
-      {
-        debug!("output[0]: {:?}", output[0]);
-        debug!("value: {:?}", payload.origo_proof.value.clone().unwrap());
-        debug!(
-          "value_polynomial_digest: {:?}",
-          polynomial_digest(
-            payload.origo_proof.value.clone().unwrap().as_bytes(),
-            ciphertext_digest,
-            0,
-          )
-        );
-        return Err(ProofError::VerifyFailed(String::from("inccorect final circuit value")).into());
-      } else {
-        // TODO: add the manifest digest?
-        debug!("output from verifier: {output:?}");
-        // This unwrap should be safe for now as the value will always be present
-        VerifyOutput {
-          value:    payload.origo_proof.value.unwrap(),
-          manifest: payload.manifest.into(),
-        }
-      }
-    },
-    Err(e) => {
-      error!("Error verifying proof: {:?}", e);
-      return Err(ProofError::SuperNova(e).into());
-    },
-  };
+//   let verify_output = match proof.proof.verify(
+//     &verifier.setup_params.public_params,
+//     &verifier.verifier_key,
+//     &z0_primary,
+//     &z0_secondary,
+//   ) {
+//     Ok((output, _)) => {
+//       // TODO: We should also check that the full extended ROM was correct? Although maybe that's
+//       // implicit in this.
+//       if output[5] != F::<G1>::from(0) {
+//         debug!("HTTP header match: {:?}", output[5]);
+//         return Err(ProofError::VerifyFailed(String::from("HTTP header match failed")).into());
+//       } else if output[8] != F::<G1>::from(0) {
+//         debug!("JSON final state: {:?}", output[8]);
+//         return Err(ProofError::VerifyFailed(String::from("JSON final state invalid")).into());
+//       } else if output[10] != ciphertext_digest {
+//         debug!("expected ciphertext_digest: {:?}", ciphertext_digest);
+//         debug!("calculated ciphertext digest {:?}", output[10]);
+//         return Err(
+//           ProofError::VerifyFailed(String::from("invalid calculated ciphertext digest")).into(),
+//         );
+//       } else if output[0]
+//         != polynomial_digest(
+//           payload.origo_proof.value.clone().unwrap().as_bytes(),
+//           ciphertext_digest,
+//           0,
+//         )
+//       {
+//         debug!("output[0]: {:?}", output[0]);
+//         debug!("value: {:?}", payload.origo_proof.value.clone().unwrap());
+//         debug!(
+//           "value_polynomial_digest: {:?}",
+//           polynomial_digest(
+//             payload.origo_proof.value.clone().unwrap().as_bytes(),
+//             ciphertext_digest,
+//             0,
+//           )
+//         );
+//         return Err(ProofError::VerifyFailed(String::from("inccorect final circuit value")).into());
+//       } else {
+//         // TODO: add the manifest digest?
+//         debug!("output from verifier: {output:?}");
+//         // This unwrap should be safe for now as the value will always be present
+//         VerifyOutput {
+//           value:    payload.origo_proof.value.unwrap(),
+//           manifest: payload.manifest.into(),
+//         }
+//       }
+//     },
+//     Err(e) => {
+//       error!("Error verifying proof: {:?}", e);
+//       return Err(ProofError::SuperNova(e).into());
+//     },
+//   };
 
-  crate::verifier::sign_verification(verify_output, State(state)).map(Json)
-}
+//   crate::verifier::sign_verification(verify_output, State(state)).map(Json)
+// }
 
 pub async fn websocket_notarize(
   socket: WebSocket,

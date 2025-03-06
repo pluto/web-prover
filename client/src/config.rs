@@ -51,7 +51,6 @@ pub struct ProvingData {
 #[serde_as]
 #[derive(Deserialize, Clone, Debug)]
 pub struct Config {
-  pub mode:                NotaryMode,
   pub notary_host:         String,
   pub notary_port:         u16,
   // optionally pass notary's ca cert to be trusted,

@@ -1,19 +1,19 @@
 extern crate core;
 
 pub mod tlsn;
-#[cfg(not(target_arch = "wasm32"))] mod tlsn_native;
-#[cfg(target_arch = "wasm32")] mod tlsn_wasm32;
+
 
 pub mod origo;
-#[cfg(not(target_arch = "wasm32"))] mod origo_native;
-#[cfg(target_arch = "wasm32")] mod origo_wasm32;
+
+pub mod proxy;
 
 pub mod config;
 pub mod errors;
-mod proof;
-mod tls;
 
-pub mod tls_client_async2;
+mod proof;
+// mod tls;
+mod tlsn_native;
+
 use std::collections::HashMap;
 
 use origo::OrigoProof;
@@ -52,12 +52,7 @@ pub async fn prover_inner(
   setup_data: Option<UninitializedSetup>,
 ) -> Result<Proof, ClientErrors> {
   info!("GIT_HASH: {}", env!("GIT_HASH"));
-  match config.mode {
-    config::NotaryMode::TLSN => prover_inner_tlsn(config).await,
-    config::NotaryMode::Origo => prover_inner_origo(config, proving_params, setup_data).await,
-    config::NotaryMode::TEE => prover_inner_tee(config).await,
-    config::NotaryMode::Proxy => prover_inner_proxy(config).await,
-  }
+  prover_inner_tee(config).await
 }
 
 pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, ClientErrors> {
@@ -78,10 +73,6 @@ pub async fn prover_inner_tlsn(mut config: config::Config) -> Result<Proof, Clie
     )
     .build()?;
 
-  #[cfg(target_arch = "wasm32")]
-  let prover = tlsn_wasm32::setup_connection(&mut config, prover_config).await?;
-
-  #[cfg(not(target_arch = "wasm32"))]
   let prover = if config.websocket_proxy_url.is_some() {
     tlsn_native::setup_websocket_connection(&mut config, prover_config).await
   } else {
@@ -146,12 +137,7 @@ pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, Clien
   let session_id = config.set_session_id();
 
   // TEE mode uses Origo networking stack with minimal changes
-
-  #[cfg(target_arch = "wasm32")]
-  let (_origo_conn, tee_proof) = origo_wasm32::proxy(config, session_id).await?;
-
-  #[cfg(not(target_arch = "wasm32"))]
-  let (_origo_conn, tee_proof) = origo_native::proxy(config, session_id).await?;
+  let (_origo_conn, tee_proof) = proxy::proxy(config, session_id).await?;
 
   Ok(Proof::TEE(tee_proof.unwrap()))
 }
@@ -211,7 +197,7 @@ pub async fn verify<T: Serialize>(
     "https://{}:{}/v1/{}/verify",
     config.notary_host.clone(),
     config.notary_port.clone(),
-    config.mode.to_string(),
+    "tee",
   );
 
   // TODO reqwest uses browsers fetch API for WASM target? if true, can't add trust anchors

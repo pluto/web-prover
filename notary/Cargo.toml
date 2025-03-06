@@ -10,14 +10,8 @@ tee-dummy-token-generator                    =[]
 tee-google-confidential-space-token-generator=[]
 
 [dependencies]
-tlsn-core  ={ workspace=true }
-tlsn-common={ workspace=true }
 chrono     ={ workspace=true }
-
-client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="8e7eb839e901dcee416179116bb0f9c4f7ae683c" }
-proofs={ workspace=true }
 client={ workspace=true }
-web-prover-core={ workspace=true }
 hyper={ workspace=true, features=["client", "http1", "server"] }
 hyper-util={ workspace=true }
 serde={ workspace=true }
@@ -33,8 +27,6 @@ tokio-rustls={ workspace=true, features=["ring"] }
 tower-http={ version="0.5.2", features=["cors"] }
 tower-service="0.3.2"
 rustls-pemfile="2.1.2"
-tlsn-verifier={ workspace=true }
-notary-server={ workspace=true }
 tokio-tungstenite={ version="0.23.1", features=["stream"] }
 ws_stream_tungstenite={ git="https://github.com/pluto/ws_stream_tungstenite.git", branch="latest", features=[
   "tokio",
@@ -61,11 +53,9 @@ alloy-primitives={ version="0.8.2", features=["k256"] }
 k256            ={ version="0.13.3", features=["ecdsa"] }
 reqwest         ={ version="0.12", features=["json"] }
 uuid            ={ workspace=true }
-tls-client2     ={ workspace=true }
 
 caratls_ekm_server                          ={ workspace=true }
-caratls_ekm_google_confidential_space_server={ workspace=true }
-web-proof-circuits-witness-generator        ={ workspace=true }
+caratls_ekm_google_confidential_space_server={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
 
 [dev-dependencies]
 tower="0.4.13"

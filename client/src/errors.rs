@@ -12,9 +12,6 @@ pub enum ClientErrors {
   RustTls(#[from] rustls::Error),
 
   #[error(transparent)]
-  SpansyError(#[from] spansy::ParseError),
-
-  #[error(transparent)]
   HttpCommitError(#[from] tlsn_formats::http::HttpCommitError),
 
   #[error(transparent)]
@@ -68,12 +65,6 @@ pub enum ClientErrors {
   UrlParse(#[from] url::ParseError),
 
   #[error(transparent)]
-  ProverError(#[from] tlsn_prover::ProverError),
-
-  #[error(transparent)]
-  ProverConfigBuilder(#[from] tlsn_prover::ProverConfigBuilderError),
-
-  #[error(transparent)]
   TranscriptProofBuilderError(#[from] tlsn_core::transcript::TranscriptProofBuilderError),
 
   #[error(transparent)]
@@ -94,17 +85,11 @@ pub enum ClientErrors {
   HexDecode(#[from] hex::FromHexError),
 
   #[error(transparent)]
-  BackendError(#[from] tls_client2::BackendError),
-
-  #[error(transparent)]
   VendoredInvalidDnsNameError(#[from] tls_core::dns::InvalidDnsNameError),
 
   #[cfg(not(target_arch = "wasm32"))]
   #[error(transparent)]
   InvalidDnsNameError(#[from] rustls::pki_types::InvalidDnsNameError),
-
-  #[error(transparent)]
-  Error(#[from] tls_client2::Error),
 
   #[error("Other error: {0}")]
   Other(String),
@@ -118,8 +103,6 @@ pub enum ClientErrors {
   #[error("Manifest missing")]
   ManifestMissingError,
 
-  #[error(transparent)]
-  WitnessGeneratorError(#[from] web_proof_circuits_witness_generator::WitnessGeneratorError),
 
   #[error("TEE proof missing")]
   TeeProofMissing,

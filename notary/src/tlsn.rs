@@ -38,6 +38,7 @@ use crate::{
 
 /// A wrapper enum to facilitate extracting TCP connection for either WebSocket or TCP clients,
 /// so that we can use a single endpoint and handler for notarization for both types of clients
+/// TODO(WJ 2025-03-05): this is used by TEEs
 pub enum ProtocolUpgrade {
   Tcp(TcpUpgrade),
   Ws(WebSocketUpgrade),
@@ -111,30 +112,6 @@ pub async fn notary_service<
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
   session_id: Uuid,
-}
-
-// TODO Response or impl IntoResponse?
-pub async fn notarize(
-  protocol_upgrade: ProtocolUpgrade,
-  query: Query<NotarizeQuery>,
-  State(state): State<Arc<SharedState>>,
-) -> Response {
-  let session_id = query.session_id.to_string();
-
-  debug!("Starting notarize with ID: {}", session_id);
-
-  let max_sent_data = Some(state.tlsn_max_sent_data);
-  let max_recv_data = Some(state.tlsn_max_recv_data);
-  let notary_signing_key = state.notary_signing_key.clone();
-
-  match protocol_upgrade {
-    ProtocolUpgrade::Ws(ws) => ws.on_upgrade(move |socket| {
-      websocket_notarize(socket, notary_signing_key, session_id, max_sent_data, max_recv_data)
-    }),
-    ProtocolUpgrade::Tcp(tcp) => tcp.on_upgrade(move |stream| {
-      tcp_notarize(stream, notary_signing_key, session_id, max_sent_data, max_recv_data)
-    }),
-  }
 }
 
 pub async fn websocket_notarize(
