@@ -201,7 +201,7 @@ async fn handle_tee_mode(
   let mut framed_reunited_socket =
     Framed::new(reunited_socket.compat(), LengthDelimitedCodec::new());
 
-  let manifest = config.proving.manifest.unwrap();
+  let manifest = config.manifest;
   let manifest_bytes: Vec<u8> = (&manifest).try_into().unwrap();
   framed_reunited_socket.send(Bytes::from(manifest_bytes)).await?;
 

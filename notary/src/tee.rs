@@ -28,6 +28,7 @@ use uuid::Uuid;
 use web_prover_core::{
   http::{ManifestRequest, NotaryResponse},
   manifest::Manifest,
+  parser::ExtractionValues,
   proof::{TeeProof, TeeProofData},
 };
 use ws_stream_tungstenite::WsStream;
@@ -243,7 +244,9 @@ pub fn create_tee_proof(
   response: &NotaryResponse,
   State(state): State<Arc<SharedState>>,
 ) -> Result<TeeProof, NotaryServerError> {
-  validate_notarization_legal(manifest, request, response)?;
+  let values = get_legal_notarization_values(manifest, request, response)?;
+  // TODO(#543): Use these values in the proof
+  debug!("Extracted values for notarization={:?}", values);
 
   let manifest_hash = manifest.to_keccak_digest()?;
   let to_sign = VerifyOutput {
@@ -252,25 +255,30 @@ pub fn create_tee_proof(
     value:    format!("0x{}", hex::encode(manifest_hash)),
     manifest: manifest.clone(),
   };
-  let signature = sign_verification(to_sign, State(state)).unwrap();
+  let signature = sign_verification(to_sign, State(state))?;
   let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
 
   Ok(TeeProof { data, signature })
 }
 
-/// Check if `manifest`, `request`, and `response` all fulfill requirements necessary for
-/// a proof to be created
-fn validate_notarization_legal(
+/// Verify that `manifest`, `request`, and `response` fulfill requirements necessary for
+/// a proof to be created and return notarization values if any
+fn get_legal_notarization_values(
   manifest: &Manifest,
   request: &ManifestRequest,
   response: &NotaryResponse,
-) -> Result<(), NotaryServerError> {
+) -> Result<ExtractionValues, NotaryServerError> {
+  // Validate manifest first
   manifest.validate()?;
+
+  // Check if request matches manifest requirements
   if !manifest.request.is_subset_of(request) {
     return Err(NotaryServerError::ManifestRequestMismatch);
   }
-  if !response.matches_client_manifest(&manifest.response) {
-    return Err(NotaryServerError::ManifestResponseMismatch);
-  }
-  Ok(())
+
+  // Check if response matches manifest and extract values
+  response
+    .match_and_extract(&manifest.response)?
+    .filter(|values| !values.is_empty())
+    .ok_or(NotaryServerError::ManifestResponseMismatch)
 }

@@ -70,7 +70,7 @@ fn compute_json_mask_range_set(
     None => return Err(errors::ClientErrors::Other("Content span is empty".to_string())),
   };
 
-  let mut content_value = parse(content_span.clone().to_bytes()).unwrap();
+  let mut content_value = parse(content_span.clone().to_bytes())?;
   content_value.offset(initial_index);
 
   let mut range_sets = Vec::new();
@@ -117,7 +117,7 @@ pub async fn notarize(
   DefaultHttpCommitter::default().commit_transcript(&mut builder, &transcript)?;
 
   let range_sets =
-    compute_json_mask_range_set(&transcript.responses[0], &manifest.response.body.json_path)?;
+    compute_json_mask_range_set(&transcript.responses[0], &manifest.response.body.json_path())?;
   for range_set in range_sets.iter() {
     builder.commit_recv(range_set)?;
   }

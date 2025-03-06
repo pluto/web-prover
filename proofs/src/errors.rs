@@ -102,7 +102,7 @@ pub enum ProofError {
   #[error(transparent)]
   SerdeWasmBindgen(#[from] serde_wasm_bindgen::Error),
 
-  /// The error is an invalid manifest
-  #[error("Invalid manifest: {0}")]
-  InvalidManifest(String),
+  /// The error is a ManifestError
+  #[error(transparent)]
+  Manifest(#[from] web_prover_core::errors::ManifestError),
 }
