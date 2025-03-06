@@ -23,19 +23,9 @@ pub enum ClientErrors {
   #[error(transparent)]
   TeeTlsConnectorError(#[from] caratls_ekm_client::TeeTlsConnectorError),
 
-  #[error("TLS error: {0}")]
-  TlsCrypto(String),
 
   #[error(transparent)]
   SerdeJson(#[from] serde_json::Error),
-
-  #[cfg(all(target_arch = "wasm32", feature = "websocket"))]
-  #[error(transparent)]
-  WebSocket(#[from] ws_stream_wasm::WsErr),
-
-  #[cfg(target_arch = "wasm32")]
-  #[error("{0}")]
-  JsValueAsError(String),
 
   #[error(transparent)]
   Hyper(#[from] hyper::Error),
@@ -43,7 +33,6 @@ pub enum ClientErrors {
   #[error(transparent)]
   Http(#[from] hyper::http::Error),
 
-  #[cfg(not(target_arch = "wasm32"))]
   #[error(transparent)]
   Join(#[from] tokio::task::JoinError),
 
@@ -65,30 +54,20 @@ pub enum ClientErrors {
   #[error(transparent)]
   HexDecode(#[from] hex::FromHexError),
 
-
-  #[cfg(not(target_arch = "wasm32"))]
   #[error(transparent)]
   InvalidDnsNameError(#[from] rustls::pki_types::InvalidDnsNameError),
 
-  #[error("Other error: {0}")]
-  Other(String),
 
   #[error(transparent)]
   Canceled(#[from] futures::channel::oneshot::Canceled),
 
-  #[error("Missing setup data")]
-  MissingSetupData,
-
   #[error("Manifest missing")]
   ManifestMissingError,
+
+  #[error("Other error: {0}")]
+  Other(String),
 
   #[error("TEE proof missing")]
   TeeProofMissing,
 }
 
-#[cfg(target_arch = "wasm32")]
-impl From<wasm_bindgen::JsValue> for ClientErrors {
-  fn from(val: wasm_bindgen::JsValue) -> ClientErrors {
-    ClientErrors::JsValueAsError(serde_wasm_bindgen::from_value::<String>(val).unwrap())
-  }
-}

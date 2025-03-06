@@ -3,7 +3,7 @@ pub mod config;
 pub mod errors;
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info};
+use tracing::debug;
 use web_prover_core::{
   manifest::Manifest,
   proof::{SignedVerificationReply, TeeProof},
@@ -11,14 +11,6 @@ use web_prover_core::{
 
 use crate::errors::ClientErrors;
 
-#[derive(Debug, Serialize)]
-pub enum Proof {
-  TEE(TeeProof),
-}
-
-pub fn get_web_prover_circuits_version() -> String {
-  env!("WEB_PROVER_CIRCUITS_VERSION").to_string()
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProxyConfig {
@@ -29,7 +21,7 @@ pub struct ProxyConfig {
   pub manifest:       Manifest,
 }
 
-pub async fn proxy(config: config::Config) -> Result<Proof, ClientErrors> {
+pub async fn proxy(config: config::Config) -> Result<TeeProof, ClientErrors> {
   let session_id = config.session_id.clone();
 
   let url = format!(
@@ -47,11 +39,6 @@ pub async fn proxy(config: config::Config) -> Result<Proof, ClientErrors> {
     manifest:       config.proving.manifest.unwrap(),
   };
 
-  // TODO reqwest uses browsers fetch API for WASM target? if true, can't add trust anchors
-  #[cfg(target_arch = "wasm32")]
-  let client = reqwest::ClientBuilder::new().build()?;
-
-  #[cfg(not(target_arch = "wasm32"))]
   let client = {
     let mut client_builder = reqwest::ClientBuilder::new().use_rustls_tls();
     if let Some(cert) = config.notary_ca_cert {
@@ -64,7 +51,7 @@ pub async fn proxy(config: config::Config) -> Result<Proof, ClientErrors> {
   let response = client.post(url).json(&proxy_config).send().await?;
   assert_eq!(response.status(), hyper::StatusCode::OK);
   let tee_proof = response.json::<TeeProof>().await?;
-  Ok(Proof::TEE(tee_proof))
+  Ok(tee_proof)
 }
 
 pub async fn verify<T: Serialize>(
@@ -78,11 +65,6 @@ pub async fn verify<T: Serialize>(
     "tee",
   );
 
-  // TODO reqwest uses browsers fetch API for WASM target? if true, can't add trust anchors
-  #[cfg(target_arch = "wasm32")]
-  let client = reqwest::ClientBuilder::new().build()?;
-
-  #[cfg(not(target_arch = "wasm32"))]
   let client = {
     let mut client_builder = reqwest::ClientBuilder::new().use_rustls_tls();
     if let Some(cert) = config.notary_ca_cert {

@@ -1,4 +1,0 @@
-module Prover {
-  header "libclient_ios.h"
-  export *
-}

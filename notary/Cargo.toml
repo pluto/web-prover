@@ -10,7 +10,7 @@ tee-dummy-token-generator                    =[]
 tee-google-confidential-space-token-generator=[]
 
 [dependencies]
-chrono     ={ workspace=true }
+chrono={ workspace=true }
 client={ workspace=true }
 hyper={ workspace=true, features=["client", "http1", "server"] }
 hyper-util={ workspace=true }

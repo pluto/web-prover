@@ -6,40 +6,23 @@ edition="2021"
 members =["client", "notary", "web-prover-core", "tests"]
 resolver="2"
 
-[workspace.metadata]
-# https://github.com/pluto/web-prover-circuits/releases
-web_prover_circuits_version="0.10.0"
-
 [workspace.dependencies]
 # Local re-exporting
-client         ={ path="client" }
-# proofs         ={ path="proofs" }
-notary         ={ path="notary" }
-# web-prover-core={ path="web-prover-core" }
+client={ path="client" }
+notary={ path="notary" }
 # Serde
 serde     ={ version="1.0.204", features=["derive"] }
 serde_json="1.0.120"
 # Logging
 tracing           ="0.1.40"
 tracing-subscriber={ version="0.3.18", features=["env-filter"] }
-
-
-# notary-server={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.7" }
-# tlsn-verifier={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.7" }
-# tlsn-prover  ={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.7" }
-# tlsn-common  ={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.7" }
-# tlsn-core    ={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.7" }
-# tlsn-utils   ={ git="https://github.com/tlsnotary/tlsn-utils", rev="e7b2db6" }
-
-# tls-core          ={ git="https://github.com/pluto/tls-origo-legacy", package="tls-core" }
 rayon             ="1.10.0"
 wasm-bindgen-rayon="=1.2.1"
 futures           ="0.3"
 
-web-prover-core ={ path="web-prover-core" }
+web-prover-core={ path="web-prover-core" }
 
 caratls_ekm_server                          ={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
-# caratls_ekm_google_confidential_space_server={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
 caratls_ekm_client                          ={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
 caratls_ekm_google_confidential_space_client={ git="https://github.com/pluto/caratls.git", rev="2f4631af7400eafec7a533b72d1d460fa5a66db3" }
 
@@ -57,7 +40,6 @@ http-body-util="0.1"
 tokio       ={ version="1.39.1", features=["full"] }
 tokio-util  ={ version="0.7" }
 tokio-rustls={ version="0.26.0", default-features=false, features=["logging", "tls12"] }
-
 
 uuid       ={ version="1.10.0", default-features=false, features=["v4", "serde"] }
 derive_more={ version="2.0.1", features=["full"] }
