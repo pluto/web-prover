@@ -12,22 +12,5 @@ book/**/*.html
 
 rustls_acme_cache
 
-# Circom junk files
-proofs/**/*.wtns
-proofs/web_proof_circuits/
-proofs/node_modules/*
-proofs/ir_log/*
-proofs/log_input_signals.txt
-client/.rustc_info.json
-
-# exclude ios/wasm build files
-client_ios/headers/libclient_ios.h
-client_wasm/demo/static/build
-client_ios/demo/demo.xcodeproj/project.xcworkspace/xcuserdata/*
-client_ios/demo/demo.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
-
-# artifacts zipfile
-*.zip
-
 # rust tools
 bacon.toml
