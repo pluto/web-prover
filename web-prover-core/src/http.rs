@@ -14,6 +14,7 @@
 //! - `default_message`: Returns the default HTTP response message string.
 
 use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
