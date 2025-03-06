@@ -2,10 +2,6 @@ name: Build Notary
 
 on:
   workflow_call:
-    inputs:
-      web-prover-circuits-cache-key:
-        required: true
-        type: string
 
 jobs:
   build:
@@ -29,12 +25,6 @@ jobs:
         if: matrix.os == 'macos-latest'
         with:
           rust-cache-key: client_notary
-
-      - name: Fetch web-prover-circuits cache
-        uses: actions/cache/restore@v4
-        with:
-          path: proofs/web_proof_circuits
-          key: ${{ inputs.web-prover-circuits-cache-key }}
 
       - run: cargo build -p notary --release
 

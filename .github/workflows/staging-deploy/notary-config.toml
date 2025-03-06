@@ -1,6 +1,3 @@
 listen            ="0.0.0.0:443"
-notary_signing_key="/opt/notary/etc/fixture/certs/tlsn.key"
-origo_signing_key ="/opt/notary/etc/fixture/certs/origo.key"
-tlsn_max_sent_data=10000
-tlsn_max_recv_data=10000
+notary_signing_key="/opt/notary/etc/fixture/certs/notary.key"
 acme_email        ="eng@pluto.xyz"

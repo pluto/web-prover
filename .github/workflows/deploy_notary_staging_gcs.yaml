@@ -2,10 +2,6 @@ name: Deploy Notary (Staging) - Google Confidential Space
 
 on:
   workflow_call:
-    inputs:
-      web-prover-circuits-cache-key:
-        required: true
-        type: string
 
 jobs:
   deploy:
@@ -22,12 +18,6 @@ jobs:
         with:
           name: "notary.linux.amd64"
           path: .github/workflows/staging-deploy-gcs
-
-      - name: Fetch web-prover-circuits cache
-        uses: actions/cache/restore@v4
-        with:
-          path: proofs/web_proof_circuits
-          key: ${{ inputs.web-prover-circuits-cache-key }}
 
       - uses: "google-github-actions/auth@v2"
         with:

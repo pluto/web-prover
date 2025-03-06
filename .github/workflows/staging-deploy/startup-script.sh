@@ -26,7 +26,6 @@ mkdir -p /opt/notary/{bin,etc}
 mv /opt/notary/assets/notary /opt/notary/bin/notary
 mv /opt/notary/assets/notary-config.toml /opt/notary/etc/
 mv /opt/notary/assets/fixture /opt/notary/etc/
-mv /opt/notary/assets/proofs /opt/notary/bin/ # TODO proofs path can't be configured right now
 chmod 0755 /opt/notary/bin/notary
 chown -R notary:notary /opt/notary
 setcap 'cap_net_bind_service=+ep' /opt/notary/bin/notary

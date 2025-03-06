@@ -2,10 +2,6 @@ name: Lint
 
 on:
   workflow_call:
-    inputs:
-      web-prover-circuits-cache-key:
-        required: true
-        type: string
 
 jobs:
   clippy:
@@ -16,23 +12,13 @@ jobs:
       matrix:
         crate:
           - notary
-          - proofs
           - client
-          - client_ios
-          # TODO - client_wasm
-
     steps:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-rust-ubuntu
         with:
           rust-cache-key: clippy
-
-      - name: Fetch web-prover-circuits cache
-        uses: actions/cache/restore@v4
-        with:
-          path: proofs/web_proof_circuits
-          key: ${{ inputs.web-prover-circuits-cache-key }}
 
       - run: cargo clippy -p ${{ matrix.crate }}
 
