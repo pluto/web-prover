@@ -11,6 +11,8 @@ thiserror                           ={ workspace=true }
 tiny-keccak                         ={ workspace=true }
 url                                 ={ workspace=true }
 derive_more                         ={ workspace=true }
+# todo remove this dependency
+web-proof-circuits-witness-generator={ git="https://github.com/pluto/web-prover-circuits", rev="0a09df087612d45fa3b0d5914d93c72417edb58b" }
 # Using `regress` crate for compatibility with ECMAScript regular expressions in Manifest validation
 regress="0.10.3"
 regex  ="1.11.1"

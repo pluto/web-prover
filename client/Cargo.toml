@@ -25,6 +25,7 @@ cargo_metadata="0.19.1"
 
 caratls_ekm_client                          ={ workspace=true }
 caratls_ekm_google_confidential_space_client={ workspace=true }
+web-prover-core ={ workspace=true }
 
 bytes                               ="1"
 tls-client   ={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.7", package="tlsn-tls-client" }

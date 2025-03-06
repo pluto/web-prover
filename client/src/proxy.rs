@@ -161,22 +161,3 @@ async fn handle_tee_mode(
   Ok(tee_proof)
 }
 
-/// Perform an HTTP handshake on client TLS connection and sends request
-// async fn client_handshake(
-//   config: &Config,
-//   client_tls_conn: TlsConnection,
-// ) -> Result<(), ClientErrors> {
-//   let client_tls_conn = hyper_util::rt::TokioIo::new(client_tls_conn.compat());
-//   let (mut request_sender, connection) =
-//     hyper::client::conn::http1::handshake(client_tls_conn).await?;
-//   let connection_task = tokio::spawn(connection.without_shutdown());
-//   let response = request_sender.send_request(config.to_request()?).await?;
-
-//   assert_eq!(response.status(), StatusCode::OK);
-
-//   let payload = response.into_body().collect().await?.to_bytes();
-//   debug!("Response: {:?}", payload);
-
-//   let hyper::client::conn::http1::Parts { io: _client_tls_conn, .. } = connection_task.await??;
-//   Ok(())
-// }

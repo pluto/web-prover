@@ -1,30 +1,22 @@
 extern crate core;
 
 pub mod tlsn;
-
-// pub mod origo;
-
 pub mod proxy;
-
 pub mod config;
 pub mod errors;
 
-mod proof;
-// mod tls;
-mod tlsn_native;
-
+mod tls;
 use std::collections::HashMap;
 
-use origo::OrigoProof;
-use proofs::{
-  circuits::{construct_setup_data_from_fs, CIRCUIT_SIZE_512},
-  program::data::UninitializedSetup,
-};
+// use proofs::{
+//   circuits::{construct_setup_data_from_fs, CIRCUIT_SIZE_512},
+//   program::data::UninitializedSetup,
+// };
 use serde::{Deserialize, Serialize};
-use tlsn::{TlsnProof, TlsnVerifyBody};
-use tlsn_common::config::ProtocolConfig;
-pub use tlsn_core::attestation::Attestation;
-use tlsn_prover::ProverConfig;
+// use tlsn::{TlsnProof, TlsnVerifyBody};
+// use tlsn_common::config::ProtocolConfig;
+// pub use tlsn_core::attestation::Attestation;
+// use tlsn_prover::ProverConfig;
 use tracing::{debug, info};
 use web_prover_core::{
   manifest::Manifest,
@@ -35,10 +27,7 @@ use crate::errors::ClientErrors;
 
 #[derive(Debug, Serialize)]
 pub enum Proof {
-  Tlsn(TlsnProof),
-  Origo(OrigoProof),
   TEE(TeeProof),
-  Proxy(TeeProof),
 }
 
 pub fn get_web_prover_circuits_version() -> String {
@@ -49,7 +38,7 @@ pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, Clien
   let session_id = config.set_session_id();
 
   // TEE mode uses Origo networking stack with minimal changes
-  let (_origo_conn, tee_proof) = proxy::proxy(config, session_id).await?;
+  let tee_proof = proxy::proxy(config, session_id).await?;
 
   Ok(Proof::TEE(tee_proof.unwrap()))
 }
@@ -98,7 +87,7 @@ pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, ClientE
   let response = client.post(url).json(&proxy_config).send().await?;
   assert_eq!(response.status(), hyper::StatusCode::OK);
   let tee_proof = response.json::<TeeProof>().await?;
-  Ok(Proof::Proxy(tee_proof))
+  Ok(Proof::TEE(tee_proof))
 }
 
 pub async fn verify<T: Serialize>(
