@@ -196,7 +196,7 @@ impl NotaryResponse {
         .get(key)
         .or_else(|| self.response.headers.get(&key.to_lowercase()))
       {
-        Some(actual_value) if actual_value == other_value => continue,
+        Some(actual_value) if actual_value.to_lowercase() == other_value.to_lowercase() => continue,
         Some(actual_value) => {
           debug!(
             "Header mismatch for key: {}: expected={}, actual={}",
