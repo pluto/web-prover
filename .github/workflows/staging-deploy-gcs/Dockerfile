@@ -3,7 +3,6 @@ RUN apt-get update && \
     apt-get install -y libssl-dev && \
     rm -rf /var/lib/apt/lists/*
 RUN mkdir /app
-COPY proofs /app/proofs
 COPY .github/workflows/staging-deploy-gcs/notary /app/notary
 COPY .github/workflows/staging-deploy-gcs/notary-config.toml /app/notary-config.toml
 RUN chmod +x /app/notary
