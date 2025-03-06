@@ -1287,39 +1287,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "client_ios"
-version = "0.7.0"
-dependencies = [
- "cargo_metadata",
- "client",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "client_wasm"
-version = "0.7.0"
-dependencies = [
- "cargo_metadata",
- "client",
- "console_error_panic_hook",
- "js-sys",
- "serde-wasm-bindgen",
- "serde_json",
- "time",
- "tracing",
- "tracing-subscriber",
- "tracing-web",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-bindgen-rayon",
- "wasm-bindgen-test",
-]
-
-[[package]]
 name = "cmake"
 version = "0.1.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"

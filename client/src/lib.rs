@@ -1,22 +1,8 @@
 extern crate core;
-
-pub mod tlsn;
-pub mod proxy;
 pub mod config;
 pub mod errors;
-
-mod tls;
 use std::collections::HashMap;
-
-// use proofs::{
-//   circuits::{construct_setup_data_from_fs, CIRCUIT_SIZE_512},
-//   program::data::UninitializedSetup,
-// };
 use serde::{Deserialize, Serialize};
-// use tlsn::{TlsnProof, TlsnVerifyBody};
-// use tlsn_common::config::ProtocolConfig;
-// pub use tlsn_core::attestation::Attestation;
-// use tlsn_prover::ProverConfig;
 use tracing::{debug, info};
 use web_prover_core::{
   manifest::Manifest,
@@ -34,15 +20,6 @@ pub fn get_web_prover_circuits_version() -> String {
   env!("WEB_PROVER_CIRCUITS_VERSION").to_string()
 }
 
-pub async fn prover_inner_tee(mut config: config::Config) -> Result<Proof, ClientErrors> {
-  let session_id = config.set_session_id();
-
-  // TEE mode uses Origo networking stack with minimal changes
-  let tee_proof = proxy::proxy(config, session_id).await?;
-
-  Ok(Proof::TEE(tee_proof.unwrap()))
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProxyConfig {
   pub target_method:  String,
@@ -52,7 +29,7 @@ pub struct ProxyConfig {
   pub manifest:       Manifest,
 }
 
-pub async fn prover_inner_proxy(config: config::Config) -> Result<Proof, ClientErrors> {
+pub async fn proxy(config: config::Config) -> Result<Proof, ClientErrors> {
   let session_id = config.session_id.clone();
 
   let url = format!(

@@ -28,9 +28,8 @@ caratls_ekm_google_confidential_space_client={ workspace=true }
 web-prover-core ={ workspace=true }
 
 bytes                               ="1"
+# todo remove
 tls-client   ={ git="https://github.com/tlsnotary/tlsn.git", tag="v0.1.0-alpha.7", package="tlsn-tls-client" }
-
-
 serde-wasm-bindgen="0.6.5"
 
 webpki-roots="0.26.1"
