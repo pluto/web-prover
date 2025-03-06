@@ -1,0 +1,84 @@
+{
+  "mode": "TEE",
+  "notary_host": "localhost",
+  "notary_port": 7443,
+  "notary_ca_cert": "MIIFszCCA5ugAwIBAgIUeXLQmnjeXsHpGji7xA8oJjjw7WwwDQYJKoZIhvcNAQELBQAwaTELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExEjAQBgNVBAcMCVBhbG8gQWx0bzEVMBMGA1UECgwMT3JnYW5pemF0aW9uMRowGAYDVQQDDBFMb2NhbGhvc3QgUm9vdCBDQTAeFw0yNDA2MDcyMjUyNDBaFw0yOTA2MDYyMjUyNDBaMGkxCzAJBgNVBAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMRIwEAYDVQQHDAlQYWxvIEFsdG8xFTATBgNVBAoMDE9yZ2FuaXphdGlvbjEaMBgGA1UEAwwRTG9jYWxob3N0IFJvb3QgQ0EwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDIHMEL9gVSxT/J0qS4xDkDZs1d1UG0+z6NFLLsGdV7gu0ZJbDPlNd0kpjWsisVNB7TcqWoq5ROK5CR+6lZxXC8nbqr2YAJ2O8mHIXcYv7msAN3UYxtM6v1M7K+vNMJdDjZVAxcOKq5R7uUDUPw1weePz6eVEjntAW8mUjqkfnCqYml943Ud3724SkI5wyUT9rKS3bk6hvneq1ah/b1zRGDF2gp+T/oNe4ieS/LGoIUluE2csGRXtt542gpJnw5L54JASmGgt6hunUSWtoaht7Qxv6hYpieu4iHqZY1kfcFDjDH2WI16g1YqrWHzk1l7vWNLVDEcK3kdSQ1GmYAij8ZjAi0LJizLwtN//EkfxiOPlV435itK3uugY+etxrk77BeA6PmVcpZeLLXYuKSrzfaBh0ifP2p0uRlShURi5Rz4IE0I7wHkZ44x9MKYv8YzXK7O29HD158tgorxqwwKmkHqSxWpp7SRKvNnMulHN/el+IKDrPeBhVXsSSkd6U+/H61q7i0SY9TqqhdiMQLW/efK9LkVRen5myhwqogwiF/42Jp2nrCeuzv5YDsAFSrQ0lukW+Hz7FXV+0axnKeXZ08Nd+IS1BhGyMgHo6PWMP1fWyfO0DJVUfIqrHqvBy8bW0yNOuhiyU2oeyDRKv75OMxpIrUeX3qvmrVcYUPvfXsVQIDAQABo1MwUTAdBgNVHQ4EFgQUlro6UuKRY+lHZ3T4FQMhoQAJ2a8wHwYDVR0jBBgwFoAUlro6UuKRY+lHZ3T4FQMhoQAJ2a8wDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAgEARliSCLdjNI5fFkNwXDK6k6jN5hITrY07XIawUIEwinjQqgLkYFvzXbMtfLwsWmxMPjDVYYDa5Y2NAGcH08b//2z9EuHxMOTOFTKr59BEcVxV1cxV+lspAunH8DLSlLJhf/EeR+MhIIHAfhlE8V7lvlE1EbM+Uj5JYIeefV/4omsGrphyHD3oSJAQDae0su200I/i2yAaTrwXLZ4HtaXsnxKZ4PMPFWaLvMQ8DsLgx2VB3/vQJn74Xepau6mYEWlRnUu90mj79gJOnwBKPlLojF6dJOMIJ2YHr9fI8sUfkVwPFVlkDKJcr0ll5RL3O/naNlLQZuOgijOM5YF5iTrefliVodEHpBPID2mhtq/E+ZIQWLpik8ulsJ8ufN9YfrbjbsiC/KeoMqoFCImRSyMGQDMADo4EV3DNfDFvfrHx0qBMmJ0nkhuGobphegMPCjZ3axvQwQulKuHXmFpAvGYcpK/twBMC1MJkV04tIwVEDZG6id5oKYtrIXHdSFshf6r3z4bbgq6kJnOxZ8Vo4cEw/dgc3hRivr+HnxOJcEk2CTQlCVOiCQAg64OqDEOoswVg6nzoO3RJhFatu+abO22MIXPNGma02zBoQZLYpGzL9z6pMnPKjL15G9H1SYVSTGhmq+GVtdRibg8rLBciSm3ERd7gNRqvYP5GrjCtUIbOTEc=",
+  "target_method": "GET",
+  "target_url": "https://en.wikipedia.org/wiki/Claude_Shannon",
+  "target_headers": {},
+  "target_body": "",
+  "max_sent_data": 10000,
+  "max_recv_data": 10000,
+  "proving": {
+    "manifest": {
+      "manifestVersion": "1",
+      "id": "wikipedia-claude-shannon",
+      "title": "Wikipedia Claude Shannon",
+      "description": "Generate a proof that you have visited the Claude Shannon Wikipedia page",
+      "prepareUrl": "https://en.wikipedia.org/wiki/Claude_Shannon",
+      "request": {
+        "method": "GET",
+        "version": "HTTP/1.1",
+        "url": "https://en.wikipedia.org/wiki/Claude_Shannon",
+        "headers": {
+          "accept-encoding": "identity",
+          "host": "en.wikipedia.org",
+          "connection": "close",
+          "accept": "*/*"
+        }
+      },
+      "response": {
+        "status": "200",
+        "version": "HTTP/1.1",
+        "message": "OK",
+        "headers": {
+          "Content-Type": "text/html; charset=UTF-8"
+        },
+        "body": {
+          "format": "html",
+          "extractors": [
+            {
+              "id": "pageTitle",
+              "description": "Extract the page title",
+              "selector": ["title"],
+              "type": "string",
+              "predicates": [
+                {
+                  "type": "value",
+                  "comparison": "contains",
+                  "value": "Claude Shannon"
+                }
+              ]
+            },
+            {
+              "id": "roles",
+              "description": "Extract his professional roles",
+              "selector": ["div#mw-content-text", "div.mw-parser-output", "p", "a"],
+              "type": "array",
+              "predicates": [
+                {
+                  "type": "value",
+                  "comparison": "contains",
+                  "value": "mathematician",
+                  "case_sensitive": false
+                },
+                {
+                  "type": "value",
+                  "comparison": "contains",
+                  "value": "electrical engineer",
+                  "case_sensitive": false
+                },
+                {
+                  "type": "value",
+                  "comparison": "contains",
+                  "value": "cryptographer",
+                  "case_sensitive": false
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

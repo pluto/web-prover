@@ -28,7 +28,7 @@ pub async fn proxy(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<client::ProxyConfig>,
 ) -> Result<Json<TeeProof>, NotaryServerError> {
-  let session_id = query.session_id.clone();
+  let session_id = query.session_id;
 
   info!("Starting proxy with ID: {}", session_id);
 
@@ -78,7 +78,7 @@ async fn from_reqwest_response(response: Response) -> NotaryResponse {
       // TODO: This makes me think that perhaps this should be an optional field or something else
       body: ManifestResponseBody::default(),
     },
-    notary_response_body: NotaryResponseBody { json },
+    notary_response_body: NotaryResponseBody { body: json },
   }
 }
 

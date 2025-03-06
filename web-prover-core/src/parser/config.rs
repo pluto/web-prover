@@ -1,7 +1,12 @@
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use std::fmt::Display;
 
-use crate::parser::{errors::ExtractorError, extractor, extractor::ExtractionResult, Extractor};
+use serde::{Deserialize, Serialize};
+
+use crate::parser::{
+  errors::ExtractorError,
+  extractors::{ExtractionResult, Extractor},
+  DocumentExtractor, HtmlDocumentExtractor, JsonDocumentExtractor,
+};
 
 /// The format of the data to extract from
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -10,6 +15,17 @@ pub enum DataFormat {
   /// JSON format
   #[default]
   Json,
+  /// HTML format
+  Html,
+}
+
+impl Display for DataFormat {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      DataFormat::Json => write!(f, "JSON"),
+      DataFormat::Html => write!(f, "HTML"),
+    }
+  }
 }
 
 /// The root configuration for data extractors
@@ -22,11 +38,15 @@ pub struct ExtractorConfig {
 }
 
 impl ExtractorConfig {
-  /// Extracts and validates data using this extractor configuration
-  pub fn extract_and_validate(&self, data: &Value) -> Result<ExtractionResult, ExtractorError> {
-    match self.format {
-      DataFormat::Json => extractor::extract_json(data, self),
-    }
+  /// Use document-specific extractors to extract and validate data
+  pub fn extract_and_validate(&self, data: &[u8]) -> Result<ExtractionResult, ExtractorError> {
+    let extractor: Box<dyn DocumentExtractor> = match self.format {
+      DataFormat::Json => Box::new(JsonDocumentExtractor),
+      DataFormat::Html => Box::new(HtmlDocumentExtractor),
+    };
+
+    extractor.validate_input(data)?;
+    extractor.extract(data, self)
   }
 }
 
@@ -35,10 +55,13 @@ mod tests {
   use serde_json::json;
 
   use super::*;
-  use crate::parser::{
-    extractor::{Extractor, ExtractorType},
-    predicate::{Comparison, PredicateType},
-    test_utils::{active_extractor, age_extractor, name_extractor, tags_extractor},
+  use crate::{
+    extractor,
+    parser::{
+      predicate::{Comparison, PredicateType},
+      test_utils::{active_extractor, age_extractor, name_extractor, tags_extractor},
+      ExtractorType,
+    },
   };
 
   #[test]
@@ -50,7 +73,9 @@ mod tests {
             "active": true,
             "tags": ["developer", "rust"]
         }
-    });
+    })
+    .to_string()
+    .into_bytes();
     let config = ExtractorConfig {
       format:     DataFormat::Json,
       extractors: vec![name_extractor(), age_extractor(), active_extractor(), tags_extractor()],
@@ -74,7 +99,9 @@ mod tests {
             "active": false,
             "tags": []    // Empty array
         }
-    });
+    })
+    .to_string()
+    .into_bytes();
     let config = ExtractorConfig {
       format:     DataFormat::Json,
       extractors: vec![name_extractor(), age_extractor(), active_extractor(), tags_extractor()],
@@ -100,27 +127,27 @@ mod tests {
             "name": "John Doe"
             // Missing age and active fields
         }
-    });
+    })
+    .to_string()
+    .into_bytes();
     let config = ExtractorConfig {
       format:     DataFormat::Json,
       extractors: vec![
         name_extractor(),
-        Extractor {
-          id:             "userAge".to_string(),
-          description:    "Extract user's age".to_string(),
-          selector:       vec!["user".to_string(), "age".to_string()],
-          extractor_type: ExtractorType::Number,
-          required:       false, // Optional
-          predicates:     vec![],
-        },
-        Extractor {
-          id:             "userActive".to_string(),
-          description:    "Extract user's active status".to_string(),
-          selector:       vec!["user".to_string(), "active".to_string()],
-          extractor_type: ExtractorType::Boolean,
-          required:       false, // Optional
-          predicates:     vec![],
-        },
+        extractor!(
+            id: "userAge".to_string(),
+            description: "Extract user's age".to_string(),
+            selector: vec!["user".to_string(), "age".to_string()],
+            extractor_type: ExtractorType::Number,
+            required: false
+        ),
+        extractor!(
+            id: "userActive".to_string(),
+            description: "Extract user's active status".to_string(),
+            selector: vec!["user".to_string(), "active".to_string()],
+            extractor_type: ExtractorType::Boolean,
+            required: false
+        ),
       ],
     };
 
@@ -220,5 +247,180 @@ mod tests {
     assert_eq!(predicate.predicate_type, PredicateType::Value);
     assert_eq!(predicate.comparison, Comparison::GreaterThanOrEqual);
     assert_eq!(predicate.value, json!(18));
+  }
+
+  #[test]
+  fn test_extract_and_validate_html() {
+    let html = r#"
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Test Page</title>
+      </head>
+      <body>
+        <div class="user-info">
+          <h1 id="username">John Doe</h1>
+          <p class="age">30</p>
+          <p class="active">true</p>
+          <ul class="tags">
+            <li>developer</li>
+            <li>rust</li>
+            <li>web</li>
+          </ul>
+        </div>
+        <a href="https://example.com" class="link">Visit Website</a>
+      </body>
+      </html>
+    "#
+    .to_string()
+    .into_bytes();
+
+    let config = ExtractorConfig {
+      format:     DataFormat::Html,
+      extractors: vec![
+        extractor!(
+            id: "username".to_string(),
+            description: "User's name".to_string(),
+            selector: vec!["#username".to_string()],
+            extractor_type: ExtractorType::String
+        ),
+        extractor!(
+            id: "age".to_string(),
+            description: "User's age".to_string(),
+            selector: vec![".age".to_string()],
+            extractor_type: ExtractorType::String
+        ),
+        extractor!(
+            id: "active".to_string(),
+            description: "User's active status".to_string(),
+            selector: vec![".active".to_string()],
+            extractor_type: ExtractorType::String
+        ),
+        extractor!(
+            id: "tags".to_string(),
+            description: "User's tags".to_string(),
+            selector: vec!["li".to_string()],
+            extractor_type: ExtractorType::Array
+        ),
+        extractor!(
+            id: "link_href".to_string(),
+            description: "Link URL".to_string(),
+            selector: vec![".link".to_string()],
+            attribute: Some("href".to_string()),
+            extractor_type: ExtractorType::String
+        ),
+      ],
+    };
+
+    let result = config.extract_and_validate(&html).unwrap();
+
+    assert_eq!(result.errors.len(), 0);
+    assert_eq!(result.values.len(), 5);
+
+    assert_eq!(result.values["username"], json!("John Doe"));
+    assert_eq!(result.values["age"], json!("30"));
+    assert_eq!(result.values["active"], json!("true"));
+    let tags = result.values["tags"].as_array().unwrap();
+    assert!(tags.contains(&json!("developer")));
+    assert!(tags.contains(&json!("rust")));
+    assert!(tags.contains(&json!("web")));
+    assert_eq!(result.values["link_href"], json!("https://example.com"));
+  }
+
+  #[test]
+  fn test_extract_and_validate_html_with_failures() {
+    let html = r#"
+      <!DOCTYPE html>
+      <html>
+      <body>
+        <div class="user-info">
+          <h1 id="username">John Doe</h1>
+        </div>
+      </body>
+      </html>
+    "#
+    .to_string()
+    .into_bytes();
+
+    let config = ExtractorConfig {
+      format:     DataFormat::Html,
+      extractors: vec![
+        extractor!(
+            id: "username".to_string(),
+            description: "User's name".to_string(),
+            selector: vec!["#username".to_string()],
+            extractor_type: ExtractorType::String
+        ),
+        extractor!(
+            id: "missing_element".to_string(),
+            description: "Missing element".to_string(),
+            selector: vec![".non-existent".to_string()],
+            extractor_type: ExtractorType::String
+        ),
+        extractor!(
+            id: "optional_missing".to_string(),
+            description: "Optional missing element".to_string(),
+            selector: vec![".optional".to_string()],
+            extractor_type: ExtractorType::String,
+            required: false
+        ),
+      ],
+    };
+
+    let result = config.extract_and_validate(&html).unwrap();
+
+    assert_eq!(result.errors.len(), 1);
+    assert_eq!(result.values.len(), 1);
+
+    assert_eq!(result.values["username"], json!("John Doe"));
+    assert!(result.errors[0].contains("No elements found for selector"));
+  }
+
+  #[test]
+  fn test_extract_and_validate_html_with_invalid_input() {
+    let config = ExtractorConfig {
+      format:     DataFormat::Html,
+      extractors: vec![extractor! {
+        id:             "username".to_string(),
+        description:    "User's name".to_string(),
+        selector:       vec!["#username".to_string()],
+        extractor_type: ExtractorType::String,
+      }],
+    };
+
+    // Test with non-UTF-8 bytes
+    let bad_input = b"\xFF\xFEInvalid UTF-8".to_vec();
+    let result = config.extract_and_validate(&bad_input);
+    assert!(matches!(result, Err(ExtractorError::InvalidHtml(_))));
+  }
+
+  #[test]
+  fn test_json_format_type_validation() {
+    let config =
+      ExtractorConfig { format: DataFormat::Json, extractors: vec![name_extractor()] };
+
+    // Test with string instead of JSON object
+    let invalid_data =
+      serde_json::Value::String("not a json object".to_string()).to_string().into_bytes();
+    let result = config.extract_and_validate(&invalid_data);
+    assert!(matches!(
+        result,
+        Err(ExtractorError::TypeMismatch { expected, actual })
+        if expected == "object or array" && actual == "string"
+    ));
+
+    // Test with valid JSON object
+    let valid_data = json!({
+        "user": {
+            "name": "John Doe"
+        }
+    })
+    .to_string()
+    .into_bytes();
+    assert!(config.extract_and_validate(&valid_data).is_ok());
+
+    // Test with valid JSON array
+    let valid_array = json!([{"user": {"name": "John Doe"}}]).to_string().into_bytes();
+    assert!(config.extract_and_validate(&valid_array).is_ok());
   }
 }

@@ -6635,6 +6635,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
+name = "tl"
+version = "0.7.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b130bd8a58c163224b44e217b4239ca7b927d82bf6cc2fea1fc561d15056e3f7"
+
+[[package]]
 name = "tls-client"
 version = "0.1.0-alpha.5"
 source = "git+https://github.com/pluto/tls-origo-legacy#47e4c30425aff40c0f081a7e718c17491a308d8b"
@@ -7904,6 +7910,7 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "tiny-keccak",
+ "tl",
  "tracing",
  "url",
  "web-proof-circuits-witness-generator",
