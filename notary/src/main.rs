@@ -12,7 +12,7 @@ use axum::{
   routing::{get, post},
   Router,
 };
-use errors::NotaryServerError;
+use error::NotaryServerError;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use k256::{ecdsa::SigningKey, elliptic_curve::rand_core, pkcs8::DecodePrivateKey};
@@ -30,7 +30,7 @@ use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod config;
-mod errors;
+mod error;
 mod proxy;
 mod verifier;
 
