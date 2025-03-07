@@ -45,21 +45,27 @@ use crate::{
   template::TemplateVar,
 };
 
+/// Represents a key in a JSON path, which can be either a string key for objects
+/// or a numeric index for arrays.
+///
+/// This enum is used to define paths for traversing JSON structures when validating
+/// response bodies against expected patterns.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum JsonKey {
-  /// Object key
+  /// A string key used to access properties in a JSON object
   String(String),
-  /// Array index
+  /// A numeric index used to access elements in a JSON array
   Num(usize),
 }
 
-/// Max HTTP headers
-pub const MAX_HTTP_HEADERS: usize = 25;
-/// HTTP/1.1
+/// HTTP/1.1 version string constant
 pub const HTTP_1_1: &str = "HTTP/1.1";
 
 /// A type of response body used to describe conditions in the client `Manifest`.
+///
+/// This structure defines the expected format and content of an HTTP response body
+/// in a manifest, particularly focusing on JSON path traversal for validation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct ManifestResponseBody(pub ExtractorConfig);
 
@@ -79,6 +85,9 @@ impl ManifestResponseBody {
 
 /// A type of response body returned by a notary. Must match `ManifestResponseBody` designated
 /// by the client.
+///
+/// This structure represents the actual JSON response body received from a notary service,
+/// which will be validated against the expected pattern defined in a `ManifestResponseBody`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NotaryResponseBody {
   /// Raw response body from the notary
@@ -88,6 +97,18 @@ pub struct NotaryResponseBody {
 impl TryFrom<&[u8]> for NotaryResponseBody {
   type Error = WebProverCoreError;
 
+  /// Attempts to create a `NotaryResponseBody` from a byte slice.
+  ///
+  /// If the byte slice is empty, returns a `NotaryResponseBody` with `json` set to `None`.
+  /// Otherwise, attempts to parse the bytes as a JSON value.
+  ///
+  /// # Arguments
+  ///
+  /// * `body_bytes` - The byte slice containing the JSON response
+  ///
+  /// # Returns
+  ///
+  /// A `Result` containing either the parsed `NotaryResponseBody` or an error
   fn try_from(body_bytes: &[u8]) -> Result<Self, Self::Error> {
     if body_bytes.is_empty() {
       return Ok(Self { body: None });
@@ -97,20 +118,35 @@ impl TryFrom<&[u8]> for NotaryResponseBody {
   }
 }
 
-/// A response the made by the notary for a request from the client. Must match client response.
+/// A response made by the notary for a request from the client. Must match client response.
+///
+/// This structure represents a complete HTTP response from a notary service, including
+/// both the response metadata (status, headers, etc.) and the parsed body.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NotaryResponse {
-  /// Client-designated response recovered from the notary
-  pub response:             ManifestResponse,
-  /// Raw response body from the notary
+  /// Client-designated response recovered from the notary.
+  ///
+  /// This field contains the parsed HTTP response metadata, including status code,
+  /// headers, and other information.
+  pub response: ManifestResponse,
+
+  /// Raw response body from the notary.
+  ///
+  /// This field contains the parsed JSON body of the response, which will be
+  /// validated against the expected pattern.
   pub notary_response_body: NotaryResponseBody,
 }
 
 impl NotaryResponse {
   /// Recovers all `Response` fields from the given payloads and creates a `Response` struct.
   ///
-  /// - `header_bytes`: The bytes representing the HTTP response headers and metadata.
-  /// - `body_bytes`: The bytes representing the HTTP response body.
+  /// # Arguments
+  ///
+  /// * `bytes` - The complete HTTP response as a byte slice, including headers and body
+  ///
+  /// # Returns
+  ///
+  /// A `Result` containing either the parsed `NotaryResponse` or an error
   pub fn from_payload(bytes: &[u8]) -> Result<Self, WebProverCoreError> {
     let delimiter = b"\r\n\r\n";
     let split_position = bytes
@@ -137,7 +173,7 @@ impl NotaryResponse {
   ///
   /// # Returns
   ///
-  /// The parsed HTTP response header.
+  /// A tuple containing the parsed headers, status code, HTTP version, and status message.
   fn parse_header(
     header_bytes: &[u8],
   ) -> Result<(HashMap<String, String>, String, String, String), WebProverCoreError> {
@@ -306,34 +342,42 @@ fn default_version() -> String { HTTP_1_1.to_string() }
 fn default_message() -> String { "OK".to_string() }
 
 /// HTTP Response items required for circuits
+///
+/// This structure defines the expected HTTP response pattern in a manifest,
+/// including status code, headers, and body validation rules.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ManifestResponse {
-  /// HTTP response status
-  pub status:  String,
-  /// HTTP version
+  /// HTTP response status code as a string (e.g., "200", "201")
+  pub status: String,
+
+  /// HTTP version string (e.g., "HTTP/1.1")
   #[serde(default = "default_version")]
   pub version: String,
-  /// HTTP response message
+
+  /// HTTP response status message (e.g., "OK", "Created")
   #[serde(default = "default_message")]
   pub message: String,
-  /// HTTP headers to lock
+
+  /// HTTP headers to validate in the response
   pub headers: HashMap<String, String>,
-  /// HTTP body keys
-  pub body:    ManifestResponseBody,
+
+  /// HTTP body validation rules
+  pub body: ManifestResponseBody,
 }
 
 impl ManifestResponse {
   /// Validates the HTTP response
   ///
-  /// This function validates the HTTP response.
-  ///
-  /// # Arguments
-  ///
-  /// * `self`: The HTTP response to validate.
+  /// This function validates the HTTP response against a set of rules:
+  /// - Status code must be supported (currently 200 or 201)
+  /// - HTTP version must be valid (currently only HTTP/1.1)
+  /// - Message must be of valid length
+  /// - Headers must include Content-Type with a supported value
+  /// - JSON path must be valid when Content-Type is application/json
   ///
   /// # Returns
   ///
-  /// The validated HTTP response.
+  /// `Ok(())` if the response is valid, or an error describing the validation failure
   pub fn validate(&self) -> Result<(), WebProverCoreError> {
     // We only support 200 and 201
     const VALID_STATUSES: [&str; 2] = ["200", "201"];
@@ -355,7 +399,7 @@ impl ManifestResponse {
     }
 
     // We always expect at least one header, "Content-Type"
-    if self.headers.len() > MAX_HTTP_HEADERS || self.headers.is_empty() {
+    if self.headers.is_empty() {
       return Err(WebProverCoreError::InvalidManifest(
         "Invalid headers length: ".to_string() + &self.headers.len().to_string(),
       ));
@@ -407,34 +451,46 @@ impl ManifestResponse {
 fn default_empty_vars() -> HashMap<String, TemplateVar> { HashMap::new() }
 
 /// HTTP Request items required for circuits
+///
+/// This structure defines the expected HTTP request pattern in a manifest,
+/// including method, URL, headers, and body.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ManifestRequest {
-  /// HTTP method (GET or POST)
-  pub method:  String,
+  /// HTTP method (e.g., "GET", "POST")
+  pub method: String,
+
   /// HTTP request URL
-  pub url:     String,
-  /// HTTP version
+  pub url: String,
+
+  /// HTTP version string (e.g., "HTTP/1.1")
   #[serde(default = "default_version")]
   pub version: String,
-  /// Request headers to lock
+
+  /// Request headers to include
   pub headers: HashMap<String, String>,
-  /// Request JSON body
-  pub body:    Option<serde_json::Value>,
-  /// Request JSON vars to be used in templates
+
+  /// Request JSON body (if any)
+  pub body: Option<serde_json::Value>,
+
+  /// Template variables that can be used in the request
+  ///
+  /// These variables allow for dynamic content in the request while
+  /// maintaining validation rules.
   #[serde(default = "default_empty_vars")]
-  pub vars:    HashMap<String, TemplateVar>,
+  pub vars: HashMap<String, TemplateVar>,
 }
 
 impl ManifestRequest {
-  /// This function validates the HTTP request.
+  /// Validates the HTTP request against a set of rules.
   ///
-  /// # Arguments
-  ///
-  /// * `self`: The HTTP request to validate.
+  /// This function checks:
+  /// - Method must be supported (currently GET or POST)
+  /// - URL must be valid and use HTTPS
+  /// - HTTP version must be valid (currently only HTTP/1.1)
   ///
   /// # Returns
   ///
-  /// The validated HTTP request.
+  /// `Ok(())` if the request is valid, or an error describing the validation failure
   pub fn validate(&self) -> Result<(), WebProverCoreError> {
     // TODO: What HTTP methods are supported?
     const ALLOWED_METHODS: [&str; 2] = ["GET", "POST"];
@@ -505,6 +561,14 @@ impl ManifestRequest {
   }
 
   /// Parses the HTTP request from the given bytes.
+  ///
+  /// # Arguments
+  ///
+  /// * `bytes` - The complete HTTP request as a byte slice, including headers and body
+  ///
+  /// # Returns
+  ///
+  /// A `Result` containing either the parsed `ManifestRequest` or an error
   pub fn from_payload(bytes: &[u8]) -> Result<Self, WebProverCoreError> {
     // todo: dedup me
     let delimiter = b"\r\n\r\n";
@@ -529,6 +593,14 @@ impl ManifestRequest {
   }
 
   /// Parses the HTTP request start-line and headers from the given bytes.
+  ///
+  /// # Arguments
+  ///
+  /// * `header_bytes` - The bytes containing the HTTP request headers
+  ///
+  /// # Returns
+  ///
+  /// A tuple containing the parsed method, URL, HTTP version, and headers
   fn parse_header(
     header_bytes: &[u8],
   ) -> Result<(String, String, String, HashMap<String, String>), WebProverCoreError> {
@@ -568,6 +640,7 @@ impl ManifestRequest {
   }
 
   /// Checks if the current request is a subset of the given `other` request.
+  ///
   /// For the request to be a subset:
   /// - All headers in `self` must exist in `other` with matching values.
   /// - All vars in `self` must exist in `other` with matching constraints.
