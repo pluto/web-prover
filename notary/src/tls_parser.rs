@@ -506,7 +506,7 @@ struct DecryptWrapper {
 impl DecryptWrapper {
   fn decrypt(&mut self, msg: &OpaqueMessage) -> Option<PlainMessage> {
     match self.ciphersuite {
-      SupportedSuites::AesGcm => match self.inner.decrypt_tls13_aes(&msg, self.seq) {
+      SupportedSuites::AesGcm => match self.inner.decrypt_tls13_aes(msg, self.seq) {
         Ok((plain_message, _)) => {
           self.seq += 1;
           Some(plain_message)

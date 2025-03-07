@@ -244,9 +244,8 @@ pub fn create_tee_proof(
   response: &NotaryResponse,
   State(state): State<Arc<SharedState>>,
 ) -> Result<TeeProof, NotaryServerError> {
-  let values = get_legal_notarization_values(manifest, request, response)?;
   // TODO(#543): Use these values in the proof
-  debug!("Extracted values for notarization={:?}", values);
+  let _result = get_legal_notarization_values(manifest, request, response)?;
 
   let manifest_hash = manifest.to_keccak_digest()?;
   let to_sign = VerifyOutput {
@@ -268,14 +267,13 @@ fn get_legal_notarization_values(
   request: &ManifestRequest,
   response: &NotaryResponse,
 ) -> Result<ExtractionValues, NotaryServerError> {
-  // Validate manifest first
-  manifest.validate()?;
+  let result = manifest.validate_with(request, response)?;
 
-  // Check if request matches manifest requirements
-  if !manifest.request.is_subset_of(request) {
-    return Err(NotaryServerError::ManifestRequestMismatch);
+  if !result.is_success() {
+    info!("Manifest validation failed: {:?}", result.errors());
   }
 
-  // Check if response matches manifest and extract values
-  response.match_and_extract(&manifest.response)?.ok_or(NotaryServerError::ManifestResponseMismatch)
+  info!("Extracted values for notarization={:?}", result.values());
+
+  Ok(result.values())
 }
