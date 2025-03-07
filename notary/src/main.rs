@@ -1,8 +1,7 @@
 use std::{
-  collections::HashMap,
   fs,
   io::{self},
-  sync::{Arc, Mutex},
+  sync::Arc,
 };
 
 use axum::{
@@ -37,8 +36,6 @@ mod verifier;
 struct SharedState {
   notary_signing_key: SigningKey,
 }
-
-struct Session {}
 
 /// Main entry point for the notary server application.
 ///
