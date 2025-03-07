@@ -1,0 +1,24 @@
+name: Test
+
+on:
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        crate:
+          - web-prover-notary
+          - web-prover-client
+          - web-prover-core
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-rust-ubuntu
+        with:
+          rust-cache-key: test
+
+      - name: Run tests
+        run: cargo test -p ${{ matrix.crate }}

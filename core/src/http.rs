@@ -703,8 +703,10 @@ pub mod tests {
   macro_rules! request {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
+        // Make clippy happy
+        #[allow(unused_mut) ]
         let mut request = ManifestRequest {
-            method: "GET".to_string(),
+          method: "GET".to_string(),
             url: "https://example.com".to_string(),
             version: "HTTP/1.1".to_string(),
             headers: std::collections::HashMap::from([
