@@ -31,7 +31,7 @@ pub struct NotarizeQuery {
 pub async fn proxy(
   query: Query<NotarizeQuery>,
   State(state): State<Arc<SharedState>>,
-  extract::Json(payload): extract::Json<client::ProxyConfig>,
+  extract::Json(payload): extract::Json<web_prover_client::ProxyConfig>,
 ) -> Result<Json<TeeProof>, NotaryServerError> {
   let session_id = query.session_id.clone();
 

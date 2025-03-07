@@ -27,20 +27,20 @@ jobs:
           rust-cache-key: client_native
 
       - run: |
-          cargo build -p client --release
+          cargo build -p web-prover-client --release
 
       - uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-latest'
         with:
-          name: "client.linux.amd64"
-          path: "target/release/client"
+          name: "web-prover-client.linux.amd64"
+          path: "target/release/web-prover-client"
           retention-days: 7
           if-no-files-found: "error"
 
       - uses: actions/upload-artifact@v4
         if: matrix.os == 'macos-latest'
         with:
-          name: "client.macos.arm64"
-          path: "target/release/client"
+          name: "web-prover-client.macos.arm64"
+          path: "target/release/web-prover-client"
           retention-days: 7
           if-no-files-found: "error"
