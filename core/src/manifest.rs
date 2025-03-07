@@ -1,3 +1,18 @@
+//! # Manifest
+//!
+//! This module defines the core `Manifest` structure that specifies the expected
+//! HTTP request and response patterns for web proofs.
+//!
+//! A manifest serves as a template and validation criteria for HTTP interactions.
+//! It defines:
+//!
+//! - The expected HTTP request (method, URL, headers, body)
+//! - The expected HTTP response (status, headers, body)
+//! - Validation rules for both request and response
+//!
+//! Manifests can be serialized to and deserialized from JSON, and can be hashed
+//! to create a unique identifier.
+
 use derive_more::From;
 use serde::{Deserialize, Serialize};
 use tiny_keccak::{Hasher, Keccak};

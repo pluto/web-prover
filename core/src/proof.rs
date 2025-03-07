@@ -1,3 +1,19 @@
+//! # Proof
+//!
+//! This module defines the data structures used to represent cryptographic proofs
+//! of web interactions.
+//!
+//! A proof consists of:
+//!
+//! - Data about the manifest that was executed
+//! - Cryptographic signatures verifying the execution
+//!
+//! ## Key Components
+//!
+//! - [`TeeProof`]: The top-level proof structure
+//! - [`TeeProofData`]: Contains the data being proven
+//! - [`SignedVerificationReply`]: Contains cryptographic signatures and verification data
+
 use std::convert::TryFrom;
 
 use serde::{Deserialize, Serialize};
