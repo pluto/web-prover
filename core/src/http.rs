@@ -1,17 +1,36 @@
 //! # HTTP Module
 //!
 //! The `http` module provides utilities for handling HTTP-related operations in the proof system.
+//! It defines structures and functions for representing, parsing, and validating HTTP requests
+//! and responses.
 //!
-//! ## Structs
+//! ## Key Components
 //!
-//! - `ResponseBody`: Represents the body of an HTTP response, containing a vector of JSON keys.
-//! - `Response`: Represents an HTTP response, including status, version, message, headers, and
-//!   body.
+//! ### Request Handling
+//!
+//! - [`ManifestRequest`]: Defines the expected HTTP request pattern in a manifest
+//! - [`TemplateVar`]: Defines template variables that can be used in requests
+//!
+//! ### Response Handling
+//!
+//! - [`ManifestResponse`]: Defines the expected HTTP response pattern in a manifest
+//! - [`ManifestResponseBody`]: Represents the body of an expected HTTP response
+//! - [`NotaryResponse`]: Represents an actual HTTP response from a notary service
+//! - [`NotaryResponseBody`]: Represents the body of an actual HTTP response
+//!
+//! ### JSON Path Handling
+//!
+//! - [`JsonKey`]: Represents a key in a JSON path (either a string key or array index)
+//!
+//! ## Constants
+//!
+//! - [`MAX_HTTP_HEADERS`]: Maximum number of HTTP headers allowed
+//! - [`HTTP_1_1`]: HTTP/1.1 version string
 //!
 //! ## Functions
 //!
-//! - `default_version`: Returns the default HTTP version string.
-//! - `default_message`: Returns the default HTTP response message string.
+//! - [`default_version`]: Returns the default HTTP version string
+//! - [`default_message`]: Returns the default HTTP response message string
 
 use std::collections::HashMap;
 
