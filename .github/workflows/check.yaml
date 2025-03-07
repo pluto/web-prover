@@ -1,4 +1,4 @@
-name: Lint
+name: Check
 
 on:
   workflow_call:
@@ -37,6 +37,25 @@ jobs:
 
       - run: cargo fmt --all -- --check
 
+  test:
+      runs-on: ubuntu-latest
+      strategy:
+        fail-fast: false
+        matrix:
+          crate:
+            - web-prover-notary
+            - web-prover-client
+            - web-prover-core
+      steps:
+        - uses: actions/checkout@v4
+
+        - uses: ./.github/actions/setup-rust-ubuntu
+          with:
+            rust-cache-key: test
+
+        - name: Run tests
+          run: cargo test -p ${{ matrix.crate }}
+
   udeps:
     continue-on-error: true
     runs-on: ubuntu-latest
@@ -50,12 +69,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+
       - uses: ./.github/actions/setup-rust-ubuntu
         with:
           rust-cache-key: udeps
 
       - name: Install cargo-udeps
-        run: cargo install cargo-udeps --locked
+        run: cargo binstall --no-confirm cargo-udeps
 
       - name: Check unused dependencies
         run: cargo udeps -p ${{ matrix.crate }}
