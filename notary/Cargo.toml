@@ -4,71 +4,44 @@ version="0.7.0"
 edition="2021"
 build  ="build.rs"
 
-[features]
-default                                      =["tee-dummy-token-generator"]
-tee-dummy-token-generator                    =[]
-tee-google-confidential-space-token-generator=[]
-
 [dependencies]
-tlsn-core  ={ workspace=true }
-tlsn-common={ workspace=true }
-chrono     ={ workspace=true }
-
-client-side-prover={ git="https://github.com/pluto/client-side-prover", rev="8e7eb839e901dcee416179116bb0f9c4f7ae683c" }
-proofs={ workspace=true }
-client={ workspace=true }
-web-prover-core={ workspace=true }
-hyper={ workspace=true, features=["client", "http1", "server"] }
-hyper-util={ workspace=true }
-serde={ workspace=true }
-serde_json={ workspace=true }
-rustls={ version="0.23.11", default-features=false, features=["logging", "tls12", "std", "ring"] }
-tokio={ workspace=true }
-tokio-util={ workspace=true, features=["compat"] }
-tracing={ workspace=true }
+web-prover-core   ={ workspace=true }
+chrono            ={ workspace=true }
+client            ={ workspace=true }
+hyper             ={ workspace=true, features=["client", "http1", "server"] }
+hyper-util        ={ workspace=true }
+serde             ={ workspace=true }
+serde_json        ={ workspace=true }
+rustls            ={ version="0.23.11", default-features=false, features=["logging", "tls12", "std", "ring"] }
+tokio             ={ workspace=true }
+tokio-util        ={ workspace=true, features=["compat"] }
+tracing           ={ workspace=true }
 tracing-subscriber={ workspace=true }
-futures={ workspace=true }
-futures-util="0.3.30"
-tokio-rustls={ workspace=true, features=["ring"] }
-tower-http={ version="0.5.2", features=["cors"] }
-tower-service="0.3.2"
-rustls-pemfile="2.1.2"
-tlsn-verifier={ workspace=true }
-notary-server={ workspace=true }
-tokio-tungstenite={ version="0.23.1", features=["stream"] }
-ws_stream_tungstenite={ git="https://github.com/pluto/ws_stream_tungstenite.git", branch="latest", features=[
-  "tokio",
-] }
-nom="7.0"
+futures           ={ workspace=true }
+futures-util      ="0.3.30"
+tokio-rustls      ={ workspace=true, features=["ring"] }
+tower-http        ={ version="0.5.2", features=["cors"] }
+tower-service     ="0.3.2"
+rustls-pemfile    ="2.1.2"
+nom               ="7.0"
 
 async-trait     ="0.1.67"
 axum            ={ version="0.7", features=["ws", "json"] }
 axum-core       ="0.4"
 eyre            ="0.6.8"
-p256            ="0.13"
 base64          ="0.21.0"
 http            ="1.1"
-sha1            ="0.10"
 config          ="0.14.0"
 clap            ={ workspace=true }
 rustls-acme     ={ version="0.10", default-features=false, features=["ring", "tokio"] }
 tokio-stream    ={ version="0.1", features=["net"] }
 thiserror       ={ workspace=true }
 hex             ="0.4"
-tls-parser      ="0.12.0"
 rs_merkle       ="1.4.2"
 alloy-primitives={ version="0.8.2", features=["k256"] }
-k256            ={ version="0.13.3", features=["ecdsa"] }
+k256            ={ version="0.13.3", features=["ecdsa", "pem"] }
 reqwest         ={ version="0.12", features=["json"] }
 uuid            ={ workspace=true }
-tls-client2     ={ workspace=true }
-
-caratls_ekm_server                          ={ workspace=true }
-caratls_ekm_google_confidential_space_server={ workspace=true }
-web-proof-circuits-witness-generator        ={ workspace=true }
 
 [dev-dependencies]
 tower="0.4.13"
-
-[build-dependencies]
-cargo_metadata="0.19.1"

@@ -13,10 +13,15 @@ use web_prover_core::{
   http::{
     ManifestRequest, ManifestResponse, ManifestResponseBody, NotaryResponse, NotaryResponseBody,
   },
-  proof::TeeProof,
+  manifest::Manifest,
+  proof::{TeeProof, TeeProofData},
 };
 
-use crate::{errors::NotaryServerError, tee::create_tee_proof, SharedState};
+use crate::{
+  errors::NotaryServerError,
+  verifier::{sign_verification, VerifyOutput},
+  SharedState,
+};
 
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
@@ -105,4 +110,45 @@ fn capitalize_header(header: &str) -> String {
     })
     .collect::<Vec<_>>()
     .join("-")
+}
+
+// TODO: Should TeeProof and other proofs be moved to `proofs` crate?
+// Otherwise, adding TeeProof::manifest necessitates extra dependencies on the client
+// Notice that all inputs to this function are from `proofs` crate
+pub fn create_tee_proof(
+  manifest: &Manifest,
+  request: &ManifestRequest,
+  response: &NotaryResponse,
+  State(state): State<Arc<SharedState>>,
+) -> Result<TeeProof, NotaryServerError> {
+  validate_notarization_legal(manifest, request, response)?;
+
+  let manifest_hash = manifest.to_keccak_digest()?;
+  let to_sign = VerifyOutput {
+    // Using manifest hash as a value here since we are not exposing any values extracted
+    // from the request or response
+    value:    format!("0x{}", hex::encode(manifest_hash)),
+    manifest: manifest.clone(),
+  };
+  let signature = sign_verification(to_sign, State(state)).unwrap();
+  let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
+
+  Ok(TeeProof { data, signature })
+}
+
+/// Check if `manifest`, `request`, and `response` all fulfill requirements necessary for
+/// a proof to be created
+fn validate_notarization_legal(
+  manifest: &Manifest,
+  request: &ManifestRequest,
+  response: &NotaryResponse,
+) -> Result<(), NotaryServerError> {
+  manifest.validate()?;
+  if !manifest.request.is_subset_of(request) {
+    return Err(NotaryServerError::ManifestRequestMismatch);
+  }
+  if !response.matches_client_manifest(&manifest.response) {
+    return Err(NotaryServerError::ManifestResponseMismatch);
+  }
+  Ok(())
 }

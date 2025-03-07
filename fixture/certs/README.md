@@ -12,13 +12,8 @@
 ## Notary keys
 
 ```
-openssl ecparam -name secp256k1 -genkey -noout -out origo.ec.key
-openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in origo.ec.key -out origo.key
-rm origo.ec.key
-openssl ec -in origo.key -pubout -out origo.pub
-
-openssl ecparam -name prime256v1 -genkey -noout -out tlsn.ec.key -outform PEM
-openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in tlsn.ec.key -out tlsn.key
-rm tlsn.ec.key
-openssl ec -in tlsn.key -pubout -out tlsn.pub
+openssl ecparam -name secp256k1 -genkey -noout -out notary.ec.key
+openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in notary.ec.key -out notary.key
+rm notary.ec.key
+openssl ec -in notary.key -pubout -out notary.pub
 ```

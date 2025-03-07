@@ -133,7 +133,7 @@ impl TestSetup {
 
       let cmd = Command::new("./target/release/client")
         .arg("--config")
-        .arg("./fixture/client.tee_tcp_local.json")
+        .arg("./fixture/client.proxy.json")
         .env("RUST_LOG", "DEBUG")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -146,7 +146,7 @@ impl TestSetup {
       Command::new("cargo")
         .args(["run", "-p", "client", "--"])
         .arg("--config")
-        .arg(workspace_root.join("fixture/client.tee_tcp_local.json"))
+        .arg(workspace_root.join("fixture/client.proxy.json"))
         .env("RUST_LOG", "DEBUG")
         .current_dir(&workspace_root)
         .stdout(Stdio::piped())

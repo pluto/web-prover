@@ -11,122 +11,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  web-prover-circuits:
-    uses: ./.github/workflows/web-prover-circuits.yaml
 
   lint:
-    needs: ["web-prover-circuits"]
     uses: ./.github/workflows/lint.yaml
-    with:
-      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
   build_notary:
-    needs: ["web-prover-circuits"]
     uses: ./.github/workflows/build_notary.yaml
-    with:
-      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
   build_client_native:
-    needs: ["web-prover-circuits"]
     uses: ./.github/workflows/build_client_native.yaml
-    with:
-      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
-
-  build_client_ios:
-    needs: ["web-prover-circuits"]
-    uses: ./.github/workflows/build_client_ios.yaml
-    with:
-      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
-
-  build_client_wasm:
-    needs: ["web-prover-circuits"]
-    uses: ./.github/workflows/build_client_wasm.yaml
-    with:
-      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
-
-  test_client_wasm_origo:
-    needs: ["web-prover-circuits", "build_client_wasm", "build_notary"]
-    uses: ./.github/workflows/test_client_wasm_origo.yaml
-    with:
-      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
-
-  test_client_wasm_tee:
-    needs: ["web-prover-circuits", "build_client_wasm", "build_notary"]
-    uses: ./.github/workflows/test_client_wasm_tee.yaml
-    with:
-      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
-
-  test_client_wasm_tlsn:
-    needs: ["web-prover-circuits", "build_client_wasm", "build_notary"]
-    uses: ./.github/workflows/test_client_wasm_tlsn.yaml
-    with:
-      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
-
-  test_client_native_tee:
-    needs: ["web-prover-circuits", "build_client_native", "build_notary"]
-    uses: ./.github/workflows/test_client_native_tee.yaml
-    with:
-      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
-
-  test_client_native_origo:
-    needs: ["web-prover-circuits", "build_client_native", "build_notary"]
-    uses: ./.github/workflows/test_client_native_origo.yaml
-    with:
-      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
-
-  test_client_native_tlsn:
-    needs: ["web-prover-circuits", "build_client_native", "build_notary"]
-    uses: ./.github/workflows/test_client_native_tlsn.yaml
-    with:
-      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
-
-  test_proofs:
-    needs: ["web-prover-circuits"]
-    uses: ./.github/workflows/test_proofs.yaml
-    with:
-      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
 
   release:
     if: github.ref == 'refs/heads/main'
     needs:
       - build_notary
-      - build_client_wasm
-      - build_client_ios
-      - test_client_wasm_origo
-      - test_client_native_origo
-      - test_client_native_tlsn
-      # - test_client_native_tee
-      - test_proofs
     uses: ./.github/workflows/release.yaml
 
   deploy_notary_staging:
     if: github.ref == 'refs/heads/main'
     needs:
-      - web-prover-circuits
       - build_notary
-      - test_client_wasm_origo
-      - test_client_wasm_tlsn
-      - test_client_native_tee
-      - test_client_native_origo
-      - test_client_native_tlsn
-      # - test_client_native_tee
-      - test_proofs
     uses: ./.github/workflows/deploy_notary_staging.yaml
-    with:
-      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
     secrets: inherit
 
   deploy_notary_staging_gcs:
     if: github.ref == 'refs/heads/main'
     needs:
-      - web-prover-circuits
       - build_notary
-      - test_client_wasm_origo
-      - test_client_native_origo
-      - test_client_native_tlsn
-      # - test_client_native_tee
-      - test_proofs
     uses: ./.github/workflows/deploy_notary_staging_gcs.yaml
-    with:
-      web-prover-circuits-cache-key: ${{ needs.web-prover-circuits.outputs.cache-key }}
     secrets: inherit

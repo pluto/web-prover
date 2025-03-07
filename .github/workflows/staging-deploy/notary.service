@@ -5,7 +5,6 @@ After=network.target
 [Service]
 User=notary
 Group=notary
-# TODO once web-prover-circuits paths is a config, change this
 WorkingDirectory=/opt/notary/bin
 ExecStart=/opt/notary/bin/notary --config /opt/notary/etc/notary-config.toml
 Restart=always

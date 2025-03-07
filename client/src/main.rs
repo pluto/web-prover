@@ -28,13 +28,11 @@ async fn main() -> Result<(), ClientErrors> {
   tracing_subscriber::fmt().with_max_level(log_level).with_line_number(true).init();
 
   let _ = rustls::crypto::ring::default_provider().install_default();
-
   let config_json = std::fs::read_to_string(args.config)?;
   let mut config: Config = serde_json::from_str(&config_json)?;
   config.set_session_id();
 
-  let proving_params = std::fs::read(proofs::circuits::PROVING_PARAMS_512)?;
-  let proof = client::prover_inner(config, Some(proving_params), None).await?;
+  let proof = client::proxy(config).await?;
   let proof_json = serde_json::to_string_pretty(&proof)?;
   println!("Proving Successful: proof_len={:?}", proof_json.len());
   Ok(())

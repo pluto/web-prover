@@ -15,7 +15,7 @@ use axum::{
 use errors::NotaryServerError;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
-use p256::{ecdsa::SigningKey, elliptic_curve::rand_core, pkcs8::DecodePrivateKey};
+use k256::{ecdsa::SigningKey, elliptic_curve::rand_core, pkcs8::DecodePrivateKey};
 use rustls::{
   pki_types::{CertificateDer, PrivateKeyDer},
   ServerConfig,
@@ -29,30 +29,17 @@ use tower_service::Service;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::origo::OrigoSigningKey;
-
-mod axum_websocket;
 mod config;
 mod errors;
-mod origo;
-mod origo_verifier;
 mod proxy;
-mod tcp;
-mod tee;
-mod tls_parser;
-mod tlsn;
 mod verifier;
-mod websocket_proxy;
 
 struct SharedState {
   notary_signing_key: SigningKey,
-  origo_signing_key:  OrigoSigningKey,
-  tlsn_max_sent_data: usize,
-  tlsn_max_recv_data: usize,
-  origo_sessions:     Arc<Mutex<HashMap<String, tls_parser::Transcript<tls_parser::Raw>>>>,
-  verifier_sessions:  Arc<Mutex<HashMap<String, origo::VerifierInputs>>>,
-  verifier:           origo_verifier::Verifier,
+  sessions:           Arc<Mutex<HashMap<String, Session>>>,
 }
+
+struct Session {}
 
 /// Main entry point for the notary server application.
 ///
@@ -103,23 +90,11 @@ async fn main() -> Result<(), NotaryServerError> {
 
   let shared_state = Arc::new(SharedState {
     notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
-    origo_signing_key:  OrigoSigningKey::load(&c.origo_signing_key),
-    tlsn_max_sent_data: c.tlsn_max_sent_data,
-    tlsn_max_recv_data: c.tlsn_max_recv_data,
-    origo_sessions:     Default::default(),
-    verifier_sessions:  Default::default(),
-    verifier:           origo_verifier::initialize_verifier().unwrap(),
+    sessions:           Default::default(),
   });
 
   let router = Router::new()
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
-    .route("/v1/tlsnotary", get(tlsn::notarize))
-    .route("/v1/tlsnotary/websocket_proxy", get(websocket_proxy::proxy))
-    .route("/v1/tlsnotary/verify", post(tlsn::verify))
-    .route("/v1/origo", get(origo::proxy))
-    .route("/v1/tee", get(tee::proxy))
-    .route("/v1/origo/sign", post(origo::sign))
-    .route("/v1/origo/verify", post(origo::verify))
     .route("/v1/proxy", post(proxy::proxy))
     .route("/v1/meta/keys/:key", get(meta_keys))
     .layer(CorsLayer::permissive())
@@ -385,19 +360,11 @@ async fn meta_keys(
   State(state): State<Arc<SharedState>>,
 ) -> (StatusCode, String) {
   match key.as_str() {
-    "tlsn.pub" => {
+    "notary.pub" => {
       let vkey = state.notary_signing_key.verifying_key();
       let hex = hex::encode(vkey.to_sec1_bytes());
       (StatusCode::OK, hex)
     },
-
-    "origo.pub" => {
-      let vkey = state.origo_signing_key.0.verifying_key();
-
-      let hex = hex::encode(vkey.to_sec1_bytes());
-      (StatusCode::OK, hex)
-    },
-
     _ => (StatusCode::NOT_FOUND, "".to_string()),
   }
 }

@@ -1,4 +1,2 @@
 listen            ="0.0.0.0:443"
-tlsn_max_sent_data=10000
-tlsn_max_recv_data=10000
 acme_email        ="eng@pluto.xyz"
