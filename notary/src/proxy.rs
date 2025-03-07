@@ -18,7 +18,7 @@ use web_prover_core::{
 };
 
 use crate::{
-  errors::NotaryServerError,
+  error::NotaryServerError,
   verifier::{sign_verification, VerifyOutput},
   SharedState,
 };
