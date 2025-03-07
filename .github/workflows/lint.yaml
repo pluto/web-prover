@@ -54,8 +54,11 @@ jobs:
         with:
           rust-cache-key: udeps
 
+      - name: Install cargo-binstall
+        run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-github-release.sh | bash
+
       - name: Install cargo-udeps
-        run: cargo install cargo-udeps --locked
+        run: cargo binstall --no-confirm cargo-udeps
 
       - name: Check unused dependencies
         run: cargo udeps -p ${{ matrix.crate }}
