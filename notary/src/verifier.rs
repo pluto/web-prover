@@ -5,7 +5,7 @@ use rs_merkle::{Hasher, MerkleTree};
 use serde::{Deserialize, Serialize};
 use web_prover_core::{manifest::Manifest, proof::SignedVerificationReply};
 
-use crate::{errors::NotaryServerError, SharedState, State};
+use crate::{error::NotaryServerError, SharedState, State};
 
 #[derive(Clone)]
 struct KeccakHasher;

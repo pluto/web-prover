@@ -1,15 +1,15 @@
 [book]
 authors     =["Pluto"]
+description ="Backend for Web Proofs"
 language    ="en"
 multilingual=false
 src         ="."
 title       ="Web Prover"
-description ="Backend for Web Proofs"
 
 [build]
 build-dir                ="."
-extra-watch-dirs         =[]    # Don't watch any extra directories
 create-missing           =false # Don't create missing files
+extra-watch-dirs         =[]    # Don't watch any extra directories
 use-default-preprocessors=false
 
 [preprocessor.links]
@@ -29,8 +29,8 @@ warning-policy             ="ignore"
 
 [output.html]
 default-theme       ="dark"
-preferred-dark-theme="ayu"
 git-repository-url  ="https://github.com/pluto/web-prover"
+preferred-dark-theme="ayu"
 
 # [output.html.playground]
 # editable=true

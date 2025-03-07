@@ -1,57 +1,100 @@
 //! # HTTP Module
 //!
 //! The `http` module provides utilities for handling HTTP-related operations in the proof system.
+//! It defines structures and functions for representing, parsing, and validating HTTP requests
+//! and responses.
 //!
-//! ## Structs
+//! ## Key Components
 //!
-//! - `ResponseBody`: Represents the body of an HTTP response, containing a vector of JSON keys.
-//! - `Response`: Represents an HTTP response, including status, version, message, headers, and
-//!   body.
+//! ### Request Handling
+//!
+//! - [`ManifestRequest`]: Defines the expected HTTP request pattern in a manifest
+//! - [`TemplateVar`]: Defines template variables that can be used in requests
+//!
+//! ### Response Handling
+//!
+//! - [`ManifestResponse`]: Defines the expected HTTP response pattern in a manifest
+//! - [`ManifestResponseBody`]: Represents the body of an expected HTTP response
+//! - [`NotaryResponse`]: Represents an actual HTTP response from a notary service
+//! - [`NotaryResponseBody`]: Represents the body of an actual HTTP response
+//!
+//! ### JSON Path Handling
+//!
+//! - [`JsonKey`]: Represents a key in a JSON path (either a string key or array index)
+//!
+//! ## Constants
+//!
+//! - [`MAX_HTTP_HEADERS`]: Maximum number of HTTP headers allowed
+//! - [`HTTP_1_1`]: HTTP/1.1 version string
 //!
 //! ## Functions
 //!
-//! - `default_version`: Returns the default HTTP version string.
-//! - `default_message`: Returns the default HTTP response message string.
+//! - [`default_version`]: Returns the default HTTP version string
+//! - [`default_message`]: Returns the default HTTP response message string
 
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
+/// Represents a key in a JSON path, which can be either a string key for objects
+/// or a numeric index for arrays.
+///
+/// This enum is used to define paths for traversing JSON structures when validating
+/// response bodies against expected patterns.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum JsonKey {
-  /// Object key
+  /// A string key used to access properties in a JSON object
   String(String),
-  /// Array index
+  /// A numeric index used to access elements in a JSON array
   Num(usize),
 }
 
-use crate::errors::ManifestError;
+use crate::error::WebProverCoreError;
 
-/// Max HTTP headers
+/// Maximum number of HTTP headers allowed in a request or response
 pub const MAX_HTTP_HEADERS: usize = 25;
-/// HTTP/1.1
+/// HTTP/1.1 version string constant
 pub const HTTP_1_1: &str = "HTTP/1.1";
 
 /// A type of response body used to describe conditions in the client `Manifest`.
+///
+/// This structure defines the expected format and content of an HTTP response body
+/// in a manifest, particularly focusing on JSON path traversal for validation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct ManifestResponseBody {
-  /// JSON Path containing expected traversal keys and expected value
+  /// JSON Path containing expected traversal keys and expected value.
+  ///
+  /// This vector defines a path through a JSON structure that should be present
+  /// in the response. Each element in the vector represents a key or index in the
+  /// path, with the last element typically being the expected value.
   #[serde(rename = "json")] // TODO: Remove after migrating to a JSON DSL
   pub json_path: Vec<JsonKey>,
 }
 
 impl TryFrom<&[u8]> for ManifestResponseBody {
-  type Error = ManifestError;
+  type Error = WebProverCoreError;
 
+  /// Attempts to create a `ManifestResponseBody` from a byte slice.
+  ///
+  /// If the byte slice is empty, returns a default `ManifestResponseBody` with an empty path.
+  /// Otherwise, attempts to parse the bytes as a JSON array of `JsonKey` elements.
+  ///
+  /// # Arguments
+  ///
+  /// * `body_bytes` - The byte slice containing the JSON representation of the path
+  ///
+  /// # Returns
+  ///
+  /// A `Result` containing either the parsed `ManifestResponseBody` or an error
   fn try_from(body_bytes: &[u8]) -> Result<Self, Self::Error> {
     if body_bytes.is_empty() {
       return Ok(Self { json_path: vec![] });
     }
     // Attempt to parse the body as JSON path.
     let json_path: Vec<JsonKey> = serde_json::from_slice(body_bytes).map_err(|_| {
-      ManifestError::InvalidManifest("Failed to parse body as valid JSON".to_string())
+      WebProverCoreError::InvalidManifest("Failed to parse body as valid JSON".to_string())
     })?;
     Ok(Self { json_path })
   }
@@ -59,22 +102,40 @@ impl TryFrom<&[u8]> for ManifestResponseBody {
 
 /// A type of response body returned by a notary. Must match `ManifestResponseBody` designated
 /// by the client.
+///
+/// This structure represents the actual JSON response body received from a notary service,
+/// which will be validated against the expected pattern defined in a `ManifestResponseBody`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NotaryResponseBody {
   /// Raw JSON value returned by a notary.
+  ///
+  /// This field contains the parsed JSON response from the notary service.
+  /// It is `None` if the response body was empty or could not be parsed as JSON.
   pub json: Option<serde_json::Value>,
 }
 
 impl TryFrom<&[u8]> for NotaryResponseBody {
-  type Error = ManifestError;
+  type Error = WebProverCoreError;
 
+  /// Attempts to create a `NotaryResponseBody` from a byte slice.
+  ///
+  /// If the byte slice is empty, returns a `NotaryResponseBody` with `json` set to `None`.
+  /// Otherwise, attempts to parse the bytes as a JSON value.
+  ///
+  /// # Arguments
+  ///
+  /// * `body_bytes` - The byte slice containing the JSON response
+  ///
+  /// # Returns
+  ///
+  /// A `Result` containing either the parsed `NotaryResponseBody` or an error
   fn try_from(body_bytes: &[u8]) -> Result<Self, Self::Error> {
     if body_bytes.is_empty() {
       return Ok(Self { json: None });
     }
     // Attempt to parse the body as JSON.
     let json: serde_json::Value = serde_json::from_slice(body_bytes).map_err(|_| {
-      ManifestError::InvalidManifest("Failed to parse body as valid JSON".to_string())
+      WebProverCoreError::InvalidManifest("Failed to parse body as valid JSON".to_string())
     })?;
     Ok(Self { json: Some(json) })
   }
@@ -91,6 +152,14 @@ impl NotaryResponseBody {
   ///
   /// The function traverses the JSON step-by-step, returning `true` if all keys match,
   /// or `false` otherwise.
+  ///
+  /// # Arguments
+  ///
+  /// * `json_path` - A slice of `JsonKey` elements defining the expected path
+  ///
+  /// # Returns
+  ///
+  /// `true` if the JSON response matches the expected path, `false` otherwise
   fn matches_path(&self, json_path: &[JsonKey]) -> bool {
     if json_path.is_empty() {
       debug!("Invalid json_path: Path is empty");
@@ -145,6 +214,17 @@ impl NotaryResponseBody {
     false
   }
 
+  /// Handles validation for string keys in the JSON path.
+  ///
+  /// # Arguments
+  ///
+  /// * `current` - The current JSON value being examined
+  /// * `expected` - The expected string key or value
+  /// * `is_last` - Whether this is the last element in the path
+  ///
+  /// # Returns
+  ///
+  /// `true` if the key exists or the value matches (if last), `false` otherwise
   fn handle_string_key(&self, current: &serde_json::Value, expected: &str, is_last: bool) -> bool {
     match current {
       serde_json::Value::String(actual) => is_last && actual == expected,
@@ -156,6 +236,17 @@ impl NotaryResponseBody {
     }
   }
 
+  /// Handles validation for numeric keys in the JSON path.
+  ///
+  /// # Arguments
+  ///
+  /// * `current` - The current JSON value being examined
+  /// * `expected` - The expected array index or numeric value
+  /// * `is_last` - Whether this is the last element in the path
+  ///
+  /// # Returns
+  ///
+  /// `true` if the index exists or the value matches (if last), `false` otherwise
   fn handle_numeric_key(
     &self,
     current: &serde_json::Value,
@@ -187,26 +278,41 @@ impl NotaryResponseBody {
   }
 }
 
-/// A response the made by the notary for a request from the client. Must match client response.
+/// A response made by the notary for a request from the client. Must match client response.
+///
+/// This structure represents a complete HTTP response from a notary service, including
+/// both the response metadata (status, headers, etc.) and the parsed body.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NotaryResponse {
-  /// Client-designated response recovered from the notary
-  pub response:             ManifestResponse,
-  /// Raw response body from the notary
+  /// Client-designated response recovered from the notary.
+  ///
+  /// This field contains the parsed HTTP response metadata, including status code,
+  /// headers, and other information.
+  pub response: ManifestResponse,
+
+  /// Raw response body from the notary.
+  ///
+  /// This field contains the parsed JSON body of the response, which will be
+  /// validated against the expected pattern.
   pub notary_response_body: NotaryResponseBody,
 }
 
 impl NotaryResponse {
   /// Recovers all `Response` fields from the given payloads and creates a `Response` struct.
   ///
-  /// - `header_bytes`: The bytes representing the HTTP response headers and metadata.
-  /// - `body_bytes`: The bytes representing the HTTP response body.
-  pub fn from_payload(bytes: &[u8]) -> Result<Self, ManifestError> {
+  /// # Arguments
+  ///
+  /// * `bytes` - The complete HTTP response as a byte slice, including headers and body
+  ///
+  /// # Returns
+  ///
+  /// A `Result` containing either the parsed `NotaryResponse` or an error
+  pub fn from_payload(bytes: &[u8]) -> Result<Self, WebProverCoreError> {
     let delimiter = b"\r\n\r\n";
     let split_position = bytes
       .windows(delimiter.len())
       .position(|window| window == delimiter)
-      .ok_or_else(|| ManifestError::InvalidManifest("Invalid HTTP format".to_string()))?;
+      .ok_or_else(|| WebProverCoreError::InvalidManifest("Invalid HTTP format".to_string()))?;
 
     let (header_bytes, rest) = bytes.split_at(split_position);
     let body_bytes = &rest[delimiter.len()..];
@@ -227,12 +333,12 @@ impl NotaryResponse {
   ///
   /// # Returns
   ///
-  /// The parsed HTTP response header.
+  /// A tuple containing the parsed headers, status code, HTTP version, and status message.
   fn parse_header(
     header_bytes: &[u8],
-  ) -> Result<(HashMap<String, String>, String, String, String), ManifestError> {
+  ) -> Result<(HashMap<String, String>, String, String, String), WebProverCoreError> {
     let headers_str = std::str::from_utf8(header_bytes).map_err(|_| {
-      ManifestError::InvalidManifest("Failed to interpret headers as valid UTF-8".to_string())
+      WebProverCoreError::InvalidManifest("Failed to interpret headers as valid UTF-8".to_string())
     })?;
     let mut headers = HashMap::new();
     let mut status = String::new();
@@ -247,7 +353,7 @@ impl NotaryResponse {
         // Process the first line as the HTTP response start-line
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() < 3 {
-          return Err(ManifestError::InvalidManifest(
+          return Err(WebProverCoreError::InvalidManifest(
             "Invalid HTTP response start-line".to_string(),
           ));
         }
@@ -259,15 +365,26 @@ impl NotaryResponse {
         if let Some((key, value)) = line.split_once(": ") {
           headers.insert(key.to_string(), value.to_string());
         } else {
-          return Err(ManifestError::InvalidManifest(format!("Invalid header line: {}", line)));
+          return Err(WebProverCoreError::InvalidManifest(format!(
+            "Invalid header line: {}",
+            line
+          )));
         }
       }
     }
     Ok((headers, status, version, message))
   }
 
-  /// Tests matching between notary response, `self`,  and client-designated response, `other`.
+  /// Tests matching between notary response, `self`, and client-designated response, `other`.
   /// Returns true if at least all values in `other` are also present in `self`.
+  ///
+  /// # Arguments
+  ///
+  /// * `other` - The client-designated response to match against
+  ///
+  /// # Returns
+  ///
+  /// `true` if the notary response matches the client manifest, `false` otherwise
   pub fn matches_client_manifest(&self, other: &ManifestResponse) -> bool {
     if self.response.status != other.status
       || self.response.version != other.version
@@ -309,53 +426,62 @@ impl NotaryResponse {
   }
 }
 
-/// Default HTTP version
+/// Returns the default HTTP version string (HTTP/1.1)
 pub fn default_version() -> String { HTTP_1_1.to_string() }
-/// Default HTTP message
+
+/// Returns the default HTTP response message string ("OK")
 pub fn default_message() -> String { "OK".to_string() }
 
 /// Returns an empty `HashMap` as the default value for `vars`
 fn default_empty_vars() -> HashMap<String, TemplateVar> { HashMap::new() }
 
 /// HTTP Response items required for circuits
+///
+/// This structure defines the expected HTTP response pattern in a manifest,
+/// including status code, headers, and body validation rules.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ManifestResponse {
-  /// HTTP response status
-  pub status:  String,
-  /// HTTP version
+  /// HTTP response status code as a string (e.g., "200", "201")
+  pub status: String,
+
+  /// HTTP version string (e.g., "HTTP/1.1")
   #[serde(default = "default_version")]
   pub version: String,
-  /// HTTP response message
+
+  /// HTTP response status message (e.g., "OK", "Created")
   #[serde(default = "default_message")]
   pub message: String,
-  /// HTTP headers to lock
+
+  /// HTTP headers to validate in the response
   pub headers: HashMap<String, String>,
-  /// HTTP body keys
-  pub body:    ManifestResponseBody,
+
+  /// HTTP body validation rules
+  pub body: ManifestResponseBody,
 }
 
 impl ManifestResponse {
   /// Validates the HTTP response
   ///
-  /// This function validates the HTTP response.
-  ///
-  /// # Arguments
-  ///
-  /// * `self`: The HTTP response to validate.
+  /// This function validates the HTTP response against a set of rules:
+  /// - Status code must be supported (currently 200 or 201)
+  /// - HTTP version must be valid (currently only HTTP/1.1)
+  /// - Message must be of valid length
+  /// - Headers must include Content-Type with a supported value
+  /// - JSON path must be valid when Content-Type is application/json
   ///
   /// # Returns
   ///
-  /// The validated HTTP response.
-  pub fn validate(&self) -> Result<(), ManifestError> {
+  /// `Ok(())` if the response is valid, or an error describing the validation failure
+  pub fn validate(&self) -> Result<(), WebProverCoreError> {
     // TODO: What are legal statuses?
     const VALID_STATUSES: [&str; 2] = ["200", "201"];
     if !VALID_STATUSES.contains(&self.status.as_str()) {
-      return Err(ManifestError::InvalidManifest("Unsupported HTTP status".to_string()));
+      return Err(WebProverCoreError::InvalidManifest("Unsupported HTTP status".to_string()));
     }
 
     // TODO: What HTTP versions are supported?
     if self.version != "HTTP/1.1" {
-      return Err(ManifestError::InvalidManifest(
+      return Err(WebProverCoreError::InvalidManifest(
         "Invalid HTTP version: ".to_string() + &self.version,
       ));
     }
@@ -363,14 +489,14 @@ impl ManifestResponse {
     // TODO: What is the max supported message length?
     // TODO: Not covered by serde's #default annotation. Is '""' a valid message?
     if self.message.len() > 1024 || self.message.is_empty() {
-      return Err(ManifestError::InvalidManifest(
+      return Err(WebProverCoreError::InvalidManifest(
         "Invalid message length: ".to_string() + &self.message,
       ));
     }
 
     // We always expect at least one header, "Content-Type"
     if self.headers.len() > MAX_HTTP_HEADERS || self.headers.is_empty() {
-      return Err(ManifestError::InvalidManifest(
+      return Err(WebProverCoreError::InvalidManifest(
         "Invalid headers length: ".to_string() + &self.headers.len().to_string(),
       ));
     }
@@ -378,7 +504,7 @@ impl ManifestResponse {
     let content_type =
       self.headers.get("Content-Type").or_else(|| self.headers.get("content-type"));
     if content_type.is_none() {
-      return Err(ManifestError::InvalidManifest("Missing 'Content-Type' header".to_string()));
+      return Err(WebProverCoreError::InvalidManifest("Missing 'Content-Type' header".to_string()));
     }
     let content_type = content_type.unwrap();
 
@@ -387,19 +513,21 @@ impl ManifestResponse {
       content_type == legal_type || content_type.starts_with(&format!("{};", legal_type))
     });
     if !is_valid_content_type {
-      return Err(ManifestError::InvalidManifest(
+      return Err(WebProverCoreError::InvalidManifest(
         "Invalid Content-Type header: ".to_string() + content_type,
       ));
     }
 
     // When Content-Type is application/json, we expect at least one JSON item
     if content_type == "application/json" && self.body.json_path.is_empty() {
-      return Err(ManifestError::InvalidManifest("Expected at least one JSON item".to_string()));
+      return Err(WebProverCoreError::InvalidManifest(
+        "Expected at least one JSON item".to_string(),
+      ));
     }
 
     const MAX_JSON_PATH_LENGTH: usize = 100;
     if self.body.json_path.len() > MAX_JSON_PATH_LENGTH {
-      return Err(ManifestError::InvalidManifest(
+      return Err(WebProverCoreError::InvalidManifest(
         "Invalid JSON path length: ".to_string() + &self.body.json_path.len().to_string(),
       ));
     }
@@ -409,64 +537,87 @@ impl ManifestResponse {
 }
 
 /// Template variable type
+///
+/// This structure defines constraints for template variables that can be used
+/// in HTTP requests, allowing for dynamic content with validation rules.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TemplateVar {
-  /// Regex for validation (if applicable)
-  pub regex:  Option<String>,
-  /// Length constraint (if applicable)
+  /// Regular expression pattern for validating the variable value
+  ///
+  /// If provided, the value of the variable must match this regex pattern.
+  pub regex: Option<String>,
+
+  /// Required length of the variable value
+  ///
+  /// If provided, the value of the variable must be exactly this length.
   pub length: Option<usize>,
-  /// Type constraint (e.g., base64, hex)
+
+  /// Type constraint for the variable
+  ///
+  /// If provided, specifies the expected format of the variable (e.g., "base64", "hex").
   pub r#type: Option<String>,
 }
 
 /// HTTP Request items required for circuits
+///
+/// This structure defines the expected HTTP request pattern in a manifest,
+/// including method, URL, headers, and body.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ManifestRequest {
-  /// HTTP method (GET or POST)
-  pub method:  String,
+  /// HTTP method (e.g., "GET", "POST")
+  pub method: String,
+
   /// HTTP request URL
-  pub url:     String,
-  /// HTTP version
+  pub url: String,
+
+  /// HTTP version string (e.g., "HTTP/1.1")
   #[serde(default = "default_version")]
   pub version: String,
-  /// Request headers to lock
+
+  /// Request headers to include
   pub headers: HashMap<String, String>,
-  /// Request JSON body
-  pub body:    Option<serde_json::Value>,
-  /// Request JSON vars to be used in templates
+
+  /// Request JSON body (if any)
+  pub body: Option<serde_json::Value>,
+
+  /// Template variables that can be used in the request
+  ///
+  /// These variables allow for dynamic content in the request while
+  /// maintaining validation rules.
   #[serde(default = "default_empty_vars")]
-  pub vars:    HashMap<String, TemplateVar>,
+  pub vars: HashMap<String, TemplateVar>,
 }
 
 impl ManifestRequest {
-  /// This function validates the HTTP request.
+  /// Validates the HTTP request against a set of rules.
   ///
-  /// # Arguments
-  ///
-  /// * `self`: The HTTP request to validate.
+  /// This function checks:
+  /// - Method must be supported (currently GET or POST)
+  /// - URL must be valid and use HTTPS
+  /// - HTTP version must be valid (currently only HTTP/1.1)
   ///
   /// # Returns
   ///
-  /// The validated HTTP request.
-  pub fn validate(&self) -> Result<(), ManifestError> {
+  /// `Ok(())` if the request is valid, or an error describing the validation failure
+  pub fn validate(&self) -> Result<(), WebProverCoreError> {
     // TODO: What HTTP methods are supported?
     const ALLOWED_METHODS: [&str; 2] = ["GET", "POST"];
     if !ALLOWED_METHODS.contains(&self.method.as_str()) {
-      return Err(ManifestError::InvalidManifest("Invalid HTTP method".to_string()));
+      return Err(WebProverCoreError::InvalidManifest("Invalid HTTP method".to_string()));
     }
 
     // Not a valid URL
     if url::Url::parse(&self.url).is_err() {
-      return Err(ManifestError::InvalidManifest("Invalid URL: ".to_string() + &self.url));
+      return Err(WebProverCoreError::InvalidManifest("Invalid URL: ".to_string() + &self.url));
     }
 
     if !self.url.starts_with("https://") {
-      return Err(ManifestError::InvalidManifest("Only HTTPS URLs are allowed".to_string()));
+      return Err(WebProverCoreError::InvalidManifest("Only HTTPS URLs are allowed".to_string()));
     }
 
     // TODO: What HTTP versions are supported?
     if self.version != "HTTP/1.1" {
-      return Err(ManifestError::InvalidManifest(
+      return Err(WebProverCoreError::InvalidManifest(
         "Invalid HTTP version: ".to_string() + &self.version,
       ));
     }
@@ -474,16 +625,29 @@ impl ManifestRequest {
     Ok(())
   }
 
-  fn validate_vars(&self) -> Result<(), ManifestError> {
+  // TODO (autoparallel): This function is not used anywhere at the moment, but i did not want to
+  // delete it.
+
+  /// Validates template variables in the request.
+  ///
+  /// This function performs comprehensive validation of template variables:
+  /// 1. Ensures all tokens used in the body and headers are declared in `vars`
+  /// 2. Ensures all variables declared in `vars` are actually used in the request
+  /// 3. Validates each variable against its constraints (regex, length, type)
+  ///
+  /// # Returns
+  ///
+  /// `Ok(())` if all variables are valid, or an error describing the validation failure
+  #[allow(unused)]
+  fn validate_vars(&self) -> Result<(), WebProverCoreError> {
     let mut all_tokens = vec![];
 
     // Parse and validate tokens in the body
     if let Some(body_tokens) = self.body.as_ref().map(extract_tokens) {
       for token in &body_tokens {
         if !self.vars.contains_key(token) {
-          return Err(ManifestError::InvalidManifest(format!(
-            "Token `<% {} %>` not declared in `vars`",
-            token
+          return Err(WebProverCoreError::InvalidManifest(format!(
+            "Token `<% {token} %>` not declared in `vars`",
           )));
         }
       }
@@ -495,7 +659,7 @@ impl ManifestRequest {
       let header_tokens = extract_tokens(&serde_json::Value::String(value.clone()));
       for token in &header_tokens {
         if !self.vars.contains_key(token) {
-          return Err(ManifestError::InvalidManifest(format!(
+          return Err(WebProverCoreError::InvalidManifest(format!(
             "Token `<% {} %>` not declared in `vars`",
             token
           )));
@@ -504,22 +668,23 @@ impl ManifestRequest {
       all_tokens.extend(header_tokens);
     }
 
+    // Ensure all declared variables are actually used somewhere in the request
     for var_key in self.vars.keys() {
       if !all_tokens.contains(var_key) {
-        return Err(ManifestError::InvalidManifest(format!(
+        return Err(WebProverCoreError::InvalidManifest(format!(
           "Token `<% {} %>` not declared in `body` or `headers`",
           var_key
         )));
       }
     }
 
-    // Validate each `vars` entry
+    // Validate each `vars` entry against its constraints
     for (key, var_def) in &self.vars {
-      // Validate regex (if defined)
+      // Validate regex pattern (if defined)
       if let Some(regex_pattern) = var_def.regex.as_ref() {
         // Using `regress` crate for compatibility with ECMAScript regular expressions
         let _regex = regress::Regex::new(regex_pattern).map_err(|_| {
-          ManifestError::InvalidManifest(format!("Invalid regex pattern for `{}`", key))
+          WebProverCoreError::InvalidManifest(format!("Invalid regex pattern for `{}`", key))
         })?;
         // TODO: It will definitely not match it here because it's a template variable, not an
         // actual variable
@@ -534,11 +699,11 @@ impl ManifestRequest {
         // }
       }
 
-      // Validate length (if applicable)
+      // Validate length constraint (if applicable)
       if let Some(length) = var_def.length {
         if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
           if value.as_str().unwrap_or("").len() != length {
-            return Err(ManifestError::InvalidManifest(format!(
+            return Err(WebProverCoreError::InvalidManifest(format!(
               "Value for token `<% {} %>` does not meet length constraint",
               key
             )));
@@ -546,19 +711,27 @@ impl ManifestRequest {
         }
       }
 
-      // TODO: Validate the token "type" constraint
+      // TODO: Validate the token "type" constraint (e.g., base64, hex)
     }
     Ok(())
   }
 
   /// Parses the HTTP request from the given bytes.
-  pub fn from_payload(bytes: &[u8]) -> Result<Self, ManifestError> {
+  ///
+  /// # Arguments
+  ///
+  /// * `bytes` - The complete HTTP request as a byte slice, including headers and body
+  ///
+  /// # Returns
+  ///
+  /// A `Result` containing either the parsed `ManifestRequest` or an error
+  pub fn from_payload(bytes: &[u8]) -> Result<Self, WebProverCoreError> {
     // todo: dedup me
     let delimiter = b"\r\n\r\n";
     let split_position = bytes
       .windows(delimiter.len())
       .position(|window| window == delimiter)
-      .ok_or_else(|| ManifestError::InvalidManifest("Invalid HTTP format".to_string()))?;
+      .ok_or_else(|| WebProverCoreError::InvalidManifest("Invalid HTTP format".to_string()))?;
 
     let (header_bytes, rest) = bytes.split_at(split_position);
     let body_bytes = &rest[delimiter.len()..];
@@ -567,7 +740,7 @@ impl ManifestRequest {
 
     let body = if !body_bytes.is_empty() {
       serde_json::from_slice(body_bytes)
-        .map_err(|_| ManifestError::InvalidManifest("Invalid body bytes".to_string()))?
+        .map_err(|_| WebProverCoreError::InvalidManifest("Invalid body bytes".to_string()))?
     } else {
       None
     };
@@ -576,21 +749,31 @@ impl ManifestRequest {
   }
 
   /// Parses the HTTP request start-line and headers from the given bytes.
+  ///
+  /// # Arguments
+  ///
+  /// * `header_bytes` - The bytes containing the HTTP request headers
+  ///
+  /// # Returns
+  ///
+  /// A tuple containing the parsed method, URL, HTTP version, and headers
   fn parse_header(
     header_bytes: &[u8],
-  ) -> Result<(String, String, String, HashMap<String, String>), ManifestError> {
+  ) -> Result<(String, String, String, HashMap<String, String>), WebProverCoreError> {
     let header_str = std::str::from_utf8(header_bytes).map_err(|_| {
-      ManifestError::InvalidManifest("Failed to interpret headers as valid UTF-8".to_string())
+      WebProverCoreError::InvalidManifest("Failed to interpret headers as valid UTF-8".to_string())
     })?;
     let mut lines = header_str.lines();
 
     let start_line = lines.next().ok_or_else(|| {
-      ManifestError::InvalidManifest("Missing start-line in the HTTP request.".to_string())
+      WebProverCoreError::InvalidManifest("Missing start-line in the HTTP request.".to_string())
     })?;
 
     let parts: Vec<&str> = start_line.split_whitespace().collect();
     if parts.len() < 3 {
-      return Err(ManifestError::InvalidManifest("Invalid HTTP request start-line.".to_string()));
+      return Err(WebProverCoreError::InvalidManifest(
+        "Invalid HTTP request start-line.".to_string(),
+      ));
     }
 
     let method = parts[0].to_string();
@@ -605,7 +788,7 @@ impl ManifestRequest {
       if let Some((key, value)) = line.split_once(": ") {
         headers.insert(key.to_string(), value.to_string());
       } else {
-        return Err(ManifestError::InvalidManifest(format!("Invalid header line: {}", line)));
+        return Err(WebProverCoreError::InvalidManifest(format!("Invalid header line: {}", line)));
       }
     }
 
@@ -613,10 +796,22 @@ impl ManifestRequest {
   }
 
   /// Checks if the current request is a subset of the given `other` request.
+  ///
   /// For the request to be a subset:
   /// - All headers in `self` must exist in `other` with matching values.
   /// - All vars in `self` must exist in `other` with matching constraints.
   /// - All remaining fields like `method`, `url`, and `body` must also match.
+  ///
+  /// This function is useful for determining if a request satisfies the requirements
+  /// specified in another request template.
+  ///
+  /// # Arguments
+  ///
+  /// * `other` - The request to check against
+  ///
+  /// # Returns
+  ///
+  /// `true` if this request is a subset of the other request, `false` otherwise
   pub fn is_subset_of(&self, other: &ManifestRequest) -> bool {
     // Check if all headers in `self` exist in `other` with the same value
     for (key, value) in &self.headers {
@@ -648,11 +843,24 @@ impl ManifestRequest {
   }
 }
 
+/// Extracts template variable tokens from a JSON value.
+///
+/// This function recursively searches through a JSON value (string, object, or array)
+/// to find all template variable tokens in the format `<% token_name %>`.
+///
+/// # Arguments
+///
+/// * `value` - The JSON value to search for tokens
+///
+/// # Returns
+///
+/// A vector of strings containing the extracted token names (without the `<% %>` delimiters)
 fn extract_tokens(value: &serde_json::Value) -> Vec<String> {
   let mut tokens = vec![];
 
   match value {
     serde_json::Value::String(s) => {
+      // For string values, use regex to find all tokens in the format <% token_name %>
       let token_regex = regex::Regex::new(r"<%\s*(\w+)\s*%>").unwrap();
       for capture in token_regex.captures_iter(s) {
         if let Some(token) = capture.get(1) {
@@ -673,7 +881,7 @@ fn extract_tokens(value: &serde_json::Value) -> Vec<String> {
         tokens.extend(extract_tokens(v));
       }
     },
-    _ => {},
+    _ => {}, // Ignore other JSON value types (numbers, booleans, null)
   }
 
   tokens
@@ -693,8 +901,10 @@ pub mod tests {
   macro_rules! request {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
+        // Make clippy happy
+        #[allow(unused_mut) ]
         let mut request = ManifestRequest {
-            method: "GET".to_string(),
+          method: "GET".to_string(),
             url: "https://example.com".to_string(),
             version: "HTTP/1.1".to_string(),
             headers: std::collections::HashMap::from([
@@ -846,7 +1056,7 @@ pub mod tests {
     let result = NotaryResponse::from_payload(&[header_bytes, invalid_body_bytes].concat());
     assert!(result.is_err());
 
-    if let Err(ManifestError::InvalidManifest(msg)) = result {
+    if let Err(WebProverCoreError::InvalidManifest(msg)) = result {
       assert!(msg.contains("Failed to parse body as valid JSON"));
     } else {
       panic!("Expected an invalid manifest error for body parsing");
@@ -864,7 +1074,7 @@ pub mod tests {
     assert!(result.is_err());
 
     match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
+      Err(WebProverCoreError::InvalidManifest(msg)) => {
         assert!(msg.contains("Unsupported HTTP status"));
       },
       _ => panic!("Expected invalid manifest error for unsupported HTTP status"),
@@ -879,7 +1089,7 @@ pub mod tests {
     let result = invalid_response.validate();
     assert!(result.is_err());
 
-    if let Err(ManifestError::InvalidManifest(msg)) = result {
+    if let Err(WebProverCoreError::InvalidManifest(msg)) = result {
       assert!(msg.contains("Invalid message length"));
     } else {
       panic!("Expected invalid manifest error for empty message");
@@ -966,7 +1176,7 @@ pub mod tests {
     assert!(result.is_err());
 
     match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
+      Err(WebProverCoreError::InvalidManifest(msg)) => {
         assert!(msg.contains("Failed to interpret headers as valid UTF-8"));
       },
       _ => panic!("Expected invalid UTF-8 headers error"),
@@ -982,7 +1192,7 @@ pub mod tests {
     assert!(result.is_err());
 
     match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
+      Err(WebProverCoreError::InvalidManifest(msg)) => {
         assert!(msg.contains("Invalid HTTP request start-line"));
       },
       _ => panic!("Expected invalid start-line error"),
@@ -999,7 +1209,7 @@ pub mod tests {
     let result = request.validate();
     assert!(result.is_err());
     match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
+      Err(WebProverCoreError::InvalidManifest(msg)) => {
         assert!(msg.contains("Only HTTPS URLs are allowed"));
       },
       _ => panic!("Expected error for non-HTTPS URL"),
@@ -1026,7 +1236,7 @@ pub mod tests {
     assert!(result.is_err());
 
     match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
+      Err(WebProverCoreError::InvalidManifest(msg)) => {
         assert!(msg.contains("Invalid body bytes"));
       },
       _ => panic!("Expected invalid body parsing error"),
@@ -1046,7 +1256,7 @@ pub mod tests {
     assert!(result.is_err());
 
     match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
+      Err(WebProverCoreError::InvalidManifest(msg)) => {
         assert!(msg.contains("Token `<% missing_token %>` not declared in `vars`"));
       },
       _ => panic!("Expected missing token error"),

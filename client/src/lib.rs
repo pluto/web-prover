@@ -1,6 +1,6 @@
 extern crate core;
 pub mod config;
-pub mod errors;
+pub mod error;
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ use web_prover_core::{
   proof::{SignedVerificationReply, TeeProof},
 };
 
-use crate::errors::ClientErrors;
+use crate::error::WebProverClientError;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProxyConfig {
@@ -21,7 +21,7 @@ pub struct ProxyConfig {
   pub manifest:       Manifest,
 }
 
-pub async fn proxy(config: config::Config) -> Result<TeeProof, ClientErrors> {
+pub async fn proxy(config: config::Config) -> Result<TeeProof, WebProverClientError> {
   let session_id = config.session_id.clone();
 
   let url = format!(
@@ -57,7 +57,7 @@ pub async fn proxy(config: config::Config) -> Result<TeeProof, ClientErrors> {
 pub async fn verify<T: Serialize>(
   config: crate::config::Config,
   verify_body: T,
-) -> Result<SignedVerificationReply, errors::ClientErrors> {
+) -> Result<SignedVerificationReply, error::WebProverClientError> {
   let url = format!(
     "https://{}:{}/v1/{}/verify",
     config.notary_host.clone(),

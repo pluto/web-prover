@@ -1,2 +1,2 @@
-listen            ="0.0.0.0:443"
-acme_email        ="eng@pluto.xyz"
+acme_email="eng@pluto.xyz"
+listen    ="0.0.0.0:443"

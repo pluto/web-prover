@@ -1,0 +1,56 @@
+name: Check
+
+on:
+  workflow_call:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [clippy, test, udeps]
+        crate: [web-prover-notary, web-prover-client, web-prover-core]
+        include:
+          - check: fmt
+            crate: all
+    steps:
+      - uses: actions/checkout@v4
+
+      # Setup Rust with cache key based on check type
+      - uses: ./.github/actions/setup-rust-ubuntu
+        with:
+          rust-cache-key: ${{ matrix.check }}
+
+      # Install necessary tools based on check type
+      - name: Install cargo-binstall
+        if: matrix.check == 'udeps'
+        uses: cargo-bins/cargo-binstall@main
+
+      - name: Install cargo-udeps
+        if: matrix.check == 'udeps'
+        run: cargo binstall --no-confirm cargo-udeps
+
+      - name: Install rustfmt
+        if: matrix.check == 'fmt'
+        run: rustup component add rustfmt
+
+      # Run the appropriate check
+      - name: Run clippy
+        if: matrix.check == 'clippy'
+        continue-on-error: true
+        run: cargo clippy -p ${{ matrix.crate }} -- -D warnings
+
+      - name: Run tests
+        if: matrix.check == 'test'
+        run: cargo test -p ${{ matrix.crate }}
+
+      - name: Check fmt
+        if: matrix.check == 'fmt'
+        continue-on-error: true
+        run: cargo fmt --all -- --check
+
+      - name: Check unused dependencies
+        if: matrix.check == 'udeps'
+        continue-on-error: true
+        run: cargo udeps -p ${{ matrix.crate }}
