@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use tiny_keccak::{Hasher, Keccak};
 
 use crate::{
-  errors::ManifestError,
+  error::WebProverCoreError,
   http::{ManifestRequest, ManifestResponse},
 };
 
@@ -28,7 +28,7 @@ pub struct Manifest {
 impl Manifest {
   /// Validates `Manifest` request and response fields. They are validated against valid statuses,
   /// http methods, and template variables.
-  pub fn validate(&self) -> Result<(), ManifestError> {
+  pub fn validate(&self) -> Result<(), WebProverCoreError> {
     // TODO: Validate manifest version, id, title, description, prepareUrl
     self.request.validate()?;
     self.response.validate()?;
@@ -42,7 +42,7 @@ impl Manifest {
   }
 
   /// Compute a `Keccak256` hash of the serialized Manifest
-  pub fn to_keccak_digest(&self) -> Result<[u8; 32], ManifestError> {
+  pub fn to_keccak_digest(&self) -> Result<[u8; 32], WebProverCoreError> {
     let as_bytes: Vec<u8> = self.try_into()?;
     let mut hasher = Keccak::v256();
     let mut output = [0u8; 32];
@@ -77,7 +77,7 @@ mod tests {
   use std::collections::HashMap;
 
   use crate::{
-    errors::ProofError,
+    error::ProofError,
     program::{
       http::{JsonKey, ManifestRequest, ManifestResponse, ManifestResponseBody, TemplateVar},
       manifest::HTTP_1_1,

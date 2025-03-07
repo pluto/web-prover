@@ -1,4 +1,4 @@
-pub mod errors;
+pub mod error;
 pub mod http;
 pub mod manifest;
 

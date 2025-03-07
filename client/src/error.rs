@@ -1,12 +1,18 @@
 use std::array::TryFromSliceError;
 
 use thiserror::Error;
-impl From<TryFromSliceError> for ClientErrors {
-  fn from(err: TryFromSliceError) -> ClientErrors { ClientErrors::Other(err.to_string()) }
+impl From<TryFromSliceError> for WebProverClientError {
+  fn from(err: TryFromSliceError) -> WebProverClientError {
+    WebProverClientError::Other(err.to_string())
+  }
 }
 
+// TODO (autoparallel): Combining enums is a good practice. This error enum could also all be moved
+// to the `web-prover-core` crate so there is one spot for all the errors. This makes error handling
+// more consistent and easier to manage.
+
 #[derive(Debug, Error)]
-pub enum ClientErrors {
+pub enum WebProverClientError {
   #[cfg(not(target_arch = "wasm32"))]
   #[error(transparent)]
   RustTls(#[from] rustls::Error),

@@ -1,6 +1,6 @@
 use clap::Parser;
 use tracing::Level;
-use web_prover_client::{config::Config, errors::ClientErrors};
+use web_prover_client::{config::Config, error::WebProverClientError};
 
 #[derive(Parser)]
 #[clap(name = "Web Proof Client")]
@@ -14,7 +14,7 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), ClientErrors> {
+async fn main() -> Result<(), WebProverClientError> {
   let args = Args::parse();
 
   let log_level = match args.log_level.to_lowercase().as_str() {
