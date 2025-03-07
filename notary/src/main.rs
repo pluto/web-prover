@@ -36,7 +36,6 @@ mod verifier;
 
 struct SharedState {
   notary_signing_key: SigningKey,
-  sessions:           Arc<Mutex<HashMap<String, Session>>>,
 }
 
 struct Session {}
@@ -88,10 +87,8 @@ async fn main() -> Result<(), NotaryServerError> {
   let listener = TcpListener::bind(&c.listen).await?;
   info!("Listening on https://{}", &c.listen);
 
-  let shared_state = Arc::new(SharedState {
-    notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
-    sessions:           Default::default(),
-  });
+  let shared_state =
+    Arc::new(SharedState { notary_signing_key: load_notary_signing_key(&c.notary_signing_key) });
 
   let router = Router::new()
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))

@@ -1,7 +1,3 @@
-[workspace.package]
-edition="2021"
-name   ="webprover"
-
 [workspace]
 members =["client", "notary", "core", "tests"]
 resolver="2"

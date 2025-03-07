@@ -77,14 +77,13 @@ mod tests {
   use std::collections::HashMap;
 
   use crate::{
-    error::ProofError,
-    program::{
-      http::{JsonKey, ManifestRequest, ManifestResponse, ManifestResponseBody, TemplateVar},
-      manifest::HTTP_1_1,
-      plain_manifest::Manifest,
+    error::WebProverCoreError,
+    http::{
+      JsonKey, ManifestRequest, ManifestResponse, ManifestResponseBody, TemplateVar, HTTP_1_1,
     },
+    manifest::Manifest,
     request, response,
-    tests::inputs::TEST_MANIFEST,
+    test_utils::TEST_MANIFEST,
   };
 
   macro_rules! create_manifest {
@@ -186,7 +185,7 @@ mod tests {
     let manifest = create_manifest!(request!(method: "INVALID".to_string()), response!(),);
     let result = manifest.validate();
     assert!(result.is_err());
-    if let Err(ManifestError::InvalidManifest(message)) = result {
+    if let Err(WebProverCoreError::InvalidManifest(message)) = result {
       assert_eq!(message, "Invalid HTTP method");
     } else {
       panic!("Expected ManifestError::InvalidManifest");
@@ -198,7 +197,7 @@ mod tests {
     let manifest = create_manifest!(request!(url: "ftp://example.com".to_string()), response!(),);
     let result = manifest.validate();
     assert!(result.is_err());
-    if let Err(ManifestError::InvalidManifest(message)) = result {
+    if let Err(WebProverCoreError::InvalidManifest(message)) = result {
       assert_eq!(message, "Only HTTPS URLs are allowed");
     } else {
       panic!("Expected ManifestError::InvalidManifest");
@@ -210,7 +209,7 @@ mod tests {
     let manifest = create_manifest!(request!(), response!(status: "500".to_string()),);
     let result = manifest.validate();
     assert!(result.is_err());
-    if let Err(ManifestError::InvalidManifest(message)) = result {
+    if let Err(WebProverCoreError::InvalidManifest(message)) = result {
       assert_eq!(message, "Unsupported HTTP status");
     } else {
       panic!("Expected ManifestError::InvalidManifest");
@@ -247,7 +246,7 @@ mod tests {
     );
     let result = manifest.validate();
     assert!(result.is_err());
-    if let Err(ManifestError::InvalidManifest(message)) = result {
+    if let Err(WebProverCoreError::InvalidManifest(message)) = result {
       assert_eq!(message, "Invalid Content-Type header: invalid/type");
     } else {
       panic!("Expected ManifestError::InvalidManifest");

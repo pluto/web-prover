@@ -33,7 +33,7 @@ pub async fn proxy(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<web_prover_client::ProxyConfig>,
 ) -> Result<Json<TeeProof>, NotaryServerError> {
-  let session_id = query.session_id.clone();
+  let session_id = query.session_id;
 
   info!("Starting proxy with ID: {}", session_id);
 

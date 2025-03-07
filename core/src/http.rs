@@ -479,6 +479,9 @@ impl ManifestRequest {
     Ok(())
   }
 
+  // TODO (autoparallel): This function is not used anywhere at the moment, but i did not want to
+  // delete it.
+  #[allow(unused)]
   fn validate_vars(&self) -> Result<(), WebProverCoreError> {
     let mut all_tokens = vec![];
 
