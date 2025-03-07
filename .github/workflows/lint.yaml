@@ -36,3 +36,26 @@ jobs:
       - run: rustup component add rustfmt
 
       - run: cargo fmt --all -- --check
+
+  udeps:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        crate:
+          - web-prover-notary
+          - web-prover-client
+          - web-prover-core
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-rust-ubuntu
+        with:
+          rust-cache-key: udeps
+
+      - name: Install cargo-udeps
+        run: cargo install cargo-udeps --locked
+
+      - name: Check unused dependencies
+        run: cargo udeps -p ${{ matrix.crate }}
