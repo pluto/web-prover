@@ -1,16 +1,16 @@
 [package]
+edition="2021"
 name   ="web-prover-core"
 version="0.7.0"
-edition="2021"
 
 [dependencies]
+derive_more={ workspace=true }
 serde      ={ workspace=true }
 serde_json ={ workspace=true }
-tracing    ={ workspace=true }
 thiserror  ={ workspace=true }
 tiny-keccak={ version="2.0.2", features=["keccak"] }
+tracing    ={ workspace=true }
 url        ={ workspace=true }
-derive_more={ workspace=true }
 # Using `regress` crate for compatibility with ECMAScript regular expressions in Manifest validation
-regress="0.10.3"
 regex  ="1.11.1"
+regress="0.10.3"

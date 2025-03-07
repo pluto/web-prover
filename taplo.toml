@@ -13,7 +13,7 @@ column_width=100
 # remove whitespace around '='
 compact_entries=true
 # alphabetically sort entries not separated by line breaks
-reorder_keys=false
+reorder_keys=true
 # align entries vertically (default: true)
 # align_comments     =false  
 # expand arrays into multiple lines (default: true)

@@ -707,36 +707,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
-name = "client"
-version = "0.7.0"
-dependencies = [
- "base64 0.22.1",
- "bytes",
- "clap",
- "futures",
- "hex",
- "http-body-util",
- "hyper",
- "hyper-util",
- "reqwest",
- "rustls",
- "rustls-pki-types",
- "serde",
- "serde_json",
- "serde_with",
- "thiserror 1.0.69",
- "tokio",
- "tokio-rustls",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "url",
- "uuid",
- "web-prover-core",
- "webpki-roots",
-]
-
-[[package]]
 name = "colorchoice"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2016,49 +1986,6 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
-]
-
-[[package]]
-name = "notary"
-version = "0.7.0"
-dependencies = [
- "alloy-primitives",
- "async-trait",
- "axum",
- "axum-core",
- "base64 0.21.7",
- "chrono",
- "clap",
- "client",
- "config",
- "eyre",
- "futures",
- "futures-util",
- "hex",
- "http",
- "hyper",
- "hyper-util",
- "k256",
- "nom",
- "reqwest",
- "rs_merkle",
- "rustls",
- "rustls-acme",
- "rustls-pemfile",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tokio-rustls",
- "tokio-stream",
- "tokio-util",
- "tower 0.4.13",
- "tower-http",
- "tower-service",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "web-prover-core",
 ]
 
 [[package]]
@@ -3908,6 +3835,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c62a0a307cb4a311d3a07867860911ca130c3494e8c2719593806c08bc5d0484"
 
 [[package]]
+name = "web-prover-client"
+version = "0.7.0"
+dependencies = [
+ "base64 0.22.1",
+ "bytes",
+ "clap",
+ "futures",
+ "hex",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "reqwest",
+ "rustls",
+ "rustls-pki-types",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-rustls",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "uuid",
+ "web-prover-core",
+ "webpki-roots",
+]
+
+[[package]]
 name = "web-prover-core"
 version = "0.7.0"
 dependencies = [
@@ -3920,6 +3877,49 @@ dependencies = [
  "tiny-keccak",
  "tracing",
  "url",
+]
+
+[[package]]
+name = "web-prover-notary"
+version = "0.7.0"
+dependencies = [
+ "alloy-primitives",
+ "async-trait",
+ "axum",
+ "axum-core",
+ "base64 0.21.7",
+ "chrono",
+ "clap",
+ "config",
+ "eyre",
+ "futures",
+ "futures-util",
+ "hex",
+ "http",
+ "hyper",
+ "hyper-util",
+ "k256",
+ "nom",
+ "reqwest",
+ "rs_merkle",
+ "rustls",
+ "rustls-acme",
+ "rustls-pemfile",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-rustls",
+ "tokio-stream",
+ "tokio-util",
+ "tower 0.4.13",
+ "tower-http",
+ "tower-service",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "web-prover-client",
+ "web-prover-core",
 ]
 
 [[package]]
