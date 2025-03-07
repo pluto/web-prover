@@ -45,11 +45,12 @@
 //! - [`http`](http/index.html): HTTP request and response handling
 //! - [`proof`](proof/index.html): Proof generation and verification
 //! - [`error`](error/index.html): Error types for the crate
-//! - [`test_utils`](test_utils/index.html): Utilities for testing
+
+#![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 pub mod error;
 pub mod http;
 pub mod manifest;
 
 pub mod proof;
-pub mod test_utils;
+#[cfg(test)] mod test_utils;
