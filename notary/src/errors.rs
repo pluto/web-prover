@@ -90,14 +90,6 @@ pub enum NotaryServerError {
   #[error(transparent)]
   ProofError(#[from] ProofError),
 
-  // TODO: Update to contain feedback
-  #[error("Manifest-request mismatch")]
-  ManifestRequestMismatch,
-
-  // TODO: Update to contain feedback
-  #[error("Manifest-response mismatch")]
-  ManifestResponseMismatch,
-
   #[error("Manifest is missing")]
   ManifestMissing,
 
