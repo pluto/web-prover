@@ -21,7 +21,7 @@ jobs:
         with:
           rust-cache-key: clippy
 
-      - run: cargo clippy -p ${{ matrix.crate }}
+      - run: cargo clippy -p ${{ matrix.crate }} -- -D warnings
 
   fmt:
     continue-on-error: true
