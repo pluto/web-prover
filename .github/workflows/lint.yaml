@@ -11,8 +11,9 @@ jobs:
       fail-fast: false
       matrix:
         crate:
-          - notary
-          - client
+          - web-prover-notary
+          - web-prover-client
+          - web-prover-core
     steps:
       - uses: actions/checkout@v4
 
