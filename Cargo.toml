@@ -1,24 +1,20 @@
-[workspace.package]
-name   ="webprover"
-edition="2021"
-
 [workspace]
-members =["client", "notary", "web-prover-core", "tests"]
+members =["client", "notary", "core", "tests"]
 resolver="2"
 
 [workspace.dependencies]
 # Local re-exporting
-client         ={ path="client" }
-notary         ={ path="notary" }
-web-prover-core={ path="web-prover-core" }
+web-prover-client={ path="client" }
+web-prover-core  ={ path="core" }
+web-prover-notary={ path="notary" }
 # Serde
 serde     ={ version="1.0.204", features=["derive"] }
 serde_json="1.0.120"
 # Logging
+futures           ="0.3"
+rayon             ="1.10.0"
 tracing           ="0.1.40"
 tracing-subscriber={ version="0.3.18", features=["env-filter"] }
-rayon             ="1.10.0"
-futures           ="0.3"
 
 # CLI
 clap={ version="4.5.13", features=["derive"] }
@@ -26,31 +22,30 @@ clap={ version="4.5.13", features=["derive"] }
 thiserror="1.0.61"
 
 # HTTP
+http-body-util="0.1"
 hyper         ={ version="1.6", features=["full"] }
 hyper-util    ={ version="0.1", features=["full"] }
-http-body-util="0.1"
 
 # Async
 tokio       ={ version="1.39.1", features=["full"] }
-tokio-util  ={ version="0.7" }
 tokio-rustls={ version="0.26.0", default-features=false, features=["logging", "tls12"] }
+tokio-util  ={ version="0.7" }
 
-uuid       ={ version="1.10.0", default-features=false, features=["v4", "serde"] }
+chrono     ="0.4"
 derive_more={ version="2.0.1", features=["full"] }
 url        ="2.5.4"
-chrono     ="0.4"
+uuid       ={ version="1.10.0", default-features=false, features=["v4", "serde"] }
 
 tracing-test="0.2"
 
 [profile.dev]
+incremental    =true
 opt-level      =1
 split-debuginfo="unpacked"
-incremental    =true
 
 [profile.release]
-opt-level    =0
-lto          =false
 codegen-units=1
+debug        =true    # Propagate more information up through FFI
+lto          =false
 panic        ="abort"
 strip        =true
-debug        =true    # Propagate more information up through FFI

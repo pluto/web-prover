@@ -27,7 +27,7 @@ pub enum JsonKey {
   Num(usize),
 }
 
-use crate::errors::ManifestError;
+use crate::error::WebProverCoreError;
 
 /// Max HTTP headers
 pub const MAX_HTTP_HEADERS: usize = 25;
@@ -43,7 +43,7 @@ pub struct ManifestResponseBody {
 }
 
 impl TryFrom<&[u8]> for ManifestResponseBody {
-  type Error = ManifestError;
+  type Error = WebProverCoreError;
 
   fn try_from(body_bytes: &[u8]) -> Result<Self, Self::Error> {
     if body_bytes.is_empty() {
@@ -51,7 +51,7 @@ impl TryFrom<&[u8]> for ManifestResponseBody {
     }
     // Attempt to parse the body as JSON path.
     let json_path: Vec<JsonKey> = serde_json::from_slice(body_bytes).map_err(|_| {
-      ManifestError::InvalidManifest("Failed to parse body as valid JSON".to_string())
+      WebProverCoreError::InvalidManifest("Failed to parse body as valid JSON".to_string())
     })?;
     Ok(Self { json_path })
   }
@@ -66,7 +66,7 @@ pub struct NotaryResponseBody {
 }
 
 impl TryFrom<&[u8]> for NotaryResponseBody {
-  type Error = ManifestError;
+  type Error = WebProverCoreError;
 
   fn try_from(body_bytes: &[u8]) -> Result<Self, Self::Error> {
     if body_bytes.is_empty() {
@@ -74,7 +74,7 @@ impl TryFrom<&[u8]> for NotaryResponseBody {
     }
     // Attempt to parse the body as JSON.
     let json: serde_json::Value = serde_json::from_slice(body_bytes).map_err(|_| {
-      ManifestError::InvalidManifest("Failed to parse body as valid JSON".to_string())
+      WebProverCoreError::InvalidManifest("Failed to parse body as valid JSON".to_string())
     })?;
     Ok(Self { json: Some(json) })
   }
@@ -201,12 +201,12 @@ impl NotaryResponse {
   ///
   /// - `header_bytes`: The bytes representing the HTTP response headers and metadata.
   /// - `body_bytes`: The bytes representing the HTTP response body.
-  pub fn from_payload(bytes: &[u8]) -> Result<Self, ManifestError> {
+  pub fn from_payload(bytes: &[u8]) -> Result<Self, WebProverCoreError> {
     let delimiter = b"\r\n\r\n";
     let split_position = bytes
       .windows(delimiter.len())
       .position(|window| window == delimiter)
-      .ok_or_else(|| ManifestError::InvalidManifest("Invalid HTTP format".to_string()))?;
+      .ok_or_else(|| WebProverCoreError::InvalidManifest("Invalid HTTP format".to_string()))?;
 
     let (header_bytes, rest) = bytes.split_at(split_position);
     let body_bytes = &rest[delimiter.len()..];
@@ -230,9 +230,9 @@ impl NotaryResponse {
   /// The parsed HTTP response header.
   fn parse_header(
     header_bytes: &[u8],
-  ) -> Result<(HashMap<String, String>, String, String, String), ManifestError> {
+  ) -> Result<(HashMap<String, String>, String, String, String), WebProverCoreError> {
     let headers_str = std::str::from_utf8(header_bytes).map_err(|_| {
-      ManifestError::InvalidManifest("Failed to interpret headers as valid UTF-8".to_string())
+      WebProverCoreError::InvalidManifest("Failed to interpret headers as valid UTF-8".to_string())
     })?;
     let mut headers = HashMap::new();
     let mut status = String::new();
@@ -247,7 +247,7 @@ impl NotaryResponse {
         // Process the first line as the HTTP response start-line
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() < 3 {
-          return Err(ManifestError::InvalidManifest(
+          return Err(WebProverCoreError::InvalidManifest(
             "Invalid HTTP response start-line".to_string(),
           ));
         }
@@ -259,7 +259,10 @@ impl NotaryResponse {
         if let Some((key, value)) = line.split_once(": ") {
           headers.insert(key.to_string(), value.to_string());
         } else {
-          return Err(ManifestError::InvalidManifest(format!("Invalid header line: {}", line)));
+          return Err(WebProverCoreError::InvalidManifest(format!(
+            "Invalid header line: {}",
+            line
+          )));
         }
       }
     }
@@ -346,16 +349,16 @@ impl ManifestResponse {
   /// # Returns
   ///
   /// The validated HTTP response.
-  pub fn validate(&self) -> Result<(), ManifestError> {
+  pub fn validate(&self) -> Result<(), WebProverCoreError> {
     // TODO: What are legal statuses?
     const VALID_STATUSES: [&str; 2] = ["200", "201"];
     if !VALID_STATUSES.contains(&self.status.as_str()) {
-      return Err(ManifestError::InvalidManifest("Unsupported HTTP status".to_string()));
+      return Err(WebProverCoreError::InvalidManifest("Unsupported HTTP status".to_string()));
     }
 
     // TODO: What HTTP versions are supported?
     if self.version != "HTTP/1.1" {
-      return Err(ManifestError::InvalidManifest(
+      return Err(WebProverCoreError::InvalidManifest(
         "Invalid HTTP version: ".to_string() + &self.version,
       ));
     }
@@ -363,14 +366,14 @@ impl ManifestResponse {
     // TODO: What is the max supported message length?
     // TODO: Not covered by serde's #default annotation. Is '""' a valid message?
     if self.message.len() > 1024 || self.message.is_empty() {
-      return Err(ManifestError::InvalidManifest(
+      return Err(WebProverCoreError::InvalidManifest(
         "Invalid message length: ".to_string() + &self.message,
       ));
     }
 
     // We always expect at least one header, "Content-Type"
     if self.headers.len() > MAX_HTTP_HEADERS || self.headers.is_empty() {
-      return Err(ManifestError::InvalidManifest(
+      return Err(WebProverCoreError::InvalidManifest(
         "Invalid headers length: ".to_string() + &self.headers.len().to_string(),
       ));
     }
@@ -378,7 +381,7 @@ impl ManifestResponse {
     let content_type =
       self.headers.get("Content-Type").or_else(|| self.headers.get("content-type"));
     if content_type.is_none() {
-      return Err(ManifestError::InvalidManifest("Missing 'Content-Type' header".to_string()));
+      return Err(WebProverCoreError::InvalidManifest("Missing 'Content-Type' header".to_string()));
     }
     let content_type = content_type.unwrap();
 
@@ -387,19 +390,21 @@ impl ManifestResponse {
       content_type == legal_type || content_type.starts_with(&format!("{};", legal_type))
     });
     if !is_valid_content_type {
-      return Err(ManifestError::InvalidManifest(
+      return Err(WebProverCoreError::InvalidManifest(
         "Invalid Content-Type header: ".to_string() + content_type,
       ));
     }
 
     // When Content-Type is application/json, we expect at least one JSON item
     if content_type == "application/json" && self.body.json_path.is_empty() {
-      return Err(ManifestError::InvalidManifest("Expected at least one JSON item".to_string()));
+      return Err(WebProverCoreError::InvalidManifest(
+        "Expected at least one JSON item".to_string(),
+      ));
     }
 
     const MAX_JSON_PATH_LENGTH: usize = 100;
     if self.body.json_path.len() > MAX_JSON_PATH_LENGTH {
-      return Err(ManifestError::InvalidManifest(
+      return Err(WebProverCoreError::InvalidManifest(
         "Invalid JSON path length: ".to_string() + &self.body.json_path.len().to_string(),
       ));
     }
@@ -448,25 +453,25 @@ impl ManifestRequest {
   /// # Returns
   ///
   /// The validated HTTP request.
-  pub fn validate(&self) -> Result<(), ManifestError> {
+  pub fn validate(&self) -> Result<(), WebProverCoreError> {
     // TODO: What HTTP methods are supported?
     const ALLOWED_METHODS: [&str; 2] = ["GET", "POST"];
     if !ALLOWED_METHODS.contains(&self.method.as_str()) {
-      return Err(ManifestError::InvalidManifest("Invalid HTTP method".to_string()));
+      return Err(WebProverCoreError::InvalidManifest("Invalid HTTP method".to_string()));
     }
 
     // Not a valid URL
     if url::Url::parse(&self.url).is_err() {
-      return Err(ManifestError::InvalidManifest("Invalid URL: ".to_string() + &self.url));
+      return Err(WebProverCoreError::InvalidManifest("Invalid URL: ".to_string() + &self.url));
     }
 
     if !self.url.starts_with("https://") {
-      return Err(ManifestError::InvalidManifest("Only HTTPS URLs are allowed".to_string()));
+      return Err(WebProverCoreError::InvalidManifest("Only HTTPS URLs are allowed".to_string()));
     }
 
     // TODO: What HTTP versions are supported?
     if self.version != "HTTP/1.1" {
-      return Err(ManifestError::InvalidManifest(
+      return Err(WebProverCoreError::InvalidManifest(
         "Invalid HTTP version: ".to_string() + &self.version,
       ));
     }
@@ -474,14 +479,17 @@ impl ManifestRequest {
     Ok(())
   }
 
-  fn validate_vars(&self) -> Result<(), ManifestError> {
+  // TODO (autoparallel): This function is not used anywhere at the moment, but i did not want to
+  // delete it.
+  #[allow(unused)]
+  fn validate_vars(&self) -> Result<(), WebProverCoreError> {
     let mut all_tokens = vec![];
 
     // Parse and validate tokens in the body
     if let Some(body_tokens) = self.body.as_ref().map(extract_tokens) {
       for token in &body_tokens {
         if !self.vars.contains_key(token) {
-          return Err(ManifestError::InvalidManifest(format!(
+          return Err(WebProverCoreError::InvalidManifest(format!(
             "Token `<% {} %>` not declared in `vars`",
             token
           )));
@@ -495,7 +503,7 @@ impl ManifestRequest {
       let header_tokens = extract_tokens(&serde_json::Value::String(value.clone()));
       for token in &header_tokens {
         if !self.vars.contains_key(token) {
-          return Err(ManifestError::InvalidManifest(format!(
+          return Err(WebProverCoreError::InvalidManifest(format!(
             "Token `<% {} %>` not declared in `vars`",
             token
           )));
@@ -506,7 +514,7 @@ impl ManifestRequest {
 
     for var_key in self.vars.keys() {
       if !all_tokens.contains(var_key) {
-        return Err(ManifestError::InvalidManifest(format!(
+        return Err(WebProverCoreError::InvalidManifest(format!(
           "Token `<% {} %>` not declared in `body` or `headers`",
           var_key
         )));
@@ -519,7 +527,7 @@ impl ManifestRequest {
       if let Some(regex_pattern) = var_def.regex.as_ref() {
         // Using `regress` crate for compatibility with ECMAScript regular expressions
         let _regex = regress::Regex::new(regex_pattern).map_err(|_| {
-          ManifestError::InvalidManifest(format!("Invalid regex pattern for `{}`", key))
+          WebProverCoreError::InvalidManifest(format!("Invalid regex pattern for `{}`", key))
         })?;
         // TODO: It will definitely not match it here because it's a template variable, not an
         // actual variable
@@ -538,7 +546,7 @@ impl ManifestRequest {
       if let Some(length) = var_def.length {
         if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
           if value.as_str().unwrap_or("").len() != length {
-            return Err(ManifestError::InvalidManifest(format!(
+            return Err(WebProverCoreError::InvalidManifest(format!(
               "Value for token `<% {} %>` does not meet length constraint",
               key
             )));
@@ -552,13 +560,13 @@ impl ManifestRequest {
   }
 
   /// Parses the HTTP request from the given bytes.
-  pub fn from_payload(bytes: &[u8]) -> Result<Self, ManifestError> {
+  pub fn from_payload(bytes: &[u8]) -> Result<Self, WebProverCoreError> {
     // todo: dedup me
     let delimiter = b"\r\n\r\n";
     let split_position = bytes
       .windows(delimiter.len())
       .position(|window| window == delimiter)
-      .ok_or_else(|| ManifestError::InvalidManifest("Invalid HTTP format".to_string()))?;
+      .ok_or_else(|| WebProverCoreError::InvalidManifest("Invalid HTTP format".to_string()))?;
 
     let (header_bytes, rest) = bytes.split_at(split_position);
     let body_bytes = &rest[delimiter.len()..];
@@ -567,7 +575,7 @@ impl ManifestRequest {
 
     let body = if !body_bytes.is_empty() {
       serde_json::from_slice(body_bytes)
-        .map_err(|_| ManifestError::InvalidManifest("Invalid body bytes".to_string()))?
+        .map_err(|_| WebProverCoreError::InvalidManifest("Invalid body bytes".to_string()))?
     } else {
       None
     };
@@ -578,19 +586,21 @@ impl ManifestRequest {
   /// Parses the HTTP request start-line and headers from the given bytes.
   fn parse_header(
     header_bytes: &[u8],
-  ) -> Result<(String, String, String, HashMap<String, String>), ManifestError> {
+  ) -> Result<(String, String, String, HashMap<String, String>), WebProverCoreError> {
     let header_str = std::str::from_utf8(header_bytes).map_err(|_| {
-      ManifestError::InvalidManifest("Failed to interpret headers as valid UTF-8".to_string())
+      WebProverCoreError::InvalidManifest("Failed to interpret headers as valid UTF-8".to_string())
     })?;
     let mut lines = header_str.lines();
 
     let start_line = lines.next().ok_or_else(|| {
-      ManifestError::InvalidManifest("Missing start-line in the HTTP request.".to_string())
+      WebProverCoreError::InvalidManifest("Missing start-line in the HTTP request.".to_string())
     })?;
 
     let parts: Vec<&str> = start_line.split_whitespace().collect();
     if parts.len() < 3 {
-      return Err(ManifestError::InvalidManifest("Invalid HTTP request start-line.".to_string()));
+      return Err(WebProverCoreError::InvalidManifest(
+        "Invalid HTTP request start-line.".to_string(),
+      ));
     }
 
     let method = parts[0].to_string();
@@ -605,7 +615,7 @@ impl ManifestRequest {
       if let Some((key, value)) = line.split_once(": ") {
         headers.insert(key.to_string(), value.to_string());
       } else {
-        return Err(ManifestError::InvalidManifest(format!("Invalid header line: {}", line)));
+        return Err(WebProverCoreError::InvalidManifest(format!("Invalid header line: {}", line)));
       }
     }
 
@@ -693,8 +703,10 @@ pub mod tests {
   macro_rules! request {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
+        // Make clippy happy
+        #[allow(unused_mut) ]
         let mut request = ManifestRequest {
-            method: "GET".to_string(),
+          method: "GET".to_string(),
             url: "https://example.com".to_string(),
             version: "HTTP/1.1".to_string(),
             headers: std::collections::HashMap::from([
@@ -846,7 +858,7 @@ pub mod tests {
     let result = NotaryResponse::from_payload(&[header_bytes, invalid_body_bytes].concat());
     assert!(result.is_err());
 
-    if let Err(ManifestError::InvalidManifest(msg)) = result {
+    if let Err(WebProverCoreError::InvalidManifest(msg)) = result {
       assert!(msg.contains("Failed to parse body as valid JSON"));
     } else {
       panic!("Expected an invalid manifest error for body parsing");
@@ -864,7 +876,7 @@ pub mod tests {
     assert!(result.is_err());
 
     match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
+      Err(WebProverCoreError::InvalidManifest(msg)) => {
         assert!(msg.contains("Unsupported HTTP status"));
       },
       _ => panic!("Expected invalid manifest error for unsupported HTTP status"),
@@ -879,7 +891,7 @@ pub mod tests {
     let result = invalid_response.validate();
     assert!(result.is_err());
 
-    if let Err(ManifestError::InvalidManifest(msg)) = result {
+    if let Err(WebProverCoreError::InvalidManifest(msg)) = result {
       assert!(msg.contains("Invalid message length"));
     } else {
       panic!("Expected invalid manifest error for empty message");
@@ -966,7 +978,7 @@ pub mod tests {
     assert!(result.is_err());
 
     match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
+      Err(WebProverCoreError::InvalidManifest(msg)) => {
         assert!(msg.contains("Failed to interpret headers as valid UTF-8"));
       },
       _ => panic!("Expected invalid UTF-8 headers error"),
@@ -982,7 +994,7 @@ pub mod tests {
     assert!(result.is_err());
 
     match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
+      Err(WebProverCoreError::InvalidManifest(msg)) => {
         assert!(msg.contains("Invalid HTTP request start-line"));
       },
       _ => panic!("Expected invalid start-line error"),
@@ -999,7 +1011,7 @@ pub mod tests {
     let result = request.validate();
     assert!(result.is_err());
     match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
+      Err(WebProverCoreError::InvalidManifest(msg)) => {
         assert!(msg.contains("Only HTTPS URLs are allowed"));
       },
       _ => panic!("Expected error for non-HTTPS URL"),
@@ -1026,7 +1038,7 @@ pub mod tests {
     assert!(result.is_err());
 
     match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
+      Err(WebProverCoreError::InvalidManifest(msg)) => {
         assert!(msg.contains("Invalid body bytes"));
       },
       _ => panic!("Expected invalid body parsing error"),
@@ -1046,7 +1058,7 @@ pub mod tests {
     assert!(result.is_err());
 
     match result {
-      Err(ManifestError::InvalidManifest(msg)) => {
+      Err(WebProverCoreError::InvalidManifest(msg)) => {
         assert!(msg.contains("Token `<% missing_token %>` not declared in `vars`"));
       },
       _ => panic!("Expected missing token error"),

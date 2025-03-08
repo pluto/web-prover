@@ -1,8 +1,7 @@
 use std::{
-  collections::HashMap,
   fs,
   io::{self},
-  sync::{Arc, Mutex},
+  sync::Arc,
 };
 
 use axum::{
@@ -12,7 +11,7 @@ use axum::{
   routing::{get, post},
   Router,
 };
-use errors::NotaryServerError;
+use error::NotaryServerError;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use k256::{ecdsa::SigningKey, elliptic_curve::rand_core, pkcs8::DecodePrivateKey};
@@ -30,16 +29,13 @@ use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod config;
-mod errors;
+mod error;
 mod proxy;
 mod verifier;
 
 struct SharedState {
   notary_signing_key: SigningKey,
-  sessions:           Arc<Mutex<HashMap<String, Session>>>,
 }
-
-struct Session {}
 
 /// Main entry point for the notary server application.
 ///
@@ -88,10 +84,8 @@ async fn main() -> Result<(), NotaryServerError> {
   let listener = TcpListener::bind(&c.listen).await?;
   info!("Listening on https://{}", &c.listen);
 
-  let shared_state = Arc::new(SharedState {
-    notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
-    sessions:           Default::default(),
-  });
+  let shared_state =
+    Arc::new(SharedState { notary_signing_key: load_notary_signing_key(&c.notary_signing_key) });
 
   let router = Router::new()
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))

@@ -26,12 +26,12 @@ jobs:
         with:
           rust-cache-key: client_notary
 
-      - run: cargo build -p notary --release
+      - run: cargo build -p web-prover-notary --release
 
       - uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-latest'
         with:
           name: "notary.linux.amd64"
-          path: "target/release/notary"
+          path: "target/release/web-prover-notary"
           retention-days: 7
           if-no-files-found: "error"

@@ -1,6 +1,6 @@
 use clap::Parser;
-use client::{config::Config, errors::ClientErrors};
 use tracing::Level;
+use web_prover_client::{config::Config, error::WebProverClientError};
 
 #[derive(Parser)]
 #[clap(name = "Web Proof Client")]
@@ -14,7 +14,7 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), ClientErrors> {
+async fn main() -> Result<(), WebProverClientError> {
   let args = Args::parse();
 
   let log_level = match args.log_level.to_lowercase().as_str() {
@@ -32,7 +32,7 @@ async fn main() -> Result<(), ClientErrors> {
   let mut config: Config = serde_json::from_str(&config_json)?;
   config.set_session_id();
 
-  let proof = client::proxy(config).await?;
+  let proof = web_prover_client::proxy(config).await?;
   let proof_json = serde_json::to_string_pretty(&proof)?;
   println!("Proving Successful: proof_len={:?}", proof_json.len());
   Ok(())

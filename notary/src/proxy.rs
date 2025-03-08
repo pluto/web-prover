@@ -18,7 +18,7 @@ use web_prover_core::{
 };
 
 use crate::{
-  errors::NotaryServerError,
+  error::NotaryServerError,
   verifier::{sign_verification, VerifyOutput},
   SharedState,
 };
@@ -31,9 +31,9 @@ pub struct NotarizeQuery {
 pub async fn proxy(
   query: Query<NotarizeQuery>,
   State(state): State<Arc<SharedState>>,
-  extract::Json(payload): extract::Json<client::ProxyConfig>,
+  extract::Json(payload): extract::Json<web_prover_client::ProxyConfig>,
 ) -> Result<Json<TeeProof>, NotaryServerError> {
-  let session_id = query.session_id.clone();
+  let session_id = query.session_id;
 
   info!("Starting proxy with ID: {}", session_id);
 

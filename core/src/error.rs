@@ -4,7 +4,7 @@ use thiserror::Error;
 
 /// Represents the various error conditions that can occur within the `proofs` crate.
 #[derive(Debug, Error)]
-pub enum ManifestError {
+pub enum WebProverCoreError {
   /// The error is an invalid manifest
   #[error("Invalid manifest: {0}")]
   InvalidManifest(String),

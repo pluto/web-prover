@@ -5,7 +5,12 @@ use axum::{
 use eyre::Report;
 use thiserror::Error;
 use tracing::error;
-use web_prover_core::errors::ManifestError;
+use web_prover_core::error::WebProverCoreError;
+
+// TODO (autoparallel): I think these error enums should be combined into `WebProverNotaryError`.
+// Combining enums is a good practice. They could also all be moved to the `web-prover-core` crate
+// so there is one spot for all the errors. This makes error handling more consistent and easier to
+// manage.
 
 #[derive(Debug, Error)]
 pub enum ProxyError {
@@ -51,7 +56,7 @@ pub enum NotaryServerError {
   ProxyError(#[from] ProxyError),
 
   #[error(transparent)]
-  ManifestError(#[from] ManifestError),
+  ManifestError(#[from] WebProverCoreError),
 }
 
 /// Trait implementation to convert this error into an axum http response

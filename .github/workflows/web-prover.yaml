@@ -12,8 +12,8 @@ concurrency:
 
 jobs:
 
-  lint:
-    uses: ./.github/workflows/lint.yaml
+  check:
+    uses: ./.github/workflows/check.yaml
 
   build_notary:
     uses: ./.github/workflows/build_notary.yaml

@@ -27,8 +27,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p releases/clients
-          cp target/release/client.linux.amd64/client releases/clients/client.linux.amd64
-          cp target/release/client.macos.arm64/client releases/clients/client.macos.arm64
+          cp target/release/web-prover-client.linux.amd64/web-prover-client releases/clients/client.linux.amd64
+          cp target/release/web-prover-client.macos.arm64/web-prover-client releases/clients/client.macos.arm64
           cd releases/clients
           tar -czf client.linux.amd64.tar.gz client.linux.amd64
           rm client.linux.amd64
