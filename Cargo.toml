@@ -47,6 +47,5 @@ split-debuginfo="unpacked"
 codegen-units=1
 debug        =true    # Propagate more information up through FFI
 lto          =false
-opt-level    =0
 panic        ="abort"
 strip        =true
