@@ -44,7 +44,6 @@ pub enum NotaryServerError {
   #[error("Error occurred from reasing server config: {0}")]
   ServerConfigError(String),
 
-  // TODO: Update to contain feedback
   #[error("Manifest-request mismatch")]
   ManifestRequestMismatch,
 

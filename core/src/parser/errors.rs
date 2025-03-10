@@ -80,6 +80,19 @@ pub enum ExtractorError {
   SelectorFailed(String),
 }
 
+#[derive(Debug, Error)]
+pub enum ExtractorErrorWithId {
+  /// Extractor error decorated with an extractor ID
+  #[error("Extractor {extractor_id} failed: {error}")]
+  ExtractorError { extractor_id: String, error: ExtractorError },
+}
+
+impl From<(String, ExtractorError)> for ExtractorErrorWithId {
+  fn from((extractor_id, error): (String, ExtractorError)) -> Self {
+    ExtractorErrorWithId::ExtractorError { extractor_id, error }
+  }
+}
+
 /// Errors that can occur during predicate validation
 #[derive(Debug, Error)]
 pub enum PredicateError {

@@ -4,6 +4,7 @@
 //! Template variables are used to parameterize manifest fields and are identified
 //! by the pattern `<% variable_name %>`.
 
+use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
 use crate::error::TemplateError;
@@ -19,7 +20,14 @@ const DEFAULT_REQUIRED: bool = true;
 fn default_required() -> bool { DEFAULT_REQUIRED }
 
 /// Template variables are identified in `Manifest` fields using the syntax `<% variable_name %>`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display)]
+#[display(
+  "TemplateVar(description={:?}, required={}, default={:?}, pattern={:?})",
+  description,
+  required,
+  default,
+  pattern
+)]
 pub struct TemplateVar {
   /// Optional description explaining the purpose of this variable
   pub description: Option<String>,

@@ -24,7 +24,15 @@
           "accept-encoding": "identity",
           "host": "en.wikipedia.org",
           "connection": "close",
-          "accept": "*/*"
+          "accept": "*/*",
+          "authorization": "Bearer <% accessToken %>"
+        },
+        "vars": {
+          "accessToken": {
+            "description": "Spotify access token",
+            "required": true,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          }
         }
       },
       "response": {
