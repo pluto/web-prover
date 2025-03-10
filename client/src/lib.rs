@@ -32,11 +32,11 @@ pub async fn proxy(config: config::Config) -> Result<TeeProof, WebProverClientEr
   );
 
   let proxy_config = ProxyConfig {
-    target_method:  config.target_method,
-    target_url:     config.target_url,
-    target_headers: config.target_headers,
+    target_method:  config.manifest.request.method.clone(),
+    target_url:     config.manifest.request.url.clone(),
+    target_headers: config.manifest.request.headers.clone(),
     target_body:    config.target_body,
-    manifest:       config.proving.manifest.unwrap(),
+    manifest:       config.manifest,
   };
 
   let client = {

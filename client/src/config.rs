@@ -11,12 +11,6 @@ use web_prover_core::manifest::Manifest;
 
 use crate::error::WebProverClientError;
 
-/// Proving data containing [`Manifest`] and serialized witnesses used for WASM
-#[derive(Deserialize, Clone, Debug)]
-pub struct ProvingData {
-  pub manifest: Option<Manifest>, // TODO(#515)
-}
-
 #[serde_as]
 #[derive(Deserialize, Clone, Debug)]
 pub struct Config {
@@ -30,7 +24,7 @@ pub struct Config {
   pub target_url:     String,
   pub target_headers: HashMap<String, String>,
   pub target_body:    String,
-  pub proving:        ProvingData,
+  pub manifest:       Manifest,
   #[serde(skip)]
   pub session_id:     String,
 }
@@ -61,7 +55,7 @@ impl Config {
   /// # Errors
   /// - Returns `ClientErrors::Other` if the host is not found in the target URL.
   pub fn target_host(&self) -> Result<String, WebProverClientError> {
-    let target_url = Url::parse(&self.target_url)?;
+    let target_url = Url::parse(&self.manifest.request.url)?;
     let host = target_url
       .host_str()
       .ok_or_else(|| WebProverClientError::Other("Host not found in target URL".to_owned()))?
@@ -82,7 +76,7 @@ impl Config {
   /// # Errors
   /// - Returns `ClientErrors::Other` if the port is not found in the target URL.
   pub fn target_port(&self) -> Result<u16, WebProverClientError> {
-    let target_url = Url::parse(&self.target_url)?;
+    let target_url = Url::parse(&self.manifest.request.url)?;
     let port = target_url
       .port_or_known_default()
       .ok_or_else(|| WebProverClientError::Other("Port not found in target URL".to_owned()))?;
@@ -100,7 +94,7 @@ impl Config {
   /// # Errors
   /// - Returns `ClientErrors::Other` if the URL is invalid.
   pub fn target_is_https(&self) -> Result<bool, WebProverClientError> {
-    let target_url = Url::parse(&self.target_url)?;
+    let target_url = Url::parse(&self.manifest.request.url)?;
     Ok(target_url.scheme() == "https")
   }
 }

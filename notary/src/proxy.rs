@@ -80,9 +80,10 @@ async fn from_reqwest_response(response: Response) -> NotaryResponse {
       version,
       message,
       headers,
-      body: ManifestResponseBody { json_path: vec![] },
+      // TODO: This makes me think that perhaps this should be an optional field or something else
+      body: ManifestResponseBody::default(),
     },
-    notary_response_body: NotaryResponseBody { json },
+    notary_response_body: NotaryResponseBody { body: json },
   }
 }
 
@@ -143,12 +144,16 @@ fn validate_notarization_legal(
   request: &ManifestRequest,
   response: &NotaryResponse,
 ) -> Result<(), NotaryServerError> {
-  manifest.validate()?;
-  if !manifest.request.is_subset_of(request) {
+  let req_result = manifest.request.is_subset_of(request)?;
+  if !req_result.is_success() {
+    info!("Manifest request validation failed: {:?}", req_result.errors());
     return Err(NotaryServerError::ManifestRequestMismatch);
   }
-  if !response.matches_client_manifest(&manifest.response) {
-    return Err(NotaryServerError::ManifestResponseMismatch);
+
+  let result = response.match_and_extract(&manifest.response)?;
+  if !result.is_success() {
+    info!("Manifest validation failed: {:?}", result.errors());
   }
+  info!("Manifest returned values: {:?}", result.values());
   Ok(())
 }
