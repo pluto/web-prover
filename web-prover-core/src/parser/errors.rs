@@ -87,6 +87,12 @@ pub enum ExtractorErrorWithId {
   ExtractorError { extractor_id: String, error: ExtractorError },
 }
 
+impl From<(String, ExtractorError)> for ExtractorErrorWithId {
+  fn from((extractor_id, error): (String, ExtractorError)) -> Self {
+    ExtractorErrorWithId::ExtractorError { extractor_id, error }
+  }
+}
+
 /// Errors that can occur during predicate validation
 #[derive(Debug, Error)]
 pub enum PredicateError {

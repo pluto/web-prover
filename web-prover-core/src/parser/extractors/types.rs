@@ -171,16 +171,25 @@ impl ExtractionResult {
 
   /// Adds an error to the result and logs it
   pub fn report_error(&mut self, error: ExtractorErrorWithId) {
-    debug!("Extraction error: {}", error);
+    tracing::debug!(
+      error_type = "extraction",
+      error_msg = %error,
+      "Extraction error occurred"
+    );
     self.errors.push(error.to_string());
   }
 
   /// Adds an extractor error to the result and logs it
   fn add_extractor_error(&mut self, extractor: &Extractor, error: ExtractorError) {
-    self.report_error(ExtractorErrorWithId::ExtractorError {
-      extractor_id: extractor.id.clone(),
-      error,
-    });
+    tracing::debug!(
+      error_type = "extractor",
+      extractor_id = %extractor.id,
+      error_msg = %error,
+      extractor_description = %extractor.description,
+      "Extractor validation failed"
+    );
+
+    self.report_error((extractor.id.clone(), error).into());
   }
 
   /// Merges another extraction result into this one

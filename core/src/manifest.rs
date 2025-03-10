@@ -1,3 +1,5 @@
+use std::fmt;
+
 use derive_more::From;
 use serde::{Deserialize, Serialize};
 use tiny_keccak::{Hasher, Keccak};
@@ -14,6 +16,102 @@ use crate::{
 pub struct ManifestValidationResult {
   errors:            Vec<String>,
   extraction_result: ExtractionResult,
+}
+
+impl fmt::Display for ManifestValidationResult {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let all_errors = self.errors();
+
+    if all_errors.is_empty() {
+      return write!(f, "Validation successful with {} extracted values", self.values().len());
+    }
+
+    writeln!(f, "Validation failed with {} errors:", all_errors.len())?;
+
+    // Group errors by type for better organization
+    let mut validation_errors = Vec::new();
+    let mut http_errors = Vec::new();
+    let mut template_errors = Vec::new();
+    let mut extraction_errors = Vec::new();
+    let mut other_errors = Vec::new();
+
+    for error in &all_errors {
+      if error.starts_with("Invalid manifest:") {
+        validation_errors.push(error);
+      } else if error.starts_with("Manifest HTTP error:") {
+        http_errors.push(error);
+      } else if error.starts_with("Template error:") {
+        template_errors.push(error);
+      } else if error.starts_with("Extraction failed:") || error.starts_with("Extractor") {
+        extraction_errors.push(error);
+      } else {
+        other_errors.push(error);
+      }
+    }
+
+    if !validation_errors.is_empty() {
+      writeln!(f, "Manifest validation errors:")?;
+      for error in validation_errors {
+        writeln!(f, "  - {}", error)?;
+      }
+    }
+
+    if !http_errors.is_empty() {
+      writeln!(f, "HTTP errors:")?;
+      for error in http_errors {
+        writeln!(f, "  - {}", error)?;
+      }
+    }
+
+    if !template_errors.is_empty() {
+      writeln!(f, "Template errors:")?;
+      for error in template_errors {
+        writeln!(f, "  - {}", error)?;
+      }
+    }
+
+    if !extraction_errors.is_empty() {
+      writeln!(f, "Extraction errors:")?;
+      for error in extraction_errors {
+        writeln!(f, "  - {}", error)?;
+      }
+    }
+
+    if !other_errors.is_empty() {
+      writeln!(f, "Other errors:")?;
+      for error in other_errors {
+        writeln!(f, "  - {}", error)?;
+      }
+    }
+
+    // Include successfully extracted values (if any)
+    let values = self.values();
+    if !values.is_empty() {
+      writeln!(f, "Successfully extracted {} values:", values.len())?;
+      for (key, value) in &values {
+        let value_str = if value.to_string().len() > 50 {
+          format!("{}... (truncated)", &value.to_string()[..47])
+        } else {
+          value.to_string()
+        };
+        writeln!(f, "  - {}: {}", key, value_str)?;
+      }
+    }
+
+    Ok(())
+  }
+}
+
+/// Helper function to categorize manifest errors
+fn get_error_category(error: &ManifestError) -> &'static str {
+  match error {
+    ManifestError::InvalidManifest(_) => "manifest_validation",
+    ManifestError::ManifestHttpError(_) => "http_validation",
+    ManifestError::SerdeError(_) => "serialization",
+    ManifestError::Template(_) => "template_validation",
+    ManifestError::ExtractionFailed(_) => "extraction",
+    ManifestError::ExtractorError(_) => "extraction",
+  }
 }
 
 impl ManifestValidationResult {
@@ -44,9 +142,14 @@ impl ManifestValidationResult {
     errors
   }
 
-  /// Adds an error to the summary and logs it
+  /// Adds an error to the summary and logs it with structured context
   pub fn report_error(&mut self, error: ManifestError) {
-    debug!("Manifest validation error: {}", error);
+    tracing::debug!(
+      error_type = "manifest_validation",
+      error_msg = %error,
+      category = %get_error_category(&error),
+      "Manifest validation error occurred"
+    );
     self.errors.push(error.to_string());
   }
 }
@@ -431,6 +534,51 @@ mod tests {
     assert!(result.is_success());
     assert_eq!(result.errors().len(), 0);
     assert_eq!(result.values().len(), 1);
+  }
+
+  #[test]
+  fn test_manifest_validation_result_display() {
+    let mut result = ManifestValidationResult::default();
+
+    // Add various types of errors
+    result.add_error("Invalid manifest: Test error");
+    result.add_error("Manifest HTTP error: Header mismatch");
+    result.add_error("Template error: Missing variable");
+    result.add_error("Extraction failed: No data");
+    result.add_error("Some other error type");
+
+    // Add some extracted values
+    let mut values = ExtractionValues::new();
+    values.insert("key1".to_string(), json!("value1"));
+    values.insert("key2".to_string(), json!(42));
+    result.merge_extraction_result(&ExtractionResult { values, errors: vec![] });
+
+    // Convert to string representation
+    let display_output = result.to_string();
+
+    // Verify all error categories are present
+    assert!(display_output.contains("Validation failed with 5 errors:"));
+    assert!(display_output.contains("Manifest validation errors:"));
+    assert!(display_output.contains("HTTP errors:"));
+    assert!(display_output.contains("Template errors:"));
+    assert!(display_output.contains("Extraction errors:"));
+    assert!(display_output.contains("Other errors:"));
+
+    // Verify all errors are included
+    assert!(display_output.contains("- Invalid manifest: Test error"));
+    assert!(display_output.contains("- Manifest HTTP error: Header mismatch"));
+    assert!(display_output.contains("- Template error: Missing variable"));
+    assert!(display_output.contains("- Extraction failed: No data"));
+    assert!(display_output.contains("- Some other error type"));
+
+    // Verify extracted values are shown
+    assert!(display_output.contains("Successfully extracted 2 values:"));
+    assert!(display_output.contains("- key1: \"value1\""));
+    assert!(display_output.contains("- key2: 42"));
+
+    // Test success case
+    let success_result = ManifestValidationResult::default();
+    assert_eq!(success_result.to_string(), "Validation successful with 0 extracted values");
   }
 
   #[test]
