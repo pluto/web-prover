@@ -59,7 +59,7 @@ impl TryFrom<&str> for ExtractorType {
   type Error = ExtractorError;
 
   fn try_from(value: &str) -> Result<Self, Self::Error> {
-    match value {
+    match value.to_lowercase().as_str() {
       "string" => Ok(ExtractorType::String),
       "number" => Ok(ExtractorType::Number),
       "boolean" => Ok(ExtractorType::Boolean),
@@ -88,6 +88,7 @@ impl Display for ExtractorType {
 fn default_true() -> bool { true }
 
 /// A data extractor configuration
+// TODO: Consider introducing a generic type parameter for the extractor https://github.com/pluto/web-prover/pull/547#discussion_r1986080565
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Extractor {
   /// Unique identifier for the extractor
@@ -110,9 +111,8 @@ pub struct Extractor {
   pub attribute:      Option<String>,
 }
 
-impl Extractor {}
-
 /// The extracted values, keyed by extractor ID
+// TODO: Consider supporting lazy evaluation https://github.com/pluto/web-prover/pull/547#discussion_r1986223169
 pub type ExtractionValues = HashMap<String, Value>;
 
 /// The result of an extraction operation
