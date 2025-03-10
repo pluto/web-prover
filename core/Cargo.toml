@@ -14,3 +14,4 @@ url        ={ workspace=true }
 # Using `regress` crate for compatibility with ECMAScript regular expressions in Manifest validation
 regex  ="1.11.1"
 regress="0.10.3"
+tl     ={ version="0.7.8", features=["simd"] }
