@@ -76,9 +76,10 @@ mod tests {
 
   use crate::{
     error::WebProverCoreError,
+    extractor,
     http::{ManifestResponseBody, HTTP_1_1},
     manifest::{Manifest, ManifestRequest, ManifestResponse},
-    parser::{DataFormat, Extractor, ExtractorConfig, ExtractorType},
+    parser::{DataFormat, ExtractorConfig, ExtractorType},
     request, response,
     template::TemplateVar,
     test_utils::TEST_MANIFEST,
@@ -121,13 +122,11 @@ mod tests {
 
     let expected_body = ManifestResponseBody(ExtractorConfig {
       format:     DataFormat::Json,
-      extractors: vec![Extractor {
+      extractors: vec![extractor! {
         id:             "userInfo".to_string(),
         description:    "Extract user information".to_string(),
         selector:       vec!["hello".to_string()],
         extractor_type: ExtractorType::String,
-        required:       true,
-        predicates:     vec![],
       }],
     });
     assert_eq!(manifest.response.body, expected_body);
