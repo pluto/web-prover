@@ -1,3 +1,9 @@
+//! Error types for the web-prover-notary crate.
+//! - `ProxyError`: Errors that occur during proxy operations
+//! - `NotaryServerError`: Errors that occur in the notary server
+//!
+//! It also provides conversion to HTTP responses for integration with the web framework.
+
 use axum::{
   http::StatusCode,
   response::{IntoResponse, Response},
@@ -7,54 +13,72 @@ use thiserror::Error;
 use tracing::error;
 use web_prover_core::error::WebProverCoreError;
 
-// TODO (autoparallel): I think these error enums should be combined into `WebProverNotaryError`.
-// Combining enums is a good practice. They could also all be moved to the `web-prover-core` crate
-// so there is one spot for all the errors. This makes error handling more consistent and easier to
-// manage.
-
+/// Errors related to the proxy functionality.
+///
+/// These errors occur during proxy operations, such as forwarding requests
+/// and handling responses between the client and the target server.
 #[derive(Debug, Error)]
 pub enum ProxyError {
-  #[error(transparent)]
+  /// IO error during proxy operations
+  #[error("IO error: {0}")]
   Io(#[from] std::io::Error),
 
-  #[error(transparent)]
+  /// Error when converting a slice to an array
+  #[error("Array conversion error: {0}")]
   TryIntoError(#[from] std::array::TryFromSliceError),
 
-  #[error(transparent)]
+  /// Base64 decoding error
+  #[error("Base64 decoding error: {0}")]
   Base64Decode(#[from] base64::DecodeError),
 
-  #[error(transparent)]
+  /// JSON serialization/deserialization error
+  #[error("JSON error: {0}")]
   SerdeJsonError(#[from] serde_json::Error),
 }
 
-#[derive(Debug, thiserror::Error)]
+/// Errors related to the notary server.
+///
+/// These errors represent all possible failures that can occur in the notary server,
+/// including configuration errors, certificate errors, and proxy errors.
+#[derive(Debug, Error)]
 pub enum NotaryServerError {
-  #[error(transparent)]
+  /// Unexpected error with full context
+  #[error("Unexpected error: {0}")]
   Unexpected(#[from] Report),
 
-  #[error(transparent)]
+  /// IO error
+  #[error("IO error: {0}")]
   Io(#[from] std::io::Error),
 
-  #[error(transparent)]
+  /// JSON serialization/deserialization error
+  #[error("JSON error: {0}")]
   SerdeJson(#[from] serde_json::Error),
 
-  #[error("Error occurred from reading certificates: {0}")]
+  /// Error occurred from reading certificates
+  #[error("Certificate error: {0}")]
   CertificateError(String),
 
-  #[error("Error occurred from reasing server config: {0}")]
+  /// Error occurred from reading server config
+  #[error("Server configuration error: {0}")]
   ServerConfigError(String),
 
+  /// Manifest-request mismatch
   #[error("Manifest-request mismatch")]
   ManifestRequestMismatch,
 
-  #[error(transparent)]
+  /// Proxy error
+  #[error("Proxy error: {0}")]
   ProxyError(#[from] ProxyError),
 
-  #[error(transparent)]
+  /// Web prover core error
+  #[error("Core error: {0}")]
   WebProverCoreError(#[from] WebProverCoreError),
 }
 
-/// Trait implementation to convert this error into an axum http response
+/// Trait implementation to convert this error into an axum http response.
+///
+/// This allows the error to be returned directly from axum handlers,
+/// automatically converting it to an appropriate HTTP response.
 impl IntoResponse for NotaryServerError {
   fn into_response(self) -> Response {
     error!("notary error: {:?}", self);

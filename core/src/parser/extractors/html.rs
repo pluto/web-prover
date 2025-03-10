@@ -407,7 +407,7 @@ mod tests {
 
   #[test]
   fn test_html_extract_basic_text() {
-    let dom = parse_html(&BASIC_HTML);
+    let dom = parse_html(BASIC_HTML);
     assert_html_extraction(
       &dom,
       &["#main-title".to_string()],
@@ -419,7 +419,7 @@ mod tests {
 
   #[test]
   fn test_html_extraction_errors() {
-    let dom = parse_html(&BASIC_HTML);
+    let dom = parse_html(BASIC_HTML);
     let basic_extractor = extractor!(
       id: "test".to_string(),
       description: "Test extractor".to_string(),

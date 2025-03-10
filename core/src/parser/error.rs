@@ -1,9 +1,23 @@
+//! Error types for the parser module.
+//!
+//! This module contains error types related to parsing and extraction:
+//! - `ExtractorError`: Errors that occur during extraction operations
+//! - `ExtractorErrorWithId`: Extractor errors with an associated ID
+//! - `PredicateError`: Errors that occur during predicate validation
+//!
+//! These error types provide detailed context about what went wrong during
+//! parsing and extraction operations.
+
 use serde_json::Value;
 use thiserror::Error;
 
 use crate::parser::predicate::{Comparison, PredicateType};
 
-/// Errors that can occur during extraction operations
+/// Errors that can occur during extraction operations.
+///
+/// These errors provide detailed information about what went wrong during
+/// the extraction process, including context about the specific operation
+/// that failed.
 #[derive(Debug, Error)]
 pub enum ExtractorError {
   /// Error when an unsupported extractor type is provided
@@ -31,7 +45,7 @@ pub enum ExtractorError {
   InvalidRegex(String),
 
   /// Error when JSON parsing fails
-  #[error(transparent)]
+  #[error("JSON error: {0}")]
   JsonError(#[from] serde_json::Error),
 
   /// Error when an array index is out of bounds
@@ -63,8 +77,7 @@ pub enum ExtractorError {
   InvalidFormat(String),
 
   /// Predicate error
-  // TODO: Should this be a standalone error?
-  #[error(transparent)]
+  #[error("Predicate error: {0}")]
   PredicateError(#[from] PredicateError),
 
   /// Error when HTML parsing fails
@@ -80,6 +93,10 @@ pub enum ExtractorError {
   SelectorFailed(String),
 }
 
+/// Extractor error with an ID.
+///
+/// This error type associates an extractor ID with an `ExtractorError`,
+/// providing additional context about which extractor failed.
 #[derive(Debug, Error)]
 pub enum ExtractorErrorWithId {
   /// Extractor error decorated with an extractor ID
@@ -93,7 +110,11 @@ impl From<(String, ExtractorError)> for ExtractorErrorWithId {
   }
 }
 
-/// Errors that can occur during predicate validation
+/// Errors that can occur during predicate validation.
+///
+/// These errors provide detailed information about what went wrong during
+/// predicate validation, including context about the values being compared
+/// and the type of comparison that failed.
 #[derive(Debug, Error)]
 pub enum PredicateError {
   /// Value is not equal to expected value

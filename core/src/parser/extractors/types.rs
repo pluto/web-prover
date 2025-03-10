@@ -9,7 +9,7 @@ use serde_json::Value;
 use tracing::debug;
 
 use crate::parser::{
-  errors::ExtractorErrorWithId, extractors::get_value_type, predicate, predicate::Predicate,
+  error::ExtractorErrorWithId, extractors::get_value_type, predicate, predicate::Predicate,
   DataFormat, ExtractorConfig, ExtractorError,
 };
 

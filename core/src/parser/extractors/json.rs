@@ -1,7 +1,7 @@
 use serde_json::Value;
 
 use super::types::{DocumentExtractor, ExtractedValue, ExtractionResult, RawDocument};
-use crate::parser::{errors::ExtractorError, DataFormat, Extractor, ExtractorConfig};
+use crate::parser::{error::ExtractorError, DataFormat, Extractor, ExtractorConfig};
 
 /// Helper function to get the type of serde_json::Value as a string
 pub fn get_value_type(value: &Value) -> &'static str {

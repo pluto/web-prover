@@ -1,8 +1,14 @@
-//! Error type for the `web-prover-core` crate.
+//! Error types for the `web-prover-core` crate.
+//!
+//! - `WebProverCoreError`: The primary error type encompassing a variety of errors that can occur
+//!   during the core operations of the crate.
+//! - `ManifestHttpError`: Specific to issues related to HTTP manifest validation, such as
+//!   mismatched statuses, versions, or missing headers.
+//! - `TemplateError`: Errors related to template processing, including variable mismatches, regex
+//!   issues, and default value problems.
 
 use thiserror::Error;
 
-/// Represents the various error conditions that can occur within the `proofs` crate.
 #[derive(Debug, Error)]
 pub enum WebProverCoreError {
   /// The error is an invalid manifest
@@ -30,6 +36,9 @@ pub enum WebProverCoreError {
   ExtractionFailed(String),
 }
 
+/// Errors related to HTTP manifest validation.
+///
+/// These errors occur when validating HTTP requests and responses against a manifest.
 #[derive(Debug, Error)]
 pub enum ManifestHttpError {
   /// HTTP status mismatch between expected and actual status
@@ -61,7 +70,9 @@ pub enum ManifestHttpError {
   UrlMismatch { expected: String, actual: String },
 }
 
-/// Represents specific error conditions related to template handling
+/// Errors related to template handling.
+///
+/// These errors occur when validating and processing templates.
 #[derive(Debug, Error)]
 pub enum TemplateError {
   /// Required template variable is not used in the template

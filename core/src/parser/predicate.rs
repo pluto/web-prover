@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::parser::{errors::PredicateError, extractors::get_value_type};
+use crate::parser::{error::PredicateError, extractors::get_value_type};
 
 /// The type of predicate to apply
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy)]

@@ -3,7 +3,7 @@ use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 
 use crate::parser::{
-  errors::ExtractorError,
+  error::ExtractorError,
   extractors::{ExtractionResult, Extractor},
   DocumentExtractor, HtmlDocumentExtractor, JsonDocumentExtractor,
 };
@@ -180,7 +180,7 @@ mod tests {
     assert_eq!(extractor1.description, "Extract user's name");
     assert_eq!(extractor1.selector, vec!["user", "name"]);
     assert_eq!(extractor1.extractor_type, ExtractorType::String);
-    assert_eq!(extractor1.required, true);
+    assert!(extractor1.required);
     assert_eq!(extractor1.predicates.len(), 1);
 
     let predicate1 = &extractor1.predicates[0];
@@ -193,7 +193,7 @@ mod tests {
     assert_eq!(extractor2.description, "Extract user's age");
     assert_eq!(extractor2.selector, vec!["user", "age"]);
     assert_eq!(extractor2.extractor_type, ExtractorType::Number);
-    assert_eq!(extractor2.required, true);
+    assert!(extractor2.required);
     assert_eq!(extractor2.predicates.len(), 1);
 
     let predicate2 = &extractor2.predicates[0];
@@ -241,7 +241,7 @@ mod tests {
     assert_eq!(extractor.id, "userAge");
     assert_eq!(extractor.selector, vec!["user", "age"]);
     assert_eq!(extractor.extractor_type, ExtractorType::Number);
-    assert_eq!(extractor.required, true);
+    assert!(extractor.required);
 
     let predicate = &extractor.predicates[0];
     assert_eq!(predicate.predicate_type, PredicateType::Value);

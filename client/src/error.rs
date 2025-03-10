@@ -1,73 +1,96 @@
-use std::array::TryFromSliceError;
+//! Error types for the web-prover-client crate.
+//!
+//! This module defines the `WebProverClientError` enum, which represents
+//! all possible errors that can occur within the client crate. It includes
+//! errors from external dependencies as well as client-specific errors.
 
 use thiserror::Error;
-impl From<TryFromSliceError> for WebProverClientError {
-  fn from(err: TryFromSliceError) -> WebProverClientError {
-    WebProverClientError::Other(err.to_string())
-  }
-}
 
-// TODO (autoparallel): Combining enums is a good practice. This error enum could also all be moved
-// to the `web-prover-core` crate so there is one spot for all the errors. This makes error handling
-// more consistent and easier to manage.
-
+/// Errors related to the web prover client.
+///
+/// This enum represents all possible errors that can occur within the client crate.
+/// It includes errors from external dependencies (like network errors, parsing errors)
+/// as well as client-specific errors (like missing manifest or TEE proof).
 #[derive(Debug, Error)]
 pub enum WebProverClientError {
+  /// Rustls TLS error
   #[cfg(not(target_arch = "wasm32"))]
-  #[error(transparent)]
+  #[error("TLS error: {0}")]
   RustTls(#[from] rustls::Error),
 
-  #[error(transparent)]
+  /// UTF-8 conversion error
+  #[error("UTF-8 conversion error: {0}")]
   FromUtf8(#[from] std::string::FromUtf8Error),
 
-  #[error(transparent)]
+  /// Reqwest HTTP client error
+  #[error("HTTP client error: {0}")]
   Reqwest(#[from] reqwest::Error),
 
-  #[error(transparent)]
+  /// IO error
+  #[error("IO error: {0}")]
   Io(#[from] std::io::Error),
 
-  #[error(transparent)]
+  /// JSON serialization/deserialization error
+  #[error("JSON error: {0}")]
   SerdeJson(#[from] serde_json::Error),
 
-  #[error(transparent)]
+  /// Hyper HTTP error
+  #[error("HTTP error: {0}")]
   Hyper(#[from] hyper::Error),
 
-  #[error(transparent)]
+  /// HTTP protocol error
+  #[error("HTTP protocol error: {0}")]
   Http(#[from] hyper::http::Error),
 
-  #[error(transparent)]
+  /// Async task join error
+  #[error("Async task error: {0}")]
   Join(#[from] tokio::task::JoinError),
 
-  #[error(transparent)]
+  /// UTF-8 error
+  #[error("UTF-8 error: {0}")]
   Utf8(#[from] std::str::Utf8Error),
 
-  #[error(transparent)]
+  /// URL parsing error
+  #[error("URL parsing error: {0}")]
   UrlParse(#[from] url::ParseError),
 
-  #[error(transparent)]
+  /// Invalid HTTP header name
+  #[error("Invalid HTTP header name: {0}")]
   InvalidHeaderName(#[from] hyper::header::InvalidHeaderName),
 
-  #[error(transparent)]
+  /// Invalid HTTP header value
+  #[error("Invalid HTTP header value: {0}")]
   InvalidHeaderValue(#[from] hyper::header::InvalidHeaderValue),
 
-  #[error(transparent)]
+  /// Base64 decoding error
+  #[error("Base64 decoding error: {0}")]
   Base64Decode(#[from] base64::DecodeError),
 
-  #[error(transparent)]
+  /// Hex decoding error
+  #[error("Hex decoding error: {0}")]
   HexDecode(#[from] hex::FromHexError),
 
-  #[error(transparent)]
+  /// Invalid DNS name error
+  #[error("Invalid DNS name: {0}")]
   InvalidDnsNameError(#[from] rustls::pki_types::InvalidDnsNameError),
 
-  #[error(transparent)]
+  /// Async operation canceled
+  #[error("Async operation canceled: {0}")]
   Canceled(#[from] futures::channel::oneshot::Canceled),
 
+  /// Manifest missing error
   #[error("Manifest missing")]
   ManifestMissingError,
 
+  /// Other error
   #[error("Other error: {0}")]
   Other(String),
 
+  /// TEE proof missing
   #[error("TEE proof missing")]
   TeeProofMissing,
+
+  /// Core error
+  #[error("Core error: {0}")]
+  CoreError(#[from] web_prover_core::error::WebProverCoreError),
 }
