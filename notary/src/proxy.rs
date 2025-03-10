@@ -144,10 +144,16 @@ fn validate_notarization_legal(
   request: &ManifestRequest,
   response: &NotaryResponse,
 ) -> Result<(), NotaryServerError> {
-  manifest.validate()?;
-  if !manifest.request.is_subset_of(request) {
+  let req_result = manifest.request.is_subset_of(request)?;
+  if !req_result.is_success() {
+    info!("Manifest request validation failed: {:?}", req_result.errors());
     return Err(NotaryServerError::ManifestRequestMismatch);
   }
-  let _result = response.match_and_extract(&manifest.response);
+
+  let result = response.match_and_extract(&manifest.response)?;
+  if !result.is_success() {
+    info!("Manifest validation failed: {:?}", result.errors());
+  }
+  info!("Manifest returned values: {:?}", result.values());
   Ok(())
 }

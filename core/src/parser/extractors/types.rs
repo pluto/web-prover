@@ -9,8 +9,8 @@ use serde_json::Value;
 use tracing::debug;
 
 use crate::parser::{
-  extractors::get_value_type, predicate, predicate::Predicate, DataFormat, ExtractorConfig,
-  ExtractorError,
+  errors::ExtractorErrorWithId, extractors::get_value_type, predicate, predicate::Predicate,
+  DataFormat, ExtractorConfig, ExtractorError,
 };
 
 /// Trait for extracting data from a document
@@ -116,7 +116,7 @@ pub struct Extractor {
 pub type ExtractionValues = HashMap<String, Value>;
 
 /// The result of an extraction operation
-#[derive(Debug, Clone, Default, Serialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct ExtractionResult {
   /// The extracted values, keyed by extractor ID
   pub values: ExtractionValues,
@@ -139,7 +139,7 @@ impl ExtractionResult {
         let value = extracted.into_value();
         if let Err(type_err) = extractor.extractor_type.is_valid_type(&value) {
           if extractor.required {
-            self.add_error(extractor, type_err);
+            self.add_extractor_error(extractor, type_err);
           }
           return;
         }
@@ -148,7 +148,7 @@ impl ExtractionResult {
         for predicate in &extractor.predicates {
           if let Err(pred_err) = predicate::validate_predicate(&value, predicate) {
             if extractor.required {
-              self.add_error(extractor, ExtractorError::PredicateError(pred_err));
+              self.add_extractor_error(extractor, ExtractorError::PredicateError(pred_err));
             }
             predicate_valid = false;
             break;
@@ -163,15 +163,43 @@ impl ExtractionResult {
         }
       },
       Err(err) if extractor.required => {
-        self.add_error(extractor, err);
+        self.add_extractor_error(extractor, err);
       },
       _ => {},
     }
   }
 
-  fn add_error(&mut self, extractor: &Extractor, error: ExtractorError) {
-    self.errors.push(format!("Extractor '{}': {}", extractor.id, error));
+  /// Adds an error to the result and logs it
+  pub fn report_error(&mut self, error: ExtractorErrorWithId) {
+    tracing::debug!(
+      error_type = "extraction",
+      error_msg = %error,
+      "Extraction error occurred"
+    );
+    self.errors.push(error.to_string());
   }
+
+  /// Adds an extractor error to the result and logs it
+  fn add_extractor_error(&mut self, extractor: &Extractor, error: ExtractorError) {
+    tracing::debug!(
+      error_type = "extractor",
+      extractor_id = %extractor.id,
+      error_msg = %error,
+      extractor_description = %extractor.description,
+      "Extractor validation failed"
+    );
+
+    self.report_error((extractor.id.clone(), error).into());
+  }
+
+  /// Merges another extraction result into this one
+  pub fn merge(&mut self, other: &ExtractionResult) {
+    self.values.extend(other.clone().values);
+    self.errors.extend(other.clone().errors);
+  }
+
+  /// Returns `true` if no errors were encountered during extraction
+  pub fn is_success(&self) -> bool { self.errors.is_empty() }
 }
 
 /// The value extracted from the raw document

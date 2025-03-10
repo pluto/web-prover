@@ -19,8 +19,9 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::{
-  error::WebProverCoreError,
-  parser::{DataFormat, ExtractionValues, ExtractorConfig},
+  error::{ManifestHttpError, TemplateError, WebProverCoreError},
+  manifest::ManifestValidationResult,
+  parser::{DataFormat, ExtractorConfig},
   template,
   template::TemplateVar,
 };
@@ -165,27 +166,38 @@ impl NotaryResponse {
   pub fn match_and_extract(
     &self,
     other: &ManifestResponse,
-  ) -> Result<Option<ExtractionValues>, WebProverCoreError> {
+  ) -> Result<ManifestValidationResult, WebProverCoreError> {
+    let mut result = ManifestValidationResult::default();
+
     // Check basic response properties
-    if self.response.status != other.status
-      || self.response.version != other.version
-      || self.response.message != other.message
-    {
-      debug!("Exact matches for status, version, or message do not match");
-      return Ok(None);
+    if self.response.status != other.status {
+      result.report_error(
+        ManifestHttpError::StatusMismatch {
+          expected: other.status.clone(),
+          actual:   self.response.status.clone(),
+        }
+        .into(),
+      );
+    }
+    if self.response.version != other.version {
+      result.report_error(
+        ManifestHttpError::VersionMismatch {
+          expected: other.version.clone(),
+          actual:   self.response.version.clone(),
+        }
+        .into(),
+      );
+    }
+    if self.response.message != other.message {
+      result.report_error(
+        ManifestHttpError::MessageMismatch {
+          expected: other.message.clone(),
+          actual:   self.response.message.clone(),
+        }
+        .into(),
+      );
     }
 
-    // Check headers
-    if !self.headers_match(other) {
-      return Ok(None);
-    }
-
-    // Check body
-    self.body_matches(other)
-  }
-
-  /// Helper method to check if headers match
-  fn headers_match(&self, other: &ManifestResponse) -> bool {
     for (key, other_value) in &other.headers {
       match self
         .response
@@ -195,51 +207,75 @@ impl NotaryResponse {
       {
         Some(actual_value) if actual_value.to_lowercase() == other_value.to_lowercase() => continue,
         Some(actual_value) => {
-          debug!(
-            "Header mismatch for key: {}: expected={}, actual={}",
-            key, other_value, actual_value
+          result.report_error(
+            ManifestHttpError::HeaderMismatch {
+              expected: other_value.clone(),
+              actual:   actual_value.clone(),
+            }
+            .into(),
           );
-          return false;
         },
         None => {
-          debug!("Header key not present in self: {}", key);
-          return false;
+          result.report_error(
+            ManifestHttpError::HeaderMissing {
+              expected: other_value.clone(),
+              actual:   key.clone(),
+            }
+            .into(),
+          );
         },
       }
     }
-    true
+
+    // Check body
+    let body_result = self.body_matches(other)?;
+    result.merge(&body_result);
+
+    // Return combined result
+    Ok(result)
   }
 
   /// Helper method to check if body matches and extract values
   fn body_matches(
     &self,
     other: &ManifestResponse,
-  ) -> Result<Option<ExtractionValues>, WebProverCoreError> {
+  ) -> Result<ManifestValidationResult, WebProverCoreError> {
+    let mut result = ManifestValidationResult::default();
+
     match &self.notary_response_body.body {
       Some(body) => {
-        let result = other.body.0.extract_and_validate(body)?;
+        let extraction_result = other.body.0.extract_and_validate(body)?;
+        result.merge_extraction_result(&extraction_result);
 
-        if !result.errors.is_empty() {
-          debug!("Response body does not match: {:?}", result.errors);
-          return Ok(None);
+        if !extraction_result.is_success() {
+          result.report_error(WebProverCoreError::ExtractionFailed(
+            "Extraction returned errors".to_string(),
+          ));
         }
 
-        if result.values.len() != other.body.0.extractors.len() {
-          debug!("Not all extractors were matched");
-          return Ok(None);
+        if extraction_result.values.len() != other.body.0.extractors.len() {
+          result.report_error(WebProverCoreError::ExtractionFailed(
+            "Not all values were extracted".to_string(),
+          ));
         }
 
         debug!("Client response matches");
-        Ok(Some(result.values))
+        Ok(result)
       },
       None if other.body.0.extractors.is_empty() => {
         // If we get here, there was a match but no data
         debug!("Client response matches (no data in response body)");
-        Ok(Some(HashMap::new()))
+        result.report_error(WebProverCoreError::ExtractionFailed(
+          "Client response returned no data".to_string(),
+        ));
+        Ok(result)
       },
       None => {
         debug!("No data to match against");
-        Ok(None)
+        result.report_error(WebProverCoreError::ExtractionFailed(
+          "No data to match against".to_string(),
+        ));
+        Ok(result)
       },
     }
   }
@@ -517,34 +553,71 @@ impl ManifestRequest {
   /// - All headers in `self` must exist in `other` with matching values.
   /// - All vars in `self` must exist in `other` with matching constraints.
   /// - All remaining fields like `method`, `url`, and `body` must also match.
-  pub fn is_subset_of(&self, other: &ManifestRequest) -> bool {
+  pub fn is_subset_of(
+    &self,
+    other: &ManifestRequest,
+  ) -> Result<ManifestValidationResult, WebProverCoreError> {
+    let mut result = ManifestValidationResult::default();
+
     // Check if all headers in `self` exist in `other` with the same value
     for (key, value) in &self.headers {
       let expected_header =
         other.headers.get(key).or_else(|| other.headers.get(&key.to_lowercase()));
       if expected_header != Some(value) {
-        return false;
+        result.report_error(
+          ManifestHttpError::HeaderMismatch {
+            expected: value.clone(),
+            actual:   expected_header.cloned().unwrap_or_else(|| "missing".to_string()),
+          }
+          .into(),
+        );
       }
     }
 
-    // TODO: Not sure how to handle `vars` now, so disabling this
-    // Check if all vars in `self` exist in `other` with the same or compatible constraints
-    // for (key, var) in &self.vars {
-    //   match other.vars.get(key) {
-    //     Some(other_var) =>
-    //       if var != other_var {
-    //         return false;
-    //       },
-    //     None => {
-    //       return false;
-    //     },
-    //   }
-    // }
+    for (key, var) in &self.vars {
+      match other.vars.get(key) {
+        Some(other_var) =>
+          if var != other_var {
+            result.report_error(WebProverCoreError::Template(TemplateError::VariableMismatch {
+              key: key.clone(),
+            }))
+          },
+        None => result.report_error(WebProverCoreError::Template(TemplateError::VariableMissing {
+          key: key.clone(),
+        })),
+      }
+    }
 
-    // TODO: Notice that we match body exactly below
-    // TODO: What to do with the body? Ominous
-    // self.method == other.method && self.url == other.url && self.body == other.body
-    self.method == other.method && self.url == other.url
+    if self.method != other.method {
+      result.report_error(
+        ManifestHttpError::MethodMismatch {
+          expected: other.method.clone(),
+          actual:   self.method.clone(),
+        }
+        .into(),
+      );
+    }
+
+    if self.url != other.url {
+      result.report_error(
+        ManifestHttpError::UrlMismatch { expected: other.url.clone(), actual: self.url.clone() }
+          .into(),
+      );
+    }
+
+    if self.version != other.version {
+      result.report_error(
+        ManifestHttpError::VersionMismatch {
+          expected: other.version.clone(),
+          actual:   self.version.clone(),
+        }
+        .into(),
+      );
+    }
+
+    // We don't compare the body here because this is what extractors are for
+
+    Ok(result)
   }
 }
 
@@ -562,14 +635,13 @@ pub mod tests {
   macro_rules! request {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
-        // Make clippy happy
-        #[allow(unused_mut) ]
+        #[allow(unused_mut)]
         let mut request = ManifestRequest {
-          method: "GET".to_string(),
+            method: "GET".to_string(),
             url: "https://example.com".to_string(),
             version: "HTTP/1.1".to_string(),
             headers: std::collections::HashMap::from([
-                ("Authorization".to_string(), "Bearer <TOKEN>".to_string()),
+                ("Authorization".to_string(), "Bearer <%TOKEN%>".to_string()),
                 ("User-Agent".to_string(), "test-agent".to_string()),
             ]),
             body: None,
@@ -606,7 +678,20 @@ pub mod tests {
             headers: std::collections::HashMap::from([
                 ("Content-Type".to_string(), "application/json".to_string())
             ]),
-            body: ManifestResponseBody::default(),
+            body: ManifestResponseBody {
+                0: ExtractorConfig {
+                    format: DataFormat::Json,
+                    extractors: vec![crate::parser::Extractor {
+                      id: "dummy".to_string(),
+                      description: "Dummy extractor".to_string(),
+                      selector: vec![],
+                      extractor_type: crate::parser::ExtractorType::String,
+                      required: true,
+                      predicates: vec![],
+                      attribute: None,
+                    }],
+                },
+            },
         };
 
         // Override default fields with provided arguments
@@ -680,12 +765,12 @@ pub mod tests {
 
     // Is a perfect match with itself
     let matching_result = notary_response.match_and_extract(&response).unwrap();
-    assert!(matching_result.is_some());
-    assert_eq!(matching_result.unwrap().get("testKey").unwrap(), &json!(3));
+    assert!(matching_result.is_success());
+    assert_eq!(matching_result.values().get("testKey").unwrap(), &json!(3));
 
     // Fails if it doesn't match directly
     let non_matching_response = response!(status: "201".to_string());
-    assert!(notary_response.match_and_extract(&non_matching_response).unwrap().is_none());
+    assert!(!notary_response.match_and_extract(&non_matching_response).unwrap().is_success());
 
     // Superset case
     let response_superset = {
@@ -699,7 +784,7 @@ pub mod tests {
       ));
       res
     };
-    assert!(response_superset.match_and_extract(&response).unwrap().is_some());
+    assert!(response_superset.match_and_extract(&response).unwrap().is_success());
   }
 
   #[test]
@@ -802,7 +887,7 @@ pub mod tests {
             )],
         })
     );
-    assert!(!base_response.match_and_extract(&other_response).unwrap().is_some());
+    assert!(!base_response.match_and_extract(&other_response).unwrap().is_success());
   }
 
   #[test]

@@ -103,14 +103,14 @@ impl fmt::Display for ManifestValidationResult {
 }
 
 /// Helper function to categorize manifest errors
-fn get_error_category(error: &ManifestError) -> &'static str {
+fn get_error_category(error: &WebProverCoreError) -> &'static str {
   match error {
-    ManifestError::InvalidManifest(_) => "manifest_validation",
-    ManifestError::ManifestHttpError(_) => "http_validation",
-    ManifestError::SerdeError(_) => "serialization",
-    ManifestError::Template(_) => "template_validation",
-    ManifestError::ExtractionFailed(_) => "extraction",
-    ManifestError::ExtractorError(_) => "extraction",
+    WebProverCoreError::InvalidManifest(_) => "manifest_validation",
+    WebProverCoreError::ManifestHttpError(_) => "http_validation",
+    WebProverCoreError::SerdeError(_) => "serialization",
+    WebProverCoreError::Template(_) => "template_validation",
+    WebProverCoreError::ExtractionFailed(_) => "extraction",
+    WebProverCoreError::ExtractorError(_) => "extraction",
   }
 }
 
@@ -143,7 +143,7 @@ impl ManifestValidationResult {
   }
 
   /// Adds an error to the summary and logs it with structured context
-  pub fn report_error(&mut self, error: ManifestError) {
+  pub fn report_error(&mut self, error: WebProverCoreError) {
     tracing::debug!(
       error_type = "manifest_validation",
       error_msg = %error,
@@ -199,7 +199,7 @@ impl Manifest {
     &self,
     request: &ManifestRequest,
     response: &NotaryResponse,
-  ) -> Result<ManifestValidationResult, ManifestError> {
+  ) -> Result<ManifestValidationResult, WebProverCoreError> {
     let mut result = ManifestValidationResult::default();
 
     // Validate manifest fields
@@ -252,8 +252,6 @@ mod tests {
   use serde_json::json;
 
   use crate::{
-    error::WebProverCoreError,
-    extractor,
     extractor,
     http::{ManifestResponseBody, NotaryResponse, NotaryResponseBody, HTTP_1_1},
     manifest::{Manifest, ManifestRequest, ManifestResponse, ManifestValidationResult},
