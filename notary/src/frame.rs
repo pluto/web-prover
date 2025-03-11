@@ -12,10 +12,13 @@ use uuid::Uuid;
 
 use crate::SharedState;
 
-pub mod sessions;
-pub use sessions::Session;
+pub mod _sessions;
+pub use _sessions::Session;
 
-pub mod states;
+pub mod _views;
+pub mod actions;
+
+pub mod views;
 
 pub async fn handler(
   ws: WebSocketUpgrade,
@@ -61,11 +64,14 @@ async fn handle_websocket(
   // allow frame session to write to websocket
   session.lock().await.set_writer(Some(WebSocketWriter::new(sender))).await;
 
+  // send current view to client
+  // TODO
+
   // handle incoming websocket messages
   while let Some(Ok(message)) = receiver.next().await {
     match message {
       axum::extract::ws::Message::Text(text) => {
-        let state = match serde_json::from_str::<states::State>(&text) {
+        let state = match serde_json::from_str::<actions::State>(&text) {
           Ok(state) => state,
           Err(e) => {
             warn!("Failed to parse websocket message: {}", e);
@@ -105,7 +111,7 @@ impl WebSocketWriter {
   }
 }
 
-impl sessions::Writer for WebSocketWriter {
+impl _sessions::Writer for WebSocketWriter {
   async fn write<T: Serialize + Send + Sync>(&mut self, data: &T) -> Result<(), String> {
     use futures::SinkExt;
 

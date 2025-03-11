@@ -38,7 +38,9 @@ mod verifier;
 
 struct SharedState {
   notary_signing_key: SigningKey,
-  frame_sessions:     Arc<Mutex<HashMap<Uuid, Arc<Mutex<frame::Session<frame::WebSocketWriter>>>>>>,
+
+  // TODO do we really need to wrap frame::Session in an Arc<Mutex<>>?
+  frame_sessions: Arc<Mutex<HashMap<Uuid, Arc<Mutex<frame::Session<frame::WebSocketWriter>>>>>>,
 }
 
 /// Main entry point for the notary server application.
