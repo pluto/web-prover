@@ -1,0 +1,8 @@
+[package]
+edition="2021"
+name   ="web-prover-executor"
+version="0.1.0"
+
+[dependencies]
+tempfile={ workspace=true }
+uuid    ={ workspace=true }
