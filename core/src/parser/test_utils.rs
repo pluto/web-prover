@@ -18,11 +18,11 @@ pub fn create_json_config(extractors: Vec<Extractor>) -> ExtractorConfig {
 macro_rules! extractor {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
-        let mut extractor = crate::parser::Extractor {
+        let mut extractor = $crate::parser::Extractor {
             id: String::new(),
             description: String::new(),
             selector: Vec::new(),
-            extractor_type: crate::parser::ExtractorType::String,
+            extractor_type: $crate::parser::ExtractorType::String,
             required: true,
             predicates: Vec::new(),
             attribute: None,
@@ -70,9 +70,9 @@ pub fn assert_extraction_error(
 macro_rules! predicate {
         // Match with optional parameters
         ($($key:ident: $value:expr),* $(,)?) => {{
-            let mut predicate = crate::parser::predicate::Predicate {
-                predicate_type: crate::parser::predicate::PredicateType::Value,
-                comparison: crate::parser::predicate::Comparison::Equal,
+            let mut predicate = $crate::parser::predicate::Predicate {
+                predicate_type: $crate::parser::predicate::PredicateType::Value,
+                comparison: $crate::parser::predicate::Comparison::Equal,
                 value: serde_json::Value::Null,
                 case_sensitive: true,
                 flags: None,

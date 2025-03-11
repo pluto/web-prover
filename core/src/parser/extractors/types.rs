@@ -8,9 +8,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::debug;
 
-use crate::parser::{
-  errors::ExtractorErrorWithId, extractors::get_value_type, predicate, predicate::Predicate,
-  DataFormat, ExtractorConfig, ExtractorError,
+use crate::{
+  hash::keccak_digest,
+  parser::{
+    errors::ExtractorErrorWithId, extractors::get_value_type, predicate, predicate::Predicate,
+    DataFormat, ExtractorConfig, ExtractorError,
+  },
 };
 
 /// Trait for extracting data from a document
@@ -200,6 +203,12 @@ impl ExtractionResult {
 
   /// Returns `true` if no errors were encountered during extraction
   pub fn is_success(&self) -> bool { self.errors.is_empty() }
+
+  /// Compute a `Keccak256` hash of the serialized ExtractionResult
+  pub fn to_keccak_digest(&self) -> Result<[u8; 32], ExtractorError> {
+    let as_bytes: Vec<u8> = serde_json::to_vec(self)?;
+    Ok(keccak_digest(&as_bytes))
+  }
 }
 
 /// The value extracted from the raw document

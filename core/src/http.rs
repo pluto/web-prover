@@ -681,11 +681,11 @@ pub mod tests {
             body: ManifestResponseBody {
                 0: ExtractorConfig {
                     format: DataFormat::Json,
-                    extractors: vec![crate::parser::Extractor {
+                    extractors: vec![$crate::parser::Extractor {
                       id: "dummy".to_string(),
                       description: "Dummy extractor".to_string(),
                       selector: vec![],
-                      extractor_type: crate::parser::ExtractorType::String,
+                      extractor_type: $crate::parser::ExtractorType::String,
                       required: true,
                       predicates: vec![],
                       attribute: None,

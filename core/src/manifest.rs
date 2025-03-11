@@ -2,11 +2,11 @@ use std::fmt;
 
 use derive_more::From;
 use serde::{Deserialize, Serialize};
-use tiny_keccak::{Hasher, Keccak};
 use tracing::debug;
 
 use crate::{
   error::WebProverCoreError,
+  hash::keccak_digest,
   http::{ManifestRequest, ManifestResponse, NotaryResponse},
   parser::{ExtractionResult, ExtractionValues},
 };
@@ -152,6 +152,10 @@ impl ManifestValidationResult {
     );
     self.errors.push(error.to_string());
   }
+
+  pub fn extraction_keccak_digest(&self) -> Result<[u8; 32], WebProverCoreError> {
+    Ok(self.extraction_result.to_keccak_digest()?)
+  }
 }
 
 /// Manifest containing [`ManifestRequest`] and [`ManifestResponse`]
@@ -217,13 +221,7 @@ impl Manifest {
   /// Compute a `Keccak256` hash of the serialized Manifest
   pub fn to_keccak_digest(&self) -> Result<[u8; 32], WebProverCoreError> {
     let as_bytes: Vec<u8> = self.try_into()?;
-    let mut hasher = Keccak::v256();
-    let mut output = [0u8; 32];
-
-    hasher.update(&as_bytes);
-    hasher.finalize(&mut output);
-
-    Ok(output)
+    Ok(keccak_digest(&as_bytes))
   }
 }
 
