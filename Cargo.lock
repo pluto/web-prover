@@ -3954,7 +3954,9 @@ name = "web-prover-executor"
 version = "0.1.0"
 dependencies = [
  "tempfile",
+ "tracing",
  "uuid",
+ "wait-timeout",
 ]
 
 [[package]]

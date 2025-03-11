@@ -4,5 +4,7 @@ name   ="web-prover-executor"
 version="0.1.0"
 
 [dependencies]
-tempfile={ workspace=true }
-uuid    ={ workspace=true }
+tempfile    ={ workspace=true }
+tracing     ={ workspace=true }
+uuid        ={ workspace=true }
+wait-timeout={ workspace=true }
