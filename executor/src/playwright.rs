@@ -50,6 +50,8 @@ pub struct PlaywrightRunner {
   config:    PlaywrightRunnerConfig,
   /// Path to the Node.js executable
   node_path: PathBuf,
+  /// environment variables
+  env:       Vec<(String, String)>,
 }
 
 #[derive(Debug)]
@@ -58,9 +60,16 @@ pub struct PlaywrightOutput {
   pub stderr: String,
 }
 
+// TODO: add a PlaywrightError type
+
 impl PlaywrightRunner {
-  pub fn new(config: PlaywrightRunnerConfig, template: String, node_path: PathBuf) -> Self {
-    Self { config, template, node_path }
+  pub fn new(
+    config: PlaywrightRunnerConfig,
+    template: String,
+    node_path: PathBuf,
+    env_vars: Vec<(String, String)>,
+  ) -> Self {
+    Self { config, template, node_path, env: env_vars }
   }
 
   pub fn run_script(&self, session_id: Uuid) -> Result<PlaywrightOutput, Box<dyn Error>> {
@@ -79,14 +88,19 @@ impl PlaywrightRunner {
     // Execute the command with timeout
     debug!("Starting Playwright session id: {}", session_id);
     let mut command = Command::new(&self.node_path);
-    let mut child = command
+    let command = command
       .arg(&temp_path)
       .arg(session_id.to_string())
-      .env("DEBUG", "pw:api")
       .current_dir(temp_dir)
       .stdout(Stdio::piped())
-      .stderr(Stdio::piped())
-      .spawn()?;
+      .stderr(Stdio::piped());
+
+    // Add environment variables
+    for (key, value) in &self.env {
+      command.env(key, value);
+    }
+
+    let mut child = command.spawn()?;
 
     // Set a timeout
     let timeout = Duration::from_secs(self.config.timeout_seconds);
@@ -174,8 +188,12 @@ await prove("bank_balance", balance);
       script:          EXAMPLE_DEVELOPER_SCRIPT.to_string(),
       timeout_seconds: 30,
     };
-    let runner =
-      PlaywrightRunner::new(config, PLAYWRIGHT_TEMPLATE.to_string(), PathBuf::from(node_path));
+    let runner = PlaywrightRunner::new(
+      config,
+      PLAYWRIGHT_TEMPLATE.to_string(),
+      PathBuf::from(node_path),
+      vec![(String::from("DEBUG"), String::from("pw:api"))],
+    );
 
     let result = runner.run_script(session_id);
 
