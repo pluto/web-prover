@@ -1,4 +1,5 @@
 use std::{
+  collections::HashMap,
   fs,
   io::{self},
   sync::Arc,
@@ -20,21 +21,24 @@ use rustls::{
   ServerConfig,
 };
 use rustls_acme::{caches::DirCache, AcmeConfig};
-use tokio::{io::AsyncWriteExt, net::TcpListener};
+use tokio::{io::AsyncWriteExt, net::TcpListener, sync::Mutex};
 use tokio_rustls::{LazyConfigAcceptor, TlsAcceptor};
 use tokio_stream::StreamExt;
 use tower_http::cors::CorsLayer;
 use tower_service::Service;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use uuid::Uuid;
 
 mod config;
 mod error;
+mod frame;
 mod proxy;
 mod verifier;
 
 struct SharedState {
   notary_signing_key: SigningKey,
+  frame_sessions:     Arc<Mutex<HashMap<Uuid, Arc<Mutex<frame::Session<frame::WebSocketWriter>>>>>>,
 }
 
 /// Main entry point for the notary server application.
@@ -84,12 +88,15 @@ async fn main() -> Result<(), NotaryServerError> {
   let listener = TcpListener::bind(&c.listen).await?;
   info!("Listening on https://{}", &c.listen);
 
-  let shared_state =
-    Arc::new(SharedState { notary_signing_key: load_notary_signing_key(&c.notary_signing_key) });
+  let shared_state = Arc::new(SharedState {
+    notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
+    frame_sessions:     Arc::new(Mutex::new(HashMap::new())),
+  });
 
   let router = Router::new()
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
     .route("/v1/proxy", post(proxy::proxy))
+    .route("/v1/frame", post(frame::handler))
     .route("/v1/meta/keys/:key", get(meta_keys))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
