@@ -79,7 +79,7 @@ mod tests {
   use crate::{
     error::WebProverCoreError,
     http::{
-      JsonKey, ManifestRequest, ManifestResponse, ManifestResponseBody, TemplateVar, HTTP_1_1,
+     TemplateVar, HTTP_1_1,
     },
     manifest::Manifest,
     request, response,
@@ -92,7 +92,7 @@ mod tests {
         $response:expr
         $(, $field:ident = $value:expr)* $(,)?
     ) => {{
-        Manifest {
+        crate::manifest::Manifest {
             // manifest_version: "1".to_string(),
             // id: "Default Manifest ID".to_string(),
             // title: "Default Manifest Title".to_string(),

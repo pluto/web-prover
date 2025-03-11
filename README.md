@@ -14,6 +14,7 @@
 # Web Prover
 
 [![web-prover workflow](https://github.com/pluto/web-prover/actions/workflows/web-prover.yaml/badge.svg)](https://github.com/pluto/web-prover/actions/workflows/web-prover.yaml)
+[![codecov](https://codecov.io/gh/pluto/web-prover/branch/main/graph/badge.svg)](https://codecov.io/gh/pluto/web-prover)
 [![docs](https://img.shields.io/badge/docs-e28f00)](https://docs.pluto.xyz)
 
 The Web Prover is infrastructure for generating Web Proofs with [Trusted Execution Environments (TEEs)](https://pluto.xyz/blog/web-proof-techniques-tee-mode).
