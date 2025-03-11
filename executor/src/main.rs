@@ -1,4 +1,4 @@
-use std::{io::Write, process::Stdio, time::Duration};
+use std::{io::Write, process::Stdio};
 
 use tempfile::NamedTempFile;
 use uuid::Uuid;
@@ -73,8 +73,34 @@ fn run_playwright_script(script: &str) -> Result<(), Box<dyn std::error::Error>>
   Ok(())
 }
 
+const DEVELOPER_SCRIPT: &str = r#"
+await page.goto("https://pseudo-bank.pluto.dev");
+
+const username = page.getByRole("textbox", { name: "Username" });
+const password = page.getByRole("textbox", { name: "Password" });
+
+let input = await prompt([
+  { title: "Username", types: "text" },
+  { title: "Password", types: "password" },
+]);
+
+await username.fill(input.inputs[0]);
+await password.fill(input.inputs[1]);
+
+const loginBtn = page.getByRole("button", { name: "Login" });
+await loginBtn.click();
+
+await page.waitForSelector("text=Your Accounts", { timeout: 5000 });
+
+const balanceLocator = page.locator("\#balance-2");
+await balanceLocator.waitFor({ state: "visible", timeout: 5000 });
+const balanceText = (await balanceLocator.textContent()) || "";
+const balance = parseFloat(balanceText.replace(/[$,]/g, ""));
+
+await prove("bank_balance", balance);
+"#;
+
 fn main() {
-  println!("Hello, world!");
   // Example developer script to inject
   let developer_script = r#"
   await page.goto('https://example.com');
@@ -84,6 +110,7 @@ fn main() {
   await page.screenshot({ path: 'example.png' });
   console.log('Screenshot taken');
   "#;
+  let developer_script = DEVELOPER_SCRIPT;
 
   let _ = run_playwright_script(developer_script);
 }

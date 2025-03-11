@@ -31,6 +31,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 mod config;
 mod error;
 mod proxy;
+mod runner;
 mod verifier;
 
 struct SharedState {
@@ -90,6 +91,8 @@ async fn main() -> Result<(), NotaryServerError> {
   let router = Router::new()
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
     .route("/v1/proxy", post(proxy::proxy))
+    .route("/v1/prompt", post(runner::prompt))
+    .route("/v1/prove", post(runner::prove))
     .route("/v1/meta/keys/:key", get(meta_keys))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
