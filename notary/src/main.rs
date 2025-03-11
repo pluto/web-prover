@@ -34,6 +34,7 @@ mod config;
 mod error;
 mod frame;
 mod proxy;
+mod runner;
 mod verifier;
 
 struct SharedState {
