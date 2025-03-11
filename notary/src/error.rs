@@ -44,9 +44,6 @@ pub enum NotaryServerError {
   #[error("Error occurred from reasing server config: {0}")]
   ServerConfigError(String),
 
-  #[error("Manifest-request mismatch")]
-  ManifestRequestMismatch,
-
   #[error(transparent)]
   ProxyError(#[from] ProxyError),
 

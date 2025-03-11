@@ -10,10 +10,11 @@ use serde_json::Value;
 use tracing::info;
 use uuid::Uuid;
 use web_prover_core::{
+  hash::keccak_digest,
   http::{
     ManifestRequest, ManifestResponse, ManifestResponseBody, NotaryResponse, NotaryResponseBody,
   },
-  manifest::Manifest,
+  manifest::{Manifest, ManifestValidationResult},
   proof::{TeeProof, TeeProofData},
 };
 
@@ -22,7 +23,6 @@ use crate::{
   verifier::{sign_verification, VerifyOutput},
   SharedState,
 };
-
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
   session_id: Uuid,
@@ -113,25 +113,23 @@ fn capitalize_header(header: &str) -> String {
     .join("-")
 }
 
-// TODO: Should TeeProof and other proofs be moved to `proofs` crate?
-// Otherwise, adding TeeProof::manifest necessitates extra dependencies on the client
-// Notice that all inputs to this function are from `proofs` crate
 pub fn create_tee_proof(
   manifest: &Manifest,
   request: &ManifestRequest,
   response: &NotaryResponse,
   State(state): State<Arc<SharedState>>,
 ) -> Result<TeeProof, NotaryServerError> {
-  validate_notarization_legal(manifest, request, response)?;
+  let validation_result = validate_notarization_legal(manifest, request, response)?;
 
   let manifest_hash = manifest.to_keccak_digest()?;
+  let extraction_hash = validation_result.extraction_keccak_digest()?;
+  let proof_value_hash = keccak_digest(&[manifest_hash, extraction_hash].concat());
+
   let to_sign = VerifyOutput {
-    // Using manifest hash as a value here since we are not exposing any values extracted
-    // from the request or response
-    value:    format!("0x{}", hex::encode(manifest_hash)),
+    value:    format!("0x{}", hex::encode(proof_value_hash)),
     manifest: manifest.clone(),
   };
-  let signature = sign_verification(to_sign, State(state)).unwrap();
+  let signature = sign_verification(to_sign, State(state))?;
   let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
 
   Ok(TeeProof { data, signature })
@@ -143,17 +141,11 @@ fn validate_notarization_legal(
   manifest: &Manifest,
   request: &ManifestRequest,
   response: &NotaryResponse,
-) -> Result<(), NotaryServerError> {
-  let req_result = manifest.request.is_subset_of(request)?;
-  if !req_result.is_success() {
-    info!("Manifest request validation failed: {:?}", req_result.errors());
-    return Err(NotaryServerError::ManifestRequestMismatch);
-  }
-
-  let result = response.match_and_extract(&manifest.response)?;
+) -> Result<ManifestValidationResult, NotaryServerError> {
+  let result = manifest.validate_with(request, response)?;
   if !result.is_success() {
     info!("Manifest validation failed: {:?}", result.errors());
   }
   info!("Manifest returned values: {:?}", result.values());
-  Ok(())
+  Ok(result)
 }
