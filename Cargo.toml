@@ -1,5 +1,5 @@
 [workspace]
-members =["client", "notary", "core", "tests"]
+members =["client", "notary", "core", "tests", "executor"]
 resolver="2"
 
 [workspace.dependencies]
@@ -37,6 +37,8 @@ url        ="2.5.4"
 uuid       ={ version="1.10.0", default-features=false, features=["v4", "serde"] }
 
 tracing-test="0.2"
+
+tempfile="3.18.0"
 
 [profile.dev]
 incremental    =true
