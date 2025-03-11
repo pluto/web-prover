@@ -2,7 +2,7 @@ use std::sync::{Arc, OnceLock};
 
 use axum::{
   extract::{Query, State},
-  response::Response,
+  response::{self, Response},
 };
 #[cfg(feature = "tee-google-confidential-space-token-generator")]
 use caratls_ekm_google_confidential_space_server::GoogleConfidentialSpaceTokenGenerator;
@@ -13,7 +13,7 @@ use client::origo::OrigoSecrets;
 use futures_util::SinkExt;
 use hyper::{body::Bytes, upgrade::Upgraded};
 use hyper_util::rt::TokioIo;
-use serde::Deserialize;
+use serde::{de::value, Deserialize};
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
   time::{timeout, Duration},
@@ -252,10 +252,34 @@ pub fn create_tee_proof(
     value:    format!("0x{}", hex::encode(manifest_hash)),
     manifest: manifest.clone(),
   };
+
+  // in the reddit example
+  let value_trgt = response.notary_response_body.clone().json.unwrap();
+  // this value is some json that has not been checked to see if our key is in it?
+  // for example if we are looking the key "hello", we do not know if it is there yet.
+  debug!("value_trgt: {:?}", value_trgt);
+
   let signature = sign_verification(to_sign, State(state)).unwrap();
-  let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
+  let data =
+    TeeProofData { manifest_hash: manifest_hash.to_vec(), value: value_trgt.to_string() };
 
   Ok(TeeProof { data, signature })
+}
+
+// pub struct SignedVerificationReply {
+//   pub merkle_leaves: Vec<String>, // leaves: hash(manifest), hash(value)
+//   pub digest:        String, // digest merkle root
+//   pub signature:     String,
+//   pub signature_r:   String,
+//   pub signature_s:   String,
+//   pub signature_v:   u8,
+//   pub signer:        String,
+// }
+
+struct fulldata {
+  SignedVerificationReply: bool,
+  value:                   String, /* the only real reason we need this is because the users
+                                    * needs to be able see what they are proving. */
 }
 
 /// Check if `manifest`, `request`, and `response` all fulfill requirements necessary for
