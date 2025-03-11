@@ -91,11 +91,21 @@ async fn main() -> Result<(), NotaryServerError> {
   let router = Router::new()
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
     .route("/v1/proxy", post(proxy::proxy))
-    .route("/v1/prompt", post(runner::prompt))
-    .route("/v1/prove", post(runner::prove))
     .route("/v1/meta/keys/:key", get(meta_keys))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
+
+  // Create a separate internal router for prompts
+  // and Start the internal HTTP server as a separate task
+  let internal_router =
+    Router::new().route("/prompt", post(runner::prompt)).route("/prove", post(runner::prove));
+  let internal_listener = TcpListener::bind(&c.listen_internal).await?;
+  info!("Internal server listening on http://{}", &c.listen_internal);
+  tokio::spawn(async move {
+    if let Err(e) = axum::serve(internal_listener, internal_router).await {
+      error!("Internal server error: {:?}", e);
+    }
+  });
 
   if !c.server_cert.is_empty() || !c.server_key.is_empty() {
     let _ = listen(listener, router, &c.server_cert, &c.server_key).await;
