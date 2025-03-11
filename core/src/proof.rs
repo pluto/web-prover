@@ -33,5 +33,6 @@ impl TryFrom<TeeProof> for Vec<u8> {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TeeProofData {
+  pub value:         String,
   pub manifest_hash: Vec<u8>,
 }

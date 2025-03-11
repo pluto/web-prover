@@ -121,17 +121,14 @@ pub fn create_tee_proof(
 ) -> Result<TeeProof, NotaryServerError> {
   let validation_result = validate_notarization_legal(manifest, request, response)?;
 
+  let value = response.notary_response_body.clone().json.unwrap();
   let manifest_hash = manifest.to_keccak_digest()?;
   let extraction_hash = validation_result.extraction_keccak_digest()?;
   let proof_value_hash = keccak_digest(&[manifest_hash, extraction_hash].concat());
 
-  let to_sign = VerifyOutput {
-    value:    format!("0x{}", hex::encode(proof_value_hash)),
-    manifest: manifest.clone(),
-  };
-  let signature = sign_verification(to_sign, State(state))?;
-  let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
-
+  let to_sign = VerifyOutput { value, manifest: manifest.clone() };
+  let signature = sign_verification(to_sign, State(state)).unwrap();
+  let data = TeeProofData { value, manifest_hash: manifest_hash.to_vec() };
   Ok(TeeProof { data, signature })
 }
 
