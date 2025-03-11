@@ -1,13 +1,12 @@
-use std::sync::Arc;
-
 use axum::{
-  extract::{self, State},
+  extract::{self},
   Json,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tracing::debug;
 
-use crate::{error::NotaryServerError, SharedState};
+use crate::error::NotaryServerError;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Prompt {
@@ -34,18 +33,18 @@ pub struct ProveRequest {
 }
 
 pub async fn prompt(
-  State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<PromptRequest>,
 ) -> Result<Json<PromptResponse>, NotaryServerError> {
+  debug!("Prompting: {:?}", payload);
   let inputs = payload.prompts.iter().map(|prompt| prompt.title.clone()).collect();
   let response = PromptResponse { inputs };
+
   Ok(Json(response))
 }
 
 pub async fn prove(
-  State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<ProveRequest>,
 ) -> Result<Json<()>, NotaryServerError> {
-  println!("Proving: {:?}", payload);
+  debug!("Proving: {:?}", payload);
   Ok(Json(()))
 }

@@ -15,6 +15,7 @@ pub struct Config {
   pub server_cert:        String,
   pub server_key:         String,
   pub listen:             String,
+  pub listen_internal:    String,
   pub notary_signing_key: String,
   pub acme_email:         String,
   pub acme_domain:        String,
@@ -27,6 +28,7 @@ pub fn read_config() -> Config {
   let builder = config::Config::builder()
     // TODO is this the right way to make server_cert optional?
     .set_default("listen", "0.0.0.0:443").unwrap()
+    .set_default("listen_internal", "127.0.0.1:7935").unwrap()
     .set_default("server_cert", "").unwrap()
     .set_default("server_key", "").unwrap()
     .set_default("notary_signing_key", "").unwrap()
