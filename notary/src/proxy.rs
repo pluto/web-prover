@@ -125,7 +125,8 @@ pub fn create_tee_proof(
   let serialized_value = serde_json::to_string(&value).unwrap();
   let to_sign = VerifyOutput { value: serialized_value.clone(), manifest: manifest.clone() };
   let signature = sign_verification(to_sign, State(state)).unwrap();
-  let data = TeeProofData { value: serialized_value, manifest_hash: manifest_hash.to_vec() };
+  let data =
+    TeeProofData { value: serialized_value, manifest_hash: manifest_hash.to_vec() };
   Ok(TeeProof { data, signature })
 }
 
