@@ -10,42 +10,77 @@ use serde::Serialize;
 //  * DoneView
 
 pub enum Action {
-  GoToView(ViewKind), // can only be "sent" by Notary/ server
+  View(View), // can only be "sent" by Notary/ server
   Message(Payload),
   Close,
 }
 
-pub enum ViewKind {
-  InitialViewKind(InitialView),
-  DoneViewKind(DoneView),
+pub enum View {
+  InitialView(InitialView),
+  DoneView(DoneView),
 }
 
 pub struct Payload {}
 
-pub trait Handler {
-  fn handle(&mut self, action: &Action) -> Action;
-}
+
 
 pub struct InitialView {
   foo: String,
 }
 
-impl Handler for InitialView {}
+impl InitialView {
+  pub fn into_done_view(&self) -> DoneView {
+
+  }
+}
 
 pub struct DoneView {
   bar: String,
 }
 
-pub struct Session {
-  current_view: ViewKind,
+pub struct Session<V: ViewT> {
+  current_view: V,
 }
 
-impl Session {
-  pub fn handle(&mut self, input_json: &[u8]) {
-    // serde deseralize into Action::Message::Payload
-    let response = self.current_view.handle(Action::Message::Payload);
+pub trait ViewT: Serialize {
+  fn handle(&mut self, action: &Action) -> View;
+}
+
+impl ViewT for InitialView {
+  fn handle(&mut self, action: &Action) -> View {
+      match action {
+        Action::View(_) => ..,
+
+      }
   }
 }
+
+
+impl Session {
+  pub fn handle(&mut self, input_json: &[u8]) -> Vec<u8> {
+    // serde deseralize into Action::Message::Payload
+    let action: Action = serde_json::from_slice(input_json);    
+
+    let next_view = self.current_view.handle(action);
+
+    return serde_json::to_vec(next_view);
+
+    // match (self.current_view, action) {
+    //   (View::InitialView(initial_view), Action::View(View::DoneView(_))) => {serde_json::to_vec(initial_view.into_done_view());},
+    //   _ => Err("Invalid action given:\nAction:{:?}\nState:{:?}");
+    // }
+
+   let response = self.current_view.handle(action); 
+   // TODO serialize response and then send to websocket connection
+   // if response == Close -> close connection
+  }
+}
+
+
+
+// impl Handler for InitialView {}
+
+
 
 // pub struct Handler {
 //   state: HandlerStates,
