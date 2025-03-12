@@ -23,7 +23,13 @@ pub struct Session {
 impl Session {
   pub fn new(session_id: Uuid) -> Self { Session { session_id } }
 
-  /// Called when the client closes the connection.
+  /// Called when the client connects. Can be called multiple times.
+  pub async fn on_client_connect(&mut self) {}
+
+  /// Called when the client disconnects unexpectedly. Can be called multiple times.
+  pub async fn on_client_disconnect(&mut self) {}
+
+  /// Called when the client closes the connection. Called only once.
   pub async fn on_client_close(&mut self) {}
 }
 
@@ -37,11 +43,11 @@ pub async fn handler(
     Some(id) => match Uuid::parse_str(id) {
       Ok(uuid) => uuid,
       Err(_) =>
-        return (axum::http::StatusCode::BAD_REQUEST, "Invalid session_id format, expected UUID")
+        return (axum::http::StatusCode::BAD_REQUEST, "Invalid session_id format, expected UUID") // TODO return json error
           .into_response(),
     },
     None =>
-      return (axum::http::StatusCode::BAD_REQUEST, "Missing required session_id query parameter")
+      return (axum::http::StatusCode::BAD_REQUEST, "Missing required session_id query parameter") // TODO return json error
         .into_response(),
   };
 
@@ -50,7 +56,7 @@ pub async fn handler(
   let session = match frame_sessions.remove(&session_id) {
     Some(ConnectionState::Connected) => {
       frame_sessions.insert(session_id, ConnectionState::Connected);
-      return (axum::http::StatusCode::BAD_REQUEST, "Session already connected").into_response();
+      return (axum::http::StatusCode::BAD_REQUEST, "Session already connected").into_response(); // TODO return json error
     },
 
     Some(ConnectionState::Disconnected(session, _)) => {
@@ -76,8 +82,9 @@ async fn handle_websocket_connection(
   mut session: Session,
 ) {
   info!("[{}] New Websocket connected", session.session_id);
-  let mut disconnected = false;
+  let mut keepalive = false;
   let (sender, mut receiver) = socket.split();
+  session.on_client_connect().await; // TODO pass sender?
 
   // TODO what if next() returns None?!
   while let Some(result) = receiver.next().await {
@@ -85,11 +92,11 @@ async fn handle_websocket_connection(
       Ok(message) => {
         match message {
           axum::extract::ws::Message::Text(text) => {
-            // TODO
+            // TODO parse json text and call session handle func
           },
           axum::extract::ws::Message::Binary(_) => {
             warn!("Binary messages are not supported");
-            disconnected = true;
+            keepalive = false;
             break;
           },
           axum::extract::ws::Message::Ping(_) => {
@@ -99,26 +106,27 @@ async fn handle_websocket_connection(
             todo!("Are Pongs handled by axum's tokio-tungstenite?");
           },
           axum::extract::ws::Message::Close(_) => {
-            session.on_client_close().await;
-            disconnected = true;
+            keepalive = false;
             break;
           },
         }
       },
       Err(_err) => {
-        disconnected = false;
+        keepalive = true;
         break;
       },
     }
   }
 
   let mut frame_sessions = state.frame_sessions.lock().await;
-  if !disconnected {
+  if keepalive {
     // If the Websocket connection drops, mark it as disconnected, unless it was correctly closed.
     info!("[{}] Websocket disconnected", session.session_id);
+    session.on_client_disconnect().await;
     frame_sessions
       .insert(session.session_id, ConnectionState::Disconnected(session, SystemTime::now()));
   } else {
+    session.on_client_close().await;
     frame_sessions.remove(&session.session_id);
   }
 }
