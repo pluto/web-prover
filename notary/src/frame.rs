@@ -7,8 +7,11 @@ use axum::{
 use futures::StreamExt;
 use tracing::{info, warn};
 use uuid::Uuid;
+use views::View;
 
 use crate::SharedState;
+
+pub mod views;
 
 pub enum ConnectionState<Session> {
   Connected,
@@ -17,14 +20,22 @@ pub enum ConnectionState<Session> {
 }
 
 pub struct Session {
-  session_id: Uuid,
+  session_id:   Uuid,
+  // client:       Option<Client>,
+  current_view: View,
 }
 
 impl Session {
-  pub fn new(session_id: Uuid) -> Self { Session { session_id } }
+  pub fn new(session_id: Uuid) -> Self {
+    Session { session_id, current_view: View::InitialView(views::InitialView {}) }
+  }
+
+  // pub async fn handle(&mut self, request: Request) -> Response;
 
   /// Called when the client connects. Can be called multiple times.
-  pub async fn on_client_connect(&mut self) {}
+  pub async fn on_client_connect(&mut self) {
+    // TODO send current_view serialized
+  }
 
   /// Called when the client disconnects unexpectedly. Can be called multiple times.
   pub async fn on_client_disconnect(&mut self) {}
@@ -33,7 +44,7 @@ impl Session {
   pub async fn on_client_close(&mut self) {}
 }
 
-pub async fn handler(
+pub async fn on_websocket(
   ws: WebSocketUpgrade,
   Query(params): Query<std::collections::HashMap<String, String>>,
   State(state): State<Arc<SharedState>>,
@@ -92,7 +103,7 @@ async fn handle_websocket_connection(
       Ok(message) => {
         match message {
           axum::extract::ws::Message::Text(text) => {
-            // TODO parse json text and call session handle func
+            // TODO parse json text and call session handle func, then call send with it
           },
           axum::extract::ws::Message::Binary(_) => {
             warn!("Binary messages are not supported");
