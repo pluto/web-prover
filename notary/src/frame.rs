@@ -5,13 +5,21 @@ use axum::{
   response::IntoResponse,
 };
 use futures::StreamExt;
+use serde::{Deserialize, Serialize};
+use tokio::sync::oneshot;
+use thiserror::Error;
 use tracing::{info, warn};
 use uuid::Uuid;
-use views::View;
 
+// use views::View;
 use crate::SharedState;
 
-pub mod views;
+// pub mod views;
+
+
+#[derive(Debug, Error)]
+pub enum FrameError {
+}
 
 pub enum ConnectionState<Session> {
   Connected,
@@ -19,18 +27,42 @@ pub enum ConnectionState<Session> {
                                       * every 60 secs */
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Action {
+  pub kind:    String,
+  pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Serialize)]
+pub enum View {
+  InitialView,
+}
+
 pub struct Session {
   session_id:   Uuid,
-  // client:       Option<Client>,
+  // sender:        Option<SplitSink<WebSocket, Message>>,
   current_view: View,
+  cancel:       oneshot::Sender<()>,
 }
 
 impl Session {
   pub fn new(session_id: Uuid) -> Self {
-    Session { session_id, current_view: View::InitialView(views::InitialView {}) }
+    let (cancel_sender, cancel_receiver) = oneshot::channel();
+    let session = Session { session_id, current_view: View::InitialView, cancel: cancel_sender };
+    tokio::spawn(session.run(cancel_receiver));
+    session
   }
 
-  // pub async fn handle(&mut self, request: Request) -> Response;
+  async fn run(&self, cancel: oneshot::Receiver<()>) {
+    // TODO start running playwright script etc
+
+    // TODO kill the session if cancelled
+    let _ = cancel.await;
+  }
+
+  pub async fn handle(&mut self, request: Action) -> Action {
+      todo!("")
+  };
 
   /// Called when the client connects. Can be called multiple times.
   pub async fn on_client_connect(&mut self) {
@@ -41,7 +73,7 @@ impl Session {
   pub async fn on_client_disconnect(&mut self) {}
 
   /// Called when the client closes the connection. Called only once.
-  pub async fn on_client_close(&mut self) {}
+  pub async fn on_client_close(&self) { let _ = self.cancel.send(()); }
 }
 
 pub async fn on_websocket(
@@ -103,7 +135,7 @@ async fn handle_websocket_connection(
       Ok(message) => {
         match message {
           axum::extract::ws::Message::Text(text) => {
-            // TODO parse json text and call session handle func, then call send with it
+              process_text_message(text, &mut session, sender).await;
           },
           axum::extract::ws::Message::Binary(_) => {
             warn!("Binary messages are not supported");
@@ -140,4 +172,11 @@ async fn handle_websocket_connection(
     session.on_client_close().await;
     frame_sessions.remove(&session.session_id);
   }
+}
+
+async fn process_text_message(text: String, session: Session, sender: SplitSink<WebSocket, Message>) {
+    // TODO parse text into Action
+    // TODO call session.handle(action)
+    // TODO send error result to client
+    // TODO send action result to client
 }
