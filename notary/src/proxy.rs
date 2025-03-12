@@ -7,12 +7,13 @@ use axum::{
 use reqwest::{Request, Response};
 use serde::Deserialize;
 use serde_json::Value;
-use tracing::info;
+use tracing::{debug, info};
 use uuid::Uuid;
 use web_prover_core::{
   hash::keccak_digest,
   http::{
-    ManifestRequest, ManifestResponse, ManifestResponseBody, NotaryResponse, NotaryResponseBody,
+    JsonKey, ManifestRequest, ManifestResponse, ManifestResponseBody, NotaryResponse,
+    NotaryResponseBody,
   },
   manifest::{Manifest, ManifestValidationResult},
   proof::{TeeProof, TeeProofData},
@@ -57,7 +58,12 @@ pub async fn proxy(
   let response = from_reqwest_response(reqwest_response).await;
   // debug!("{:?}", response);
 
+  if !response.matches_client_manifest(&payload.manifest.response) {
+    return Err(NotaryServerError::ManifestResponseMismatch);
+  }
+
   let tee_proof = create_tee_proof(&payload.manifest, &request, &response, State(state))?;
+  debug!("{:?}", tee_proof);
 
   Ok(Json(tee_proof))
 }
@@ -119,9 +125,10 @@ pub fn create_tee_proof(
   response: &NotaryResponse,
   State(state): State<Arc<SharedState>>,
 ) -> Result<TeeProof, NotaryServerError> {
-  let validation_result = validate_notarization_legal(manifest, request, response)?;
-
-  let value = response.notary_response_body.clone().json.unwrap();
+  validate_notarization_legal(manifest, request, response)?;
+  let path = manifest.response.body.json_path.clone();
+  let body = response.notary_response_body.clone().json.unwrap();
+  let value = get_value_from_json_path(&body, &path);
   let serialized_value = serde_json::to_string(&value).unwrap();
   let to_sign = VerifyOutput { value: serialized_value.clone(), manifest: manifest.clone() };
   let signature = sign_verification(to_sign, State(state)).unwrap();
@@ -143,4 +150,62 @@ fn validate_notarization_legal(
   }
   info!("Manifest returned values: {:?}", result.values());
   Ok(result)
+}
+
+fn get_value_from_json_path(json_body: &Value, path: &[JsonKey]) -> Value {
+  let mut current = json_body;
+  for key in path {
+    current = match key {
+      JsonKey::String(s) => current.get(s),
+      JsonKey::Num(n) => current.get(n),
+    }
+    .unwrap();
+  }
+  current.clone()
+}
+
+#[test]
+fn test_get_value_from_json_path() {
+  let json_body = json!({
+    "foo": {
+      "bar": "baz"
+    }
+  });
+  let path = vec![JsonKey::String("foo".to_string()), JsonKey::String("bar".to_string())];
+  let value = get_value_from_json_path(&json_body, &path).unwrap();
+  assert_eq!(value, "baz");
+}
+
+#[test]
+fn test_get_value_from_json_path_num() {
+  let json_body = json!({
+    "foo": [1, 2, 3]
+  });
+  let path = vec![JsonKey::String("foo".to_string()), JsonKey::Num(1)];
+  let value = get_value_from_json_path(&json_body, &path).unwrap();
+  assert_eq!(value, 2);
+}
+
+#[test]
+fn test_get_value_from_json_path_bool() {
+  let json_body = json!({
+    "foo": {
+      "bar": true
+    }
+  });
+  let path = vec![JsonKey::String("foo".to_string()), JsonKey::String("bar".to_string())];
+  let value = get_value_from_json_path(&json_body, &path).unwrap();
+  assert_eq!(value, true);
+}
+
+#[test]
+fn test_get_value_from_json_path_null() {
+  let json_body = json!({
+    "foo": {
+      "bar": null
+    }
+  });
+  let path = vec![JsonKey::String("foo".to_string()), JsonKey::String("bar".to_string())];
+  let value = get_value_from_json_path(&json_body, &path).unwrap();
+  assert_eq!(value, Value::Null);
 }
