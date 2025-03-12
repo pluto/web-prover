@@ -6,7 +6,7 @@ use axum::{
 };
 use reqwest::{Request, Response};
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 use tracing::{debug, info};
 use uuid::Uuid;
 use web_prover_core::{
@@ -172,7 +172,7 @@ fn test_get_value_from_json_path() {
     }
   });
   let path = vec![JsonKey::String("foo".to_string()), JsonKey::String("bar".to_string())];
-  let value = get_value_from_json_path(&json_body, &path).unwrap();
+  let value = get_value_from_json_path(&json_body, &path);
   assert_eq!(value, "baz");
 }
 
@@ -182,7 +182,7 @@ fn test_get_value_from_json_path_num() {
     "foo": [1, 2, 3]
   });
   let path = vec![JsonKey::String("foo".to_string()), JsonKey::Num(1)];
-  let value = get_value_from_json_path(&json_body, &path).unwrap();
+  let value = get_value_from_json_path(&json_body, &path);
   assert_eq!(value, 2);
 }
 
@@ -194,7 +194,7 @@ fn test_get_value_from_json_path_bool() {
     }
   });
   let path = vec![JsonKey::String("foo".to_string()), JsonKey::String("bar".to_string())];
-  let value = get_value_from_json_path(&json_body, &path).unwrap();
+  let value = get_value_from_json_path(&json_body, &path);
   assert_eq!(value, true);
 }
 
@@ -206,6 +206,6 @@ fn test_get_value_from_json_path_null() {
     }
   });
   let path = vec![JsonKey::String("foo".to_string()), JsonKey::String("bar".to_string())];
-  let value = get_value_from_json_path(&json_body, &path).unwrap();
+  let value = get_value_from_json_path(&json_body, &path);
   assert_eq!(value, Value::Null);
 }
