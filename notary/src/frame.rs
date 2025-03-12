@@ -1,24 +1,27 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::SystemTime};
 
 use axum::{
   extract::{ws::WebSocket, Query, State, WebSocketUpgrade},
   response::IntoResponse,
 };
-use futures::StreamExt;
-use serde::Serialize;
-use tokio::sync::Mutex;
-use tracing::warn;
+use tracing::info;
 use uuid::Uuid;
 
 use crate::SharedState;
 
-pub mod _sessions;
-pub use _sessions::Session;
+pub enum ConnectionState<Session> {
+  Connected,
+  Disconnected(Session, SystemTime), /* TODO run a task that cleans up disconnected sessions
+                                      * every 60 secs */
+}
 
-pub mod _views;
-pub mod actions;
+pub struct Session {
+  session_id: Uuid,
+}
 
-pub mod views;
+impl Session {
+  pub fn new(session_id: Uuid) -> Self { Session { session_id } }
+}
 
 pub async fn handler(
   ws: WebSocketUpgrade,
@@ -38,90 +41,39 @@ pub async fn handler(
         .into_response(),
   };
 
-  // create or resume session
-  let session = {
-    let mut sessions = state.frame_sessions.lock().await;
-    match sessions.get(&session_id) {
-      Some(session) => session.clone(),
-      None => {
-        let session = Arc::new(Mutex::new(Session::new(session_id)));
-        sessions.insert(session_id, session.clone());
-        session
-      },
-    }
+  let mut frame_sessions = state.frame_sessions.lock().await;
+
+  let session = match frame_sessions.remove(&session_id) {
+    Some(ConnectionState::Connected) => {
+      frame_sessions.insert(session_id, ConnectionState::Connected);
+      return (axum::http::StatusCode::BAD_REQUEST, "Session already connected").into_response();
+    },
+
+    Some(ConnectionState::Disconnected(session, _)) => {
+      frame_sessions.insert(session_id, ConnectionState::Connected);
+      session
+    },
+
+    None => {
+      let session = Session::new(session_id);
+      frame_sessions.insert(session_id, ConnectionState::Connected);
+      session
+    },
   };
 
-  ws.on_upgrade(|socket| handle_websocket(session, socket, state))
+  drop(frame_sessions); // drop mutex guard
+
+  ws.on_upgrade(move |socket| handle_websocket_connection(state, socket, session))
 }
 
-async fn handle_websocket(
-  session: Arc<Mutex<Session<WebSocketWriter>>>,
-  socket: WebSocket,
-  _state: Arc<SharedState>,
-) {
-  let (sender, mut receiver) = socket.split();
+async fn handle_websocket_connection(state: Arc<SharedState>, socket: WebSocket, session: Session) {
+  info!("[{}] New Websocket connected", session.session_id);
 
-  // allow frame session to write to websocket
-  session.lock().await.set_writer(Some(WebSocketWriter::new(sender))).await;
+  // TODO: Handle Websocket messages
 
-  // send current view to client
-  // TODO
-
-  // handle incoming websocket messages
-  while let Some(Ok(message)) = receiver.next().await {
-    match message {
-      axum::extract::ws::Message::Text(text) => {
-        let state = match serde_json::from_str::<actions::State>(&text) {
-          Ok(state) => state,
-          Err(e) => {
-            warn!("Failed to parse websocket message: {}", e);
-            continue;
-          },
-        };
-        session.lock().await.read(state).await;
-      },
-      axum::extract::ws::Message::Binary(_) => {
-        warn!("Binary messages are not supported");
-        break;
-      },
-      axum::extract::ws::Message::Ping(_) => {
-        todo!("Are Pings handled by axum's tokio-tungstenite?");
-      },
-      axum::extract::ws::Message::Pong(_) => {
-        todo!("Are Pongs handled by axum's tokio-tungstenite?");
-      },
-      axum::extract::ws::Message::Close(_) => {
-        break;
-      },
-    }
-  }
-
-  session.lock().await.close().await;
-}
-
-pub struct WebSocketWriter {
-  sender: futures::stream::SplitSink<axum::extract::ws::WebSocket, axum::extract::ws::Message>,
-}
-
-impl WebSocketWriter {
-  pub fn new(
-    sender: futures::stream::SplitSink<axum::extract::ws::WebSocket, axum::extract::ws::Message>,
-  ) -> Self {
-    WebSocketWriter { sender }
-  }
-}
-
-impl _sessions::Writer for WebSocketWriter {
-  async fn write<T: Serialize + Send + Sync>(&mut self, data: &T) -> Result<(), String> {
-    use futures::SinkExt;
-
-    let json =
-      serde_json::to_string(data).map_err(|e| format!("Failed to serialize to JSON: {}", e))?;
-
-    self
-      .sender
-      .send(axum::extract::ws::Message::Text(json))
-      .await
-      .map_err(|e| format!("Failed to send message: {}", e))
-  }
+  // If the Websocket connection drops, mark it as disconnected, unless it was correctly closed.
+  info!("[{}] Websocket disconnected", session.session_id);
+  let mut frame_sessions = state.frame_sessions.lock().await;
+  frame_sessions
+    .insert(session.session_id, ConnectionState::Disconnected(session, SystemTime::now()));
 }

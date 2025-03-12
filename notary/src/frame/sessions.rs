@@ -4,18 +4,21 @@ use serde::Serialize;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use super::_views::{InitialView, View};
+// use super::_views::{InitialView, View};
 
 pub struct Session<W: Writer> {
   session_id:   Uuid,
   writer:       Mutex<Option<W>>,
-  current_view: View,
+  // current_view: View,
 }
 
 impl<W: Writer> Session<W> {
   pub fn new(session_id: Uuid) -> Self {
-    Session { session_id, writer: Mutex::new(None), current_view: InitialView::new() }
+    // Session { session_id, writer: Mutex::new(None), current_view: InitialView::new() }
+    Session { session_id, writer: Mutex::new(None)  }
   }
+
+  // pub handle() func which passes through to current_view.handle()
 
   pub async fn set_writer(&mut self, writer: Option<W>) { *self.writer.lock().await = writer; }
 
