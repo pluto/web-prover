@@ -39,8 +39,6 @@ mod verifier;
 struct SharedState {
   notary_signing_key: SigningKey,
 
-  // Can be None if a websocket is currently connected and dealing with the session
-  // frame_sessions: Arc<Mutex<HashMap<Uuid, Option<_frame::Session<_frame::WebSocketWriter>>>>>,
   frame_sessions: Arc<Mutex<HashMap<Uuid, frame::ConnectionState<frame::Session>>>>,
 }
 

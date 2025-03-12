@@ -4,7 +4,8 @@ use axum::{
   extract::{ws::WebSocket, Query, State, WebSocketUpgrade},
   response::IntoResponse,
 };
-use tracing::info;
+use futures::StreamExt;
+use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::SharedState;
@@ -21,6 +22,9 @@ pub struct Session {
 
 impl Session {
   pub fn new(session_id: Uuid) -> Self { Session { session_id } }
+
+  /// Called when the client closes the connection.
+  pub async fn on_client_close(&mut self) {}
 }
 
 pub async fn handler(
@@ -66,14 +70,55 @@ pub async fn handler(
   ws.on_upgrade(move |socket| handle_websocket_connection(state, socket, session))
 }
 
-async fn handle_websocket_connection(state: Arc<SharedState>, socket: WebSocket, session: Session) {
+async fn handle_websocket_connection(
+  state: Arc<SharedState>,
+  socket: WebSocket,
+  mut session: Session,
+) {
   info!("[{}] New Websocket connected", session.session_id);
+  let mut disconnected = false;
+  let (sender, mut receiver) = socket.split();
 
-  // TODO: Handle Websocket messages
+  // TODO what if next() returns None?!
+  while let Some(result) = receiver.next().await {
+    match result {
+      Ok(message) => {
+        match message {
+          axum::extract::ws::Message::Text(text) => {
+            // TODO
+          },
+          axum::extract::ws::Message::Binary(_) => {
+            warn!("Binary messages are not supported");
+            disconnected = true;
+            break;
+          },
+          axum::extract::ws::Message::Ping(_) => {
+            todo!("Are Pings handled by axum's tokio-tungstenite?");
+          },
+          axum::extract::ws::Message::Pong(_) => {
+            todo!("Are Pongs handled by axum's tokio-tungstenite?");
+          },
+          axum::extract::ws::Message::Close(_) => {
+            session.on_client_close().await;
+            disconnected = true;
+            break;
+          },
+        }
+      },
+      Err(_err) => {
+        disconnected = false;
+        break;
+      },
+    }
+  }
 
-  // If the Websocket connection drops, mark it as disconnected, unless it was correctly closed.
-  info!("[{}] Websocket disconnected", session.session_id);
   let mut frame_sessions = state.frame_sessions.lock().await;
-  frame_sessions
-    .insert(session.session_id, ConnectionState::Disconnected(session, SystemTime::now()));
+  if !disconnected {
+    // If the Websocket connection drops, mark it as disconnected, unless it was correctly closed.
+    info!("[{}] Websocket disconnected", session.session_id);
+    frame_sessions
+      .insert(session.session_id, ConnectionState::Disconnected(session, SystemTime::now()));
+  } else {
+    frame_sessions.remove(&session.session_id);
+  }
 }
