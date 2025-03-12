@@ -3954,6 +3954,8 @@ name = "web-prover-executor"
 version = "0.1.0"
 dependencies = [
  "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
  "tracing",
  "uuid",
  "wait-timeout",

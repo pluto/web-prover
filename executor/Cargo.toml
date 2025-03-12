@@ -5,6 +5,8 @@ version="0.1.0"
 
 [dependencies]
 tempfile    ={ workspace=true }
+thiserror   ={ workspace=true }
+tokio       ={ workspace=true }
 tracing     ={ workspace=true }
 uuid        ={ workspace=true }
 wait-timeout={ workspace=true }

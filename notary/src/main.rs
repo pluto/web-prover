@@ -40,7 +40,8 @@ mod verifier;
 struct SharedState {
   notary_signing_key: SigningKey,
 
-  frame_sessions: Arc<Mutex<HashMap<Uuid, frame::ConnectionState<frame::Session>>>>,
+  frame_sessions: Arc<Mutex<HashMap<Uuid, frame::ConnectionState>>>,
+  sessions:       Arc<Mutex<HashMap<Uuid, Arc<Mutex<frame::Session>>>>>,
 }
 
 /// Main entry point for the notary server application.
@@ -93,9 +94,10 @@ async fn main() -> Result<(), NotaryServerError> {
   let shared_state = Arc::new(SharedState {
     notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
     frame_sessions:     Arc::new(Mutex::new(HashMap::new())),
+    sessions:           Arc::new(Mutex::new(HashMap::new())),
   });
 
-  let _ = start_internal_server(&c).await?;
+  let _ = start_internal_server(&c, shared_state.clone()).await?;
 
   let router = Router::new()
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
@@ -115,9 +117,14 @@ async fn main() -> Result<(), NotaryServerError> {
 
 /// Create a separate internal router for prompts and Start the internal HTTP server as a separate
 /// task
-async fn start_internal_server(c: &config::Config) -> Result<(), NotaryServerError> {
-  let internal_router =
-    Router::new().route("/prompt", post(runner::prompt)).route("/prove", post(runner::prove));
+async fn start_internal_server(
+  c: &config::Config,
+  shared_state: Arc<SharedState>,
+) -> Result<(), NotaryServerError> {
+  let internal_router = Router::new()
+    .route("/prompt", post(runner::prompt))
+    .route("/prove", post(runner::prove))
+    .with_state(shared_state);
   let internal_listener = TcpListener::bind(&c.listen_internal).await?;
   info!("Internal server listening on http://{}", &c.listen_internal);
   tokio::spawn(async move {

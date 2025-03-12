@@ -1,1 +1,1 @@
-mod playwright;
+pub mod playwright;

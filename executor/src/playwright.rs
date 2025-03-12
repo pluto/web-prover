@@ -1,5 +1,4 @@
 use std::{
-  error::Error,
   io::{Read, Write},
   path::PathBuf,
   process::{Command, Stdio},
@@ -12,7 +11,7 @@ use uuid::Uuid;
 use wait_timeout::ChildExt;
 
 /// The Playwright template with a placeholder for the script
-const PLAYWRIGHT_TEMPLATE: &str = r#"
+pub const PLAYWRIGHT_TEMPLATE: &str = r#"
 const { chromium } = require('playwright-core');
 const { prompt, prove, setSessionUUID } = require("@plutoxyz/playwright-utils");
 
@@ -38,7 +37,7 @@ const { prompt, prove, setSessionUUID } = require("@plutoxyz/playwright-utils");
 /// Configuration for the Playwright runner
 pub struct PlaywrightRunnerConfig {
   /// Developer script to run in the Playwright template
-  script:              String,
+  pub script:          String,
   /// Timeout for script execution in seconds
   pub timeout_seconds: u64,
 }
@@ -60,6 +59,15 @@ pub struct PlaywrightOutput {
   pub stderr: String,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum PlaywrightError {
+  #[error(transparent)]
+  IoError(#[from] std::io::Error),
+
+  #[error("Playwright execution failed: {0}")]
+  ExecutionError(String),
+}
+
 // TODO: add a PlaywrightError type
 
 impl PlaywrightRunner {
@@ -72,7 +80,7 @@ impl PlaywrightRunner {
     Self { config, template, node_path, env: env_vars }
   }
 
-  pub fn run_script(&self, session_id: Uuid) -> Result<PlaywrightOutput, Box<dyn Error>> {
+  pub async fn run_script(&self, session_id: &Uuid) -> Result<PlaywrightOutput, PlaywrightError> {
     // fill the template with the developer script
     let template = self.template.replace("{{.Script}}", &self.config.script);
 
@@ -110,12 +118,12 @@ impl PlaywrightRunner {
           code
         } else {
           error!("Process terminated by signal: {:?}", status);
-          return Err("Process terminated by signal".into());
+          return Err(PlaywrightError::ExecutionError("Process terminated by signal".into()));
         },
       None => {
         child.kill()?;
         error!("Process timed out after {:?}", timeout);
-        return Err("Process timed out".into());
+        return Err(PlaywrightError::ExecutionError("Process timed out".into()));
       },
     };
 
@@ -175,8 +183,8 @@ const balance = parseFloat(balanceText.replace(/[$,]/g, ""));
 await prove("bank_balance", balance);
 "#;
 
-  #[test]
-  fn test_playwright_script() {
+  #[tokio::test]
+  async fn test_playwright_script() {
     // Example developer script to inject into the Playwright template
     let session_id = Uuid::new_v4();
     // output of `which node`
@@ -195,7 +203,7 @@ await prove("bank_balance", balance);
       vec![(String::from("DEBUG"), String::from("pw:api"))],
     );
 
-    let result = runner.run_script(session_id);
+    let result = runner.run_script(&session_id).await;
 
     if let Err(e) = result {
       eprintln!("Failed to run Playwright script: {:?}", e);
