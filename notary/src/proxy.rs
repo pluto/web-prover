@@ -58,10 +58,6 @@ pub async fn proxy(
   let response = from_reqwest_response(reqwest_response).await;
   // debug!("{:?}", response);
 
-  if !response.matches_client_manifest(&payload.manifest.response) {
-    return Err(NotaryServerError::ManifestResponseMismatch);
-  }
-
   let tee_proof = create_tee_proof(&payload.manifest, &request, &response, State(state))?;
   debug!("{:?}", tee_proof);
 
@@ -126,9 +122,10 @@ pub fn create_tee_proof(
   State(state): State<Arc<SharedState>>,
 ) -> Result<TeeProof, NotaryServerError> {
   validate_notarization_legal(manifest, request, response)?;
-  let path = manifest.response.body.json_path.clone();
-  let body = response.notary_response_body.clone().json.unwrap();
+  let path = manifest.response.body.json_path().clone();
+  let body = serde_json::from_slice(&response.notary_response_body.clone().body.unwrap()).unwrap();
   let value = get_value_from_json_path(&body, &path);
+  let manifest_hash = manifest.to_keccak_digest().unwrap();
   let serialized_value = serde_json::to_string(&value).unwrap();
   let to_sign = VerifyOutput { value: serialized_value.clone(), manifest: manifest.clone() };
   let signature = sign_verification(to_sign, State(state)).unwrap();
