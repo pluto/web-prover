@@ -4,9 +4,10 @@ resolver="2"
 
 [workspace.dependencies]
 # Local re-exporting
-web-prover-client={ path="client" }
-web-prover-core  ={ path="core" }
-web-prover-notary={ path="notary" }
+web-prover-client  ={ path="client" }
+web-prover-core    ={ path="core" }
+web-prover-executor={ path="executor" }
+web-prover-notary  ={ path="notary" }
 # Serde
 serde     ={ version="1.0.204", features=["derive"] }
 serde_json="1.0.120"

@@ -4000,6 +4000,7 @@ dependencies = [
  "uuid",
  "web-prover-client",
  "web-prover-core",
+ "web-prover-executor",
 ]
 
 [[package]]

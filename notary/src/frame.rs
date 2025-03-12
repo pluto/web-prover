@@ -1,13 +1,17 @@
 use std::{sync::Arc, time::SystemTime};
 
 use axum::{
-  extract::{ws::WebSocket, Query, State, WebSocketUpgrade},
+  extract::{
+    ws::{Message, WebSocket},
+    Query, State, WebSocketUpgrade,
+  },
   response::IntoResponse,
 };
 use futures::StreamExt;
+use futures_util::{stream::SplitSink, SinkExt};
 use serde::{Deserialize, Serialize};
-use tokio::sync::oneshot;
 use thiserror::Error;
+use tokio::sync::oneshot;
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -16,10 +20,8 @@ use crate::SharedState;
 
 // pub mod views;
 
-
 #[derive(Debug, Error)]
-pub enum FrameError {
-}
+pub enum FrameError {}
 
 pub enum ConnectionState<Session> {
   Connected,
@@ -49,20 +51,21 @@ impl Session {
   pub fn new(session_id: Uuid) -> Self {
     let (cancel_sender, cancel_receiver) = oneshot::channel();
     let session = Session { session_id, current_view: View::InitialView, cancel: cancel_sender };
-    tokio::spawn(session.run(cancel_receiver));
+    // TODO: this moves session to the new task, so we can't use it anymore
+    // Run should be executed elsewhere
+    // tokio::spawn(session.run(cancel_receiver));
     session
   }
 
   async fn run(&self, cancel: oneshot::Receiver<()>) {
-    // TODO start running playwright script etc
+    // TODO start running playwright script
+    //
 
     // TODO kill the session if cancelled
     let _ = cancel.await;
   }
 
-  pub async fn handle(&mut self, request: Action) -> Action {
-      todo!("")
-  };
+  pub async fn handle(&mut self, request: Action) -> Action { todo!("") }
 
   /// Called when the client connects. Can be called multiple times.
   pub async fn on_client_connect(&mut self) {
@@ -126,33 +129,31 @@ async fn handle_websocket_connection(
 ) {
   info!("[{}] New Websocket connected", session.session_id);
   let mut keepalive = false;
-  let (sender, mut receiver) = socket.split();
+  let (mut sender, mut receiver) = socket.split();
   session.on_client_connect().await; // TODO pass sender?
 
   // TODO what if next() returns None?!
   while let Some(result) = receiver.next().await {
     match result {
-      Ok(message) => {
-        match message {
-          axum::extract::ws::Message::Text(text) => {
-              process_text_message(text, &mut session, sender).await;
-          },
-          axum::extract::ws::Message::Binary(_) => {
-            warn!("Binary messages are not supported");
-            keepalive = false;
-            break;
-          },
-          axum::extract::ws::Message::Ping(_) => {
-            todo!("Are Pings handled by axum's tokio-tungstenite?");
-          },
-          axum::extract::ws::Message::Pong(_) => {
-            todo!("Are Pongs handled by axum's tokio-tungstenite?");
-          },
-          axum::extract::ws::Message::Close(_) => {
-            keepalive = false;
-            break;
-          },
-        }
+      Ok(message) => match message {
+        axum::extract::ws::Message::Text(text) => {
+          process_text_message(text, &mut session, &mut sender).await;
+        },
+        axum::extract::ws::Message::Binary(_) => {
+          warn!("Binary messages are not supported");
+          keepalive = false;
+          break;
+        },
+        axum::extract::ws::Message::Ping(_) => {
+          todo!("Are Pings handled by axum's tokio-tungstenite?");
+        },
+        axum::extract::ws::Message::Pong(_) => {
+          todo!("Are Pongs handled by axum's tokio-tungstenite?");
+        },
+        axum::extract::ws::Message::Close(_) => {
+          keepalive = false;
+          break;
+        },
       },
       Err(_err) => {
         keepalive = true;
@@ -174,9 +175,22 @@ async fn handle_websocket_connection(
   }
 }
 
-async fn process_text_message(text: String, session: Session, sender: SplitSink<WebSocket, Message>) {
-    // TODO parse text into Action
-    // TODO call session.handle(action)
-    // TODO send error result to client
-    // TODO send action result to client
+async fn process_text_message(
+  text: String,
+  session: &mut Session,
+  sender: &mut SplitSink<WebSocket, Message>,
+) {
+  let action = serde_json::from_str::<Action>(&text);
+  match action {
+    Ok(action) => {
+      let result = session.handle(action).await;
+      // TODO send result to client
+    },
+    Err(err) => {
+      // TODO send error to client
+      let _ = sender.send(Message::Text(format!("Invalid action: {}", err))).await;
+    },
+  }
+  // TODO send error result to client
+  // TODO send action result to client
 }

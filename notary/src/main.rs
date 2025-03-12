@@ -95,6 +95,8 @@ async fn main() -> Result<(), NotaryServerError> {
     frame_sessions:     Arc::new(Mutex::new(HashMap::new())),
   });
 
+  let _ = start_internal_server(&c).await?;
+
   let router = Router::new()
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
     .route("/v1/proxy", post(proxy::proxy))
@@ -103,8 +105,17 @@ async fn main() -> Result<(), NotaryServerError> {
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
 
-  // Create a separate internal router for prompts
-  // and Start the internal HTTP server as a separate task
+  if !c.server_cert.is_empty() || !c.server_key.is_empty() {
+    let _ = listen(listener, router, &c.server_cert, &c.server_key).await;
+  } else {
+    let _ = acme_listen(listener, router, &c.acme_domain, &c.acme_email).await;
+  }
+  Ok(())
+}
+
+/// Create a separate internal router for prompts and Start the internal HTTP server as a separate
+/// task
+async fn start_internal_server(c: &config::Config) -> Result<(), NotaryServerError> {
   let internal_router =
     Router::new().route("/prompt", post(runner::prompt)).route("/prove", post(runner::prove));
   let internal_listener = TcpListener::bind(&c.listen_internal).await?;
@@ -114,12 +125,6 @@ async fn main() -> Result<(), NotaryServerError> {
       error!("Internal server error: {:?}", e);
     }
   });
-
-  if !c.server_cert.is_empty() || !c.server_key.is_empty() {
-    let _ = listen(listener, router, &c.server_cert, &c.server_key).await;
-  } else {
-    let _ = acme_listen(listener, router, &c.acme_domain, &c.acme_email).await;
-  }
   Ok(())
 }
 
