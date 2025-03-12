@@ -21,13 +21,12 @@ jobs:
         run: |
           curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf -y | sh
           rustup update
-          rustup toolchain install nightly-2025-02-20
-          
+
       - name: Install mdbook and plugins
         run: |
-          cargo +nightly-2025-02-20 binstall --no-confirm --version ${MDBOOK_VERSION} mdbook
-          cargo +nightly-2025-02-20 binstall --no-confirm --version ${MDBOOK_KATEX_VERSION} mdbook-katex
-          cargo +nightly-2025-02-20 binstall --no-confirm --version ${MDBOOK_LINKCHECK_VERSION} mdbook-linkcheck
+          cargo binstall --no-confirm --version ${MDBOOK_VERSION} mdbook
+          cargo binstall --no-confirm --version ${MDBOOK_KATEX_VERSION} mdbook-katex
+          cargo binstall --no-confirm --version ${MDBOOK_LINKCHECK_VERSION} mdbook-linkcheck
           
       - name: Build mdBook
         run: |
