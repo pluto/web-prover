@@ -17,11 +17,16 @@ pub const TEST_MANIFEST: &str = r#"
         },
         "vars": {
             "userId": {
-                "regex": "[a-z]{,20}+"
+                "description": "Reddit username for karma lookup",
+                "required": true,
+                "pattern": "^[a-z]{1,20}$",
+                "default": null
             },
             "token": {
-                "type": "base64",
-                "length": 32
+                "description": "Authentication token",
+                "required": false,
+                "pattern": "^[A-Za-z0-9+/]{32}={0,2}$",
+                "default": "abcdefghijklmnopqrstuvwxyz123456=="
             }
         }
     },
@@ -32,10 +37,15 @@ pub const TEST_MANIFEST: &str = r#"
             "Content-Length": "22"
         },
         "body": {
-            "json": [
-                "hello"
-            ],
-            "contains": "this_string_exists_in_body"
+            "format": "json",
+            "extractors": [
+                {
+                    "id": "userInfo",
+                    "description": "Extract user information",
+                    "selector": ["hello"],
+                    "type": "string"
+                }
+            ]
         }
     }
 }

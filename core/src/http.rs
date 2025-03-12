@@ -18,6 +18,14 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
+use crate::{
+  error::{ManifestHttpError, TemplateError, WebProverCoreError},
+  manifest::ManifestValidationResult,
+  parser::{DataFormat, ExtractorConfig},
+  template,
+  template::TemplateVar,
+};
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum JsonKey {
@@ -27,8 +35,6 @@ pub enum JsonKey {
   Num(usize),
 }
 
-use crate::error::WebProverCoreError;
-
 /// Max HTTP headers
 pub const MAX_HTTP_HEADERS: usize = 25;
 /// HTTP/1.1
@@ -36,24 +42,19 @@ pub const HTTP_1_1: &str = "HTTP/1.1";
 
 /// A type of response body used to describe conditions in the client `Manifest`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-pub struct ManifestResponseBody {
-  /// JSON Path containing expected traversal keys and expected value
-  #[serde(rename = "json")] // TODO: Remove after migrating to a JSON DSL
-  pub json_path: Vec<JsonKey>,
-}
+pub struct ManifestResponseBody(pub ExtractorConfig);
 
-impl TryFrom<&[u8]> for ManifestResponseBody {
-  type Error = WebProverCoreError;
-
-  fn try_from(body_bytes: &[u8]) -> Result<Self, Self::Error> {
-    if body_bytes.is_empty() {
-      return Ok(Self { json_path: vec![] });
-    }
-    // Attempt to parse the body as JSON path.
-    let json_path: Vec<JsonKey> = serde_json::from_slice(body_bytes).map_err(|_| {
-      WebProverCoreError::InvalidManifest("Failed to parse body as valid JSON".to_string())
-    })?;
-    Ok(Self { json_path })
+impl ManifestResponseBody {
+  // TODO: A workaround for backwards-compatibility with JsonKey
+  // TODO: It doesn't afford any security
+  /// Returns the IDs of all extractors in the configuration
+  pub fn json_path(&self) -> Vec<JsonKey> {
+    self
+      .0
+      .extractors
+      .iter()
+      .flat_map(|extractor| extractor.selector.iter().map(|s| JsonKey::String(s.clone())))
+      .collect()
   }
 }
 
@@ -61,8 +62,8 @@ impl TryFrom<&[u8]> for ManifestResponseBody {
 /// by the client.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NotaryResponseBody {
-  /// Raw JSON value returned by a notary.
-  pub json: Option<serde_json::Value>,
+  /// Raw response body from the notary
+  pub body: Option<Vec<u8>>,
 }
 
 impl TryFrom<&[u8]> for NotaryResponseBody {
@@ -70,120 +71,10 @@ impl TryFrom<&[u8]> for NotaryResponseBody {
 
   fn try_from(body_bytes: &[u8]) -> Result<Self, Self::Error> {
     if body_bytes.is_empty() {
-      return Ok(Self { json: None });
-    }
-    // Attempt to parse the body as JSON.
-    let json: serde_json::Value = serde_json::from_slice(body_bytes).map_err(|_| {
-      WebProverCoreError::InvalidManifest("Failed to parse body as valid JSON".to_string())
-    })?;
-    Ok(Self { json: Some(json) })
-  }
-}
-
-impl NotaryResponseBody {
-  /// Verifies if the notary's JSON response matches the client-provided `json_path`.
-  ///
-  /// The `json_path` defines a sequence of keys for traversing the JSON structure.
-  /// Each key specifies either:
-  /// - A string to look for in a JSON object.
-  /// - An index to access an element in a JSON array.
-  /// - A concrete value at the end of the path.
-  ///
-  /// The function traverses the JSON step-by-step, returning `true` if all keys match,
-  /// or `false` otherwise.
-  fn matches_path(&self, json_path: &[JsonKey]) -> bool {
-    if json_path.is_empty() {
-      debug!("Invalid json_path: Path is empty");
-      return false;
-    }
-    let Some(json) = &self.json else {
-      debug!("No JSON data to match against");
-      return false;
-    };
-    self.traverse_json_path(json, json_path)
-  }
-
-  /// Traverses a JSON value using a specified path of keys and verifies if it matches the given
-  /// sequence.
-  ///
-  /// # Arguments
-  /// * `initial_value` - The root JSON value to start traversal from.
-  /// * `json_path` - A sequence of `JsonKey` elements defining the traversal path.
-  ///
-  /// # Returns
-  /// `true` if the traversal successfully matches the sequence or reaches the expected value;
-  /// `false` otherwise.
-  fn traverse_json_path(&self, initial_value: &serde_json::Value, json_path: &[JsonKey]) -> bool {
-    let mut current = initial_value;
-
-    for (i, key) in json_path.iter().enumerate() {
-      // If the element is last, we return true because we've reached the end of the path
-      let is_last = i == json_path.len() - 1;
-
-      match key {
-        JsonKey::String(expected) => {
-          if !self.handle_string_key(current, expected, is_last) {
-            return false;
-          }
-          if is_last {
-            return true;
-          }
-          current = current.as_object().and_then(|obj| obj.get(expected)).unwrap();
-        },
-        JsonKey::Num(expected) => {
-          if !self.handle_numeric_key(current, expected, is_last) {
-            return false;
-          }
-          if is_last {
-            return true;
-          }
-          current = current.as_array().and_then(|arr| arr.get(*expected)).unwrap();
-        },
-      }
+      return Ok(Self { body: None });
     }
 
-    false
-  }
-
-  fn handle_string_key(&self, current: &serde_json::Value, expected: &str, is_last: bool) -> bool {
-    match current {
-      serde_json::Value::String(actual) => is_last && actual == expected,
-      serde_json::Value::Object(obj) => obj.contains_key(expected),
-      _ => {
-        debug!("Expected string or object, found: {:?}", current);
-        false
-      },
-    }
-  }
-
-  fn handle_numeric_key(
-    &self,
-    current: &serde_json::Value,
-    expected: &usize,
-    is_last: bool,
-  ) -> bool {
-    match current {
-      serde_json::Value::Number(actual) => {
-        if !is_last {
-          return false;
-        }
-        if let Some(n) = actual.as_u64() {
-          return n == (*expected as u64);
-        }
-        if let Some(n) = actual.as_i64() {
-          return n == (*expected as i64);
-        }
-        if let Some(n) = actual.as_f64() {
-          return (n - (*expected as f64)).abs() < f64::EPSILON;
-        }
-        false
-      },
-      serde_json::Value::Array(arr) => expected >= &0 && *expected < arr.len(),
-      _ => {
-        debug!("Expected number or array, found: {:?}", current);
-        false
-      },
-    }
+    Ok(Self { body: Some(body_bytes.to_vec()) })
   }
 }
 
@@ -270,55 +161,130 @@ impl NotaryResponse {
   }
 
   /// Tests matching between notary response, `self`,  and client-designated response, `other`.
-  /// Returns true if at least all values in `other` are also present in `self`.
-  pub fn matches_client_manifest(&self, other: &ManifestResponse) -> bool {
-    if self.response.status != other.status
-      || self.response.version != other.version
-      || self.response.message != other.message
-    {
-      debug!("Exact matches for status, version, or message do not match");
-      return false;
+  /// Returns `Some(values)` if at least all values in `other` are also present in `self` and `None`
+  /// otherwise.
+  pub fn match_and_extract(
+    &self,
+    other: &ManifestResponse,
+  ) -> Result<ManifestValidationResult, WebProverCoreError> {
+    let mut result = ManifestValidationResult::default();
+
+    // Check basic response properties
+    if self.response.status != other.status {
+      result.report_error(
+        ManifestHttpError::StatusMismatch {
+          expected: other.status.clone(),
+          actual:   self.response.status.clone(),
+        }
+        .into(),
+      );
+    }
+    if self.response.version != other.version {
+      result.report_error(
+        ManifestHttpError::VersionMismatch {
+          expected: other.version.clone(),
+          actual:   self.response.version.clone(),
+        }
+        .into(),
+      );
+    }
+    if self.response.message != other.message {
+      result.report_error(
+        ManifestHttpError::MessageMismatch {
+          expected: other.message.clone(),
+          actual:   self.response.message.clone(),
+        }
+        .into(),
+      );
     }
 
-    // Ensure all headers in `other` are present in `self`
     for (key, other_value) in &other.headers {
-      let value =
-        self.response.headers.get(key).or_else(|| self.response.headers.get(&key.to_lowercase()));
-      if let Some(actual_value) = value {
-        if actual_value != other_value {
-          debug!(
-            "Header mismatch for key: {}: expected={}, actual={}",
-            key, other_value, actual_value
+      match self
+        .response
+        .headers
+        .get(key)
+        .or_else(|| self.response.headers.get(&key.to_lowercase()))
+      {
+        Some(actual_value) if actual_value.to_lowercase() == other_value.to_lowercase() => continue,
+        Some(actual_value) => {
+          result.report_error(
+            ManifestHttpError::HeaderMismatch {
+              expected: other_value.clone(),
+              actual:   actual_value.clone(),
+            }
+            .into(),
           );
-          return false;
-        }
-      } else {
-        debug!("Header key not present in self: {}", key);
-        return false;
+        },
+        None => {
+          result.report_error(
+            ManifestHttpError::HeaderMissing {
+              expected: other_value.clone(),
+              actual:   key.clone(),
+            }
+            .into(),
+          );
+        },
       }
     }
 
-    // Check if the `body` of `other` matches the `json_path` within `self`.
-    if !self.notary_response_body.matches_path(&other.body.json_path) {
-      debug!(
-        "JSON path does not match. notary_response_body={:?}, json_path={:?}",
-        self.notary_response_body, other.body.json_path,
-      );
-      return false;
-    }
+    // Check body
+    let body_result = self.body_matches(other)?;
+    result.merge(&body_result);
 
-    debug!("Client response matches");
-    true
+    // Return combined result
+    Ok(result)
+  }
+
+  /// Helper method to check if body matches and extract values
+  fn body_matches(
+    &self,
+    other: &ManifestResponse,
+  ) -> Result<ManifestValidationResult, WebProverCoreError> {
+    let mut result = ManifestValidationResult::default();
+
+    match &self.notary_response_body.body {
+      Some(body) => {
+        let extraction_result = other.body.0.extract_and_validate(body)?;
+        result.merge_extraction_result(&extraction_result);
+
+        if !extraction_result.is_success() {
+          result.report_error(WebProverCoreError::ExtractionFailed(
+            "Extraction returned errors".to_string(),
+          ));
+        }
+
+        if extraction_result.values.len() != other.body.0.extractors.len() {
+          result.report_error(WebProverCoreError::ExtractionFailed(
+            "Not all values were extracted".to_string(),
+          ));
+        }
+
+        debug!("Client response matches");
+        Ok(result)
+      },
+      None if other.body.0.extractors.is_empty() => {
+        // If we get here, there was a match but no data
+        debug!("Client response matches (no data in response body)");
+        result.report_error(WebProverCoreError::ExtractionFailed(
+          "Client response returned no data".to_string(),
+        ));
+        Ok(result)
+      },
+      None => {
+        debug!("No data to match against");
+        result.report_error(WebProverCoreError::ExtractionFailed(
+          "No data to match against".to_string(),
+        ));
+        Ok(result)
+      },
+    }
   }
 }
 
 /// Default HTTP version
-pub fn default_version() -> String { HTTP_1_1.to_string() }
+fn default_version() -> String { HTTP_1_1.to_string() }
 /// Default HTTP message
-pub fn default_message() -> String { "OK".to_string() }
-
-/// Returns an empty `HashMap` as the default value for `vars`
-fn default_empty_vars() -> HashMap<String, TemplateVar> { HashMap::new() }
+fn default_message() -> String { "OK".to_string() }
 
 /// HTTP Response items required for circuits
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -350,21 +316,19 @@ impl ManifestResponse {
   ///
   /// The validated HTTP response.
   pub fn validate(&self) -> Result<(), WebProverCoreError> {
-    // TODO: What are legal statuses?
+    // We only support 200 and 201
     const VALID_STATUSES: [&str; 2] = ["200", "201"];
     if !VALID_STATUSES.contains(&self.status.as_str()) {
       return Err(WebProverCoreError::InvalidManifest("Unsupported HTTP status".to_string()));
     }
-
-    // TODO: What HTTP versions are supported?
+    // We only support HTTP/1.1
     if self.version != "HTTP/1.1" {
       return Err(WebProverCoreError::InvalidManifest(
         "Invalid HTTP version: ".to_string() + &self.version,
       ));
     }
 
-    // TODO: What is the max supported message length?
-    // TODO: Not covered by serde's #default annotation. Is '""' a valid message?
+    // An empty message is not allowed
     if self.message.len() > 1024 || self.message.is_empty() {
       return Err(WebProverCoreError::InvalidManifest(
         "Invalid message length: ".to_string() + &self.message,
@@ -385,8 +349,9 @@ impl ManifestResponse {
     }
     let content_type = content_type.unwrap();
 
-    const VALID_CONTENT_TYPES: [&str; 2] = ["application/json", "text/plain"];
+    const VALID_CONTENT_TYPES: [&str; 3] = ["application/json", "text/plain", "text/html"];
     let is_valid_content_type = VALID_CONTENT_TYPES.iter().any(|&legal_type| {
+      let content_type = content_type.to_lowercase();
       content_type == legal_type || content_type.starts_with(&format!("{};", legal_type))
     });
     if !is_valid_content_type {
@@ -396,33 +361,31 @@ impl ManifestResponse {
     }
 
     // When Content-Type is application/json, we expect at least one JSON item
-    if content_type == "application/json" && self.body.json_path.is_empty() {
-      return Err(WebProverCoreError::InvalidManifest(
-        "Expected at least one JSON item".to_string(),
-      ));
-    }
+    if content_type == "application/json" {
+      if self.body.0.format != DataFormat::Json {
+        return Err(WebProverCoreError::InvalidManifest("Expected JSON format".to_string()));
+      }
 
-    const MAX_JSON_PATH_LENGTH: usize = 100;
-    if self.body.json_path.len() > MAX_JSON_PATH_LENGTH {
-      return Err(WebProverCoreError::InvalidManifest(
-        "Invalid JSON path length: ".to_string() + &self.body.json_path.len().to_string(),
-      ));
+      if self.body.0.extractors.is_empty() {
+        return Err(WebProverCoreError::InvalidManifest(
+          "Expected at least one JSON item".to_string(),
+        ));
+      }
+    }
+    const MAX_EXTRACTORS: usize = 100;
+    if self.body.0.extractors.len() > MAX_EXTRACTORS {
+      return Err(WebProverCoreError::InvalidManifest(format!(
+        "Invalid extractors length: {}",
+        self.body.0.extractors.len()
+      )));
     }
 
     Ok(())
   }
 }
 
-/// Template variable type
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TemplateVar {
-  /// Regex for validation (if applicable)
-  pub regex:  Option<String>,
-  /// Length constraint (if applicable)
-  pub length: Option<usize>,
-  /// Type constraint (e.g., base64, hex)
-  pub r#type: Option<String>,
-}
+/// Returns an empty `HashMap` as the default value for `vars`
+fn default_empty_vars() -> HashMap<String, TemplateVar> { HashMap::new() }
 
 /// HTTP Request items required for circuits
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -479,83 +442,46 @@ impl ManifestRequest {
     Ok(())
   }
 
-  // TODO (autoparallel): This function is not used anywhere at the moment, but i did not want to
-  // delete it.
+  // TODO(#517)
   #[allow(unused)]
-  fn validate_vars(&self) -> Result<(), WebProverCoreError> {
-    let mut all_tokens = vec![];
+  fn collect_tokens(&self) -> Vec<String> {
+    let mut all_tokens = Vec::new();
 
-    // Parse and validate tokens in the body
-    if let Some(body_tokens) = self.body.as_ref().map(extract_tokens) {
-      for token in &body_tokens {
-        if !self.vars.contains_key(token) {
-          return Err(WebProverCoreError::InvalidManifest(format!(
-            "Token `<% {} %>` not declared in `vars`",
-            token
-          )));
-        }
-      }
+    // Collect tokens from body
+    if let Some(body_tokens) = self.body.as_ref().map(template::extract_tokens) {
       all_tokens.extend(body_tokens);
     }
 
-    // Parse and validate tokens in headers
+    // Collect tokens from headers
     for value in self.headers.values() {
-      let header_tokens = extract_tokens(&serde_json::Value::String(value.clone()));
-      for token in &header_tokens {
-        if !self.vars.contains_key(token) {
-          return Err(WebProverCoreError::InvalidManifest(format!(
-            "Token `<% {} %>` not declared in `vars`",
-            token
-          )));
-        }
-      }
+      let header_tokens = template::extract_tokens(&serde_json::Value::String(value.clone()));
       all_tokens.extend(header_tokens);
     }
 
-    for var_key in self.vars.keys() {
-      if !all_tokens.contains(var_key) {
+    all_tokens
+  }
+
+  fn validate_tokens(&self, tokens: &[String]) -> Result<(), WebProverCoreError> {
+    for token in tokens {
+      if !self.vars.contains_key(token) {
         return Err(WebProverCoreError::InvalidManifest(format!(
-          "Token `<% {} %>` not declared in `body` or `headers`",
-          var_key
+          "Token `<% {} %>` not declared in `vars`",
+          token
         )));
       }
     }
+    Ok(())
+  }
 
-    // Validate each `vars` entry
-    for (key, var_def) in &self.vars {
-      // Validate regex (if defined)
-      if let Some(regex_pattern) = var_def.regex.as_ref() {
-        // Using `regress` crate for compatibility with ECMAScript regular expressions
-        let _regex = regress::Regex::new(regex_pattern).map_err(|_| {
-          WebProverCoreError::InvalidManifest(format!("Invalid regex pattern for `{}`", key))
-        })?;
-        // TODO: It will definitely not match it here because it's a template variable, not an
-        // actual variable
-        // TODO: How does the Manifest receiver (notary) verifies this?
-        // if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
-        //   if regex.find(value.as_str().unwrap_or("")).is_none() {
-        //     return Err(ManifestError::InvalidManifest(format!(
-        //       "Value for token `<% {} %>` does not match regex",
-        //       key
-        //     )));
-        //   }
-        // }
-      }
+  pub fn validate_vars(&self) -> Result<(), WebProverCoreError> {
+    let all_tokens = self.collect_tokens();
+    self.validate_tokens(&all_tokens)?;
 
-      // Validate length (if applicable)
-      if let Some(length) = var_def.length {
-        if let Some(value) = self.body.as_ref().and_then(|b| b.get(key)) {
-          if value.as_str().unwrap_or("").len() != length {
-            return Err(WebProverCoreError::InvalidManifest(format!(
-              "Value for token `<% {} %>` does not meet length constraint",
-              key
-            )));
-          }
-        }
-      }
-
-      // TODO: Validate the token "type" constraint
+    for (key, variable) in &self.vars {
+      let is_used = all_tokens.contains(key);
+      variable.validate(key, is_used)?;
     }
+
     Ok(())
   }
 
@@ -627,66 +553,72 @@ impl ManifestRequest {
   /// - All headers in `self` must exist in `other` with matching values.
   /// - All vars in `self` must exist in `other` with matching constraints.
   /// - All remaining fields like `method`, `url`, and `body` must also match.
-  pub fn is_subset_of(&self, other: &ManifestRequest) -> bool {
+  pub fn is_subset_of(
+    &self,
+    other: &ManifestRequest,
+  ) -> Result<ManifestValidationResult, WebProverCoreError> {
+    let mut result = ManifestValidationResult::default();
+
     // Check if all headers in `self` exist in `other` with the same value
     for (key, value) in &self.headers {
       let expected_header =
         other.headers.get(key).or_else(|| other.headers.get(&key.to_lowercase()));
       if expected_header != Some(value) {
-        return false;
+        result.report_error(
+          ManifestHttpError::HeaderMismatch {
+            expected: value.clone(),
+            actual:   expected_header.cloned().unwrap_or_else(|| "missing".to_string()),
+          }
+          .into(),
+        );
       }
     }
 
-    // TODO: Not sure how to handle `vars` now, so disabling this
-    // Check if all vars in `self` exist in `other` with the same or compatible constraints
-    // for (key, var) in &self.vars {
-    //   match other.vars.get(key) {
-    //     Some(other_var) =>
-    //       if var != other_var {
-    //         return false;
-    //       },
-    //     None => {
-    //       return false;
-    //     },
-    //   }
-    // }
+    for (key, var) in &self.vars {
+      match other.vars.get(key) {
+        Some(other_var) =>
+          if var != other_var {
+            result.report_error(WebProverCoreError::Template(TemplateError::VariableMismatch {
+              key: key.clone(),
+            }))
+          },
+        None => result.report_error(WebProverCoreError::Template(TemplateError::VariableMissing {
+          key: key.clone(),
+        })),
+      }
+    }
 
-    // TODO: Notice that we match body exactly below
-    // TODO: What to do with the body? Ominous
-    // self.method == other.method && self.url == other.url && self.body == other.body
-    self.method == other.method && self.url == other.url
-  }
-}
-
-fn extract_tokens(value: &serde_json::Value) -> Vec<String> {
-  let mut tokens = vec![];
-
-  match value {
-    serde_json::Value::String(s) => {
-      let token_regex = regex::Regex::new(r"<%\s*(\w+)\s*%>").unwrap();
-      for capture in token_regex.captures_iter(s) {
-        if let Some(token) = capture.get(1) {
-          // Extract token name
-          tokens.push(token.as_str().to_string());
+    if self.method != other.method {
+      result.report_error(
+        ManifestHttpError::MethodMismatch {
+          expected: other.method.clone(),
+          actual:   self.method.clone(),
         }
-      }
-    },
-    serde_json::Value::Object(map) => {
-      // Recursively parse nested objects
-      for (_, v) in map {
-        tokens.extend(extract_tokens(v));
-      }
-    },
-    serde_json::Value::Array(arr) => {
-      // Recursively parse arrays
-      for v in arr {
-        tokens.extend(extract_tokens(v));
-      }
-    },
-    _ => {},
-  }
+        .into(),
+      );
+    }
 
-  tokens
+    if self.url != other.url {
+      result.report_error(
+        ManifestHttpError::UrlMismatch { expected: other.url.clone(), actual: self.url.clone() }
+          .into(),
+      );
+    }
+
+    if self.version != other.version {
+      result.report_error(
+        ManifestHttpError::VersionMismatch {
+          expected: other.version.clone(),
+          actual:   self.version.clone(),
+        }
+        .into(),
+      );
+    }
+
+    // We don't compare the body here because this is what extractors are for
+
+    Ok(result)
+  }
 }
 
 #[cfg(test)]
@@ -696,30 +628,30 @@ pub mod tests {
   use serde_json::json;
 
   use super::*;
-  use crate::http::{ManifestRequest, ManifestResponse};
+  use crate::{extractor, parser::ExtractorType};
 
-  /// Creates a new HTTP request with optional parameters.
+  /// Creates a new `ManifestRequest` with optional parameters.
   #[macro_export]
   macro_rules! request {
     // Match with optional parameters
     ($($key:ident: $value:expr),* $(,)?) => {{
-        // Make clippy happy
-        #[allow(unused_mut) ]
+        #[allow(unused_mut)]
         let mut request = ManifestRequest {
-          method: "GET".to_string(),
+            method: "GET".to_string(),
             url: "https://example.com".to_string(),
             version: "HTTP/1.1".to_string(),
             headers: std::collections::HashMap::from([
-                ("Authorization".to_string(), "Bearer <TOKEN>".to_string()),
+                ("Authorization".to_string(), "Bearer <%TOKEN%>".to_string()),
                 ("User-Agent".to_string(), "test-agent".to_string()),
             ]),
             body: None,
             vars: std::collections::HashMap::from([(
                 "TOKEN".to_string(),
                 TemplateVar {
-                    regex: Some("^[A-Za-z0-9]+$".to_string()),
-                    length: Some(20),
-                    r#type: Some("base64".to_string()),
+                    description: Some("Authentication token".to_string()),
+                    required: true,
+                    default: None,
+                    pattern: Some("^[A-Za-z0-9]+$".to_string()),
                 },
             )]),
         };
@@ -733,7 +665,7 @@ pub mod tests {
     }};
   }
 
-  /// Creates a new HTTP response with optional parameters.
+  /// Creates a new `ManifestResponse` with optional parameters.
   #[macro_export]
   macro_rules! response {
     // Match with optional parameters
@@ -747,11 +679,18 @@ pub mod tests {
                 ("Content-Type".to_string(), "application/json".to_string())
             ]),
             body: ManifestResponseBody {
-                json_path: vec![
-                    JsonKey::String("key1".to_string()),
-                    JsonKey::String("key2".to_string()),
-                    JsonKey::Num(3)
-                ]
+                0: ExtractorConfig {
+                    format: DataFormat::Json,
+                    extractors: vec![$crate::parser::Extractor {
+                      id: "dummy".to_string(),
+                      description: "Dummy extractor".to_string(),
+                      selector: vec![],
+                      extractor_type: $crate::parser::ExtractorType::String,
+                      required: true,
+                      predicates: vec![],
+                      attribute: None,
+                    }],
+                },
             },
         };
 
@@ -772,7 +711,7 @@ pub mod tests {
     ($response:expr, $($key:ident: $value:expr),* $(,)?) => {{
         #[allow(unused_mut)]
         let mut notary_response_body = NotaryResponseBody {
-            json: Some(json!({})), // Default to empty JSON
+            body: Some(json!({}).to_string().into_bytes().to_vec()), // Default to empty JSON
         };
 
         // Apply custom key-value overrides for NotaryResponseBody
@@ -793,43 +732,59 @@ pub mod tests {
     let header_bytes: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
     let body = json!({"key1": { "key2": 3 }});
     let response =
-      NotaryResponse::from_payload(&[header_bytes, body.to_string().as_bytes()].concat()).unwrap();
+      NotaryResponse::from_payload(&[header_bytes, &body.to_string().into_bytes()].concat())
+        .unwrap();
     assert_eq!(response.response.status, "200");
     assert_eq!(response.response.version, "HTTP/1.1");
     assert_eq!(response.response.message, "OK");
     assert_eq!(response.response.headers.len(), 1);
     assert_eq!(response.response.headers.get("Content-Type").unwrap(), "application/json");
-    assert_eq!(response.response.body.json_path.len(), 0);
-    assert_eq!(response.notary_response_body.json, Some(body));
+    assert_eq!(response.response.body, ManifestResponseBody::default());
+    assert_eq!(response.notary_response_body.body, Some(body.to_string().into_bytes().to_vec()));
   }
 
   #[test]
   fn test_notary_matches_other_response() {
-    let response = response!();
+    let response = response!(
+        body: ManifestResponseBody(ExtractorConfig {
+            format: DataFormat::Json,
+            extractors: vec![extractor!(
+                id: "testKey".to_string(),
+                description: "Test key".to_string(),
+                selector: vec!["key1".to_string(), "key2".to_string()],
+                extractor_type: ExtractorType::Number,
+            )],
+        })
+    );
     let notary_response = notary_response!(
       response.clone(),
-      json: Some(json!({
+      body: Some(json!({
             "key1": {"key2": 3},
-        })),
+        }).to_string().into_bytes().to_vec()),
     );
 
     // Is a perfect match with itself
-    assert!(notary_response.matches_client_manifest(&response));
-    assert!(notary_response.matches_client_manifest(&notary_response.response));
+    let matching_result = notary_response.match_and_extract(&response).unwrap();
+    assert!(matching_result.is_success());
+    assert_eq!(matching_result.values().get("testKey").unwrap(), &json!(3));
 
     // Fails if it doesn't match directly
     let non_matching_response = response!(status: "201".to_string());
-    assert!(!notary_response.matches_client_manifest(&non_matching_response));
+    assert!(!notary_response.match_and_extract(&non_matching_response).unwrap().is_success());
 
     // Superset case
     let response_superset = {
       let mut res = notary_response.clone();
       res.response.headers.insert("extra".to_string(), "header".to_string());
-      res.response.body.json_path = notary_response.response.body.json_path.clone();
-      res.response.body.json_path.push(JsonKey::Num(3));
+      res.response.body.0.extractors.push(extractor!(
+        id: "extra".to_string(),
+        description: "Extra".to_string(),
+        selector: vec!["key1".to_string(), "key2".to_string()],
+        extractor_type: ExtractorType::Number,
+      ));
       res
     };
-    assert!(response_superset.matches_client_manifest(&response));
+    assert!(response_superset.match_and_extract(&response).unwrap().is_success());
   }
 
   #[test]
@@ -842,27 +797,12 @@ pub mod tests {
     let expected = NotaryResponse {
       response:             response!(
         headers: HashMap::from([("Content-Type".to_string(), "text/plain".to_string())]),
-        body: ManifestResponseBody { json_path: vec![] }
+        body: ManifestResponseBody::default(),
       ),
-      notary_response_body: NotaryResponseBody { json: None },
+      notary_response_body: NotaryResponseBody { body: None },
     };
 
     assert_eq!(actual, expected);
-  }
-
-  #[test]
-  fn test_invalid_body_parsing() {
-    let header_bytes: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
-    let invalid_body_bytes: &[u8] = br#"This is not JSON"#;
-
-    let result = NotaryResponse::from_payload(&[header_bytes, invalid_body_bytes].concat());
-    assert!(result.is_err());
-
-    if let Err(WebProverCoreError::InvalidManifest(msg)) = result {
-      assert!(msg.contains("Failed to parse body as valid JSON"));
-    } else {
-      panic!("Expected an invalid manifest error for body parsing");
-    }
   }
 
   #[test]
@@ -908,13 +848,11 @@ pub mod tests {
         headers: std::collections::HashMap::from([
             ("Content-Type".to_string(), "application/json".to_string())
         ]),
-        body: ManifestResponseBody {
-            json_path: vec![],
-        }
+        body: ManifestResponseBody::default()
     );
     let expected_response = notary_response!(
         manifest_response,
-        json: Some(json!({"key1": "value1"}))
+        body: Some(body_bytes.to_vec())
     );
 
     assert_eq!(response, expected_response);
@@ -928,19 +866,28 @@ pub mod tests {
     let notary_response =
       NotaryResponse::from_payload(&[header_bytes, empty_body_bytes].concat()).unwrap();
 
-    assert_eq!(notary_response.response.body.json_path.len(), 0);
-    assert_eq!(notary_response.notary_response_body.json, Some(json!({})));
+    assert_eq!(notary_response.response.body, ManifestResponseBody::default());
+    assert_eq!(
+      notary_response.notary_response_body.body,
+      Some(json!({}).to_string().into_bytes().to_vec())
+    );
   }
 
   #[test]
   fn test_subset_with_missing_key_in_other() {
     let base_response = notary_response!(response!(),);
     let other_response = response!(
-        body: ManifestResponseBody {
-            json_path: vec![JsonKey::String("key1".to_string())],
-        }
+        body: ManifestResponseBody(ExtractorConfig {
+            format: DataFormat::Json,
+            extractors: vec![extractor!(
+                id: "testKey".to_string(),
+                description: "Test key".to_string(),
+                selector: vec!["missingKey".to_string()],
+                extractor_type: ExtractorType::String,
+            )],
+        })
     );
-    assert!(!base_response.matches_client_manifest(&other_response));
+    assert!(!base_response.match_and_extract(&other_response).unwrap().is_success());
   }
 
   #[test]
@@ -1046,286 +993,18 @@ pub mod tests {
   }
 
   #[test]
-  fn test_validate_vars_with_missing_token() {
-    let header_bytes: &[u8] =
-      b"POST /path HTTP/1.1\r\nX-Custom-Header: <% missing_token %>\r\n\r\n";
+  fn test_request_with_template_vars() {
+    let header_bytes: &[u8] = b"POST /path HTTP/1.1\r\nX-Custom-Header: <% test_var %>\r\n\r\n";
     let body_bytes: &[u8] = br#"{"key": "value"}"#;
 
     let mut request = ManifestRequest::from_payload(&[header_bytes, body_bytes].concat()).unwrap();
-    request.vars = HashMap::new(); // No vars provided, but the template references a token
+    request.vars.insert("test_var".to_string(), TemplateVar {
+      description: Some("Test variable".to_string()),
+      required:    true,
+      default:     None,
+      pattern:     Some("^[A-Za-z0-9]+$".to_string()),
+    });
 
-    let result = request.validate_vars();
-    assert!(result.is_err());
-
-    match result {
-      Err(WebProverCoreError::InvalidManifest(msg)) => {
-        assert!(msg.contains("Token `<% missing_token %>` not declared in `vars`"));
-      },
-      _ => panic!("Expected missing token error"),
-    }
-  }
-
-  #[test]
-  fn test_request_subset_comparison() {
-    let base_request = request!(
-        method: "GET".to_string(),
-        url: "/path".to_string(),
-        headers: HashMap::from([("Authorization".to_string(), "Bearer token".to_string())]),
-        body: None,
-        vars: HashMap::new()
-    );
-
-    // Create a superset of the base request with an additional header
-    let mut other_request = base_request.clone();
-    other_request.headers.insert("Extra-Header".to_string(), "Extra-Value".to_string());
-    assert!(base_request.is_subset_of(&other_request));
-
-    // Modify the method in the other request, making it not a subset
-    other_request.method = "POST".to_string();
-    assert!(!base_request.is_subset_of(&other_request));
-  }
-
-  /// Creates a response body with a given serde_json::Value
-  #[macro_export]
-  macro_rules! notary_body {
-    ($($key:tt : $value:tt),* $(,)?) => {{
-        NotaryResponseBody {
-            json: Some(json!({
-                $(
-                    $key: $value
-                ),*
-            }))
-        }
-    }};
-}
-
-  #[test]
-  fn test_json_contains_path_valid_object_path() {
-    let json = notary_body!(
-        "key1": {
-            "key2": {
-                "key3": "value"
-            }
-        }
-    );
-    // ["key1", "key2", "key3"]
-    let path = vec![
-      JsonKey::String("key1".to_string()),
-      JsonKey::String("key2".to_string()),
-      JsonKey::String("key3".to_string()),
-    ];
-    assert!(json.matches_path(&path));
-
-    // ["key1", "key2", "key3", "value"]
-    let mut path_with_value = path.clone();
-    path_with_value.push(JsonKey::String("value".to_string()));
-    assert!(json.matches_path(&path_with_value));
-
-    // ["key1", "key2", "key3", "value", "invalid"]
-    let mut path_with_invalid_value = path.clone();
-    path_with_invalid_value.push(JsonKey::String("invalid_value".to_string()));
-    assert!(!json.matches_path(&path_with_invalid_value));
-  }
-
-  #[test]
-  fn test_json_contains_path_valid_array_path() {
-    let json = notary_body!(
-        "key1": [
-            {
-                "key2": "value1"
-            },
-            {
-                "key3": "value2"
-            }
-        ]
-    );
-    let path = vec![
-      JsonKey::String("key1".to_string()),
-      JsonKey::Num(1),
-      JsonKey::String("key3".to_string()),
-      JsonKey::String("value2".to_string()),
-    ];
-    assert!(json.matches_path(&path));
-  }
-
-  #[test]
-  fn test_json_contains_path_invalid_key() {
-    let json = notary_body!(
-        "key1": {
-            "key2": "value"
-        }
-    );
-    let path =
-      vec![JsonKey::String("key1".to_string()), JsonKey::String("invalid_key".to_string())];
-    assert!(!json.matches_path(&path));
-  }
-
-  #[test]
-  fn test_json_contains_path_invalid_array_index() {
-    let json = notary_body!(
-        "key1": [
-            "value1",
-            "value2"
-        ]
-    );
-    let path = vec![
-      JsonKey::String("key1".to_string()),
-      JsonKey::Num(3), // Out of bounds
-    ];
-    assert!(!json.matches_path(&path));
-  }
-
-  #[test]
-  fn test_json_contains_path_index_on_non_array() {
-    let json = notary_body!(
-        "key1": {
-            "key2": "value"
-        }
-    );
-    let path = vec![
-      JsonKey::String("key1".to_string()),
-      JsonKey::Num(0), // Applying index on a non-array
-    ];
-    assert!(!&json.matches_path(&path));
-  }
-
-  #[test]
-  fn test_empty_path() {
-    let json = notary_body!(
-        "key1": {
-            "key2": {
-                "key3": "value"
-            }
-        }
-    );
-    let path: Vec<JsonKey> = vec![];
-    assert!(!json.matches_path(&path));
-  }
-
-  #[test]
-  fn test_empty_body() {
-    let json = notary_body!();
-    let mut path: Vec<JsonKey> = vec![];
-    assert!(!json.matches_path(&path));
-
-    path.push(JsonKey::String("key1".to_string()));
-    assert!(!json.matches_path(&path));
-  }
-
-  #[test]
-  fn test_number_matching() {
-    let test_cases = vec![
-      // Unsigned integers
-      (json!({"val": 42u64}), 42, true),
-      // Signed integers
-      (json!({"val": -42}), -42, true),
-      // Floating point
-      (json!({"val": 42.0}), 42, true),
-      // Large numbers
-      (json!({"val": u64::MAX}), u64::MAX as i64, true),
-      // Mismatched types
-      (json!({"val": "42"}), 42, false),
-      // Edge cases
-      (json!({"val": 42.000001}), 42, false),
-    ];
-
-    for (json, expected, should_match) in test_cases {
-      let body = NotaryResponseBody { json: Some(json.clone()) };
-      assert_eq!(
-        body.matches_path(&[JsonKey::String("val".to_string()), JsonKey::Num(expected as usize)]),
-        should_match,
-        "Failed for value: {:?}, expected: {}",
-        json,
-        expected
-      );
-    }
-  }
-
-  #[test]
-  fn test_nested_array_path() {
-    let json = notary_body!(
-        "data": [
-            [1, 2, 3],
-            [4, 5, 6]
-        ]
-    );
-    assert!(json.matches_path(&[
-      JsonKey::String("data".to_string()),
-      JsonKey::Num(1),
-      JsonKey::Num(1),
-      JsonKey::Num(5),
-    ]));
-  }
-
-  #[test]
-  fn test_mixed_types_in_array() {
-    let json = notary_body!(
-        "mixed": [
-            42,
-            "string",
-            { "key": "value" },
-            [1, 2, 3]
-        ]
-    );
-    assert!(json.matches_path(&[
-      JsonKey::String("mixed".to_string()),
-      JsonKey::Num(0),
-      JsonKey::Num(42),
-    ]));
-    assert!(json.matches_path(&[
-      JsonKey::String("mixed".to_string()),
-      JsonKey::Num(1),
-      JsonKey::String("string".to_string()),
-    ]));
-    assert!(json.matches_path(&[
-      JsonKey::String("mixed".to_string()),
-      JsonKey::Num(2),
-      JsonKey::String("key".to_string()),
-      JsonKey::String("value".to_string()),
-    ]));
-  }
-
-  #[test]
-  fn test_empty_string_keys_and_values() {
-    let json = notary_body!(
-        "": {
-            "empty": ""
-        }
-    );
-    // Test empty string keys and values
-    assert!(json.matches_path(&[
-      JsonKey::String("".to_string()),
-      JsonKey::String("empty".to_string()),
-      JsonKey::String("".to_string()),
-    ]));
-  }
-
-  #[test]
-  fn test_very_deep_nesting() {
-    // Test different depths: 5, 25, and 100 levels
-    let depths = vec![5, 25, 100];
-
-    for depth in depths {
-      // Build nested JSON structure
-      let mut json_value = json!("value");
-      for i in (0..depth).rev() {
-        json_value = json!({
-            format!("level{}", i): json_value
-        });
-      }
-
-      let json = NotaryResponseBody { json: Some(json_value) };
-
-      // Build the path
-      let mut path = Vec::new();
-      for i in 0..depth {
-        path.push(JsonKey::String(format!("level{}", i)));
-      }
-      path.push(JsonKey::String("value".to_string()));
-
-      // Test the path
-      let result = json.matches_path(&path);
-      assert!(result, "Failed to match path at depth {}: {:?}", depth, path);
-    }
+    assert!(request.validate_vars().is_ok());
   }
 }

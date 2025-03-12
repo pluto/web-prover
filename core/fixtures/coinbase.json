@@ -1,0 +1,3465 @@
+{
+  "data": {
+    "viewer": {
+      "userProperties": {
+        "needsKycRemediation": false,
+        "id": "ztORgzj/a30TGwHC+IVSLYAy"
+      },
+      "id": "MgBjcFyyIUbcn26OUvo4DuX7",
+      "balanceData": {
+        "portfolioBalanceV5": {
+          "balance": {
+            "totalPortfolioBalance": {
+              "value": "3.6247695088814202"
+            },
+            "id": "VG90YWxQb3J0Zm9saW9CYWxhbmNl"
+          },
+          "error": null
+        },
+        "web3WalletBalanceInFiatV2": {
+          "balance": {
+            "value": "0"
+          },
+          "error": null
+        },
+        "portfolioBalanceV5ByPlatform": {
+          "balance": {
+            "cashEquivalentBalance": {
+              "value": "8.967465955899945"
+            },
+            "id": "VG90YWxQb3J0Zm9saW9CYWxhbmNl"
+          },
+          "error": null
+        },
+        "nonCashEqPortfolioBalanceV5ByPlatform": {
+          "balance": {
+            "nonCashEquivalentBalance": {
+              "value": "5.397568357301648"
+            },
+            "id": "VG90YWxQb3J0Zm9saW9CYWxhbmNl"
+          },
+          "error": null
+        }
+      },
+      "defiV2": {
+        "network": {
+          "controlledAccountsV2": {
+            "nodes": [
+              {
+                "address": "0xb9de5faa36e81e41d908e4e1d2e4117110291b9e",
+                "id": "tn8AVPaOcQHtp+3zGdosOU9+"
+              }
+            ],
+            "error": null
+          },
+          "id": "RGVmaU5ldHdvcms6RXRoZXJldW06MQ=="
+        },
+        "networks": {
+          "nodes": [
+            {
+              "chainId": 1,
+              "controlledAccountsV2": {
+                "nodes": [
+                  {
+                    "balances": {
+                      "nodes": [
+                        {
+                          "id": "Bel5KtPXS2qNnL2OQoB0ns/J",
+                          "value": "0",
+                          "asset": {
+                            "exponent": 18,
+                            "viewerAsset": {
+                              "retailAsset": {
+                                "uuid": "07448f53-f128-4a61-b160-9674512b9426",
+                                "displaySymbol": "ETH",
+                                "latestPrice": {
+                                  "price": "8.405987856750084",
+                                  "id": "TGF0ZXN0QXNzZXRQcmljZTpkODVkY2U5Yi01YjczLTVjM2MtODk3OC01MjJjZTFkMWMxYjQ6VVNE"
+                                },
+                                "id": "J5CaM1+El5+INmVCMQqet1Yd"
+                              },
+                              "id": "Vmlld2VyJ5CaM1+El5+INmVCMQqet1Yd"
+                            },
+                            "id": "RGVmaU9uY2hhaW5Bc3NldDoxOjB4RWVlZWVFZWVlRWVFZWVFZUVlRWVlRUVFZWVlZUVlZWVlZWVlRUVlRQ=="
+                          }
+                        }
+                      ]
+                    },
+                    "id": "tn8AVPaOcQHtp+3zGdosOU9+",
+                    "balancesV2": {
+                      "error": null,
+                      "nodes": [
+                        {
+                          "__typename": "DefiAmount",
+                          "id": "Bel5KtPXS2qNnL2OQoB0ns/J",
+                          "value": "0",
+                          "defiAsset": {
+                            "exponent": 18,
+                            "viewerAsset": {
+                              "__isAssetOrCurrency": "ViewerAsset",
+                              "asset": {
+                                "name": "Ethereum",
+                                "latestPrice": {
+                                  "price": "8.405987856750084",
+                                  "id": "TGF0ZXN0QXNzZXRQcmljZTpkODVkY2U5Yi01YjczLTVjM2MtODk3OC01MjJjZTFkMWMxYjQ6VVNE"
+                                },
+                                "id": "J5CaM1+El5+INmVCMQqet1Yd",
+                                "uuid": "07448f53-f128-4a61-b160-9674512b9426",
+                                "contractAddress": null,
+                                "platformName": "ETH",
+                                "slug": "ethereum",
+                                "imageUrl": "https://dynamic-assets.coinbase.com/dbb4b4983bde81309ddab83eb598358eb44375b930b94687ebe38bc22e52c3b2125258ffb8477a5ef22e33d6bd72e32a506c391caa13af64c00e46613c3e5806/asset_icons/4113b082d21cc5fab17fc8f2d19fb996165bcce635e6900f7fc2d57c4ef33ae9.png",
+                                "color": "#627EEA",
+                                "displaySymbol": "ETH",
+                                "priceDataForDayV2": {
+                                  "percentChange": -0.0666440851896243
+                                },
+                                "isAssetStablecoin": false,
+                                "exponent": 8
+                              },
+                              "assetCurrentBalance": {
+                                "totalBalance": {
+                                  "value": "0.000523067532462"
+                                },
+                                "totalBalanceFiat": {
+                                  "value": "1.21843089477932049"
+                                },
+                                "id": "QXNzZXRDdXJyZW50QmFsYW5jZXM6RVRIOlVOU1BFQ0lGSUVEOkFTU0VUX1BMQVRGT1JNX1VOU1BFQ0lGSUVEOjpVTlNQRUNJRklFRDoy"
+                              },
+                              "oneDayPerformance": {
+                                "returns": {
+                                  "unrealized": {
+                                    "value": {
+                                      "value": "-0.081493973530618300053"
+                                    },
+                                    "percent": -6.269999980926514
+                                  }
+                                }
+                              },
+                              "allTimePerformance": {
+                                "returns": {
+                                  "unrealized": {
+                                    "value": {
+                                      "value": "-0.1229532663899894047903770890966"
+                                    },
+                                    "percent": -9.170000076293945
+                                  }
+                                },
+                                "summary": {
+                                  "allocation": 20.21881103515625
+                                }
+                              },
+                              "__typename": "ViewerAsset",
+                              "earnProgram": {
+                                "type": "STAKING_V2",
+                                "isEnrolled": true,
+                                "id": "4cc83cb2-9585-4eb1-946a-a3b7949e6ef9"
+                              },
+                              "staking": {
+                                "pendingRequests": {
+                                  "stakingAvailableBalance": {
+                                    "value": "0"
+                                  }
+                                },
+                                "summary": {
+                                  "totalStakedPercent": "1"
+                                }
+                              },
+                              "accounts": [
+                                {
+                                  "type": "STAKED_FUNDS",
+                                  "totalBalance": {
+                                    "value": "0.00052305"
+                                  },
+                                  "id": "QWNjb3VudDozYmNiY2VjMi0wZTNlLTU0NjctOTRjMi03MDdiZDJiMjVhM2Q=",
+                                  "uuid": "1b98a4b3-aa64-4b60-b1e2-bfde7b65d1dd",
+                                  "primary": false,
+                                  "allowDeposits": false,
+                                  "allowWithdrawals": false
+                                },
+                                {
+                                  "type": "STAKED_FUNDS",
+                                  "totalBalance": {
+                                    "value": "0"
+                                  },
+                                  "id": "QWNjb3VudDphZTk2YWYyNC0yMTg1LTVhNmEtYTBiMS0xYzczYTBmMjExYWE=",
+                                  "uuid": "3f41c19d-bb0d-47eb-a6c1-26dbd289f62d",
+                                  "primary": false,
+                                  "allowDeposits": false,
+                                  "allowWithdrawals": false
+                                },
+                                {
+                                  "type": "WALLET",
+                                  "totalBalance": {
+                                    "value": "0"
+                                  },
+                                  "id": "QWNjb3VudDo0YWM1NzAwMS0zMzVmLTUxZjYtOTBkYy1kZTlmM2M0OTlhNjk=",
+                                  "uuid": "4ac57001-335f-51f6-90dc-de9f3c499a69",
+                                  "primary": true,
+                                  "allowDeposits": true,
+                                  "allowWithdrawals": true
+                                }
+                              ],
+                              "supportedContextsV2": {
+                                "isConvertible": true,
+                                "isBrokerage": true,
+                                "isTradable": true,
+                                "isDex": true,
+                                "isStablecoinCashEquivalent": false
+                              },
+                              "id": "Vmlld2VyJ5CaM1+El5+INmVCMQqet1Yd"
+                            },
+                            "id": "RGVmaU9uY2hhaW5Bc3NldDoxOjB4RWVlZWVFZWVlRWVFZWVFZUVlRWVlRUVFZWVlZUVlZWVlZWVlRUVlRQ=="
+                          }
+                        }
+                      ]
+                    },
+                    "multiChainBalances": {
+                      "nodes": [
+                        {
+                          "value": "0",
+                          "defiAsset": {
+                            "network": {
+                              "name": "Ethereum",
+                              "chainId": 1,
+                              "imageUrl": "https://dynamic-assets.coinbase.com/dbb4b4983bde81309ddab83eb598358eb44375b930b94687ebe38bc22e52c3b2125258ffb8477a5ef22e33d6bd72e32a506c391caa13af64c00e46613c3e5806/asset_icons/4113b082d21cc5fab17fc8f2d19fb996165bcce635e6900f7fc2d57c4ef33ae9.png",
+                              "nativeAsset": {
+                                "imageUrl": "https://dynamic-assets.coinbase.com/dbb4b4983bde81309ddab83eb598358eb44375b930b94687ebe38bc22e52c3b2125258ffb8477a5ef22e33d6bd72e32a506c391caa13af64c00e46613c3e5806/asset_icons/4113b082d21cc5fab17fc8f2d19fb996165bcce635e6900f7fc2d57c4ef33ae9.png",
+                                "id": "RGVmaU9uY2hhaW5Bc3NldDoxOjB4RWVlZWVFZWVlRWVFZWVFZUVlRWVlRUVFZWVlZUVlZWVlZWVlRUVlRQ=="
+                              },
+                              "id": "RGVmaU5ldHdvcms6RXRoZXJldW06MQ=="
+                            },
+                            "symbol": "ETH",
+                            "exponent": 18,
+                            "contractAccount": null,
+                            "viewerAsset": {
+                              "asset": {
+                                "imageUrl": "https://dynamic-assets.coinbase.com/dbb4b4983bde81309ddab83eb598358eb44375b930b94687ebe38bc22e52c3b2125258ffb8477a5ef22e33d6bd72e32a506c391caa13af64c00e46613c3e5806/asset_icons/4113b082d21cc5fab17fc8f2d19fb996165bcce635e6900f7fc2d57c4ef33ae9.png",
+                                "platformName": "ETH",
+                                "uuid": "07448f53-f128-4a61-b160-9674512b9426",
+                                "exponent": 8,
+                                "latestPrice": {
+                                  "price": "8.405987856750084",
+                                  "id": "TGF0ZXN0QXNzZXRQcmljZTpkODVkY2U5Yi01YjczLTVjM2MtODk3OC01MjJjZTFkMWMxYjQ6VVNE"
+                                },
+                                "id": "J5CaM1+El5+INmVCMQqet1Yd"
+                              },
+                              "id": "Vmlld2VyJ5CaM1+El5+INmVCMQqet1Yd"
+                            },
+                            "id": "RGVmaU9uY2hhaW5Bc3NldDoxOjB4RWVlZWVFZWVlRWVFZWVFZUVlRWVlRUVFZWVlZUVlZWVlZWVlRUVlRQ=="
+                          },
+                          "id": "Bel5KtPXS2qNnL2OQoB0ns/J"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "error": null
+              },
+              "id": "RGVmaU5ldHdvcms6RXRoZXJldW06MQ=="
+            },
+            {
+              "chainId": 137,
+              "controlledAccountsV2": {
+                "nodes": [
+                  {
+                    "balances": {
+                      "nodes": [
+                        {
+                          "id": "RGVmaUFtb3VudDowOjB4ZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZTpSR1ZtYVU1bGRIZHZjbXM2VUc5c2VXZHZiam94TXpjPQ==",
+                          "value": "0",
+                          "asset": {
+                            "exponent": 18,
+                            "viewerAsset": {
+                              "retailAsset": {
+                                "uuid": "32d0ed81-fd18-4d9e-9557-74ccf153f767",
+                                "displaySymbol": "POL",
+                                "latestPrice": {
+                                  "price": "0.27275",
+                                  "id": "jT+At710S8etd2kubMeK0YB3"
+                                },
+                                "id": "QXNzZXQ6MzJkMGVkODEtZmQxOC00ZDllLTk1NTctNzRjY2YxNTNmNzY3"
+                              },
+                              "id": "Vmlld2VyQXNzZXQ6MzJkMGVkODEtZmQxOC00ZDllLTk1NTctNzRjY2YxNTNmNzY3"
+                            },
+                            "id": "RGVmaU9uY2hhaW5Bc3NldDoxMzc6MHhFZWVlZUVlZWVFZUVlZUVlRWVFZWVFRUVlZWVlRWVlZWVlZWVFRWVF"
+                          }
+                        }
+                      ]
+                    },
+                    "id": "RGVmaUFjY291bnQ6MHgxRmVmNjI0MTNlODU4NzkzOTg5ZjQxNUVhZTIzOTAzYjNlOUU2NTRBOjEzNw==",
+                    "balancesV2": {
+                      "error": null,
+                      "nodes": [
+                        {
+                          "__typename": "DefiAmount",
+                          "id": "RGVmaUFtb3VudDowOjB4ZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZTpSR1ZtYVU1bGRIZHZjbXM2VUc5c2VXZHZiam94TXpjPQ==",
+                          "value": "0",
+                          "defiAsset": {
+                            "exponent": 18,
+                            "viewerAsset": {
+                              "__isAssetOrCurrency": "ViewerAsset",
+                              "asset": {
+                                "name": "Polygon Ecosystem Token",
+                                "latestPrice": {
+                                  "price": "0.27275",
+                                  "id": "jT+At710S8etd2kubMeK0YB3"
+                                },
+                                "id": "QXNzZXQ6MzJkMGVkODEtZmQxOC00ZDllLTk1NTctNzRjY2YxNTNmNzY3",
+                                "uuid": "32d0ed81-fd18-4d9e-9557-74ccf153f767",
+                                "contractAddress": "0x455e53CBB86018Ac2B8092FdCd39d8444aFFC3F6",
+                                "platformName": "POL",
+                                "slug": "polygon-pol",
+                                "imageUrl": "https://asset-metadata-service-production.s3.amazonaws.com/asset_icons/d0f91824568fe7ed63f2fe8a21e68ae8aaa4133840fdba541471d470d9aaa16d.png",
+                                "color": "#6C00F6",
+                                "displaySymbol": "POL",
+                                "priceDataForDayV2": {
+                                  "percentChange": -0.0001834862385321
+                                },
+                                "isAssetStablecoin": false,
+                                "exponent": 8
+                              },
+                              "assetCurrentBalance": {
+                                "totalBalance": {
+                                  "value": "0"
+                                },
+                                "totalBalanceFiat": {
+                                  "value": "0"
+                                },
+                                "id": "QXNzZXRDdXJyZW50QmFsYW5jZXM6UE9MOlVOU1BFQ0lGSUVEOkFTU0VUX1BMQVRGT1JNX1VOU1BFQ0lGSUVEOjpVTlNQRUNJRklFRDoy"
+                              },
+                              "oneDayPerformance": {
+                                "returns": {
+                                  "unrealized": {
+                                    "value": {
+                                      "value": "0"
+                                    },
+                                    "percent": 0
+                                  }
+                                }
+                              },
+                              "allTimePerformance": {
+                                "returns": {
+                                  "unrealized": {
+                                    "value": {
+                                      "value": "0"
+                                    },
+                                    "percent": 0
+                                  }
+                                },
+                                "summary": {
+                                  "allocation": 0
+                                }
+                              },
+                              "__typename": "ViewerAsset",
+                              "earnProgram": null,
+                              "staking": null,
+                              "accounts": [
+                                {
+                                  "type": "WALLET",
+                                  "totalBalance": {
+                                    "value": "0"
+                                  },
+                                  "id": "QWNjb3VudDpQT0w=",
+                                  "uuid": "POL",
+                                  "primary": true,
+                                  "allowDeposits": true,
+                                  "allowWithdrawals": true
+                                }
+                              ],
+                              "supportedContextsV2": {
+                                "isConvertible": true,
+                                "isBrokerage": true,
+                                "isTradable": true,
+                                "isDex": false,
+                                "isStablecoinCashEquivalent": false
+                              },
+                              "id": "Vmlld2VyQXNzZXQ6MzJkMGVkODEtZmQxOC00ZDllLTk1NTctNzRjY2YxNTNmNzY3"
+                            },
+                            "id": "RGVmaU9uY2hhaW5Bc3NldDoxMzc6MHhFZWVlZUVlZWVFZUVlZUVlRWVFZWVFRUVlZWVlRWVlZWVlZWVFRWVF"
+                          }
+                        }
+                      ]
+                    },
+                    "multiChainBalances": {
+                      "nodes": [
+                        {
+                          "value": "0",
+                          "defiAsset": {
+                            "network": {
+                              "name": "Polygon",
+                              "chainId": 137,
+                              "imageUrl": "https://asset-metadata-service-production.s3.amazonaws.com/asset_icons/d0f91824568fe7ed63f2fe8a21e68ae8aaa4133840fdba541471d470d9aaa16d.png",
+                              "nativeAsset": {
+                                "imageUrl": "https://asset-metadata-service-production.s3.amazonaws.com/asset_icons/d0f91824568fe7ed63f2fe8a21e68ae8aaa4133840fdba541471d470d9aaa16d.png",
+                                "id": "RGVmaU9uY2hhaW5Bc3NldDoxMzc6MHhFZWVlZUVlZWVFZUVlZUVlRWVFZWVFRUVlZWVlRWVlZWVlZWVFRWVF"
+                              },
+                              "id": "RGVmaU5ldHdvcms6UG9seWdvbjoxMzc="
+                            },
+                            "symbol": "POL",
+                            "exponent": 18,
+                            "contractAccount": null,
+                            "viewerAsset": {
+                              "asset": {
+                                "imageUrl": "https://asset-metadata-service-production.s3.amazonaws.com/asset_icons/d0f91824568fe7ed63f2fe8a21e68ae8aaa4133840fdba541471d470d9aaa16d.png",
+                                "platformName": "POL",
+                                "uuid": "32d0ed81-fd18-4d9e-9557-74ccf153f767",
+                                "exponent": 8,
+                                "latestPrice": {
+                                  "price": "0.27275",
+                                  "id": "jT+At710S8etd2kubMeK0YB3"
+                                },
+                                "id": "QXNzZXQ6MzJkMGVkODEtZmQxOC00ZDllLTk1NTctNzRjY2YxNTNmNzY3"
+                              },
+                              "id": "Vmlld2VyQXNzZXQ6MzJkMGVkODEtZmQxOC00ZDllLTk1NTctNzRjY2YxNTNmNzY3"
+                            },
+                            "id": "RGVmaU9uY2hhaW5Bc3NldDoxMzc6MHhFZWVlZUVlZWVFZUVlZUVlRWVFZWVFRUVlZWVlRWVlZWVlZWVFRWVF"
+                          },
+                          "id": "RGVmaUFtb3VudDowOjB4ZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZTpSR1ZtYVU1bGRIZHZjbXM2VUc5c2VXZHZiam94TXpjPQ=="
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "error": null
+              },
+              "id": "RGVmaU5ldHdvcms6UG9seWdvbjoxMzc="
+            },
+            {
+              "chainId": 8453,
+              "controlledAccountsV2": {
+                "nodes": [
+                  {
+                    "balances": {
+                      "nodes": [
+                        {
+                          "id": "RGVmaUFtb3VudDowOjB4ZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZTpSR1ZtYVU1bGRIZHZjbXM2UW1GelpUbzRORFV6",
+                          "value": "0",
+                          "asset": {
+                            "exponent": 18,
+                            "viewerAsset": {
+                              "retailAsset": {
+                                "uuid": "07448f53-f128-4a61-b160-9674512b9426",
+                                "displaySymbol": "ETH",
+                                "latestPrice": {
+                                  "price": "8.405987856750084",
+                                  "id": "TGF0ZXN0QXNzZXRQcmljZTpkODVkY2U5Yi01YjczLTVjM2MtODk3OC01MjJjZTFkMWMxYjQ6VVNE"
+                                },
+                                "id": "J5CaM1+El5+INmVCMQqet1Yd"
+                              },
+                              "id": "Vmlld2VyJ5CaM1+El5+INmVCMQqet1Yd"
+                            },
+                            "id": "RGVmaU9uY2hhaW5Bc3NldDo4NDUzOjB4RWVlZWVFZWVlRWVFZWVFZUVlRWVlRUVFZWVlZUVlZWVlZWVlRUVlRQ=="
+                          }
+                        }
+                      ]
+                    },
+                    "id": "RGVmaUFjY291bnQ6MHgxRmVmNjI0MTNlODU4NzkzOTg5ZjQxNUVhZTIzOTAzYjNlOUU2NTRBOjg0NTM=",
+                    "balancesV2": {
+                      "error": null,
+                      "nodes": [
+                        {
+                          "__typename": "DefiAmount",
+                          "id": "RGVmaUFtb3VudDowOjB4ZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZTpSR1ZtYVU1bGRIZHZjbXM2UW1GelpUbzRORFV6",
+                          "value": "0",
+                          "defiAsset": {
+                            "exponent": 18,
+                            "viewerAsset": {
+                              "__isAssetOrCurrency": "ViewerAsset",
+                              "asset": {
+                                "name": "Ethereum",
+                                "latestPrice": {
+                                  "price": "8.405987856750084",
+                                  "id": "TGF0ZXN0QXNzZXRQcmljZTpkODVkY2U5Yi01YjczLTVjM2MtODk3OC01MjJjZTFkMWMxYjQ6VVNE"
+                                },
+                                "id": "J5CaM1+El5+INmVCMQqet1Yd",
+                                "uuid": "07448f53-f128-4a61-b160-9674512b9426",
+                                "contractAddress": null,
+                                "platformName": "ETH",
+                                "slug": "ethereum",
+                                "imageUrl": "https://dynamic-assets.coinbase.com/dbb4b4983bde81309ddab83eb598358eb44375b930b94687ebe38bc22e52c3b2125258ffb8477a5ef22e33d6bd72e32a506c391caa13af64c00e46613c3e5806/asset_icons/4113b082d21cc5fab17fc8f2d19fb996165bcce635e6900f7fc2d57c4ef33ae9.png",
+                                "color": "#627EEA",
+                                "displaySymbol": "ETH",
+                                "priceDataForDayV2": {
+                                  "percentChange": -0.0666440851896243
+                                },
+                                "isAssetStablecoin": false,
+                                "exponent": 8
+                              },
+                              "assetCurrentBalance": {
+                                "totalBalance": {
+                                  "value": "0.000523067532462"
+                                },
+                                "totalBalanceFiat": {
+                                  "value": "1.21843089477932049"
+                                },
+                                "id": "QXNzZXRDdXJyZW50QmFsYW5jZXM6RVRIOlVOU1BFQ0lGSUVEOkFTU0VUX1BMQVRGT1JNX1VOU1BFQ0lGSUVEOjpVTlNQRUNJRklFRDoy"
+                              },
+                              "oneDayPerformance": {
+                                "returns": {
+                                  "unrealized": {
+                                    "value": {
+                                      "value": "-0.081493973530618300053"
+                                    },
+                                    "percent": -6.269999980926514
+                                  }
+                                }
+                              },
+                              "allTimePerformance": {
+                                "returns": {
+                                  "unrealized": {
+                                    "value": {
+                                      "value": "-0.1229532663899894047903770890966"
+                                    },
+                                    "percent": -9.170000076293945
+                                  }
+                                },
+                                "summary": {
+                                  "allocation": 20.21881103515625
+                                }
+                              },
+                              "__typename": "ViewerAsset",
+                              "earnProgram": {
+                                "type": "STAKING_V2",
+                                "isEnrolled": true,
+                                "id": "4cc83cb2-9585-4eb1-946a-a3b7949e6ef9"
+                              },
+                              "staking": {
+                                "pendingRequests": {
+                                  "stakingAvailableBalance": {
+                                    "value": "0"
+                                  }
+                                },
+                                "summary": {
+                                  "totalStakedPercent": "1"
+                                }
+                              },
+                              "accounts": [
+                                {
+                                  "type": "STAKED_FUNDS",
+                                  "totalBalance": {
+                                    "value": "0.00052305"
+                                  },
+                                  "id": "QWNjb3VudDozYmNiY2VjMi0wZTNlLTU0NjctOTRjMi03MDdiZDJiMjVhM2Q=",
+                                  "uuid": "1b98a4b3-aa64-4b60-b1e2-bfde7b65d1dd",
+                                  "primary": false,
+                                  "allowDeposits": false,
+                                  "allowWithdrawals": false
+                                },
+                                {
+                                  "type": "STAKED_FUNDS",
+                                  "totalBalance": {
+                                    "value": "0"
+                                  },
+                                  "id": "QWNjb3VudDphZTk2YWYyNC0yMTg1LTVhNmEtYTBiMS0xYzczYTBmMjExYWE=",
+                                  "uuid": "3f41c19d-bb0d-47eb-a6c1-26dbd289f62d",
+                                  "primary": false,
+                                  "allowDeposits": false,
+                                  "allowWithdrawals": false
+                                },
+                                {
+                                  "type": "WALLET",
+                                  "totalBalance": {
+                                    "value": "0"
+                                  },
+                                  "id": "QWNjb3VudDo0YWM1NzAwMS0zMzVmLTUxZjYtOTBkYy1kZTlmM2M0OTlhNjk=",
+                                  "uuid": "4ac57001-335f-51f6-90dc-de9f3c499a69",
+                                  "primary": true,
+                                  "allowDeposits": true,
+                                  "allowWithdrawals": true
+                                }
+                              ],
+                              "supportedContextsV2": {
+                                "isConvertible": true,
+                                "isBrokerage": true,
+                                "isTradable": true,
+                                "isDex": true,
+                                "isStablecoinCashEquivalent": false
+                              },
+                              "id": "Vmlld2VyJ5CaM1+El5+INmVCMQqet1Yd"
+                            },
+                            "id": "RGVmaU9uY2hhaW5Bc3NldDo4NDUzOjB4RWVlZWVFZWVlRWVFZWVFZUVlRWVlRUVFZWVlZUVlZWVlZWVlRUVlRQ=="
+                          }
+                        }
+                      ]
+                    },
+                    "multiChainBalances": {
+                      "nodes": [
+                        {
+                          "value": "0",
+                          "defiAsset": {
+                            "network": {
+                              "name": "Base",
+                              "chainId": 8453,
+                              "imageUrl": "https://static-assets.coinbase.com/p2p/l2/networks/v1/base.png",
+                              "nativeAsset": {
+                                "imageUrl": "https://dynamic-assets.coinbase.com/dbb4b4983bde81309ddab83eb598358eb44375b930b94687ebe38bc22e52c3b2125258ffb8477a5ef22e33d6bd72e32a506c391caa13af64c00e46613c3e5806/asset_icons/4113b082d21cc5fab17fc8f2d19fb996165bcce635e6900f7fc2d57c4ef33ae9.png",
+                                "id": "RGVmaU9uY2hhaW5Bc3NldDo4NDUzOjB4RWVlZWVFZWVlRWVFZWVFZUVlRWVlRUVFZWVlZUVlZWVlZWVlRUVlRQ=="
+                              },
+                              "id": "RGVmaU5ldHdvcms6QmFzZTo4NDUz"
+                            },
+                            "symbol": "ETH",
+                            "exponent": 18,
+                            "contractAccount": null,
+                            "viewerAsset": {
+                              "asset": {
+                                "imageUrl": "https://dynamic-assets.coinbase.com/dbb4b4983bde81309ddab83eb598358eb44375b930b94687ebe38bc22e52c3b2125258ffb8477a5ef22e33d6bd72e32a506c391caa13af64c00e46613c3e5806/asset_icons/4113b082d21cc5fab17fc8f2d19fb996165bcce635e6900f7fc2d57c4ef33ae9.png",
+                                "platformName": "ETH",
+                                "uuid": "07448f53-f128-4a61-b160-9674512b9426",
+                                "exponent": 8,
+                                "latestPrice": {
+                                  "price": "8.405987856750084",
+                                  "id": "TGF0ZXN0QXNzZXRQcmljZTpkODVkY2U5Yi01YjczLTVjM2MtODk3OC01MjJjZTFkMWMxYjQ6VVNE"
+                                },
+                                "id": "J5CaM1+El5+INmVCMQqet1Yd"
+                              },
+                              "id": "Vmlld2VyJ5CaM1+El5+INmVCMQqet1Yd"
+                            },
+                            "id": "RGVmaU9uY2hhaW5Bc3NldDo4NDUzOjB4RWVlZWVFZWVlRWVFZWVFZUVlRWVlRUVFZWVlZUVlZWVlZWVlRUVlRQ=="
+                          },
+                          "id": "RGVmaUFtb3VudDowOjB4ZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZTpSR1ZtYVU1bGRIZHZjbXM2UW1GelpUbzRORFV6"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "error": null
+              },
+              "id": "RGVmaU5ldHdvcms6QmFzZTo4NDUz"
+            }
+          ],
+          "error": null
+        }
+      },
+      "performance": {
+        "status": "AVAILABLE",
+        "isEnabled": true
+      },
+      "oneHourPerformance": {
+        "isEnabled": true,
+        "returns": {
+          "unrealized": {
+            "value": {
+              "value": "5.55982059288754",
+              "currency": "USD"
+            },
+            "percent": 1.2999999523162842
+          }
+        }
+      },
+      "oneDayPerformance": {
+        "isEnabled": true,
+        "returns": {
+          "unrealized": {
+            "value": {
+              "value": "-0.39122651661704062188825924778158",
+              "currency": "USD"
+            },
+            "percent": -6.099999904632568
+          }
+        },
+        "status": "AVAILABLE"
+      },
+      "oneWeekPerformance": {
+        "isEnabled": true,
+        "returns": {
+          "unrealized": {
+            "value": {
+              "value": "-1.32638411589794856567135924778158",
+              "currency": "USD"
+            },
+            "percent": -18.040000915527344
+          }
+        }
+      },
+      "oneMonthPerformance": {
+        "isEnabled": true,
+        "returns": {
+          "unrealized": {
+            "value": {
+              "value": "-4.63190868114808163697295924778158",
+              "currency": "USD"
+            },
+            "percent": -43.459999084472656
+          }
+        }
+      },
+      "oneYearPerformance": {
+        "isEnabled": true,
+        "returns": {
+          "unrealized": {
+            "value": {
+              "value": "0.46275696646141553958624075221842",
+              "currency": "USD"
+            },
+            "percent": 0.019999999552965164
+          }
+        }
+      },
+      "allTimePerformance": {
+        "isEnabled": true,
+        "returns": {
+          "unrealized": {
+            "value": {
+              "value": "8.30211484226034",
+              "currency": "USD"
+            },
+            "percent": 195.75
+          }
+        },
+        "status": "AVAILABLE"
+      },
+      "earn": {
+        "assets": {
+          "current": [
+            {
+              "type": "STAKING_V2",
+              "asset": {
+                "staking": {
+                  "actionEligibility": [
+                    {
+                      "action": "STAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    },
+                    {
+                      "action": "UNSTAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    },
+                    {
+                      "action": "BUY_AND_STAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    }
+                  ],
+                  "pendingRequests": {
+                    "stakingAvailableBalance": {
+                      "value": "0"
+                    }
+                  },
+                  "summary": {
+                    "totalNotStaked": {
+                      "value": "0"
+                    },
+                    "totalNotStakedFiat": {
+                      "value": "0"
+                    },
+                    "totalStaked": {
+                      "value": "0"
+                    },
+                    "totalStakedFiat": {
+                      "value": "0"
+                    }
+                  }
+                },
+                "id": "Vmlld2VyQXNzZXQ6NjllNTU5ZWMtNTQ3YS01MjBhLWFlYjMtMDFjYWMyM2YxODI2",
+                "accounts": [
+                  {
+                    "type": "WALLET",
+                    "totalBalance": {
+                      "value": "0"
+                    },
+                    "totalBalanceInNativeCurrency": {
+                      "value": "0"
+                    },
+                    "id": "QWNjb3VudDpjZTRlMjUwZS0xNDE4LTUzYTYtOTg5Ni1jZTc1MDcxNjI1NTU=",
+                    "primary": true,
+                    "availableBalance": {
+                      "value": "0"
+                    },
+                    "availableBalanceInNativeCurrency": {
+                      "value": "0"
+                    }
+                  }
+                ],
+                "asset": {
+                  "latestPrice": {
+                    "price": "0.7635",
+                    "id": "TGF0ZXN0QXNzZXRQcmljZTo2OWU1NTllYy01NDdhLTUyMGEtYWViMy0wMWNhYzIzZjE4MjY6VVNE"
+                  },
+                  "id": "QXNzZXQ6NjllNTU5ZWMtNTQ3YS01MjBhLWFlYjMtMDFjYWMyM2YxODI2",
+                  "uuid": "69e559ec-547a-520a-aeb3-01cac23f1826",
+                  "platformName": "XTZ"
+                }
+              },
+              "id": "30674aad-0005-47f6-8ac6-24fc6c0e34e9",
+              "currentRate": {
+                "value": "0.0519",
+                "formatted": "5.19%",
+                "unitSymbol": "APY"
+              },
+              "isEnrolled": true
+            },
+            {
+              "type": "STAKING_V2",
+              "asset": {
+                "staking": {
+                  "actionEligibility": [
+                    {
+                      "action": "STAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    },
+                    {
+                      "action": "UNSTAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    },
+                    {
+                      "action": "BUY_AND_STAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    }
+                  ],
+                  "pendingRequests": {
+                    "stakingAvailableBalance": {
+                      "value": "0"
+                    }
+                  },
+                  "summary": {
+                    "totalNotStaked": {
+                      "value": "0"
+                    },
+                    "totalNotStakedFiat": {
+                      "value": "0"
+                    },
+                    "totalStaked": {
+                      "value": "0.00052305"
+                    },
+                    "totalStakedFiat": {
+                      "value": "1.21"
+                    }
+                  }
+                },
+                "id": "Vmlld2VyJ5CaM1+El5+INmVCMQqet1Yd",
+                "accounts": [
+                  {
+                    "type": "STAKED_FUNDS",
+                    "totalBalance": {
+                      "value": "0.00052305"
+                    },
+                    "totalBalanceInNativeCurrency": {
+                      "value": "1.21839005475"
+                    },
+                    "id": "QWNjb3VudDozYmNiY2VjMi0wZTNlLTU0NjctOTRjMi03MDdiZDJiMjVhM2Q=",
+                    "primary": false,
+                    "availableBalance": {
+                      "value": "0.00052305"
+                    },
+                    "availableBalanceInNativeCurrency": {
+                      "value": "1.21839005475"
+                    }
+                  },
+                  {
+                    "type": "STAKED_FUNDS",
+                    "totalBalance": {
+                      "value": "0"
+                    },
+                    "totalBalanceInNativeCurrency": {
+                      "value": "0"
+                    },
+                    "id": "QWNjb3VudDphZTk2YWYyNC0yMTg1LTVhNmEtYTBiMS0xYzczYTBmMjExYWE=",
+                    "primary": false,
+                    "availableBalance": {
+                      "value": "0"
+                    },
+                    "availableBalanceInNativeCurrency": {
+                      "value": "0"
+                    }
+                  },
+                  {
+                    "type": "WALLET",
+                    "totalBalance": {
+                      "value": "0"
+                    },
+                    "totalBalanceInNativeCurrency": {
+                      "value": "0"
+                    },
+                    "id": "QWNjb3VudDo0YWM1NzAwMS0zMzVmLTUxZjYtOTBkYy1kZTlmM2M0OTlhNjk=",
+                    "primary": true,
+                    "availableBalance": {
+                      "value": "0"
+                    },
+                    "availableBalanceInNativeCurrency": {
+                      "value": "0"
+                    }
+                  }
+                ],
+                "asset": {
+                  "latestPrice": {
+                    "price": "8.405987856750084",
+                    "id": "TGF0ZXN0QXNzZXRQcmljZTpkODVkY2U5Yi01YjczLTVjM2MtODk3OC01MjJjZTFkMWMxYjQ6VVNE"
+                  },
+                  "id": "J5CaM1+El5+INmVCMQqet1Yd",
+                  "uuid": "07448f53-f128-4a61-b160-9674512b9426",
+                  "platformName": "ETH"
+                }
+              },
+              "id": "4cc83cb2-9585-4eb1-946a-a3b7949e6ef9",
+              "currentRate": {
+                "value": "0.02182308",
+                "formatted": "2.18%",
+                "unitSymbol": "APY"
+              },
+              "isEnrolled": true
+            },
+            {
+              "type": "WRAPPED",
+              "asset": {
+                "staking": null,
+                "id": "Vmlld2VyQXNzZXQ6MTYxZjVkMGEtMTY1Ny00MzAwLWIwNzItM2Y5Y2I0ZDZiZGFk",
+                "accounts": [
+                  {
+                    "type": "WALLET",
+                    "totalBalance": {
+                      "value": "0"
+                    },
+                    "totalBalanceInNativeCurrency": {
+                      "value": "0"
+                    },
+                    "id": "QWNjb3VudDpjZmEzMzhiNi01MGZjLTVlM2UtYTg5Ny0yMTU3NWZkN2Q3MWU=",
+                    "primary": true,
+                    "availableBalance": {
+                      "value": "0"
+                    },
+                    "availableBalanceInNativeCurrency": {
+                      "value": "0"
+                    }
+                  }
+                ],
+                "asset": {
+                  "latestPrice": {
+                    "price": "2543.675",
+                    "id": "TGF0ZXN0QXNzZXRQcmljZToxNjFmNWQwYS0xNjU3LTQzMDAtYjA3Mi0zZjljYjRkNmJkYWQ6VVNE"
+                  },
+                  "id": "QXNzZXQ6MTYxZjVkMGEtMTY1Ny00MzAwLWIwNzItM2Y5Y2I0ZDZiZGFk",
+                  "uuid": "161f5d0a-1657-4300-b072-3f9cb4d6bdad",
+                  "platformName": "CBETH"
+                }
+              },
+              "id": "30cdf84c-ed5b-31c8-8138-740a3f7583e8",
+              "currentRate": {
+                "value": "0.02522168",
+                "formatted": "2.52%",
+                "unitSymbol": "APY"
+              },
+              "isEnrolled": false
+            },
+            {
+              "type": "STAKING_V2",
+              "asset": {
+                "staking": {
+                  "actionEligibility": [
+                    {
+                      "action": "STAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    },
+                    {
+                      "action": "UNSTAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    },
+                    {
+                      "action": "BUY_AND_STAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    }
+                  ],
+                  "pendingRequests": {
+                    "stakingAvailableBalance": {
+                      "value": "0"
+                    }
+                  },
+                  "summary": {
+                    "totalNotStaked": {
+                      "value": "0"
+                    },
+                    "totalNotStakedFiat": {
+                      "value": "0"
+                    },
+                    "totalStaked": {
+                      "value": "0"
+                    },
+                    "totalStakedFiat": {
+                      "value": "0"
+                    }
+                  }
+                },
+                "id": "Vmlld2VyQXNzZXQ6NjMwNjIwMzktN2FmYi01NmZmLThlMTktNWUzMjE1ZGM0MDRh",
+                "accounts": [
+                  {
+                    "type": "WALLET",
+                    "totalBalance": {
+                      "value": "0"
+                    },
+                    "totalBalanceInNativeCurrency": {
+                      "value": "0"
+                    },
+                    "id": "QWNjb3VudDpBREE=",
+                    "primary": true,
+                    "availableBalance": {
+                      "value": "0"
+                    },
+                    "availableBalanceInNativeCurrency": {
+                      "value": "0"
+                    }
+                  }
+                ],
+                "asset": {
+                  "latestPrice": {
+                    "price": "0.65095",
+                    "id": "TGF0ZXN0QXNzZXRQcmljZTo2MzA2MjAzOS03YWZiLTU2ZmYtOGUxOS01ZTMyMTVkYzQwNGE6VVNE"
+                  },
+                  "id": "QXNzZXQ6NjMwNjIwMzktN2FmYi01NmZmLThlMTktNWUzMjE1ZGM0MDRh",
+                  "uuid": "63062039-7afb-56ff-8e19-5e3215dc404a",
+                  "platformName": "ADA"
+                }
+              },
+              "id": "ade40aea-e852-4a62-8d48-c0b63737f89f",
+              "currentRate": {
+                "value": "0.0227",
+                "formatted": "2.27%",
+                "unitSymbol": "APY"
+              },
+              "isEnrolled": false
+            },
+            {
+              "type": "STAKING_V2",
+              "asset": {
+                "staking": {
+                  "actionEligibility": [
+                    {
+                      "action": "STAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    },
+                    {
+                      "action": "UNSTAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    },
+                    {
+                      "action": "BUY_AND_STAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    }
+                  ],
+                  "pendingRequests": {
+                    "stakingAvailableBalance": {
+                      "value": "0"
+                    }
+                  },
+                  "summary": {
+                    "totalNotStaked": {
+                      "value": "0"
+                    },
+                    "totalNotStakedFiat": {
+                      "value": "0"
+                    },
+                    "totalStaked": {
+                      "value": "0"
+                    },
+                    "totalStakedFiat": {
+                      "value": "0"
+                    }
+                  }
+                },
+                "id": "Vmlld2VyQXNzZXQ6MDI2YmNjMWUtOTE2My01OTFjLWE3MDktMzRkZDE4YjJlN2Ex",
+                "accounts": [
+                  {
+                    "type": "WALLET",
+                    "totalBalance": {
+                      "value": "0"
+                    },
+                    "totalBalanceInNativeCurrency": {
+                      "value": "0"
+                    },
+                    "id": "QWNjb3VudDpNQVRJQw==",
+                    "primary": true,
+                    "availableBalance": {
+                      "value": "0"
+                    },
+                    "availableBalanceInNativeCurrency": {
+                      "value": "0"
+                    }
+                  }
+                ],
+                "asset": {
+                  "latestPrice": {
+                    "price": "0.27285",
+                    "id": "TGF0ZXN0QXNzZXRQcmljZTowMjZiY2MxZS05MTYzLTU5MWMtYTcwOS0zNGRkMThiMmU3YTE6VVNE"
+                  },
+                  "id": "QXNzZXQ6MDI2YmNjMWUtOTE2My01OTFjLWE3MDktMzRkZDE4YjJlN2Ex",
+                  "uuid": "026bcc1e-9163-591c-a709-34dd18b2e7a1",
+                  "platformName": "MATIC"
+                }
+              },
+              "id": "0afc204e-9b4a-459e-a0cb-b5073bbbe382",
+              "currentRate": {
+                "value": "0.0268",
+                "formatted": "2.68%",
+                "unitSymbol": "APY"
+              },
+              "isEnrolled": false
+            },
+            {
+              "type": "STAKING_V2",
+              "asset": {
+                "staking": {
+                  "actionEligibility": [
+                    {
+                      "action": "STAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    },
+                    {
+                      "action": "UNSTAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    },
+                    {
+                      "action": "BUY_AND_STAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    }
+                  ],
+                  "pendingRequests": {
+                    "stakingAvailableBalance": {
+                      "value": "0"
+                    }
+                  },
+                  "summary": {
+                    "totalNotStaked": {
+                      "value": "0"
+                    },
+                    "totalNotStakedFiat": {
+                      "value": "0"
+                    },
+                    "totalStaked": {
+                      "value": "0"
+                    },
+                    "totalStakedFiat": {
+                      "value": "0"
+                    }
+                  }
+                },
+                "id": "Vmlld2VyQXNzZXQ6OWQwNmU0NjMtYjNiYS01YWJmLTkwODItODc2MTg0NmIyOGFi",
+                "accounts": [
+                  {
+                    "type": "WALLET",
+                    "totalBalance": {
+                      "value": "0"
+                    },
+                    "totalBalanceInNativeCurrency": {
+                      "value": "0"
+                    },
+                    "id": "QWNjb3VudDpBVkFY",
+                    "primary": true,
+                    "availableBalance": {
+                      "value": "0"
+                    },
+                    "availableBalanceInNativeCurrency": {
+                      "value": "0"
+                    }
+                  }
+                ],
+                "asset": {
+                  "latestPrice": {
+                    "price": "21.7850000000000138",
+                    "id": "TGF0ZXN0QXNzZXRQcmljZTo5ZDA2ZTQ2My1iM2JhLTVhYmYtOTA4Mi04NzYxODQ2YjI4YWI6VVNE"
+                  },
+                  "id": "QXNzZXQ6OWQwNmU0NjMtYjNiYS01YWJmLTkwODItODc2MTg0NmIyOGFi",
+                  "uuid": "9d06e463-b3ba-5abf-9082-8761846b28ab",
+                  "platformName": "AVAX"
+                }
+              },
+              "id": "130b8daa-98ef-41a6-bd2d-1aa20a4b05a6",
+              "currentRate": {
+                "value": "0.0447",
+                "formatted": "4.47%",
+                "unitSymbol": "APY"
+              },
+              "isEnrolled": false
+            },
+            {
+              "type": "STAKING_V2",
+              "asset": {
+                "staking": {
+                  "actionEligibility": [
+                    {
+                      "action": "STAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    },
+                    {
+                      "action": "UNSTAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    },
+                    {
+                      "action": "BUY_AND_STAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    }
+                  ],
+                  "pendingRequests": {
+                    "stakingAvailableBalance": {
+                      "value": "0"
+                    }
+                  },
+                  "summary": {
+                    "totalNotStaked": {
+                      "value": "0"
+                    },
+                    "totalNotStakedFiat": {
+                      "value": "0"
+                    },
+                    "totalStaked": {
+                      "value": "0"
+                    },
+                    "totalStakedFiat": {
+                      "value": "0"
+                    }
+                  }
+                },
+                "id": "Vmlld2VyQXNzZXQ6ZWJlYTg2MWEtYzBhZS01MzIzLWJiZTAtNDY4OTNhMTE5YTM5",
+                "accounts": [
+                  {
+                    "type": "WALLET",
+                    "totalBalance": {
+                      "value": "0"
+                    },
+                    "totalBalanceInNativeCurrency": {
+                      "value": "0"
+                    },
+                    "id": "QWNjb3VudDpET1Q=",
+                    "primary": true,
+                    "availableBalance": {
+                      "value": "0"
+                    },
+                    "availableBalanceInNativeCurrency": {
+                      "value": "0"
+                    }
+                  }
+                ],
+                "asset": {
+                  "latestPrice": {
+                    "price": "4.7874999999999991",
+                    "id": "TGF0ZXN0QXNzZXRQcmljZTplYmVhODYxYS1jMGFlLTUzMjMtYmJlMC00Njg5M2ExMTlhMzk6VVNE"
+                  },
+                  "id": "QXNzZXQ6ZWJlYTg2MWEtYzBhZS01MzIzLWJiZTAtNDY4OTNhMTE5YTM5",
+                  "uuid": "ebea861a-c0ae-5323-bbe0-46893a119a39",
+                  "platformName": "DOT"
+                }
+              },
+              "id": "5b0364f3-c657-4c66-8b3f-069a45ef7022",
+              "currentRate": {
+                "value": "0.0936",
+                "formatted": "9.36%",
+                "unitSymbol": "APY"
+              },
+              "isEnrolled": false
+            },
+            {
+              "type": "STAKING_V2",
+              "asset": {
+                "staking": {
+                  "actionEligibility": [
+                    {
+                      "action": "STAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    },
+                    {
+                      "action": "UNSTAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    },
+                    {
+                      "action": "BUY_AND_STAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    }
+                  ],
+                  "pendingRequests": {
+                    "stakingAvailableBalance": {
+                      "value": "0.035152546"
+                    }
+                  },
+                  "summary": {
+                    "totalNotStaked": {
+                      "value": "0.035152546"
+                    },
+                    "totalNotStakedFiat": {
+                      "value": "4.74"
+                    },
+                    "totalStaked": {
+                      "value": "0.00004412"
+                    },
+                    "totalStakedFiat": {
+                      "value": "0"
+                    }
+                  }
+                },
+                "id": "Vmlld2VyQXNzZXQ6NGYwMzk0OTctM2FmOC01YmIzLTk1MWMtNmRmOWFmYTliZTFj",
+                "accounts": [
+                  {
+                    "type": "STAKED_FUNDS",
+                    "totalBalance": {
+                      "value": "0.00004412"
+                    },
+                    "totalBalanceInNativeCurrency": {
+                      "value": "0.005958185400000039231504"
+                    },
+                    "id": "QWNjb3VudDphNTMyMWFhZC0yOTg3LTU0YzItYWMxNi0xM2FhZTg1NTQyMDk=",
+                    "primary": false,
+                    "availableBalance": {
+                      "value": "0.00004412"
+                    },
+                    "availableBalanceInNativeCurrency": {
+                      "value": "0.005958185400000039231504"
+                    }
+                  },
+                  {
+                    "type": "WALLET",
+                    "totalBalance": {
+                      "value": "0.035152546"
+                    },
+                    "totalBalanceInNativeCurrency": {
+                      "value": "4.7471755745700312576439032"
+                    },
+                    "id": "QWNjb3VudDo3YjM2MTk4MS04YTg1LTVlNzgtOGQyMi04YTYyZWVjOWIyZWQ=",
+                    "primary": true,
+                    "availableBalance": {
+                      "value": "0.035152546"
+                    },
+                    "availableBalanceInNativeCurrency": {
+                      "value": "4.7471755745700312576439032"
+                    }
+                  }
+                ],
+                "asset": {
+                  "latestPrice": {
+                    "price": "5.686157484668424",
+                    "id": "TGF0ZXN0QXNzZXRQcmljZTo0ZjAzOTQ5Ny0zYWY4LTViYjMtOTUxYy02ZGY5YWZhOWJlMWM6VVNE"
+                  },
+                  "id": "QXNzZXQ6NGYwMzk0OTctM2FmOC01YmIzLTk1MWMtNmRmOWFmYTliZTFj",
+                  "uuid": "06eb15f8-1c26-45cd-a9b3-8bc49eae9d35",
+                  "platformName": "SOL"
+                }
+              },
+              "id": "3692bab0-e386-11ec-8fea-0242ac120002",
+              "currentRate": {
+                "value": "0.0769",
+                "formatted": "7.69%",
+                "unitSymbol": "APY"
+              },
+              "isEnrolled": true
+            },
+            {
+              "type": "STAKING_V2",
+              "asset": {
+                "staking": {
+                  "actionEligibility": [
+                    {
+                      "action": "STAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    },
+                    {
+                      "action": "UNSTAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    },
+                    {
+                      "action": "BUY_AND_STAKE",
+                      "isEnabled": true,
+                      "isHidden": false
+                    }
+                  ],
+                  "pendingRequests": {
+                    "stakingAvailableBalance": {
+                      "value": "0"
+                    }
+                  },
+                  "summary": {
+                    "totalNotStaked": {
+                      "value": "0"
+                    },
+                    "totalNotStakedFiat": {
+                      "value": "0"
+                    },
+                    "totalStaked": {
+                      "value": "0"
+                    },
+                    "totalStakedFiat": {
+                      "value": "0"
+                    }
+                  }
+                },
+                "id": "Vmlld2VyQXNzZXQ6NjRjNjA3ZDItNDY2My01NjQ5LTg2ZTAtM2FiMDZiYmEwMjAy",
+                "accounts": [
+                  {
+                    "type": "WALLET",
+                    "totalBalance": {
+                      "value": "0"
+                    },
+                    "totalBalanceInNativeCurrency": {
+                      "value": "0"
+                    },
+                    "id": "QWNjb3VudDo3MjAxYjhiMC1hZTk3LTU1ZWEtOWI5Ni05OGViYjc3ZjI5ZTY=",
+                    "primary": true,
+                    "availableBalance": {
+                      "value": "0"
+                    },
+                    "availableBalanceInNativeCurrency": {
+                      "value": "0"
+                    }
+                  }
+                ],
+                "asset": {
+                  "latestPrice": {
+                    "price": "4.614500000000001",
+                    "id": "TGF0ZXN0QXNzZXRQcmljZTo2NGM2MDdkMi00NjYzLTU2NDktODZlMC0zYWIwNmJiYTAyMDI6VVNE"
+                  },
+                  "id": "QXNzZXQ6NjRjNjA3ZDItNDY2My01NjQ5LTg2ZTAtM2FiMDZiYmEwMjAy",
+                  "uuid": "64c607d2-4663-5649-86e0-3ab06bba0202",
+                  "platformName": "ATOM"
+                }
+              },
+              "id": "d568fbc5-2900-48a6-a47d-2563a1d4383d",
+              "currentRate": {
+                "value": "0.1524",
+                "formatted": "15.24%",
+                "unitSymbol": "APY"
+              },
+              "isEnrolled": true
+            },
+            {
+              "type": "USDC_REWARDS",
+              "asset": {
+                "staking": null,
+                "id": "Vmlld2VyQXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1",
+                "accounts": [
+                  {
+                    "type": "WALLET",
+                    "totalBalance": {
+                      "value": "8.967465955899945"
+                    },
+                    "totalBalanceInNativeCurrency": {
+                      "value": "8.967465955899945"
+                    },
+                    "id": "QWNjb3VudDpmN2QwNWM2MC1jNDgzLTU1MTEtOTE3Yy1lNjU0MDcxZGMzODY=",
+                    "primary": true,
+                    "availableBalance": {
+                      "value": "8.967465955899945"
+                    },
+                    "availableBalanceInNativeCurrency": {
+                      "value": "8.967465955899945"
+                    }
+                  }
+                ],
+                "asset": {
+                  "latestPrice": {
+                    "price": "1",
+                    "id": "TGF0ZXN0QXNzZXRQcmljZToyYjkyMzE1ZC1lYWI3LTViZWYtODRmYS0wODlhMTMxMzMzZjU6VVNE"
+                  },
+                  "id": "QXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1",
+                  "uuid": "2b92315d-eab7-5bef-84fa-089a131333f5",
+                  "platformName": "USDC"
+                }
+              },
+              "id": "4e953219-30b1-3be0-8974-a392783c1ac4",
+              "currentRate": {
+                "value": "0.041",
+                "formatted": "4.10%",
+                "unitSymbol": "APY"
+              },
+              "isEnrolled": false
+            }
+          ]
+        },
+        "payouts": {
+          "asset": [
+            {
+              "totalFiat": {
+                "value": "5.913233019296548",
+                "currency": "USD"
+              },
+              "asset": {
+                "asset": {
+                  "platformName": "SOL",
+                  "id": "QXNzZXQ6NGYwMzk0OTctM2FmOC01YmIzLTk1MWMtNmRmOWFmYTliZTFj"
+                },
+                "id": "Vmlld2VyQXNzZXQ6NGYwMzk0OTctM2FmOC01YmIzLTk1MWMtNmRmOWFmYTliZTFj"
+              },
+              "id": "EarnAssetPayout-06eb15f8-1c26-45cd-a9b3-8bc49eae9d35"
+            },
+            {
+              "totalFiat": {
+                "value": "26.807016823913515913",
+                "currency": "USD"
+              },
+              "asset": {
+                "asset": {
+                  "platformName": "ETH",
+                  "id": "J5CaM1+El5+INmVCMQqet1Yd"
+                },
+                "id": "Vmlld2VyJ5CaM1+El5+INmVCMQqet1Yd"
+              },
+              "id": "EarnAssetPayout-07448f53-f128-4a61-b160-9674512b9426"
+            },
+            {
+              "totalFiat": {
+                "value": "0.16194",
+                "currency": "USD"
+              },
+              "asset": {
+                "asset": {
+                  "platformName": "USDC",
+                  "id": "QXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1"
+                },
+                "id": "Vmlld2VyQXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1"
+              },
+              "id": "EarnAssetPayout-2b92315d-eab7-5bef-84fa-089a131333f5"
+            }
+          ]
+        }
+      },
+      "staking": {
+        "summary": {
+          "totalStakedPercent": "0.2034",
+          "totalStakedFiat": {
+            "value": "1.21"
+          },
+          "totalNotStakedFiat": {
+            "value": "4.74"
+          },
+          "amountPendingToUnstakeFiat": {
+            "value": "0",
+            "currency": "USD"
+          }
+        }
+      },
+      "ownedAssets": {
+        "edges": [
+          {
+            "node": {
+              "__typename": "ViewerAsset",
+              "asset": {
+                "platformName": "SOL",
+                "id": "QXNzZXQ6NGYwMzk0OTctM2FmOC01YmIzLTk1MWMtNmRmOWFmYTliZTFj",
+                "name": "Solana",
+                "latestPrice": {
+                  "price": "5.686157484668424",
+                  "id": "TGF0ZXN0QXNzZXRQcmljZTo0ZjAzOTQ5Ny0zYWY4LTViYjMtOTUxYy02ZGY5YWZhOWJlMWM6VVNE"
+                },
+                "uuid": "06eb15f8-1c26-45cd-a9b3-8bc49eae9d35",
+                "contractAddress": null,
+                "slug": "solana",
+                "imageUrl": "https://asset-metadata-service-production.s3.amazonaws.com/asset_icons/b658adaf7913c1513c8d120bcb41934a5a4bf09b6adbcb436085e2fbf6eb128c.png",
+                "color": "#9945FF",
+                "displaySymbol": "SOL",
+                "priceDataForDayV2": {
+                  "percentChange": -0.0622844602361793
+                },
+                "isAssetStablecoin": false
+              },
+              "__isNode": "ViewerAsset",
+              "id": "Vmlld2VyQXNzZXQ6NGYwMzk0OTctM2FmOC01YmIzLTk1MWMtNmRmOWFmYTliZTFj",
+              "__isAssetOrCurrency": "ViewerAsset",
+              "assetCurrentBalance": {
+                "totalBalance": {
+                  "value": "0.035196666"
+                },
+                "totalBalanceFiat": {
+                  "value": "7.502702417813126"
+                },
+                "id": "QXNzZXRDdXJyZW50QmFsYW5jZXM6U09MOlVOU1BFQ0lGSUVEOkFTU0VUX1BMQVRGT1JNX1VOU1BFQ0lGSUVEOjpVTlNQRUNJRklFRDoy"
+              },
+              "oneDayPerformance": {
+                "returns": {
+                  "unrealized": {
+                    "value": {
+                      "value": "-0.30867476082"
+                    },
+                    "percent": -6.099999904632568
+                  }
+                }
+              },
+              "allTimePerformance": {
+                "returns": {
+                  "unrealized": {
+                    "value": {
+                      "value": "4.1126283698561640629710009"
+                    },
+                    "percent": 641.030029296875
+                  }
+                },
+                "summary": {
+                  "allocation": 78.87416076660156
+                }
+              },
+              "earnProgram": {
+                "type": "STAKING_V2",
+                "isEnrolled": true,
+                "id": "3692bab0-e386-11ec-8fea-0242ac120002"
+              },
+              "staking": {
+                "pendingRequests": {
+                  "stakingAvailableBalance": {
+                    "value": "0.035152546"
+                  }
+                },
+                "summary": {
+                  "totalStakedPercent": "0.0013"
+                }
+              },
+              "accounts": [
+                {
+                  "type": "STAKED_FUNDS",
+                  "totalBalance": {
+                    "value": "0.00004412"
+                  },
+                  "id": "QWNjb3VudDphNTMyMWFhZC0yOTg3LTU0YzItYWMxNi0xM2FhZTg1NTQyMDk=",
+                  "uuid": "a5321aad-2987-54c2-ac16-13aae8554209",
+                  "primary": false,
+                  "allowDeposits": false,
+                  "allowWithdrawals": false
+                },
+                {
+                  "type": "WALLET",
+                  "totalBalance": {
+                    "value": "0.035152546"
+                  },
+                  "id": "QWNjb3VudDo3YjM2MTk4MS04YTg1LTVlNzgtOGQyMi04YTYyZWVjOWIyZWQ=",
+                  "uuid": "7b361981-8a85-5e78-8d22-8a62eec9b2ed",
+                  "primary": true,
+                  "allowDeposits": true,
+                  "allowWithdrawals": true
+                }
+              ],
+              "supportedContextsV2": {
+                "isConvertible": true,
+                "isBrokerage": true,
+                "isTradable": true,
+                "isDex": false,
+                "isStablecoinCashEquivalent": false
+              }
+            }
+          },
+          {
+            "node": {
+              "__typename": "ViewerAsset",
+              "asset": {
+                "platformName": "ETH",
+                "id": "J5CaM1+El5+INmVCMQqet1Yd",
+                "name": "Ethereum",
+                "latestPrice": {
+                  "price": "8.405987856750084",
+                  "id": "TGF0ZXN0QXNzZXRQcmljZTpkODVkY2U5Yi01YjczLTVjM2MtODk3OC01MjJjZTFkMWMxYjQ6VVNE"
+                },
+                "uuid": "07448f53-f128-4a61-b160-9674512b9426",
+                "contractAddress": null,
+                "slug": "ethereum",
+                "imageUrl": "https://dynamic-assets.coinbase.com/dbb4b4983bde81309ddab83eb598358eb44375b930b94687ebe38bc22e52c3b2125258ffb8477a5ef22e33d6bd72e32a506c391caa13af64c00e46613c3e5806/asset_icons/4113b082d21cc5fab17fc8f2d19fb996165bcce635e6900f7fc2d57c4ef33ae9.png",
+                "color": "#627EEA",
+                "displaySymbol": "ETH",
+                "priceDataForDayV2": {
+                  "percentChange": -0.0666440851896243
+                },
+                "isAssetStablecoin": false
+              },
+              "__isNode": "ViewerAsset",
+              "id": "Vmlld2VyJ5CaM1+El5+INmVCMQqet1Yd",
+              "__isAssetOrCurrency": "ViewerAsset",
+              "assetCurrentBalance": {
+                "totalBalance": {
+                  "value": "0.000523067532462"
+                },
+                "totalBalanceFiat": {
+                  "value": "1.21843089477932049"
+                },
+                "id": "QXNzZXRDdXJyZW50QmFsYW5jZXM6RVRIOlVOU1BFQ0lGSUVEOkFTU0VUX1BMQVRGT1JNX1VOU1BFQ0lGSUVEOjpVTlNQRUNJRklFRDoy"
+              },
+              "oneDayPerformance": {
+                "returns": {
+                  "unrealized": {
+                    "value": {
+                      "value": "-0.081493973530618300053"
+                    },
+                    "percent": -6.269999980926514
+                  }
+                }
+              },
+              "allTimePerformance": {
+                "returns": {
+                  "unrealized": {
+                    "value": {
+                      "value": "-0.1229532663899894047903770890966"
+                    },
+                    "percent": -9.170000076293945
+                  }
+                },
+                "summary": {
+                  "allocation": 20.21881103515625
+                }
+              },
+              "earnProgram": {
+                "type": "STAKING_V2",
+                "isEnrolled": true,
+                "id": "4cc83cb2-9585-4eb1-946a-a3b7949e6ef9"
+              },
+              "staking": {
+                "pendingRequests": {
+                  "stakingAvailableBalance": {
+                    "value": "0"
+                  }
+                },
+                "summary": {
+                  "totalStakedPercent": "1"
+                }
+              },
+              "accounts": [
+                {
+                  "type": "STAKED_FUNDS",
+                  "totalBalance": {
+                    "value": "0.00052305"
+                  },
+                  "id": "QWNjb3VudDozYmNiY2VjMi0wZTNlLTU0NjctOTRjMi03MDdiZDJiMjVhM2Q=",
+                  "uuid": "1b98a4b3-aa64-4b60-b1e2-bfde7b65d1dd",
+                  "primary": false,
+                  "allowDeposits": false,
+                  "allowWithdrawals": false
+                },
+                {
+                  "type": "STAKED_FUNDS",
+                  "totalBalance": {
+                    "value": "0"
+                  },
+                  "id": "QWNjb3VudDphZTk2YWYyNC0yMTg1LTVhNmEtYTBiMS0xYzczYTBmMjExYWE=",
+                  "uuid": "3f41c19d-bb0d-47eb-a6c1-26dbd289f62d",
+                  "primary": false,
+                  "allowDeposits": false,
+                  "allowWithdrawals": false
+                },
+                {
+                  "type": "WALLET",
+                  "totalBalance": {
+                    "value": "0"
+                  },
+                  "id": "QWNjb3VudDo0YWM1NzAwMS0zMzVmLTUxZjYtOTBkYy1kZTlmM2M0OTlhNjk=",
+                  "uuid": "4ac57001-335f-51f6-90dc-de9f3c499a69",
+                  "primary": true,
+                  "allowDeposits": true,
+                  "allowWithdrawals": true
+                }
+              ],
+              "supportedContextsV2": {
+                "isConvertible": true,
+                "isBrokerage": true,
+                "isTradable": true,
+                "isDex": true,
+                "isStablecoinCashEquivalent": false
+              }
+            }
+          },
+          {
+            "node": {
+              "__typename": "ViewerAsset",
+              "asset": {
+                "platformName": "USDC",
+                "id": "QXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1",
+                "name": "USDC",
+                "latestPrice": {
+                  "price": "1",
+                  "id": "TGF0ZXN0QXNzZXRQcmljZToyYjkyMzE1ZC1lYWI3LTViZWYtODRmYS0wODlhMTMxMzMzZjU6VVNE"
+                },
+                "uuid": "2b92315d-eab7-5bef-84fa-089a131333f5",
+                "contractAddress": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "slug": "usdc",
+                "imageUrl": "https://dynamic-assets.coinbase.com/3c15df5e2ac7d4abbe9499ed9335041f00c620f28e8de2f93474a9f432058742cdf4674bd43f309e69778a26969372310135be97eb183d91c492154176d455b8/asset_icons/9d67b728b6c8f457717154b3a35f9ddc702eae7e76c4684ee39302c4d7fd0bb8.png",
+                "color": "#2775CA",
+                "displaySymbol": "USDC",
+                "priceDataForDayV2": {
+                  "percentChange": 0
+                },
+                "isAssetStablecoin": true
+              },
+              "__isNode": "ViewerAsset",
+              "id": "Vmlld2VyQXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1",
+              "__isAssetOrCurrency": "ViewerAsset",
+              "assetCurrentBalance": {
+                "totalBalance": {
+                  "value": "8.967465955899945"
+                },
+                "totalBalanceFiat": {
+                  "value": "8.967465955899945"
+                },
+                "id": "QXNzZXRDdXJyZW50QmFsYW5jZXM6VVNEQzpVTlNQRUNJRklFRDpBU1NFVF9QTEFURk9STV9VTlNQRUNJRklFRDo6VU5TUEVDSUZJRUQ6Mg=="
+              },
+              "oneDayPerformance": {
+                "returns": {
+                  "unrealized": {
+                    "value": {
+                      "value": "-0.0000005675498782199181"
+                    },
+                    "percent": 0
+                  }
+                }
+              },
+              "allTimePerformance": {
+                "returns": {
+                  "unrealized": {
+                    "value": {
+                      "value": "0"
+                    },
+                    "percent": 0
+                  }
+                },
+                "summary": {
+                  "allocation": 0.9066871404647827
+                }
+              },
+              "earnProgram": {
+                "type": "USDC_REWARDS",
+                "isEnrolled": false,
+                "id": "4e953219-30b1-3be0-8974-a392783c1ac4"
+              },
+              "staking": null,
+              "accounts": [
+                {
+                  "type": "WALLET",
+                  "totalBalance": {
+                    "value": "8.967465955899945"
+                  },
+                  "id": "QWNjb3VudDpmN2QwNWM2MC1jNDgzLTU1MTEtOTE3Yy1lNjU0MDcxZGMzODY=",
+                  "uuid": "f7d05c60-c483-5511-917c-e654071dc386",
+                  "primary": true,
+                  "allowDeposits": true,
+                  "allowWithdrawals": true
+                }
+              ],
+              "supportedContextsV2": {
+                "isConvertible": true,
+                "isBrokerage": true,
+                "isTradable": true,
+                "isDex": true,
+                "isStablecoinCashEquivalent": true
+              }
+            }
+          }
+        ]
+      },
+      "fiatAccounts": [
+        {
+          "assetOrFiatCurrency": {
+            "__typename": "TiersCurrency",
+            "code": "USD"
+          },
+          "id": "QWNjb3VudDpkMmYzYTQwZS1mZmFjLTUwNzEtOTcwZS03YzlhZTA3MWY2YjU=",
+          "uuid": "d2f3a40e-ffac-5071-970e-7c9ae071f6b5",
+          "type": "FIAT",
+          "allowWithdrawals": true,
+          "allowDeposits": true,
+          "availableBalance": {
+            "value": "0"
+          }
+        }
+      ],
+      "sends": [],
+      "buys": [],
+      "cb1StakingSummaryUiComponents": {
+        "edges": []
+      },
+      "futuresPositionsV2": {
+        "futuresPnL": {
+          "value": "0",
+          "currency": "USD"
+        },
+        "positions": []
+      },
+      "derivativesOnboarding": {
+        "accountStatus": "NOT_ONBOARDED"
+      },
+      "stablecoinSlug": {
+        "assetCurrentBalanceV2": {
+          "totalBalanceFiat": {
+            "value": "8.967465955899945",
+            "currency": "USD"
+          },
+          "id": "QXNzZXRDdXJyZW50QmFsYW5jZXM6VVNEQzpQUklNQVJZOkFTU0VUX1BMQVRGT1JNX1VOU1BFQ0lGSUVEOjpVTlNQRUNJRklFRDoy"
+        },
+        "earnProgram": {
+          "programRate": {
+            "formatted": "4.10%",
+            "unitSymbol": "APY"
+          },
+          "currentRate": {
+            "formatted": "4.10%",
+            "unitSymbol": "APY"
+          },
+          "boostedRate": {
+            "formatted": "4.50%",
+            "unitSymbol": "APY"
+          },
+          "id": "4e953219-30b1-3be0-8974-a392783c1ac4",
+          "isEnrolled": false
+        },
+        "id": "Vmlld2VyQXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1",
+        "asset": {
+          "uuid": "2b92315d-eab7-5bef-84fa-089a131333f5",
+          "platformName": "USDC",
+          "id": "QXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1",
+          "slug": "usdc"
+        },
+        "earnAsset": {
+          "copy": {
+            "status": {
+              "shortText": "Not earning",
+              "longText": ""
+            }
+          },
+          "id": "RWFybkFzc2V0OjJiOTIzMTVkLWVhYjctNWJlZi04NGZhLTA4OWExMzEzMzNmNQ=="
+        },
+        "rewardsPreferenceOptions": [
+          {
+            "version": "V1",
+            "confirmationTitle": "Switch rates?",
+            "confirmationText": "If you'd like to switch your USDC to the Standard rate, please confirm now.",
+            "cta": "Yes, switch to Standard",
+            "secondaryCta": "No thanks",
+            "title": "Standard",
+            "description": "Our standard rate for USDC.",
+            "rate": {
+              "title": "Standard",
+              "formattedValue": "4.10%",
+              "label": "APY"
+            }
+          },
+          {
+            "version": "",
+            "confirmationTitle": "Pause earning?",
+            "confirmationText": "You'll no longer earn rewards on your USDC.",
+            "cta": "Yes, I'm sure",
+            "secondaryCta": "Cancel",
+            "title": "None",
+            "description": "If you choose, you can earn no rewards on your USDC.",
+            "rate": {
+              "title": "",
+              "formattedValue": "",
+              "label": ""
+            }
+          }
+        ],
+        "rewardPromotionBySource": {
+          "cta": null
+        },
+        "earnPayout": {
+          "totalFiat": {
+            "value": "0.16194",
+            "currency": "USD"
+          },
+          "total": {
+            "value": "0.16194",
+            "currency": "USDC"
+          },
+          "id": "EarnAssetPayout-2b92315d-eab7-5bef-84fa-089a131333f5"
+        }
+      },
+      "coinbaseSubscriptionUserBenefit": {
+        "usdcBoostedRewardBenefit": {
+          "userBenefitState": {
+            "isBenefitActive": false
+          },
+          "apy": "",
+          "stakingCap": null
+        }
+      },
+      "rewardsPreferencesV2": {
+        "preferences": [
+          {
+            "version": "V1",
+            "enabled": false,
+            "showRewardExplainer": true,
+            "asset": {
+              "asset": {
+                "uuid": "2b92315d-eab7-5bef-84fa-089a131333f5",
+                "id": "QXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1"
+              },
+              "id": "Vmlld2VyQXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1"
+            }
+          },
+          {
+            "version": "STAKING",
+            "enabled": false,
+            "showRewardExplainer": true,
+            "asset": {
+              "asset": {
+                "uuid": "63062039-7afb-56ff-8e19-5e3215dc404a",
+                "id": "QXNzZXQ6NjMwNjIwMzktN2FmYi01NmZmLThlMTktNWUzMjE1ZGM0MDRh"
+              },
+              "id": "Vmlld2VyQXNzZXQ6NjMwNjIwMzktN2FmYi01NmZmLThlMTktNWUzMjE1ZGM0MDRh"
+            }
+          },
+          {
+            "version": "STAKING",
+            "enabled": false,
+            "showRewardExplainer": true,
+            "asset": {
+              "asset": {
+                "uuid": "ebea861a-c0ae-5323-bbe0-46893a119a39",
+                "id": "QXNzZXQ6ZWJlYTg2MWEtYzBhZS01MzIzLWJiZTAtNDY4OTNhMTE5YTM5"
+              },
+              "id": "Vmlld2VyQXNzZXQ6ZWJlYTg2MWEtYzBhZS01MzIzLWJiZTAtNDY4OTNhMTE5YTM5"
+            }
+          },
+          {
+            "version": "STAKING",
+            "enabled": true,
+            "showRewardExplainer": false,
+            "asset": {
+              "asset": {
+                "uuid": "69e559ec-547a-520a-aeb3-01cac23f1826",
+                "id": "QXNzZXQ6NjllNTU5ZWMtNTQ3YS01MjBhLWFlYjMtMDFjYWMyM2YxODI2"
+              },
+              "id": "Vmlld2VyQXNzZXQ6NjllNTU5ZWMtNTQ3YS01MjBhLWFlYjMtMDFjYWMyM2YxODI2"
+            }
+          },
+          {
+            "version": "STAKING",
+            "enabled": true,
+            "showRewardExplainer": false,
+            "asset": {
+              "asset": {
+                "uuid": "06eb15f8-1c26-45cd-a9b3-8bc49eae9d35",
+                "id": "QXNzZXQ6NGYwMzk0OTctM2FmOC01YmIzLTk1MWMtNmRmOWFmYTliZTFj"
+              },
+              "id": "Vmlld2VyQXNzZXQ6NGYwMzk0OTctM2FmOC01YmIzLTk1MWMtNmRmOWFmYTliZTFj"
+            }
+          },
+          {
+            "version": "NON_PG_STAKING",
+            "enabled": true,
+            "showRewardExplainer": false,
+            "asset": {
+              "asset": {
+                "uuid": "3bec5bf3-507a-51ba-8e41-dc953b1a5c4d",
+                "id": "QXNzZXQ6M2JlYzViZjMtNTA3YS01MWJhLThlNDEtZGM5NTNiMWE1YzRk"
+              },
+              "id": "Vmlld2VyQXNzZXQ6M2JlYzViZjMtNTA3YS01MWJhLThlNDEtZGM5NTNiMWE1YzRk"
+            }
+          },
+          {
+            "version": "STAKING",
+            "enabled": true,
+            "showRewardExplainer": false,
+            "asset": {
+              "asset": {
+                "uuid": "64c607d2-4663-5649-86e0-3ab06bba0202",
+                "id": "QXNzZXQ6NjRjNjA3ZDItNDY2My01NjQ5LTg2ZTAtM2FiMDZiYmEwMjAy"
+              },
+              "id": "Vmlld2VyQXNzZXQ6NjRjNjA3ZDItNDY2My01NjQ5LTg2ZTAtM2FiMDZiYmEwMjAy"
+            }
+          },
+          {
+            "version": "STAKING",
+            "enabled": true,
+            "showRewardExplainer": false,
+            "asset": {
+              "asset": {
+                "uuid": "07448f53-f128-4a61-b160-9674512b9426",
+                "id": "J5CaM1+El5+INmVCMQqet1Yd"
+              },
+              "id": "Vmlld2VyJ5CaM1+El5+INmVCMQqet1Yd"
+            }
+          },
+          {
+            "version": "V1",
+            "enabled": false,
+            "showRewardExplainer": true,
+            "asset": {
+              "asset": {
+                "uuid": "3bec5bf3-507a-51ba-8e41-dc953b1a5c4d",
+                "id": "QXNzZXQ6M2JlYzViZjMtNTA3YS01MWJhLThlNDEtZGM5NTNiMWE1YzRk"
+              },
+              "id": "Vmlld2VyQXNzZXQ6M2JlYzViZjMtNTA3YS01MWJhLThlNDEtZGM5NTNiMWE1YzRk"
+            }
+          },
+          {
+            "version": "STAKING",
+            "enabled": false,
+            "showRewardExplainer": true,
+            "asset": {
+              "asset": {
+                "uuid": "026bcc1e-9163-591c-a709-34dd18b2e7a1",
+                "id": "QXNzZXQ6MDI2YmNjMWUtOTE2My01OTFjLWE3MDktMzRkZDE4YjJlN2Ex"
+              },
+              "id": "Vmlld2VyQXNzZXQ6MDI2YmNjMWUtOTE2My01OTFjLWE3MDktMzRkZDE4YjJlN2Ex"
+            }
+          },
+          {
+            "version": "STAKING",
+            "enabled": false,
+            "showRewardExplainer": true,
+            "asset": {
+              "asset": {
+                "uuid": "9d06e463-b3ba-5abf-9082-8761846b28ab",
+                "id": "QXNzZXQ6OWQwNmU0NjMtYjNiYS01YWJmLTkwODItODc2MTg0NmIyOGFi"
+              },
+              "id": "Vmlld2VyQXNzZXQ6OWQwNmU0NjMtYjNiYS01YWJmLTkwODItODc2MTg0NmIyOGFi"
+            }
+          }
+        ]
+      },
+      "USDC": {
+        "accounts": [
+          {
+            "primary": true,
+            "type": "WALLET",
+            "totalBalance": {
+              "value": "8.967465955899945",
+              "currency": "USDC"
+            },
+            "id": "QWNjb3VudDpmN2QwNWM2MC1jNDgzLTU1MTEtOTE3Yy1lNjU0MDcxZGMzODY="
+          }
+        ],
+        "earnPayout": {
+          "total": {
+            "value": "0.16194",
+            "currency": "USDC"
+          },
+          "id": "EarnAssetPayout-2b92315d-eab7-5bef-84fa-089a131333f5",
+          "totalFiat": {
+            "value": "0.16194",
+            "currency": "USD"
+          }
+        },
+        "earnProgram": {
+          "isEnrolled": false,
+          "currentRate": {
+            "formatted": "4.10%",
+            "unitSymbol": "APY"
+          },
+          "id": "4e953219-30b1-3be0-8974-a392783c1ac4"
+        },
+        "id": "Vmlld2VyQXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1",
+        "asset": {
+          "uuid": "2b92315d-eab7-5bef-84fa-089a131333f5",
+          "platformName": "USDC",
+          "id": "QXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1",
+          "slug": "usdc"
+        },
+        "earnAsset": {
+          "copy": {
+            "status": {
+              "shortText": "Not earning",
+              "longText": ""
+            }
+          },
+          "id": "RWFybkFzc2V0OjJiOTIzMTVkLWVhYjctNWJlZi04NGZhLTA4OWExMzEzMzNmNQ=="
+        },
+        "rewardsPreferenceOptions": [
+          {
+            "version": "V1",
+            "confirmationTitle": "Switch rates?",
+            "confirmationText": "If you'd like to switch your USDC to the Standard rate, please confirm now.",
+            "cta": "Yes, switch to Standard",
+            "secondaryCta": "No thanks",
+            "title": "Standard",
+            "description": "Our standard rate for USDC.",
+            "rate": {
+              "title": "Standard",
+              "formattedValue": "4.10%",
+              "label": "APY"
+            }
+          },
+          {
+            "version": "",
+            "confirmationTitle": "Pause earning?",
+            "confirmationText": "You'll no longer earn rewards on your USDC.",
+            "cta": "Yes, I'm sure",
+            "secondaryCta": "Cancel",
+            "title": "None",
+            "description": "If you choose, you can earn no rewards on your USDC.",
+            "rate": {
+              "title": "",
+              "formattedValue": "",
+              "label": ""
+            }
+          }
+        ],
+        "rewardPromotionBySource": {
+          "cta": null
+        }
+      },
+      "coinbaseSubscriptionEligibility": [
+        {
+          "isEligible": true
+        }
+      ],
+      "coinbaseSubscription": null,
+      "sellPolicyRestrictions": [],
+      "buyPolicyRestrictions": [],
+      "tradePolicyRestrictions": [],
+      "stableAssets": {
+        "edges": [
+          {
+            "node": {
+              "__isAssetOrCurrency": "ViewerAsset",
+              "__typename": "ViewerAsset",
+              "asset": {
+                "uuid": "2b92315d-eab7-5bef-84fa-089a131333f5",
+                "imageUrl": "https://dynamic-assets.coinbase.com/3c15df5e2ac7d4abbe9499ed9335041f00c620f28e8de2f93474a9f432058742cdf4674bd43f309e69778a26969372310135be97eb183d91c492154176d455b8/asset_icons/9d67b728b6c8f457717154b3a35f9ddc702eae7e76c4684ee39302c4d7fd0bb8.png",
+                "name": "USDC",
+                "platformName": "USDC",
+                "slug": "usdc",
+                "displaySymbol": "USDC",
+                "contractAddress": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "id": "QXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1",
+                "stablecoinConfig": {
+                  "peggedFiatSymbol": "USD"
+                },
+                "symbol": "USDC"
+              },
+              "accounts": [
+                {
+                  "uuid": "f7d05c60-c483-5511-917c-e654071dc386",
+                  "name": "USDC Wallet",
+                  "type": "WALLET",
+                  "allowWithdrawals": true,
+                  "allowDeposits": true,
+                  "id": "QWNjb3VudDpmN2QwNWM2MC1jNDgzLTU1MTEtOTE3Yy1lNjU0MDcxZGMzODY="
+                }
+              ],
+              "supportedContextsV2": {
+                "isTradable": true,
+                "isConvertible": true,
+                "isStablecoinCashEquivalent": true
+              },
+              "assetCurrentBalanceV2": {
+                "totalBalanceFiat": {
+                  "value": "8.967465955899945",
+                  "currency": "USD"
+                },
+                "id": "QXNzZXRDdXJyZW50QmFsYW5jZXM6VVNEQzpVTlNQRUNJRklFRDpBU1NFVF9QTEFURk9STV9VTlNQRUNJRklFRDo6VU5TUEVDSUZJRUQ6Mg=="
+              },
+              "earnProgram": {
+                "currentRate": {
+                  "formatted": "4.10%"
+                },
+                "id": "4e953219-30b1-3be0-8974-a392783c1ac4"
+              },
+              "__isNode": "ViewerAsset",
+              "id": "Vmlld2VyQXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1",
+              "rewardApy": {
+                "formattedValue": "4.10%",
+                "label": "APY"
+              }
+            }
+          },
+          {
+            "node": {
+              "__isAssetOrCurrency": "TiersCurrency",
+              "__typename": "TiersCurrency",
+              "code": "USD",
+              "name": "United States Dollar",
+              "accounts": [
+                {
+                  "uuid": "d2f3a40e-ffac-5071-970e-7c9ae071f6b5",
+                  "id": "QWNjb3VudDpkMmYzYTQwZS1mZmFjLTUwNzEtOTcwZS03YzlhZTA3MWY2YjU=",
+                  "availableBalance": {
+                    "value": "0",
+                    "currency": "USD"
+                  }
+                }
+              ],
+              "assetCurrentBalanceV2": {
+                "totalBalanceFiat": {
+                  "value": "0"
+                },
+                "id": "QXNzZXRDdXJyZW50QmFsYW5jZXM6VVNEOlVOU1BFQ0lGSUVEOkFTU0VUX1BMQVRGT1JNX1VOU1BFQ0lGSUVEOjpVTlNQRUNJRklFRDoy"
+              }
+            }
+          }
+        ]
+      },
+      "ethAsset": {
+        "__isAssetOrCurrency": "ViewerAsset",
+        "asset": {
+          "name": "Ethereum",
+          "latestPrice": {
+            "price": "8.405987856750084",
+            "id": "TGF0ZXN0QXNzZXRQcmljZTpkODVkY2U5Yi01YjczLTVjM2MtODk3OC01MjJjZTFkMWMxYjQ6VVNE"
+          },
+          "id": "J5CaM1+El5+INmVCMQqet1Yd",
+          "uuid": "07448f53-f128-4a61-b160-9674512b9426",
+          "contractAddress": null,
+          "platformName": "ETH",
+          "slug": "ethereum",
+          "imageUrl": "https://dynamic-assets.coinbase.com/dbb4b4983bde81309ddab83eb598358eb44375b930b94687ebe38bc22e52c3b2125258ffb8477a5ef22e33d6bd72e32a506c391caa13af64c00e46613c3e5806/asset_icons/4113b082d21cc5fab17fc8f2d19fb996165bcce635e6900f7fc2d57c4ef33ae9.png",
+          "color": "#627EEA",
+          "displaySymbol": "ETH",
+          "priceDataForDayV2": {
+            "percentChange": -0.0666440851896243
+          }
+        },
+        "assetCurrentBalance": {
+          "totalBalance": {
+            "value": "0.000523067532462"
+          },
+          "totalBalanceFiat": {
+            "value": "1.21843089477932049"
+          },
+          "id": "QXNzZXRDdXJyZW50QmFsYW5jZXM6RVRIOlVOU1BFQ0lGSUVEOkFTU0VUX1BMQVRGT1JNX1VOU1BFQ0lGSUVEOjpVTlNQRUNJRklFRDoy"
+        },
+        "oneDayPerformance": {
+          "returns": {
+            "unrealized": {
+              "value": {
+                "value": "-0.081493973530618300053"
+              },
+              "percent": -6.269999980926514
+            }
+          }
+        },
+        "allTimePerformance": {
+          "returns": {
+            "unrealized": {
+              "value": {
+                "value": "-0.1229532663899894047903770890966"
+              },
+              "percent": -9.170000076293945
+            }
+          },
+          "summary": {
+            "allocation": 20.21881103515625
+          }
+        },
+        "__typename": "ViewerAsset",
+        "earnProgram": {
+          "type": "STAKING_V2",
+          "isEnrolled": true,
+          "id": "4cc83cb2-9585-4eb1-946a-a3b7949e6ef9"
+        },
+        "staking": {
+          "pendingRequests": {
+            "stakingAvailableBalance": {
+              "value": "0"
+            }
+          },
+          "summary": {
+            "totalStakedPercent": "1"
+          }
+        },
+        "accounts": [
+          {
+            "type": "STAKED_FUNDS",
+            "totalBalance": {
+              "value": "0.00052305"
+            },
+            "id": "QWNjb3VudDozYmNiY2VjMi0wZTNlLTU0NjctOTRjMi03MDdiZDJiMjVhM2Q=",
+            "uuid": "1b98a4b3-aa64-4b60-b1e2-bfde7b65d1dd",
+            "primary": false,
+            "allowDeposits": false,
+            "allowWithdrawals": false
+          },
+          {
+            "type": "STAKED_FUNDS",
+            "totalBalance": {
+              "value": "0"
+            },
+            "id": "QWNjb3VudDphZTk2YWYyNC0yMTg1LTVhNmEtYTBiMS0xYzczYTBmMjExYWE=",
+            "uuid": "3f41c19d-bb0d-47eb-a6c1-26dbd289f62d",
+            "primary": false,
+            "allowDeposits": false,
+            "allowWithdrawals": false
+          },
+          {
+            "type": "WALLET",
+            "totalBalance": {
+              "value": "0"
+            },
+            "id": "QWNjb3VudDo0YWM1NzAwMS0zMzVmLTUxZjYtOTBkYy1kZTlmM2M0OTlhNjk=",
+            "uuid": "4ac57001-335f-51f6-90dc-de9f3c499a69",
+            "primary": true,
+            "allowDeposits": true,
+            "allowWithdrawals": true
+          }
+        ],
+        "supportedContextsV2": {
+          "isConvertible": true,
+          "isBrokerage": true,
+          "isTradable": true,
+          "isDex": true,
+          "isStablecoinCashEquivalent": false
+        },
+        "id": "Vmlld2VyJ5CaM1+El5+INmVCMQqet1Yd"
+      },
+      "btcAsset": {
+        "__isAssetOrCurrency": "ViewerAsset",
+        "asset": {
+          "name": "Bitcoin",
+          "latestPrice": {
+            "price": "84168.055",
+            "id": "TGF0ZXN0QXNzZXRQcmljZTo1YjcxZmM0OC0zZGQzLTU0MGMtODA5Yi1mOGM5NGQwZTY4YjU6VVNE"
+          },
+          "id": "QXNzZXQ6NWI3MWZjNDgtM2RkMy01NDBjLTgwOWItZjhjOTRkMGU2OGI1",
+          "uuid": "5b71fc48-3dd3-540c-809b-f8c94d0e68b5",
+          "contractAddress": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+          "platformName": "BTC",
+          "slug": "bitcoin",
+          "imageUrl": "https://dynamic-assets.coinbase.com/e785e0181f1a23a30d9476038d9be91e9f6c63959b538eabbc51a1abc8898940383291eede695c3b8dfaa1829a9b57f5a2d0a16b0523580346c6b8fab67af14b/asset_icons/b57ac673f06a4b0338a596817eb0a50ce16e2059f327dc117744449a47915cb2.png",
+          "color": "#F7931A",
+          "displaySymbol": "BTC",
+          "priceDataForDayV2": {
+            "percentChange": -0.0438452863769496
+          }
+        },
+        "assetCurrentBalance": {
+          "totalBalance": {
+            "value": "0"
+          },
+          "totalBalanceFiat": {
+            "value": "0"
+          },
+          "id": "QXNzZXRDdXJyZW50QmFsYW5jZXM6QlRDOlVOU1BFQ0lGSUVEOkFTU0VUX1BMQVRGT1JNX1VOU1BFQ0lGSUVEOjpVTlNQRUNJRklFRDoy"
+        },
+        "oneDayPerformance": {
+          "returns": {
+            "unrealized": {
+              "value": {
+                "value": "0"
+              },
+              "percent": 0
+            }
+          }
+        },
+        "allTimePerformance": {
+          "returns": {
+            "unrealized": {
+              "value": {
+                "value": "0"
+              },
+              "percent": 0
+            }
+          },
+          "summary": {
+            "allocation": 0
+          }
+        },
+        "__typename": "ViewerAsset",
+        "earnProgram": null,
+        "staking": null,
+        "accounts": [
+          {
+            "type": "WALLET",
+            "totalBalance": {
+              "value": "0"
+            },
+            "id": "QWNjb3VudDpiYjljOWY2Mi1jMjdjLTViMzgtOGFhOS0zOGQ0Nzg3MzlkMGQ=",
+            "uuid": "bb9c9f62-c27c-5b38-8aa9-38d478739d0d",
+            "primary": true,
+            "allowDeposits": true,
+            "allowWithdrawals": true
+          }
+        ],
+        "supportedContextsV2": {
+          "isConvertible": true,
+          "isBrokerage": true,
+          "isTradable": true,
+          "isDex": false,
+          "isStablecoinCashEquivalent": false
+        },
+        "id": "Vmlld2VyQXNzZXQ6NWI3MWZjNDgtM2RkMy01NDBjLTgwOWItZjhjOTRkMGU2OGI1"
+      },
+      "cashPositions": {
+        "edges": [
+          {
+            "node": {
+              "asset": {
+                "__typename": "ViewerAsset",
+                "asset": {
+                  "displaySymbol": "USDC",
+                  "id": "QXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1"
+                },
+                "__isNode": "ViewerAsset",
+                "id": "Vmlld2VyQXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1"
+              },
+              "id": "cG9ydGZvbGlvX3Nwb3RfcG9zaXRpb246MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1Og=="
+            }
+          },
+          {
+            "node": {
+              "asset": {
+                "__typename": "TiersCurrency"
+              },
+              "id": "cG9ydGZvbGlvX3Nwb3RfcG9zaXRpb246VVNEOg=="
+            }
+          }
+        ]
+      },
+      "lowBalanceAssets": {
+        "edges": [
+          {
+            "node": {
+              "__typename": "ViewerAsset",
+              "id": "Vmlld2VyQXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1",
+              "__isNode": "ViewerAsset"
+            }
+          }
+        ]
+      },
+      "upsellList": [
+        {
+          "name": "retail-assets-carousel-web",
+          "isActive": true,
+          "maxSize": 5,
+          "coolOffSeconds": 86400,
+          "lastSeen": null,
+          "upsells": [],
+          "experiment": null
+        }
+      ],
+      "pageContainerData": {
+        "layouts": [
+          {
+            "deviceType": "DEVICE_TYPE_MOBILE",
+            "columns": 1,
+            "maxWidth": "",
+            "layoutType": "LAYOUT_TYPE_1_0",
+            "align": "ALIGN_LEFT",
+            "stickyColumn": "STICKY_COLUMN_LEFT"
+          },
+          {
+            "deviceType": "DEVICE_TYPE_TABLET",
+            "columns": 1,
+            "maxWidth": "",
+            "layoutType": "LAYOUT_TYPE_1_0",
+            "align": "ALIGN_LEFT",
+            "stickyColumn": "STICKY_COLUMN_LEFT"
+          },
+          {
+            "deviceType": "DEVICE_TYPE_DESKTOP",
+            "columns": 2,
+            "maxWidth": "",
+            "layoutType": "LAYOUT_TYPE_2_1",
+            "align": "ALIGN_LEFT",
+            "stickyColumn": "STICKY_COLUMN_RIGHT"
+          }
+        ],
+        "edges": [
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_ASSETS_BALANCE",
+              "layouts": [
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_MOBILE",
+                  "border": {
+                    "borderedBottom": false
+                  },
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_DESKTOP",
+                  "border": {
+                    "borderedBottom": false
+                  },
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_TABLET",
+                  "border": {
+                    "borderedBottom": false
+                  },
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                }
+              ],
+              "id": "VUlDb21wb25lbnQ6NDltMW5oYUdjdWxnUlFkVW9YR0p4cA=="
+            }
+          },
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_ASSETS_TABS",
+              "layouts": [
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_MOBILE",
+                  "border": null,
+                  "position": "POSITION_STICKY",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_DESKTOP",
+                  "border": null,
+                  "position": "POSITION_STICKY",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_TABLET",
+                  "border": null,
+                  "position": "POSITION_STICKY",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                }
+              ],
+              "id": "VUlDb21wb25lbnQ6YnBFUVpOSEV5eVJlQlV2T2ZqbXpp"
+            }
+          },
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_ASSETS_TABS_CONTENT_COLUMN_1",
+              "layouts": [
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_MOBILE",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_DESKTOP",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_TABLET",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                }
+              ],
+              "id": "VUlDb21wb25lbnQ6MUxBNTZEMkRwc2xJakVxOHk2aXFSZQ=="
+            }
+          },
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_ASSETS_TABS_CONTENT_COLUMN_2",
+              "layouts": [
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_MOBILE",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 2,
+                  "deviceType": "DEVICE_TYPE_DESKTOP",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_TABLET",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                }
+              ],
+              "id": "VUlDb21wb25lbnQ6NVQ5NHQ4YW8yNkJpWmdRcjFSb040dw=="
+            }
+          }
+        ],
+        "error": null
+      },
+      "cryptoTabSurface": {
+        "edges": [
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_ASSETS_CRYPTO_BALANCES",
+              "layouts": [
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_MOBILE",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_DESKTOP",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_TABLET",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                }
+              ],
+              "id": "VUlDb21wb25lbnQ6MXNoRnZuaFN1aVdvczNDbzdwZ2FEeQ=="
+            }
+          },
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_ASSETS_CRYPTO_FUTURE_POSITIONS",
+              "layouts": [
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_MOBILE",
+                  "border": {
+                    "borderedBottom": false
+                  },
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_DESKTOP",
+                  "border": {
+                    "borderedBottom": false
+                  },
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_TABLET",
+                  "border": {
+                    "borderedBottom": false
+                  },
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                }
+              ],
+              "id": "VUlDb21wb25lbnQ6NlFpUHRCeEFJUGtrSWszUThFY1BBRQ=="
+            }
+          },
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_ASSETS_CRYPTO_STAKING",
+              "layouts": [
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_MOBILE",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_DESKTOP",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_TABLET",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                }
+              ],
+              "id": "VUlDb21wb25lbnQ6NDlSaWQ3cGFOQnFrUEdTN1AxZTNOag=="
+            }
+          },
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_ASSETS_CRYPTO_NFT",
+              "layouts": [
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_MOBILE",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_DESKTOP",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_TABLET",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                }
+              ],
+              "id": "VUlDb21wb25lbnQ6NTc1R0RYUktDWW84R2F0NUQwMUZYSQ=="
+            }
+          },
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS",
+              "layouts": [
+                {
+                  "column": 2,
+                  "deviceType": "DEVICE_TYPE_DESKTOP",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                }
+              ],
+              "id": "VUlDb21wb25lbnQ6MVFOVVpXR2JWUktBZHNDN09SdWQ1Ng=="
+            }
+          },
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_ASSETS_UPSELL_CARDS",
+              "layouts": [
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_MOBILE",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 2,
+                  "deviceType": "DEVICE_TYPE_DESKTOP",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_TABLET",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                }
+              ],
+              "id": "VUlDb21wb25lbnQ6MzZGaVNRcjBjUUVLSGM3MkNZUXdLUg=="
+            }
+          }
+        ],
+        "error": null
+      },
+      "cashTabSurface": {
+        "edges": [
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_ASSETS_CASH_BALANCES",
+              "layouts": [
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_MOBILE",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_DESKTOP",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_TABLET",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                }
+              ],
+              "id": "VUlDb21wb25lbnQ6MDFPM1VaS0x1eHdFRWliUkhyQ1dWRg=="
+            }
+          },
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_ASSETS_CASH_REWARDS",
+              "layouts": [
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_MOBILE",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_DESKTOP",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_TABLET",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                }
+              ],
+              "id": "VUlDb21wb25lbnQ6MkU0RHBCNDJEVU5qNFhsUktkUHZxVw=="
+            }
+          },
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS",
+              "layouts": [
+                {
+                  "column": 2,
+                  "deviceType": "DEVICE_TYPE_DESKTOP",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                }
+              ],
+              "id": "VUlDb21wb25lbnQ6NUZ5Y1NjRzlWQWxwOTFNek4zS3hTZg=="
+            }
+          },
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_ASSETS_UPSELL_CARDS",
+              "layouts": [
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_MOBILE",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 2,
+                  "deviceType": "DEVICE_TYPE_DESKTOP",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                },
+                {
+                  "column": 1,
+                  "deviceType": "DEVICE_TYPE_TABLET",
+                  "border": null,
+                  "position": "POSITION_UNSPECIFIED",
+                  "top": 0,
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0
+                }
+              ],
+              "id": "VUlDb21wb25lbnQ6MjJpM2d5cTZqbWZnNEZVNHlETmxCQQ=="
+            }
+          }
+        ],
+        "error": null
+      },
+      "quickActionsData": {
+        "edges": [
+          {
+            "node": {
+              "componentId": "1QNUZWGbVRKAdsC7ORud56",
+              "contentId": "",
+              "surface": "UI_COMPONENT_SURFACE_ASSETS_CRYPTO_WEB",
+              "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS",
+              "type": "UI_COMPONENT_TYPE_CONTAINER",
+              "language": "en",
+              "publishedAt": "2024-06-14T00:16:15.324Z",
+              "component": {
+                "__typename": "UIComponentContainer",
+                "components": [
+                  {
+                    "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS",
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "simple_trade",
+                      "title": "Simple trade",
+                      "pictogramId": "add"
+                    },
+                    "id": "VUlDb21wb25lbnQ6NmZMemJnQTFuck5UZkl6MFJRUUNTNQ=="
+                  },
+                  {
+                    "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS",
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "send",
+                      "title": "Send crypto",
+                      "pictogramId": "arrowUp"
+                    },
+                    "id": "VUlDb21wb25lbnQ6cmNLazZPR1hlVWc3eXpJaVBUT1dR"
+                  },
+                  {
+                    "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS",
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "receive",
+                      "title": "Receive crypto",
+                      "pictogramId": "arrowDown"
+                    },
+                    "id": "VUlDb21wb25lbnQ6NXZnZVdQeE5NOWR1VWZjcUU0Tkhndg=="
+                  },
+                  {
+                    "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS",
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "deposit",
+                      "title": "Deposit cash",
+                      "pictogramId": "bank"
+                    },
+                    "id": "VUlDb21wb25lbnQ6NGV3dlJ6bDdNRlBORnkzUHkwNU50Mg=="
+                  },
+                  {
+                    "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS",
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "withdraw",
+                      "title": "Withdraw cash",
+                      "pictogramId": "cash"
+                    },
+                    "id": "VUlDb21wb25lbnQ6SW45ZEZ1S0d3VzEyQ2ZiVXJ5WjNZ"
+                  }
+                ]
+              },
+              "id": "VUlDb21wb25lbnQ6MVFOVVpXR2JWUktBZHNDN09SdWQ1Ng=="
+            },
+            "cursor": "4aedf76d-0aec-4c00-92ac-5fa78cefb42d"
+          }
+        ]
+      },
+      "sendPolicyRestrictions": [],
+      "receivePolicyRestrictions": [],
+      "cashEquivalentAssets": {
+        "edges": [
+          {
+            "node": {
+              "asset": {
+                "stablecoinConfig": {
+                  "peggedFiatSymbol": "USD"
+                },
+                "uuid": "2b92315d-eab7-5bef-84fa-089a131333f5",
+                "name": "USDC",
+                "platformName": "USDC",
+                "imageUrl": "https://dynamic-assets.coinbase.com/3c15df5e2ac7d4abbe9499ed9335041f00c620f28e8de2f93474a9f432058742cdf4674bd43f309e69778a26969372310135be97eb183d91c492154176d455b8/asset_icons/9d67b728b6c8f457717154b3a35f9ddc702eae7e76c4684ee39302c4d7fd0bb8.png",
+                "symbol": "USDC",
+                "id": "QXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1"
+              },
+              "assetCurrentBalanceV2": {
+                "totalBalanceFiat": {
+                  "value": "8.967465955899945",
+                  "currency": "USD"
+                },
+                "id": "QXNzZXRDdXJyZW50QmFsYW5jZXM6VVNEQzpVTlNQRUNJRklFRDpBU1NFVF9QTEFURk9STV9VTlNQRUNJRklFRDo6VU5TUEVDSUZJRUQ6Mg=="
+              },
+              "rewardApy": {
+                "formattedValue": "4.10%",
+                "label": "APY"
+              },
+              "supportedContextsV2": {
+                "isConvertible": true,
+                "isTradable": true
+              },
+              "id": "Vmlld2VyQXNzZXQ6MmI5MjMxNWQtZWFiNy01YmVmLTg0ZmEtMDg5YTEzMTMzM2Y1"
+            }
+          },
+          {
+            "node": {
+              "asset": {
+                "stablecoinConfig": {
+                  "peggedFiatSymbol": "EUR"
+                },
+                "uuid": "674c6343-41a8-4b79-8914-21762877e907",
+                "name": "EURC",
+                "platformName": "EURC",
+                "imageUrl": "https://asset-metadata-service-production.s3.amazonaws.com/asset_icons/54f4216472dd25b1ffb5caf32cc0d81f645c84be166cd713f759a80f05a1418f.png",
+                "symbol": "EURC",
+                "id": "QXNzZXQ6Njc0YzYzNDMtNDFhOC00Yjc5LTg5MTQtMjE3NjI4NzdlOTA3"
+              },
+              "assetCurrentBalanceV2": {
+                "totalBalanceFiat": {
+                  "value": "0",
+                  "currency": "USD"
+                },
+                "id": "QXNzZXRDdXJyZW50QmFsYW5jZXM6RVVSQzpVTlNQRUNJRklFRDpBU1NFVF9QTEFURk9STV9VTlNQRUNJRklFRDo6VU5TUEVDSUZJRUQ6Mg=="
+              },
+              "rewardApy": null,
+              "supportedContextsV2": {
+                "isConvertible": true,
+                "isTradable": true
+              },
+              "id": "Vmlld2VyQXNzZXQ6Njc0YzYzNDMtNDFhOC00Yjc5LTg5MTQtMjE3NjI4NzdlOTA3"
+            }
+          }
+        ]
+      },
+      "cashQuickActionsData": {
+        "edges": [
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS",
+              "component": {
+                "__typename": "UIComponentContainer",
+                "components": [
+                  {
+                    "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS",
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "deposit",
+                      "title": "Deposit cash",
+                      "pictogramId": "institutions"
+                    },
+                    "id": "VUlDb21wb25lbnQ6NUxyZ1BJOEJXWTczVFVHU0ZvRkE1cQ=="
+                  },
+                  {
+                    "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS",
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "withdraw",
+                      "title": "Withdraw cash",
+                      "pictogramId": "cash"
+                    },
+                    "id": "VUlDb21wb25lbnQ6NDlQSjl3VDEyb1ZSUGZIdEZoU25oTA=="
+                  },
+                  {
+                    "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS",
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "swap",
+                      "title": "Convert crypto",
+                      "pictogramId": "wireTransfer"
+                    },
+                    "id": "VUlDb21wb25lbnQ6MWE2akVjaUFaZm80Q1hTa28xQ0V0Mg=="
+                  },
+                  {
+                    "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS",
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "convert_cash",
+                      "title": "Convert cash",
+                      "pictogramId": "cashUSD"
+                    },
+                    "id": "VUlDb21wb25lbnQ6NkZZNFZoQUw0Sng1cTcySU5VZXN1dQ=="
+                  },
+                  {
+                    "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS",
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "send",
+                      "title": "Send USDC",
+                      "pictogramId": "arrowUp"
+                    },
+                    "id": "VUlDb21wb25lbnQ6MkcxSUEwRDlSWThIbGt2WDZLeGcxOA=="
+                  },
+                  {
+                    "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS",
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "receive",
+                      "title": "Receive USDC",
+                      "pictogramId": "arrowDown"
+                    },
+                    "id": "VUlDb21wb25lbnQ6MXlJVVBrUE9vTWpGTkI3MkJtcDd1Vw=="
+                  }
+                ]
+              },
+              "id": "VUlDb21wb25lbnQ6NUZ5Y1NjRzlWQWxwOTFNek4zS3hTZg=="
+            }
+          }
+        ]
+      },
+      "accountByUuidV3": {
+        "account": {
+          "uuid": "f7d05c60-c483-5511-917c-e654071dc386",
+          "id": "QWNjb3VudDpmN2QwNWM2MC1jNDgzLTU1MTEtOTE3Yy1lNjU0MDcxZGMzODY="
+        }
+      },
+      "globalActions": {
+        "edges": [
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS_TRADE_TRAY",
+              "contentId": "",
+              "componentId": "66BTGDcSTkuBpJyjhx9wg0",
+              "surface": "UI_COMPONENT_SURFACE_QUICK_ACTIONS",
+              "type": "UI_COMPONENT_TYPE_CONTAINER_COMPONENT",
+              "language": "en",
+              "publishedAt": "2024-08-26T15:14:31.716Z",
+              "component": {
+                "__typename": "UIComponentContainer",
+                "title": "",
+                "primaryCta": {
+                  "text": "Buy & sell",
+                  "url": ""
+                },
+                "secondaryCta": {
+                  "text": "",
+                  "url": ""
+                },
+                "components": [
+                  {
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "buy",
+                      "title": "Buy",
+                      "subtitle": "",
+                      "description": "Buy crypto with cash",
+                      "informationUrl": "https://www.coinbase.com/buy",
+                      "pictogramId": "add"
+                    },
+                    "id": "VUlDb21wb25lbnQ6MnY3OEpPb1BUeVhhaWVYTld2R0diMA=="
+                  },
+                  {
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "sell",
+                      "title": "Sell",
+                      "subtitle": "",
+                      "description": "Sell crypto for cash",
+                      "informationUrl": "https://www.coinbase.com/sell",
+                      "pictogramId": "minus"
+                    },
+                    "id": "VUlDb21wb25lbnQ6NUU5aExiWGJweGpKMFdRcmlObDE5TQ=="
+                  },
+                  {
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "convert",
+                      "title": "Convert",
+                      "subtitle": "",
+                      "description": "Convert one crypto to another",
+                      "informationUrl": "https://www.coinbase.com/convert",
+                      "pictogramId": "wireTransfer"
+                    },
+                    "id": "VUlDb21wb25lbnQ6NDNCSWtCMWxqYklBcUY3STFrZ09OYw=="
+                  }
+                ]
+              },
+              "id": "VUlDb21wb25lbnQ6NjZCVEdEY1NUa3VCcEp5amh4OXdnMA=="
+            }
+          },
+          {
+            "node": {
+              "category": "UI_COMPONENT_CATEGORY_QUICK_ACTIONS_TRANSFER_TRAY",
+              "contentId": "",
+              "componentId": "1EYy8OnTVXOUyNQK9Njues",
+              "surface": "UI_COMPONENT_SURFACE_QUICK_ACTIONS",
+              "type": "UI_COMPONENT_TYPE_CONTAINER_COMPONENT",
+              "language": "en",
+              "publishedAt": "2024-08-26T15:31:15.203Z",
+              "component": {
+                "__typename": "UIComponentContainer",
+                "title": "",
+                "primaryCta": {
+                  "text": "",
+                  "url": ""
+                },
+                "secondaryCta": {
+                  "text": "Transfer",
+                  "url": ""
+                },
+                "components": [
+                  {
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "send",
+                      "title": "Send crypto",
+                      "subtitle": "",
+                      "description": "To a crypto address, email, or phone number",
+                      "informationUrl": "https://www.coinbase.com/send",
+                      "pictogramId": "arrowUp"
+                    },
+                    "id": "VUlDb21wb25lbnQ6NGVuY2gyQXo5QW1JbzZQV2NFNWIwRw=="
+                  },
+                  {
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "receive",
+                      "title": "Receive crypto",
+                      "subtitle": "",
+                      "description": "From another crypto wallet",
+                      "informationUrl": "https://www.coinbase.com/receive",
+                      "pictogramId": "arrowDown"
+                    },
+                    "id": "VUlDb21wb25lbnQ6N3cyOHBiQlk1dTJHTFQzMVliTDNGcQ=="
+                  },
+                  {
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "cash_in",
+                      "title": "Deposit cash",
+                      "subtitle": "",
+                      "description": "Transfer funds from your bank",
+                      "informationUrl": "https://www.coinbase.com/deposit",
+                      "pictogramId": "bank"
+                    },
+                    "id": "VUlDb21wb25lbnQ6MDFoYjhlcjBHUEdOd3NBRVYyemRBNg=="
+                  },
+                  {
+                    "component": {
+                      "__typename": "UIComponentElement",
+                      "key": "cash_out",
+                      "title": "Withdraw cash",
+                      "subtitle": "",
+                      "description": "Transfer funds to your bank",
+                      "informationUrl": "https://www.coinbase.com/withdraw",
+                      "pictogramId": "cash"
+                    },
+                    "id": "VUlDb21wb25lbnQ6Mm5EWHVzeFQzeGJiNlgxaXRITUlpZQ=="
+                  }
+                ]
+              },
+              "id": "VUlDb21wb25lbnQ6MUVZeThPblRWWE9VeU5RSzlOanVlcw=="
+            }
+          }
+        ]
+      },
+      "uiComponentsForSystemAlerts": {
+        "edges": []
+      }
+    },
+    "stablecoinRateCard": {
+      "rateCard": [
+        {
+          "upperBalanceLimit": "9007199254740991",
+          "lowerBalanceLimit": "0",
+          "rewardRate": "0.041"
+        }
+      ],
+      "currency": "USDC"
+    },
+    "retailAccruedRewardsSummary": {
+      "accruedThisMonth": {
+        "fromDate": "2025-02-01",
+        "toDate": "2025-02-25",
+        "amount": {
+          "value": "0",
+          "currency": "USDC"
+        }
+      },
+      "accruedThisPeriod": {
+        "amount": {
+          "value": "0",
+          "currency": "USDC"
+        },
+        "fromDate": "2025-02-01",
+        "toDate": "2025-02-25"
+      }
+    },
+    "retailRewardsDailySummary": {
+      "rewardsDaily": []
+    }
+  }
+}
