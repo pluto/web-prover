@@ -1,4 +1,10 @@
-use std::{path::PathBuf, process::Command, sync::Arc, time::SystemTime};
+use core::panic;
+use std::{
+  path::PathBuf,
+  process::Command,
+  sync::Arc,
+  time::{Duration, SystemTime},
+};
 
 use axum::{
   extract::{
@@ -11,7 +17,7 @@ use futures::StreamExt;
 use futures_util::{stream::SplitSink, SinkExt};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{oneshot, Mutex};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
@@ -22,7 +28,12 @@ use crate::SharedState;
 // pub mod views;
 
 #[derive(Debug, Error)]
-pub enum FrameError {}
+pub enum FrameError {
+  #[error("WebSocket error: {0}")]
+  WebSocketError(String),
+  #[error("Prompt timeout")]
+  PromptTimeout,
+}
 
 // TODO: either session should live under connection state or connection state should be a session
 #[derive(Debug)]
@@ -45,18 +56,23 @@ pub enum View {
 }
 
 pub struct Session {
-  session_id:   Uuid,
-  // sender:        Option<SplitSink<WebSocket, Message>>,
-  sender:       Option<mpsc::Sender<View>>,
-  current_view: View,
-  // prompt_request_sender: Arc<Mutex<oneshot::Sender<PromptResponse>>>,
+  session_id:             Uuid,
+  ws_sender:              Option<SplitSink<WebSocket, Message>>,
+  // sender:                Option<mpsc::Sender<View>>,
+  current_view:           View,
+  prompt_response_sender: Arc<Mutex<Option<oneshot::Sender<PromptResponse>>>>,
   // cancel:       oneshot::Sender<()>,
 }
 
 impl Session {
   pub fn new(session_id: Uuid) -> Self {
     // let (cancel_sender, cancel_receiver) = oneshot::channel();
-    let session = Session { session_id, current_view: View::InitialView, sender: None };
+    let session = Session {
+      session_id,
+      current_view: View::InitialView,
+      ws_sender: None,
+      prompt_response_sender: Arc::new(Mutex::new(None)),
+    };
     session
   }
 
@@ -99,17 +115,51 @@ impl Session {
 
   pub async fn handle(&mut self, request: Action) -> Action { todo!("") }
 
+  pub async fn handle_prompt(
+    &mut self,
+    prompts: Vec<Prompt>,
+  ) -> Result<PromptResponse, FrameError> {
+    let prompt_view = View::PromptView { prompts };
+    let serialized_view = serde_json::to_string(&prompt_view).unwrap();
+
+    let (prompt_response_sender, prompt_response_receiver) = oneshot::channel::<PromptResponse>();
+    self.prompt_response_sender.lock().await.replace(prompt_response_sender);
+
+    // TODO: session should store each view sent with a request id, so that it can match the
+    // response
+    self.ws_sender.as_mut().unwrap().send(Message::Text(serialized_view)).await.unwrap();
+
+    self.current_view = prompt_view;
+
+    match tokio::time::timeout(Duration::from_secs(60), prompt_response_receiver).await {
+      Ok(Ok(prompt_response)) => Ok(prompt_response),
+      Ok(Err(_)) => Err(FrameError::WebSocketError("Prompt response channel closed".to_string())),
+      Err(_) => Err(FrameError::PromptTimeout),
+    }
+  }
+
+  pub async fn handle_prompt_response(&mut self, prompt_response: PromptResponse) {
+    let prompt_response_sender = self.prompt_response_sender.lock().await.take().unwrap();
+    prompt_response_sender.send(prompt_response).unwrap();
+  }
+
   /// Called when the client connects. Can be called multiple times.
   pub async fn on_client_connect(&mut self) {
-    // TODO send current_view serialized
+    // send initial view
+    let current_view_serialized = serde_json::to_string(&self.current_view).unwrap();
+    self.ws_sender.as_mut().unwrap().send(Message::Text(current_view_serialized)).await.unwrap();
   }
 
   /// Called when the client disconnects unexpectedly. Can be called multiple times.
   pub async fn on_client_disconnect(&mut self) {}
 
   /// Called when the client closes the connection. Called only once.
-  pub async fn on_client_close(&self) {
+  pub async fn on_client_close(&mut self) {
     // let _ = self.cancel.send(());
+    // TODO: cancel other tasks like playwright
+    if let Some(mut ws_sender) = self.ws_sender.take() {
+      let _ = ws_sender.close().await; // attempt to close the websocket connection gracefully
+    }
   }
 }
 
@@ -164,7 +214,9 @@ async fn handle_websocket_connection(
 ) {
   info!("[{}] New Websocket connected", session.lock().await.session_id);
   let mut keepalive = false;
-  let (mut sender, mut receiver) = socket.split();
+  let (sender, mut receiver) = socket.split();
+
+  session.lock().await.ws_sender = Some(sender);
 
   state.sessions.lock().await.insert(session.lock().await.session_id, session.clone());
 
@@ -177,7 +229,7 @@ async fn handle_websocket_connection(
     match result {
       Ok(message) => match message {
         axum::extract::ws::Message::Text(text) => {
-          process_text_message(text, session.clone(), &mut sender).await;
+          process_text_message(text, session.clone()).await;
         },
         axum::extract::ws::Message::Binary(_) => {
           warn!("Binary messages are not supported");
@@ -207,29 +259,42 @@ async fn handle_websocket_connection(
     // If the Websocket connection drops, mark it as disconnected, unless it was correctly closed.
     info!("[{}] Websocket disconnected", session.lock().await.session_id);
     session.lock().await.on_client_disconnect().await;
-    // frame_sessions
-    // .insert(session.lock().await.session_id, ConnectionState::Disconnected(session.clone(),
-    // SystemTime::now()));
+    frame_sessions
+      .insert(session.lock().await.session_id, ConnectionState::Disconnected(SystemTime::now()));
   } else {
     session.lock().await.on_client_close().await;
     frame_sessions.remove(&session.lock().await.session_id);
+    state.sessions.lock().await.remove(&session.lock().await.session_id);
   }
+  drop(frame_sessions);
 }
 
-async fn process_text_message(
-  text: String,
-  session: Arc<Mutex<Session>>,
-  sender: &mut SplitSink<WebSocket, Message>,
-) {
+async fn process_text_message(text: String, session: Arc<Mutex<Session>>) {
   let action = serde_json::from_str::<Action>(&text);
   match action {
     Ok(action) => {
-      let result = session.lock().await.handle(action).await;
+      let action = session.lock().await.handle(action).await;
+      match action.kind.as_str() {
+        "prompt_response" => {
+          let prompt_response = serde_json::from_value::<PromptResponse>(action.payload).unwrap();
+          session.lock().await.handle_prompt_response(prompt_response).await;
+        },
+        _ => {
+          panic!("Invalid action: {}", action.kind);
+        },
+      }
       // TODO send result to client
     },
     Err(err) => {
       // TODO send error to client
-      let _ = sender.send(Message::Text(format!("Invalid action: {}", err))).await;
+
+      // let sender = session.lock().await.ws_sender.as_mut();
+
+      // // Send an error message to the client
+      // if let Some(sender) = sender {
+      //   let _ =
+      //     sender.send(axum::extract::ws::Message::Text(format!("Invalid action: {}",
+      // err))).await; }
     },
   }
   // TODO send error result to client

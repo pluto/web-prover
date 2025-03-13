@@ -49,6 +49,8 @@ pub enum NotaryServerError {
 
   #[error(transparent)]
   WebProverCoreError(#[from] WebProverCoreError),
+  #[error(transparent)]
+  RunnerError(#[from] crate::runner::RunnerError),
 }
 
 /// Trait implementation to convert this error into an axum http response

@@ -34,25 +34,42 @@ pub struct ProveRequest {
   pub value: Value,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum RunnerError {
+  #[error("Playwright session disconnected")]
+  PlaywrightSessionDisconnected,
+  #[error("Playwright session not connected")]
+  PlaywrightSessionNotConnected,
+  #[error(transparent)]
+  FrameError(#[from] crate::frame::FrameError),
+}
+
 pub async fn prompt(
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<PromptRequest>,
 ) -> Result<Json<PromptResponse>, NotaryServerError> {
   debug!("Prompting: {:?}", payload);
-  let inputs = payload.prompts.iter().map(|prompt| prompt.title.clone()).collect();
-  let response = PromptResponse { inputs };
+  // let inputs = payload.prompts.iter().map(|prompt| prompt.title.clone()).collect();
+  // let response = PromptResponse { inputs };
 
   let session_id = uuid::Uuid::parse_str(&payload.uuid).unwrap();
   let frame_sessions = state.frame_sessions.lock().await;
-  // match frame_sessions.get(&session_id) {
-  //   Some(crate::frame::ConnectionState::Connected) => {},
-  //   Some(crate::frame::ConnectionState::Disconnected(_)) => {
-  //     return Err(NotaryServerError::SessionDisconnected);
-  //   },
-  //   None => {
-  //     return Err(NotaryServerError::SessionNotConnected);
-  //   },
-  // }
+  let response = match frame_sessions.get(&session_id) {
+    Some(crate::frame::ConnectionState::Connected) => {
+      let session = state.sessions.lock().await.get(&session_id).unwrap().clone();
+      let response =
+        session.lock().await.handle_prompt(payload.prompts).await.map_err(RunnerError::from)?;
+      Ok::<PromptResponse, RunnerError>(response)
+    },
+    Some(crate::frame::ConnectionState::Disconnected(_)) => {
+      return Err(RunnerError::PlaywrightSessionDisconnected).map_err(NotaryServerError::from);
+    },
+    None => {
+      return Err(RunnerError::PlaywrightSessionNotConnected).map_err(NotaryServerError::from);
+    },
+  }?;
+
+  drop(frame_sessions);
 
   Ok(Json(response))
 }

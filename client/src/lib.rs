@@ -82,3 +82,11 @@ pub async fn verify<T: Serialize>(
 
   Ok(verify_response)
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[tokio::test]
+  async fn test_frame() {}
+}

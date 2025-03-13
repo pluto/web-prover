@@ -153,7 +153,6 @@ impl PlaywrightRunner {
 }
 
 mod tests {
-
   use super::*;
 
   const EXAMPLE_DEVELOPER_SCRIPT: &str = r#"
