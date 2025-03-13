@@ -182,7 +182,9 @@ pub async fn frame() {
                 payload: serde_json::to_value(prompt_response).unwrap(),
               };
               ws_stream.send(Text(serde_json::to_string(&action).unwrap().into())).await.unwrap();
-              debug!("Sent prompt response: {:?}", action);
+
+              // TODO (autoparallel): Seeing if this close signal is sent.
+              ws_stream.close(None).await.unwrap();
             },
           }
         },

@@ -47,7 +47,7 @@ pub struct Session {
   ws_sender:              Option<SplitSink<WebSocket, Message>>,
   // sender:                Option<mpsc::Sender<View>>,
   current_view:           View,
-  prompt_response_sender: Arc<Mutex<Option<oneshot::Sender<PromptResponse>>>>,
+  prompt_response_sender: Option<oneshot::Sender<PromptResponse>>,
   // cancel:       oneshot::Sender<()>,
 }
 
@@ -58,7 +58,7 @@ impl Session {
       session_id,
       current_view: View::InitialView,
       ws_sender: None,
-      prompt_response_sender: Arc::new(Mutex::new(None)),
+      prompt_response_sender: None,
     };
     session
   }
@@ -112,14 +112,24 @@ impl Session {
     let serialized_view = serde_json::to_string(&prompt_view).unwrap();
 
     let (prompt_response_sender, prompt_response_receiver) = oneshot::channel::<PromptResponse>();
-    self.prompt_response_sender.lock().await.replace(prompt_response_sender);
 
-    assert!(self.prompt_response_sender.lock().await.is_some());
+    // TODO (autoparallel): I was dummy sending something to see if this worked at all, it does.
+    // prompt_response_sender.send(PromptResponse { inputs: vec![] }).unwrap();
+
+    self.prompt_response_sender = Some(prompt_response_sender);
+
+    debug!("prompt_response_sender: {:?}", self.prompt_response_sender);
+    // debug!("prompt_response_receiver: {:?}", prompt_response_receiver);
+
+    // TODO (autoparallel): dangerous assert, this will crash the notary and also it should never
+    // happen.
+    assert!(self.prompt_response_sender.is_some());
 
     // TODO: session should store each view sent with a request id, so that it can match the
     // response
     debug!("Sending prompt view to client");
     self.current_view = prompt_view;
+    debug!("current_view: {:?}", self.current_view);
     self.ws_sender.as_mut().unwrap().send(Message::Text(serialized_view)).await.unwrap();
 
     debug!("Prompt view sent successfully");
@@ -128,8 +138,8 @@ impl Session {
 
   pub async fn handle_prompt_response(&mut self, prompt_response: PromptResponse) {
     debug!("Received prompt response: {:?}", prompt_response);
-    assert!(self.prompt_response_sender.lock().await.is_some(), "No prompt response sender");
-    let prompt_response_sender = self.prompt_response_sender.lock().await.take().unwrap();
+    assert!(self.prompt_response_sender.is_some(), "No prompt response sender");
+    let prompt_response_sender = self.prompt_response_sender.take().unwrap();
     let send_result = prompt_response_sender.send(prompt_response);
     if let Err(e) = send_result {
       error!("Failed to send prompt response: {:?}", e);
@@ -198,6 +208,8 @@ pub async fn on_websocket(
     },
   };
 
+  // TODO (autoparallel): This shouldn't be necessary since the end of the function will drop the
+  // mutex guard.
   drop(frame_sessions); // drop mutex guard
 
   ws.on_upgrade(move |socket| handle_websocket_connection(state, socket, session))
@@ -225,6 +237,7 @@ async fn handle_websocket_connection(
     match result {
       Ok(message) => match message {
         axum::extract::ws::Message::Text(text) => {
+          debug!("Received text message in: {:?}", text);
           process_text_message(text, session.clone()).await;
         },
         axum::extract::ws::Message::Binary(_) => {
@@ -250,6 +263,8 @@ async fn handle_websocket_connection(
     }
   }
 
+  warn!("Websocket connection closed");
+
   let mut frame_sessions = state.frame_sessions.lock().await;
   if keepalive {
     // If the Websocket connection drops, mark it as disconnected, unless it was correctly closed.
@@ -266,6 +281,7 @@ async fn handle_websocket_connection(
 }
 
 async fn process_text_message(text: String, session: Arc<Mutex<Session>>) {
+  debug!("Processing text message: {:?}", text);
   let action = serde_json::from_str::<Action>(&text);
   match action {
     Ok(action) => {

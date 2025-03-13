@@ -37,8 +37,10 @@ pub async fn prompt(
     Some(crate::frame::ConnectionState::Connected) => {
       let session = state.sessions.lock().await.get(&session_id).unwrap().clone();
       debug!("session lock acquired");
+      let mut prompt_response_receiver = session.lock().await;
+      debug!("prompt_response_receiver lock acquired");
       let prompt_response_receiver =
-        session.lock().await.handle_prompt(payload.prompts).await.map_err(RunnerError::from)?;
+        prompt_response_receiver.handle_prompt(payload.prompts).await.map_err(RunnerError::from)?;
       debug!("prompt_response_receiver acquired");
       // TODO: is there a deadlock here???
       // prompt response is received after timeout has passed
@@ -55,10 +57,10 @@ pub async fn prompt(
       Ok::<PromptResponse, RunnerError>(response)
     },
     Some(crate::frame::ConnectionState::Disconnected(_)) => {
-      return Err(RunnerError::PlaywrightSessionDisconnected).map_err(NotaryServerError::from);
+      return Err(NotaryServerError::from(RunnerError::PlaywrightSessionDisconnected));
     },
     None => {
-      return Err(RunnerError::PlaywrightSessionNotConnected).map_err(NotaryServerError::from);
+      return Err(NotaryServerError::from(RunnerError::PlaywrightSessionNotConnected));
     },
   }?;
 

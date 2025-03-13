@@ -23,7 +23,6 @@ const { prompt, prove, setSessionUUID } = require("@plutoxyz/playwright-utils");
 
   const browser = await chromium.launch({
     headless: true,
-    executablePath: '/Users/darkrai/Library/Caches/ms-playwright/chromium_headless_shell-1155/chrome-mac/headless_shell'
   });
   const context = await browser.newContext();
   const page = await context.newPage();
