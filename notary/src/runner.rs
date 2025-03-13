@@ -4,35 +4,10 @@ use axum::{
   extract::{self, State},
   Json,
 };
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use tracing::debug;
+use web_prover_core::frame::{PromptRequest, PromptResponse, ProveRequest};
 
 use crate::{error::NotaryServerError, SharedState};
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Prompt {
-  pub title: String,
-  pub types: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PromptRequest {
-  pub uuid:    String,
-  pub prompts: Vec<Prompt>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PromptResponse {
-  pub inputs: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ProveRequest {
-  pub uuid:  String,
-  pub key:   String,
-  pub value: Value,
-}
 
 #[derive(Debug, thiserror::Error)]
 pub enum RunnerError {

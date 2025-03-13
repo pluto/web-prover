@@ -1,4 +1,3 @@
-use core::panic;
 use std::{
   path::PathBuf,
   process::Command,
@@ -18,11 +17,11 @@ use futures_util::{stream::SplitSink, SinkExt};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::{oneshot, Mutex};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
-
-use crate::runner::{Prompt, PromptResponse};
 // use views::View;
+use web_prover_core::frame::{Action, Prompt, PromptResponse, View};
+
 use crate::SharedState;
 
 // pub mod views;
@@ -41,18 +40,6 @@ pub enum ConnectionState {
   Connected,
   Disconnected(SystemTime), /* TODO run a task that cleans up disconnected sessions
                              * every 60 secs */
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Action {
-  pub kind:    String,
-  pub payload: serde_json::Value,
-}
-
-#[derive(Debug, Serialize)]
-pub enum View {
-  InitialView,
-  PromptView { prompts: Vec<Prompt> },
 }
 
 pub struct Session {
@@ -76,10 +63,10 @@ impl Session {
     session
   }
 
-  async fn run(&self) {
+  async fn run(&self, initial_input: web_prover_core::frame::InitialInput) {
     let playwright_runner_config = web_prover_executor::playwright::PlaywrightRunnerConfig {
-      script:          "".to_string(),
-      timeout_seconds: 0,
+      script:          initial_input.script,
+      timeout_seconds: 60,
     };
 
     let node_path =
@@ -145,7 +132,7 @@ impl Session {
 
   /// Called when the client connects. Can be called multiple times.
   pub async fn on_client_connect(&mut self) {
-    // send initial view
+    debug!("Sending initial view");
     let current_view_serialized = serde_json::to_string(&self.current_view).unwrap();
     self.ws_sender.as_mut().unwrap().send(Message::Text(current_view_serialized)).await.unwrap();
   }
@@ -168,6 +155,7 @@ pub async fn on_websocket(
   Query(params): Query<std::collections::HashMap<String, String>>,
   State(state): State<Arc<SharedState>>,
 ) -> impl IntoResponse {
+  debug!("Starting frame connection");
   // Parse ?session_id from query
   let session_id = match params.get("session_id") {
     Some(id) => match Uuid::parse_str(id) {
@@ -222,7 +210,7 @@ async fn handle_websocket_connection(
 
   session.lock().await.on_client_connect().await; // TODO pass sender?
 
-  session.lock().await.run().await;
+  // session.lock().await.run().await;
 
   // TODO what if next() returns None?!
   while let Some(result) = receiver.next().await {
@@ -275,19 +263,24 @@ async fn process_text_message(text: String, session: Arc<Mutex<Session>>) {
     Ok(action) => {
       let action = session.lock().await.handle(action).await;
       match action.kind.as_str() {
+        "initial_input" => {
+          let initial_input =
+            serde_json::from_value::<web_prover_core::frame::InitialInput>(action.payload).unwrap();
+          session.lock().await.run(initial_input).await;
+        },
         "prompt_response" => {
           let prompt_response = serde_json::from_value::<PromptResponse>(action.payload).unwrap();
           session.lock().await.handle_prompt_response(prompt_response).await;
         },
         _ => {
-          panic!("Invalid action: {}", action.kind);
+          error!("Invalid action: {}", action.kind);
         },
       }
       // TODO send result to client
     },
     Err(err) => {
       // TODO send error to client
-
+      error!("Failed to parse action: {}", err);
       // let sender = session.lock().await.ws_sender.as_mut();
 
       // // Send an error message to the client

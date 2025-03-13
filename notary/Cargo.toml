@@ -29,8 +29,8 @@ tracing-subscriber={ workspace=true }
 
 alloy-primitives={ version="0.8.2", features=["k256"] }
 async-trait     ="0.1.67"
-axum            ={ version="0.7", features=["ws", "json"] }
-axum-core       ="0.4"
+axum            ={ workspace=true }
+axum-core       ={ workspace=true }
 base64          ="0.21.0"
 clap            ={ workspace=true }
 config          ="0.14.0"

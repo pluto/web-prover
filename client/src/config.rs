@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use serde::Deserialize;
 use serde_with::{
   base64::{Base64, Standard},
@@ -20,9 +18,6 @@ pub struct Config {
   // this is helpful for local debugging with self-signed certs
   #[serde_as(as = "Option<Base64<Standard, Padded>>")]
   pub notary_ca_cert: Option<Vec<u8>>,
-  pub target_method:  String,
-  pub target_url:     String,
-  pub target_headers: HashMap<String, String>,
   pub target_body:    String,
   pub manifest:       Manifest,
   #[serde(skip)]
