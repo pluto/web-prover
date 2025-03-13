@@ -1,6 +1,6 @@
 pub const TEST_MANIFEST: &str = r#"
 {
-    "manifestVersion": "1",
+    "manifestVersion": "2",
     "id": "reddit-user-karma",
     "title": "Total Reddit Karma",
     "description": "Generate a proof that you have a certain amount of karma",

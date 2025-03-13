@@ -160,25 +160,33 @@ impl ManifestValidationResult {
 
 /// Manifest containing [`ManifestRequest`] and [`ManifestResponse`]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, From)]
-// #[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct Manifest {
-  // /// Manifest version
-  // pub manifest_version: String,
-  // /// ID of the manifest
-  // pub id:               String,
-  // /// Title of the manifest
-  // pub title:            String,
-  // /// Description of the manifest
-  // pub description:      String,
+  /// Manifest version
+  pub manifest_version: String,
+  /// ID of the manifest
+  pub id:               Option<String>,
+  /// Title of the manifest
+  pub title:            Option<String>,
+  /// Description of the manifest
+  pub description:      Option<String>,
   /// HTTP request lock items
-  pub request:  ManifestRequest,
+  pub request:          ManifestRequest,
   /// HTTP response lock items
-  pub response: ManifestResponse,
+  pub response:         ManifestResponse,
 }
 
 impl Manifest {
-  fn validate_manifest(&self) -> ManifestValidationResult {
+  fn validate_manifest(&self) -> Result<ManifestValidationResult, WebProverCoreError> {
     let mut summary = ManifestValidationResult::default();
+
+    // Validate manifest version
+    if self.manifest_version != "2" {
+      return Err(WebProverCoreError::InvalidManifest(format!(
+        "Invalid manifest version: {}",
+        self.manifest_version
+      )));
+    }
 
     // TODO: Validate manifest version, id, title, description, prepareUrl
     if let Err(e) = self.request.validate() {
@@ -194,7 +202,7 @@ impl Manifest {
       summary.errors.push(e.to_string());
     }
 
-    summary
+    Ok(summary)
   }
 
   /// Validates `Manifest` request and response fields. They are validated against valid statuses,
@@ -207,7 +215,7 @@ impl Manifest {
     let mut result = ManifestValidationResult::default();
 
     // Validate manifest fields
-    result.merge(&self.validate_manifest());
+    result.merge(&self.validate_manifest()?);
 
     // Check if request matches manifest requirements
     result.merge(&self.request.is_subset_of(request)?);
@@ -266,10 +274,10 @@ mod tests {
         $(, $field:ident = $value:expr)* $(,)?
     ) => {{
         Manifest {
-            // manifest_version: "1".to_string(),
-            // id: "Default Manifest ID".to_string(),
-            // title: "Default Manifest Title".to_string(),
-            // description: "Default description.".to_string(),
+            manifest_version: "2".to_string(),
+            id: Some("Default Manifest ID".to_string()),
+            title: Some("Default Manifest Title".to_string()),
+            description: Some("Default description.".to_string()),
             request: $request,
             response: $response,
             $(
@@ -317,14 +325,14 @@ mod tests {
   #[test]
   fn test_green_path_manifest_validation() {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
-    let result = manifest.validate_manifest();
+    let result = manifest.validate_manifest().unwrap();
     assert!(result.is_success());
     assert!(result.values().is_empty());
   }
 
   const TEST_MANIFEST_WITHOUT_VARS: &str = r#"
 {
-    "manifestVersion": "1",
+    "manifestVersion": "2",
     "id": "reddit-user-karma",
     "title": "Total Reddit Karma",
     "description": "Generate a proof that you have a certain amount of karma",
@@ -363,7 +371,7 @@ mod tests {
   #[test]
   fn test_parse_manifest_without_vars() {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST_WITHOUT_VARS).unwrap();
-    let result = manifest.validate_manifest();
+    let result = manifest.validate_manifest().unwrap();
     assert!(!result.is_success());
 
     assert!(manifest.request.body.is_none()); // Optional field we omitted
@@ -376,7 +384,7 @@ mod tests {
   #[test]
   fn test_manifest_validation_invalid_method() {
     let manifest = create_manifest!(request!(method: "INVALID".to_string()), response!(),);
-    let result = manifest.validate_manifest();
+    let result = manifest.validate_manifest().unwrap();
     assert!(!result.is_success());
     assert!(result.values().is_empty());
     assert_eq!(result.errors.len(), 1);
@@ -386,7 +394,7 @@ mod tests {
   #[test]
   fn test_manifest_validation_invalid_url() {
     let manifest = create_manifest!(request!(url: "ftp://example.com".to_string()), response!(),);
-    let result = manifest.validate_manifest();
+    let result = manifest.validate_manifest().unwrap();
     assert!(!result.is_success());
     assert!(result.values().is_empty());
     assert_eq!(result.errors.len(), 1);
@@ -396,7 +404,7 @@ mod tests {
   #[test]
   fn test_manifest_validation_invalid_response_status() {
     let manifest = create_manifest!(request!(), response!(status: "500".to_string()),);
-    let result = manifest.validate_manifest();
+    let result = manifest.validate_manifest().unwrap();
     assert!(!result.is_success());
     assert!(result.values().is_empty());
     assert_eq!(result.errors.len(), 1);
@@ -419,7 +427,7 @@ mod tests {
       ),
       response!(),
     );
-    let result = manifest.validate_manifest();
+    let result = manifest.validate_manifest().unwrap();
     assert!(!result.is_success());
     assert!(result.values().is_empty());
     assert_eq!(result.errors.len(), 1);
@@ -437,7 +445,7 @@ mod tests {
           ("Content-Type".to_string(), "invalid/type".to_string())
       ])),
     );
-    let result = manifest.validate_manifest();
+    let result = manifest.validate_manifest().unwrap();
     assert!(!result.is_success());
     assert!(result.values().is_empty());
     assert_eq!(result.errors.len(), 1);
@@ -659,5 +667,13 @@ mod tests {
     // Verify the overall state
     assert!(!result.is_success());
     assert!(result.values().is_empty());
+  }
+
+  #[test]
+  fn test_manifest_with_a_wrong_version() {
+    let mut manifest = create_manifest!(request!(), response!(),);
+    manifest.manifest_version = "1".to_string();
+    let result = manifest.validate_manifest();
+    assert!(result.is_err());
   }
 }
