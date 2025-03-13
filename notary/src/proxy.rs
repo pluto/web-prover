@@ -121,16 +121,23 @@ pub fn create_tee_proof(
   response: &NotaryResponse,
   State(state): State<Arc<SharedState>>,
 ) -> Result<TeeProof, NotaryServerError> {
-  validate_notarization_legal(manifest, request, response)?;
+  let result = validate_notarization_legal(manifest, request, response)?;
   let path = manifest.response.body.json_path().clone();
-  let body = serde_json::from_slice(&response.notary_response_body.clone().body.unwrap()).unwrap();
-  let value = get_value_from_json_path(&body, &path);
-  let manifest_hash = KeccakHasher::hash(serde_json::to_string(&manifest)?.as_bytes());
-  let serialized_value = serde_json::to_string(&value).unwrap();
+
+  // Make sure that the extracted values have the same order as the manifest
+  let mut value = vec![];
+  for key in path {
+    let v = result.values().get(&key.to_string()).unwrap();
+    value.push(v.clone());
+  }
+
+  let serialized_value = serde_json::to_string(&value)?;
   let to_sign = VerifyOutput { value: serialized_value.clone(), manifest: manifest.clone() };
-  let signature = sign_verification(to_sign, State(state)).unwrap();
-  let data =
-    TeeProofData { value: serialized_value, manifest_hash: manifest_hash.to_vec() };
+  let signature = sign_verification(to_sign, State(state))?;
+
+  let manifest_hash = keccak_digest(serde_json::to_string(&manifest)?.as_bytes()).to_vec();
+  let data = TeeProofData { value: serialized_value, manifest_hash };
+
   Ok(TeeProof { data, signature })
 }
 
