@@ -146,7 +146,7 @@ impl TestSetup {
       Command::new("cargo")
         .args(["run", "-p", "client", "--"])
         .arg("--config")
-        .arg(workspace_root.join("fixture/client.proxy.json"))
+        .arg(workspace_root.join("../../fixture/client.json.proxy.json"))
         .env("RUST_LOG", "DEBUG")
         .current_dir(&workspace_root)
         .stdout(Stdio::piped())
