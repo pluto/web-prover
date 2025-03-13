@@ -17,6 +17,8 @@ pub enum RunnerError {
   PlaywrightSessionNotConnected,
   #[error(transparent)]
   FrameError(#[from] crate::frame::FrameError),
+  #[error(transparent)]
+  RecvError(#[from] tokio::sync::oneshot::error::RecvError),
 }
 
 pub async fn prompt(
@@ -28,12 +30,28 @@ pub async fn prompt(
   // let response = PromptResponse { inputs };
 
   let session_id = uuid::Uuid::parse_str(&payload.uuid).unwrap();
+  debug!("session_id: {:?}", session_id);
   let frame_sessions = state.frame_sessions.lock().await;
+  debug!("frame_sessions_got");
   let response = match frame_sessions.get(&session_id) {
     Some(crate::frame::ConnectionState::Connected) => {
       let session = state.sessions.lock().await.get(&session_id).unwrap().clone();
-      let response =
+      debug!("session lock acquired");
+      let prompt_response_receiver =
         session.lock().await.handle_prompt(payload.prompts).await.map_err(RunnerError::from)?;
+      debug!("prompt_response_receiver acquired");
+      // TODO: is there a deadlock here???
+      // prompt response is received after timeout has passed
+      let response =
+        tokio::time::timeout(std::time::Duration::from_secs(30), prompt_response_receiver)
+          .await
+          .map_err(|_| RunnerError::FrameError(crate::frame::FrameError::PromptTimeout))?
+          .map_err(RunnerError::from)?;
+      // let response = match prompt_response_receiver.await {
+      //   Ok(response) => response,
+      //   Err(e) => return Err(e).map_err(RunnerError::from)?,
+      // };
+      debug!("Prompt response: {:?}", response);
       Ok::<PromptResponse, RunnerError>(response)
     },
     Some(crate::frame::ConnectionState::Disconnected(_)) => {

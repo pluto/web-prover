@@ -1,11 +1,12 @@
 use std::{
   io::{Read, Write},
   path::PathBuf,
-  process::{Command, Stdio},
+  process::Stdio,
   time::Duration,
 };
 
 use tempfile::NamedTempFile;
+use tokio::process::Command;
 use tracing::{debug, error};
 use uuid::Uuid;
 use wait_timeout::ChildExt;
@@ -108,43 +109,52 @@ impl PlaywrightRunner {
       command.env(key, value);
     }
 
-    let mut child = command.spawn()?;
+    let child = command.spawn()?;
+
+    let status = child.wait_with_output().await?;
+    if !status.status.success() {
+      error!("Playwright execution failed: {:?}", status);
+      return Err(PlaywrightError::ExecutionError("Playwright execution failed".into()));
+    }
+
+    let stdout = String::from_utf8_lossy(&status.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&status.stderr).to_string();
 
     // Set a timeout
-    let timeout = Duration::from_secs(self.config.timeout_seconds);
-    let _ = match child.wait_timeout(timeout)? {
-      Some(status) =>
-        if let Some(code) = status.code() {
-          code
-        } else {
-          error!("Process terminated by signal: {:?}", status);
-          return Err(PlaywrightError::ExecutionError("Process terminated by signal".into()));
-        },
-      None => {
-        child.kill()?;
-        error!("Process timed out after {:?}", timeout);
-        return Err(PlaywrightError::ExecutionError("Process timed out".into()));
-      },
-    };
+    // let timeout = Duration::from_secs(self.config.timeout_seconds);
+    // let _ = match child.wait_timeout(timeout)? {
+    //   Some(status) =>
+    //     if let Some(code) = status.code() {
+    //       code
+    //     } else {
+    //       error!("Process terminated by signal: {:?}", status);
+    //       return Err(PlaywrightError::ExecutionError("Process terminated by signal".into()));
+    //     },
+    //   None => {
+    //     child.kill()?;
+    //     error!("Process timed out after {:?}", timeout);
+    //     return Err(PlaywrightError::ExecutionError("Process timed out".into()));
+    //   },
+    // };
 
     // Convert output to string
-    let stdout = match child.stdout.take() {
-      Some(mut stdout_stream) => {
-        let mut stdout = String::new();
-        stdout_stream.read_to_string(&mut stdout)?;
-        stdout
-      },
-      None => String::new(),
-    };
+    // let stdout = match child.stdout.take() {
+    //   Some(mut stdout_stream) => {
+    //     let mut stdout = String::new();
+    //     stdout_stream.read_to_string(&mut stdout)?;
+    //     stdout
+    //   },
+    //   None => String::new(),
+    // };
 
-    let stderr = match child.stderr.take() {
-      Some(mut stderr_stream) => {
-        let mut stderr = String::new();
-        stderr_stream.read_to_string(&mut stderr)?;
-        stderr
-      },
-      None => String::new(),
-    };
+    // let stderr = match child.stderr.take() {
+    //   Some(mut stderr_stream) => {
+    //     let mut stderr = String::new();
+    //     stderr_stream.read_to_string(&mut stderr)?;
+    //     stderr
+    //   },
+    //   None => String::new(),
+    // };
 
     let output = PlaywrightOutput { stdout, stderr };
 

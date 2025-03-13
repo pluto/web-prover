@@ -51,7 +51,7 @@ tokio            ={ workspace=true, features=["rt", "rt-multi-thread", "macros",
 tokio-rustls     ={ version="0.26", default-features=false, features=["logging", "tls12"] }
 tokio-tungstenite={ workspace=true }
 # TLSN
-reqwest={ version="0.12", features=["json", "rustls-tls"] }
+native-tls="0.2.14"
+reqwest   ={ version="0.12", features=["json", "rustls-tls"] }
 
 [dev-dependencies]
-native-tls="0.2.14"

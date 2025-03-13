@@ -63,7 +63,8 @@ impl Session {
     session
   }
 
-  async fn run(&self, initial_input: web_prover_core::frame::InitialInput) {
+  // TODO: return result
+  async fn run(session_id: Uuid, initial_input: web_prover_core::frame::InitialInput) {
     let playwright_runner_config = web_prover_executor::playwright::PlaywrightRunnerConfig {
       script:          initial_input.script,
       timeout_seconds: 60,
@@ -80,7 +81,7 @@ impl Session {
       vec![(String::from("DEBUG"), String::from("pw:api"))],
     );
 
-    let session_id = self.session_id.clone();
+    let session_id = session_id.clone();
     let script_result =
       tokio::spawn(async move { playwright_runner.run_script(&session_id).await });
 
@@ -105,29 +106,36 @@ impl Session {
   pub async fn handle_prompt(
     &mut self,
     prompts: Vec<Prompt>,
-  ) -> Result<PromptResponse, FrameError> {
+  ) -> Result<oneshot::Receiver<PromptResponse>, FrameError> {
+    debug!("Handling prompt: {:?}", prompts);
     let prompt_view = View::PromptView { prompts };
     let serialized_view = serde_json::to_string(&prompt_view).unwrap();
 
     let (prompt_response_sender, prompt_response_receiver) = oneshot::channel::<PromptResponse>();
     self.prompt_response_sender.lock().await.replace(prompt_response_sender);
 
+    assert!(self.prompt_response_sender.lock().await.is_some());
+
     // TODO: session should store each view sent with a request id, so that it can match the
     // response
+    debug!("Sending prompt view to client");
+    self.current_view = prompt_view;
     self.ws_sender.as_mut().unwrap().send(Message::Text(serialized_view)).await.unwrap();
 
-    self.current_view = prompt_view;
-
-    match tokio::time::timeout(Duration::from_secs(60), prompt_response_receiver).await {
-      Ok(Ok(prompt_response)) => Ok(prompt_response),
-      Ok(Err(_)) => Err(FrameError::WebSocketError("Prompt response channel closed".to_string())),
-      Err(_) => Err(FrameError::PromptTimeout),
-    }
+    debug!("Prompt view sent successfully");
+    Ok(prompt_response_receiver)
   }
 
   pub async fn handle_prompt_response(&mut self, prompt_response: PromptResponse) {
+    debug!("Received prompt response: {:?}", prompt_response);
+    assert!(self.prompt_response_sender.lock().await.is_some(), "No prompt response sender");
     let prompt_response_sender = self.prompt_response_sender.lock().await.take().unwrap();
-    prompt_response_sender.send(prompt_response).unwrap();
+    let send_result = prompt_response_sender.send(prompt_response);
+    if let Err(e) = send_result {
+      error!("Failed to send prompt response: {:?}", e);
+    } else {
+      debug!("Prompt response handled!");
+    }
   }
 
   /// Called when the client connects. Can be called multiple times.
@@ -261,15 +269,17 @@ async fn process_text_message(text: String, session: Arc<Mutex<Session>>) {
   let action = serde_json::from_str::<Action>(&text);
   match action {
     Ok(action) => {
-      let action = session.lock().await.handle(action).await;
+      // let action = session.lock().await.handle(action).await;
       match action.kind.as_str() {
         "initial_input" => {
           let initial_input =
             serde_json::from_value::<web_prover_core::frame::InitialInput>(action.payload).unwrap();
-          session.lock().await.run(initial_input).await;
+          let session_id = session.lock().await.session_id;
+          Session::run(session_id, initial_input).await;
         },
         "prompt_response" => {
           let prompt_response = serde_json::from_value::<PromptResponse>(action.payload).unwrap();
+          debug!("Received prompt response: {:?}", prompt_response);
           session.lock().await.handle_prompt_response(prompt_response).await;
         },
         _ => {
