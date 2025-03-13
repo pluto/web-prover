@@ -37,8 +37,8 @@ If you have any questions, please reach out to any of Pluto's [team members](htt
 ### Usage
 
 ```
-cargo run -p notary -- --config ./fixture/notary-config.toml
-cargo run -p client -- --config ./fixture/client.proxy.json
+cargo run -p web-prover-notary -- --config ./fixture/notary-config.toml  
+cargo run -p web-prover-client -- --config ./fixture/client.proxy.json 
 ```
 
 ## Security Status

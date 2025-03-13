@@ -6,13 +6,14 @@ use axum::{
 };
 use reqwest::{Request, Response};
 use serde::Deserialize;
-use serde_json::Value;
-use tracing::info;
+use serde_json::{json, Value};
+use tracing::{debug, info};
 use uuid::Uuid;
 use web_prover_core::{
   hash::keccak_digest,
   http::{
-    ManifestRequest, ManifestResponse, ManifestResponseBody, NotaryResponse, NotaryResponseBody,
+    JsonKey, ManifestRequest, ManifestResponse, ManifestResponseBody, NotaryResponse,
+    NotaryResponseBody,
   },
   manifest::{Manifest, ManifestValidationResult},
   proof::{TeeProof, TeeProofData},
@@ -20,7 +21,7 @@ use web_prover_core::{
 
 use crate::{
   error::NotaryServerError,
-  verifier::{sign_verification, VerifyOutput},
+  verifier::{hash_value, sign_verification, VerifyOutput},
   SharedState,
 };
 #[derive(Deserialize)]
@@ -58,6 +59,7 @@ pub async fn proxy(
   // debug!("{:?}", response);
 
   let tee_proof = create_tee_proof(&payload.manifest, &request, &response, State(state))?;
+  debug!("{:?}", tee_proof);
 
   Ok(Json(tee_proof))
 }
@@ -119,19 +121,16 @@ pub fn create_tee_proof(
   response: &NotaryResponse,
   State(state): State<Arc<SharedState>>,
 ) -> Result<TeeProof, NotaryServerError> {
-  let validation_result = validate_notarization_legal(manifest, request, response)?;
-
-  let manifest_hash = manifest.to_keccak_digest()?;
-  let extraction_hash = validation_result.extraction_keccak_digest()?;
-  let proof_value_hash = keccak_digest(&[manifest_hash, extraction_hash].concat());
-
-  let to_sign = VerifyOutput {
-    value:    format!("0x{}", hex::encode(proof_value_hash)),
-    manifest: manifest.clone(),
-  };
-  let signature = sign_verification(to_sign, State(state))?;
-  let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
-
+  validate_notarization_legal(manifest, request, response)?;
+  let path = manifest.response.body.json_path().clone();
+  let body = serde_json::from_slice(&response.notary_response_body.clone().body.unwrap()).unwrap();
+  let value = get_value_from_json_path(&body, &path);
+  let manifest_hash = hash_value(serde_json::to_string(&manifest)?.as_bytes());
+  let serialized_value = serde_json::to_string(&value).unwrap();
+  let to_sign = VerifyOutput { value: serialized_value.clone(), manifest: manifest.clone() };
+  let signature = sign_verification(to_sign, State(state)).unwrap();
+  let data =
+    TeeProofData { value: serialized_value, manifest_hash: manifest_hash.to_vec() };
   Ok(TeeProof { data, signature })
 }
 
@@ -148,4 +147,62 @@ fn validate_notarization_legal(
   }
   info!("Manifest returned values: {:?}", result.values());
   Ok(result)
+}
+
+fn get_value_from_json_path(json_body: &Value, path: &[JsonKey]) -> Value {
+  let mut current = json_body;
+  for key in path {
+    current = match key {
+      JsonKey::String(s) => current.get(s),
+      JsonKey::Num(n) => current.get(n),
+    }
+    .unwrap();
+  }
+  current.clone()
+}
+
+#[test]
+fn test_get_value_from_json_path() {
+  let json_body = json!({
+    "foo": {
+      "bar": "baz"
+    }
+  });
+  let path = vec![JsonKey::String("foo".to_string()), JsonKey::String("bar".to_string())];
+  let value = get_value_from_json_path(&json_body, &path);
+  assert_eq!(value, "baz");
+}
+
+#[test]
+fn test_get_value_from_json_path_num() {
+  let json_body = json!({
+    "foo": [1, 2, 3]
+  });
+  let path = vec![JsonKey::String("foo".to_string()), JsonKey::Num(1)];
+  let value = get_value_from_json_path(&json_body, &path);
+  assert_eq!(value, 2);
+}
+
+#[test]
+fn test_get_value_from_json_path_bool() {
+  let json_body = json!({
+    "foo": {
+      "bar": true
+    }
+  });
+  let path = vec![JsonKey::String("foo".to_string()), JsonKey::String("bar".to_string())];
+  let value = get_value_from_json_path(&json_body, &path);
+  assert_eq!(value, true);
+}
+
+#[test]
+fn test_get_value_from_json_path_null() {
+  let json_body = json!({
+    "foo": {
+      "bar": null
+    }
+  });
+  let path = vec![JsonKey::String("foo".to_string()), JsonKey::String("bar".to_string())];
+  let value = get_value_from_json_path(&json_body, &path);
+  assert_eq!(value, Value::Null);
 }
