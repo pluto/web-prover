@@ -22,11 +22,6 @@
 //!
 //! - [`JsonKey`]: Represents a key in a JSON path (either a string key or array index)
 //!
-//! ## Constants
-//!
-//! - [`MAX_HTTP_HEADERS`]: Maximum number of HTTP headers allowed
-//! - [`HTTP_1_1`]: HTTP/1.1 version string
-//!
 //! ## Functions
 //!
 //! - [`default_version`]: Returns the default HTTP version string
@@ -58,9 +53,6 @@ pub enum JsonKey {
   /// A numeric index used to access elements in a JSON array
   Num(usize),
 }
-
-/// HTTP/1.1 version string constant
-pub const HTTP_1_1: &str = "HTTP/1.1";
 
 /// A type of response body used to describe conditions in the client `Manifest`.
 ///
@@ -337,9 +329,9 @@ impl NotaryResponse {
 }
 
 /// Default HTTP version
-fn default_version() -> String { HTTP_1_1.to_string() }
+pub fn default_version() -> String { "HTTP/1.1".to_string() }
 /// Default HTTP message
-fn default_message() -> String { "OK".to_string() }
+pub fn default_message() -> String { "OK".to_string() }
 
 /// HTTP Response items required for circuits
 ///

@@ -266,7 +266,7 @@ mod tests {
 
   use crate::{
     extractor,
-    http::{ManifestResponseBody, NotaryResponse, NotaryResponseBody, HTTP_1_1},
+    http::{default_version, ManifestResponseBody, NotaryResponse, NotaryResponseBody},
     manifest::{Manifest, ManifestRequest, ManifestResponse, ManifestValidationResult},
     parser::{DataFormat, ExtractionResult, ExtractionValues, ExtractorConfig, ExtractorType},
     request, response,
@@ -298,14 +298,14 @@ mod tests {
   fn test_deserialize_from_string() {
     let manifest: Manifest = serde_json::from_str(TEST_MANIFEST).unwrap();
     // verify defaults are working
-    assert_eq!(manifest.request.version, HTTP_1_1);
+    assert_eq!(manifest.request.version, default_version());
     assert_eq!(manifest.request.method, "GET");
     assert_eq!(manifest.request.headers.len(), 2);
     assert_eq!(manifest.request.headers.get("host").unwrap(), "gist.githubusercontent.com");
 
     // verify defaults are working
     assert_eq!(manifest.response.status, "200");
-    assert_eq!(manifest.response.version, HTTP_1_1);
+    assert_eq!(manifest.response.version, default_version());
     assert_eq!(manifest.response.headers.len(), 2);
     assert_eq!(manifest.response.headers.get("Content-Type").unwrap(), "text/plain; charset=utf-8");
 
