@@ -21,7 +21,7 @@ use web_prover_core::{
 
 use crate::{
   error::NotaryServerError,
-  verifier::{sign_verification, VerifyOutput},
+  verifier::{hash_value, sign_verification, VerifyOutput},
   SharedState,
 };
 #[derive(Deserialize)]
@@ -125,7 +125,7 @@ pub fn create_tee_proof(
   let path = manifest.response.body.json_path().clone();
   let body = serde_json::from_slice(&response.notary_response_body.clone().body.unwrap()).unwrap();
   let value = get_value_from_json_path(&body, &path);
-  let manifest_hash = KeccakHasher::hash(serde_json::to_string(&manifest)?.as_bytes());
+  let manifest_hash = hash_value(serde_json::to_string(&manifest)?.as_bytes());
   let serialized_value = serde_json::to_string(&value).unwrap();
   let to_sign = VerifyOutput { value: serialized_value.clone(), manifest: manifest.clone() };
   let signature = sign_verification(to_sign, State(state)).unwrap();

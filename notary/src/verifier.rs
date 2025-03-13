@@ -8,13 +8,15 @@ use web_prover_core::{manifest::Manifest, proof::SignedVerificationReply};
 use crate::{error::NotaryServerError, SharedState, State};
 
 #[derive(Clone)]
-struct KeccakHasher;
+pub struct KeccakHasher;
 
 impl Hasher for KeccakHasher {
   type Hash = [u8; 32];
 
   fn hash(data: &[u8]) -> Self::Hash { keccak256(data).into() }
 }
+
+pub fn hash_value<T: AsRef<[u8]>>(value: T) -> [u8; 32] { KeccakHasher::hash(value.as_ref()) }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VerifyOutput<T: AsRef<[u8]>> {
