@@ -14,7 +14,7 @@ use tokio::time::{sleep, timeout};
 
 // File paths
 const NOTARY_CONFIG_PATH: &str = "fixture/notary-config.toml";
-const CLIENT_CONFIG_PATH: &str = "fixture/client.proxy.json";
+const CLIENT_CONFIG_PATH: &str = "fixture/client.json.proxy.json";
 const RELEASE_DIR: &str = "target/release";
 
 // Binary names
