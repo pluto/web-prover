@@ -35,3 +35,9 @@ impl TryFrom<TeeProof> for Vec<u8> {
 pub struct TeeProofData {
   pub manifest_hash: Vec<u8>,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct NotarizationResult {
+  pub tee_proof: Option<TeeProof>,
+  pub errors:    Option<Vec<String>>,
+}
