@@ -1,12 +1,13 @@
 [workspace]
-members =["client", "notary", "core", "tests"]
+members =["client", "notary", "core", "tests", "executor"]
 resolver="2"
 
 [workspace.dependencies]
 # Local re-exporting
-web-prover-client={ path="client" }
-web-prover-core  ={ path="core" }
-web-prover-notary={ path="notary" }
+web-prover-client  ={ path="client" }
+web-prover-core    ={ path="core" }
+web-prover-executor={ path="executor" }
+web-prover-notary  ={ path="notary" }
 # Serde
 serde     ={ version="1.0.204", features=["derive"] }
 serde_json="1.0.120"
@@ -27,9 +28,12 @@ hyper         ={ version="1.6", features=["full"] }
 hyper-util    ={ version="0.1", features=["full"] }
 
 # Async
-tokio       ={ version="1.39.1", features=["full"] }
-tokio-rustls={ version="0.26.0", default-features=false, features=["logging", "tls12"] }
-tokio-util  ={ version="0.7" }
+axum             ={ version="0.7", features=["ws", "json"] }
+axum-core        ="0.4"
+tokio            ={ version="1.39.1", features=["full"] }
+tokio-rustls     ={ version="0.26.0", default-features=false, features=["logging", "tls12"] }
+tokio-tungstenite={ version="0.26.2", features=["native-tls", "rustls"] }
+tokio-util       ={ version="0.7" }
 
 chrono     ="0.4"
 derive_more={ version="2.0.1", features=["full"] }
@@ -37,6 +41,9 @@ url        ="2.5.4"
 uuid       ={ version="1.10.0", default-features=false, features=["v4", "serde"] }
 
 tracing-test="0.2"
+
+tempfile    ="3.18.0"
+wait-timeout="0.2.1"
 
 [profile.dev]
 incremental    =true

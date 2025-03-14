@@ -33,12 +33,13 @@ If you have any questions, please reach out to any of Pluto's [team members](htt
 - `client`: contains components for the client that are shared across both WASM and iOS targets.
 - `fixture`: contains testing artifacts such as TLS certificates and configuration files.
 - `notary`: notary server which can notarize TEE proofs.
+- `core`: core features of web proofs, i.e. manifest validation, parser, extraction.
 
 ### Usage
 
 ```
-cargo run -p notary -- --config ./fixture/notary-config.toml
-cargo run -p client -- --config ./fixture/client.proxy.json
+cargo run -p web-prover-notary -- --config ./fixture/notary-config.toml
+cargo run -p web-prover-client -- --config ./fixture/client.proxy.json
 ```
 
 ## Security Status

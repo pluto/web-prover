@@ -1,4 +1,5 @@
 use std::{
+  collections::HashMap,
   fs,
   io::{self},
   sync::Arc,
@@ -20,21 +21,27 @@ use rustls::{
   ServerConfig,
 };
 use rustls_acme::{caches::DirCache, AcmeConfig};
-use tokio::{io::AsyncWriteExt, net::TcpListener};
+use tokio::{io::AsyncWriteExt, net::TcpListener, sync::Mutex};
 use tokio_rustls::{LazyConfigAcceptor, TlsAcceptor};
 use tokio_stream::StreamExt;
 use tower_http::cors::CorsLayer;
 use tower_service::Service;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use uuid::Uuid;
 
 mod config;
 mod error;
+mod frame;
 mod proxy;
+mod runner;
 mod verifier;
 
 struct SharedState {
   notary_signing_key: SigningKey,
+
+  frame_sessions: Arc<Mutex<HashMap<Uuid, frame::ConnectionState>>>,
+  sessions:       Arc<Mutex<HashMap<Uuid, Arc<Mutex<frame::Session>>>>>,
 }
 
 /// Main entry point for the notary server application.
@@ -84,12 +91,18 @@ async fn main() -> Result<(), NotaryServerError> {
   let listener = TcpListener::bind(&c.listen).await?;
   info!("Listening on https://{}", &c.listen);
 
-  let shared_state =
-    Arc::new(SharedState { notary_signing_key: load_notary_signing_key(&c.notary_signing_key) });
+  let shared_state = Arc::new(SharedState {
+    notary_signing_key: load_notary_signing_key(&c.notary_signing_key),
+    frame_sessions:     Arc::new(Mutex::new(HashMap::new())),
+    sessions:           Arc::new(Mutex::new(HashMap::new())),
+  });
+
+  let _ = start_internal_server(&c, shared_state.clone()).await?;
 
   let router = Router::new()
     .route("/health", get(|| async move { (StatusCode::OK, "Ok").into_response() }))
     .route("/v1/proxy", post(proxy::proxy))
+    .route("/v1/frame", get(frame::on_websocket))
     .route("/v1/meta/keys/:key", get(meta_keys))
     .layer(CorsLayer::permissive())
     .with_state(shared_state);
@@ -99,6 +112,26 @@ async fn main() -> Result<(), NotaryServerError> {
   } else {
     let _ = acme_listen(listener, router, &c.acme_domain, &c.acme_email).await;
   }
+  Ok(())
+}
+
+/// Create a separate internal router for prompts and Start the internal HTTP server as a separate
+/// task
+async fn start_internal_server(
+  c: &config::Config,
+  shared_state: Arc<SharedState>,
+) -> Result<(), NotaryServerError> {
+  let internal_router = Router::new()
+    .route("/prompt", post(runner::prompt))
+    .route("/prove", post(runner::prove))
+    .with_state(shared_state);
+  let internal_listener = TcpListener::bind(&c.listen_internal).await?;
+  info!("Internal server listening on http://{}", &c.listen_internal);
+  tokio::spawn(async move {
+    if let Err(e) = axum::serve(internal_listener, internal_router).await {
+      error!("Internal server error: {:?}", e);
+    }
+  });
   Ok(())
 }
 
