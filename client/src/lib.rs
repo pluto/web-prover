@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 use web_prover_core::{
   manifest::Manifest,
-  proof::{SignedVerificationReply, TeeProof},
+  proof::{NotarizationResult, SignedVerificationReply},
 };
 
 use crate::error::WebProverClientError;
@@ -21,7 +21,7 @@ pub struct ProxyConfig {
   pub manifest:       Manifest,
 }
 
-pub async fn proxy(config: config::Config) -> Result<TeeProof, WebProverClientError> {
+pub async fn proxy(config: config::Config) -> Result<NotarizationResult, WebProverClientError> {
   let session_id = config.session_id.clone();
 
   let url = format!(
@@ -50,8 +50,8 @@ pub async fn proxy(config: config::Config) -> Result<TeeProof, WebProverClientEr
 
   let response = client.post(url).json(&proxy_config).send().await?;
   assert_eq!(response.status(), hyper::StatusCode::OK);
-  let tee_proof = response.json::<TeeProof>().await?;
-  Ok(tee_proof)
+  let notarization_result = response.json::<NotarizationResult>().await?;
+  Ok(notarization_result)
 }
 
 pub async fn verify<T: Serialize>(
@@ -75,7 +75,7 @@ pub async fn verify<T: Serialize>(
   };
 
   let response = client.post(url).json(&verify_body).send().await?;
-  assert!(response.status() == hyper::StatusCode::OK, "response={:?}", response);
+  assert_eq!(response.status(), hyper::StatusCode::OK, "response={:?}", response);
   let verify_response = response.json::<SignedVerificationReply>().await?;
 
   debug!("\n{:?}\n\n", verify_response.clone());

@@ -195,14 +195,20 @@ async fn test_proving_successful() {
       if let Some(Ok(line)) = stdout_lines.next() {
         println!("Client stdout: {}", line);
         if line.contains(PROVING_SUCCESS_MSG) {
-          return true;
+          return Ok(());
+        }
+        if line.contains("Proving Failed") {
+          return Err(line);
         }
       }
 
       if let Some(Ok(line)) = stderr_lines.next() {
         println!("Client stderr: {}", line);
         if line.contains(PROVING_SUCCESS_MSG) {
-          return true;
+          return Ok(());
+        }
+        if line.contains("Proving Failed") {
+          return Err(line);
         }
       }
 
@@ -212,9 +218,10 @@ async fn test_proving_successful() {
   .await;
 
   match result {
-    Ok(found) => assert!(found, "Did not find '{}' in output", PROVING_SUCCESS_MSG),
+    Ok(Ok(())) => (),
+    Ok(Err(failed_msg)) => panic!("Proving failed: {}", failed_msg),
     Err(_) => panic!(
-      "Timed out waiting for '{}' after {} seconds",
+      "Timed out waiting for '{}' or 'Proving Failed' after {} seconds",
       PROVING_SUCCESS_MSG,
       PROVING_TIMEOUT.as_secs()
     ),

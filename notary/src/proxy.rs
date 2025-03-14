@@ -14,8 +14,8 @@ use web_prover_core::{
   http::{
     ManifestRequest, ManifestResponse, ManifestResponseBody, NotaryResponse, NotaryResponseBody,
   },
-  manifest::{Manifest, ManifestValidationResult},
-  proof::{TeeProof, TeeProofData},
+  manifest::Manifest,
+  proof::{NotarizationResult, TeeProof, TeeProofData},
 };
 
 use crate::{
@@ -33,7 +33,7 @@ pub async fn proxy(
   query: Query<NotarizeQuery>,
   State(state): State<Arc<SharedState>>,
   extract::Json(payload): extract::Json<web_prover_client::ProxyConfig>,
-) -> Result<Json<TeeProof>, NotaryServerError> {
+) -> Result<Json<NotarizationResult>, NotaryServerError> {
   let session_id = query.session_id;
 
   info!("Starting proxy with ID: {}", session_id);
@@ -58,9 +58,9 @@ pub async fn proxy(
   let response = from_reqwest_response(reqwest_response).await?;
   // debug!("{:?}", response);
 
-  let tee_proof = create_tee_proof(&payload.manifest, &request, &response, State(state))?;
+  let notarization_result = create_tee_proof(&payload.manifest, &request, &response, State(state))?;
 
-  Ok(Json(tee_proof))
+  Ok(Json(notarization_result))
 }
 
 // TODO: This, similarly to other from_* methods, should be a trait
@@ -124,13 +124,21 @@ fn capitalize_header(header: &str) -> String {
     .join("-")
 }
 
+/// Check if `manifest`, `request`, and `response` all fulfill requirements necessary for
+/// a proof to be created.
 pub fn create_tee_proof(
   manifest: &Manifest,
   request: &ManifestRequest,
   response: &NotaryResponse,
   State(state): State<Arc<SharedState>>,
-) -> Result<TeeProof, NotaryServerError> {
-  let validation_result = validate_notarization_legal(manifest, request, response)?;
+) -> Result<NotarizationResult, NotaryServerError> {
+  debug!("Validating manifest");
+  let validation_result = manifest.validate_with(request, response)?;
+  if !validation_result.is_success() {
+    info!("Manifest validation failed: {:?}", validation_result.errors());
+    return Ok(NotarizationResult { tee_proof: None, errors: Some(validation_result.errors()) });
+  }
+  info!("Manifest returned values: {:?}", validation_result.values());
 
   let manifest_hash = manifest.to_keccak_digest()?;
   let extraction_hash = validation_result.extraction_keccak_digest()?;
@@ -142,22 +150,10 @@ pub fn create_tee_proof(
   };
   let signature = sign_verification(to_sign, State(state))?;
   let data = TeeProofData { manifest_hash: manifest_hash.to_vec() };
+  let proof = TeeProof { data, signature };
+  debug!("Created proof: {:?}", proof);
 
-  Ok(TeeProof { data, signature })
-}
-
-/// Check if `manifest`, `request`, and `response` all fulfill requirements necessary for
-/// a proof to be created
-fn validate_notarization_legal(
-  manifest: &Manifest,
-  request: &ManifestRequest,
-  response: &NotaryResponse,
-) -> Result<ManifestValidationResult, NotaryServerError> {
-  debug!("Validating manifest");
-  let result = manifest.validate_with(request, response)?;
-  if !result.is_success() {
-    info!("Manifest validation failed: {:?}", result.errors());
-  }
-  info!("Manifest returned values: {:?}", result.values());
-  Ok(result)
+  let notarization_result =
+    NotarizationResult { tee_proof: Some(proof), errors: Some(validation_result.errors()) };
+  Ok(notarization_result)
 }

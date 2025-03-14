@@ -32,8 +32,14 @@ async fn main() -> Result<(), WebProverClientError> {
   let mut config: Config = serde_json::from_str(&config_json)?;
   config.set_session_id();
 
-  let proof = web_prover_client::proxy(config).await?;
-  let proof_json = serde_json::to_string_pretty(&proof)?;
+  let result = web_prover_client::proxy(config).await?;
+
+  if result.errors.is_some() {
+    println!("Proving Failed: {:?}", result.errors);
+    return Ok(());
+  }
+
+  let proof_json = serde_json::to_string_pretty(&result.tee_proof)?;
   println!("Proving Successful: proof_len={:?}", proof_json.len());
   Ok(())
 }
