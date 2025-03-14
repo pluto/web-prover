@@ -7,7 +7,7 @@ use axum::{
 use reqwest::{Request, Response};
 use serde::Deserialize;
 use serde_json::Value;
-use tracing::info;
+use tracing::{debug, info};
 use uuid::Uuid;
 use web_prover_core::{
   hash::keccak_digest,
@@ -19,10 +19,11 @@ use web_prover_core::{
 };
 
 use crate::{
-  error::NotaryServerError,
+  error::{NotaryServerError, ProxyError},
   verifier::{sign_verification, VerifyOutput},
   SharedState,
 };
+
 #[derive(Deserialize)]
 pub struct NotarizeQuery {
   session_id: Uuid,
@@ -54,7 +55,7 @@ pub async fn proxy(
   let request = from_reqwest_request(&reqwest_request);
   // debug!("{:?}", request);
 
-  let response = from_reqwest_response(reqwest_response).await;
+  let response = from_reqwest_response(reqwest_response).await?;
   // debug!("{:?}", response);
 
   let tee_proof = create_tee_proof(&payload.manifest, &request, &response, State(state))?;
@@ -64,7 +65,7 @@ pub async fn proxy(
 
 // TODO: This, similarly to other from_* methods, should be a trait
 // Requires adding reqwest to proofs crate
-async fn from_reqwest_response(response: Response) -> NotaryResponse {
+async fn from_reqwest_response(response: Response) -> Result<NotaryResponse, NotaryServerError> {
   let status = response.status().as_u16().to_string();
   let version = format!("{:?}", response.version());
   let message = response.status().canonical_reason().unwrap_or("").to_string();
@@ -73,8 +74,17 @@ async fn from_reqwest_response(response: Response) -> NotaryResponse {
     .iter()
     .map(|(k, v)| (capitalize_header(k.as_ref()), v.to_str().unwrap_or("").to_string()))
     .collect();
-  let json = response.json().await.ok();
-  NotaryResponse {
+  let body = response
+    .bytes()
+    .await
+    .map_err(|_| {
+      NotaryServerError::ProxyError(ProxyError::Io(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "Failed to read response body",
+      )))
+    })?
+    .to_vec();
+  Ok(NotaryResponse {
     response:             ManifestResponse {
       status,
       version,
@@ -83,8 +93,9 @@ async fn from_reqwest_response(response: Response) -> NotaryResponse {
       // TODO: This makes me think that perhaps this should be an optional field or something else
       body: ManifestResponseBody::default(),
     },
-    notary_response_body: NotaryResponseBody { body: json },
-  }
+    // TODO: Should we remove Option<_> on body?
+    notary_response_body: NotaryResponseBody { body: Some(body) },
+  })
 }
 
 fn from_reqwest_request(request: &Request) -> ManifestRequest {
@@ -142,6 +153,7 @@ fn validate_notarization_legal(
   request: &ManifestRequest,
   response: &NotaryResponse,
 ) -> Result<ManifestValidationResult, NotaryServerError> {
+  debug!("Validating manifest");
   let result = manifest.validate_with(request, response)?;
   if !result.is_success() {
     info!("Manifest validation failed: {:?}", result.errors());
