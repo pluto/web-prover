@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -11,6 +13,7 @@ pub struct Action {
 pub enum View {
   InitialView,
   PromptView { prompts: Vec<Prompt> },
+  ProveView { proof: FrameProof },
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -35,9 +38,9 @@ pub struct PromptResponse {
   pub inputs: Vec<String>,
 }
 
+pub type FrameProof = HashMap<String, Value>;
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ProveRequest {
+pub struct ProveOutput {
   pub uuid:  String,
-  pub key:   String,
-  pub value: Value,
+  pub proof: FrameProof,
 }

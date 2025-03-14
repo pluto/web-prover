@@ -20,7 +20,7 @@ use tokio::sync::{oneshot, Mutex};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 // use views::View;
-use web_prover_core::frame::{Action, Prompt, PromptResponse, View};
+use web_prover_core::frame::{Action, FrameProof, Prompt, PromptResponse, ProveOutput, View};
 
 use crate::SharedState;
 
@@ -126,6 +126,15 @@ impl Session {
     Ok(prompt_response_receiver)
   }
 
+  pub async fn handle_prove(&mut self, proof: FrameProof) -> Result<(), FrameError> {
+    debug!("Handling prove: {:?}", proof);
+    let prove_view = View::ProveView { proof };
+    let serialized_view = serde_json::to_string(&prove_view).unwrap();
+    self.ws_sender.as_mut().unwrap().send(Message::Text(serialized_view)).await.unwrap();
+    debug!("Prove view sent successfully");
+    Ok(())
+  }
+
   pub async fn handle_prompt_response(&mut self, prompt_response: PromptResponse) {
     debug!("Received prompt response: {:?}", prompt_response);
     assert!(self.prompt_response_sender.lock().await.is_some(), "No prompt response sender");
@@ -218,14 +227,15 @@ async fn handle_websocket_connection(
 
   session.lock().await.on_client_connect().await; // TODO pass sender?
 
-  // session.lock().await.run().await;
-
   // TODO what if next() returns None?!
   while let Some(result) = receiver.next().await {
     match result {
       Ok(message) => match message {
         axum::extract::ws::Message::Text(text) => {
-          process_text_message(text, session.clone()).await;
+          let session_clone = session.clone();
+          tokio::spawn(async move {
+            process_text_message(text, session_clone.clone()).await;
+          });
         },
         axum::extract::ws::Message::Binary(_) => {
           warn!("Binary messages are not supported");

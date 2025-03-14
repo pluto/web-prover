@@ -162,7 +162,7 @@ pub async fn frame() {
           let view: View = serde_json::from_str(&text).unwrap();
           match view {
             InitialView => {
-              debug!("InitialView");
+              debug!("Received InitialView");
               let action = Action {
                 kind:    "initial_input".to_owned(),
                 payload: serde_json::to_value(InitialInput {
@@ -182,15 +182,23 @@ pub async fn frame() {
                 payload: serde_json::to_value(prompt_response).unwrap(),
               };
               ws_stream.send(Text(serde_json::to_string(&action).unwrap().into())).await.unwrap();
-              debug!("Sent prompt response: {:?}", action);
+            },
+            View::ProveView { proof } => {
+              debug!("Received ProveView with proof: {:?}", proof);
+
+              ws_stream.close(None).await.unwrap();
             },
           }
         },
         _ => panic!("unexpected message"),
       };
     }
-  })
-  .await;
+  });
+
+  match ws_spawn.await {
+    Ok(_) => debug!("WebSocket task completed"),
+    Err(e) => debug!("WebSocket task failed: {:?}", e),
+  }
 }
 
 #[cfg(test)]
@@ -275,12 +283,21 @@ mod tests {
                 ws_stream.send(Text(serde_json::to_string(&action).unwrap().into())).await.unwrap();
                 println!("Sent prompt response: {:?}", action);
               },
+              View::ProveView { proof } => {
+                println!("Received ProveView with proof: {:?}", proof);
+
+                ws_stream.close(None).await.unwrap();
+              },
             }
           },
           _ => panic!("unexpected message"),
         };
       }
-    })
-    .await;
+    });
+
+    match ws_spawn.await {
+      Ok(_) => println!("WebSocket task completed"),
+      Err(e) => println!("WebSocket task failed: {:?}", e),
+    }
   }
 }
