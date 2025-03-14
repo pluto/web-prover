@@ -14,7 +14,8 @@ use tokio::time::{sleep, timeout};
 
 // File paths
 const NOTARY_CONFIG_PATH: &str = "fixture/notary-config.toml";
-const CLIENT_CONFIG_PATH: &str = "fixture/client.json.proxy.json";
+const CLIENT_CONFIG_PATHS: [&str; 2] =
+  ["fixture/client.json.proxy.json", "fixture/client.html.tee.json"];
 const RELEASE_DIR: &str = "target/release";
 
 // Binary names
@@ -37,7 +38,7 @@ struct TestSetup {
 }
 
 impl TestSetup {
-  async fn new() -> Self {
+  async fn new(client_config_path: &str) -> Self {
     // Find the workspace root directory
     let workspace_root = {
       let output =
@@ -148,7 +149,7 @@ impl TestSetup {
 
       let cmd = Command::new(format!("./{}/{}", RELEASE_DIR, CLIENT_BIN))
         .arg("--config")
-        .arg(format!("./{}", CLIENT_CONFIG_PATH))
+        .arg(format!("./{}",  client_config_path))
         .env("RUST_LOG", "DEBUG")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -161,7 +162,7 @@ impl TestSetup {
       Command::new("cargo")
         .args(["run", "-p", CLIENT_BIN, "--"])
         .arg("--config")
-        .arg(workspace_root.join(CLIENT_CONFIG_PATH))
+        .arg(workspace_root.join(client_config_path))
         .env("RUST_LOG", "DEBUG")
         .current_dir(&workspace_root)
         .stdout(Stdio::piped())
@@ -183,40 +184,45 @@ impl Drop for TestSetup {
 
 #[tokio::test]
 async fn test_proving_successful() {
-  let mut setup = TestSetup::new().await;
+  // Test each config path
+  for config_path in CLIENT_CONFIG_PATHS.into_iter() {
+    println!("Testing with config: {}", config_path);
+    
+    let mut setup = TestSetup::new(config_path).await;
 
-  let stdout = BufReader::new(setup.client.stdout.take().unwrap());
-  let stderr = BufReader::new(setup.client.stderr.take().unwrap());
+    let stdout = BufReader::new(setup.client.stdout.take().unwrap());
+    let stderr = BufReader::new(setup.client.stderr.take().unwrap());
 
-  let result = timeout(PROVING_TIMEOUT, async {
-    let mut stdout_lines = stdout.lines();
-    let mut stderr_lines = stderr.lines();
-    loop {
-      if let Some(Ok(line)) = stdout_lines.next() {
-        println!("Client stdout: {}", line);
-        if line.contains(PROVING_SUCCESS_MSG) {
-          return true;
+    let result = timeout(PROVING_TIMEOUT, async {
+      let mut stdout_lines = stdout.lines();
+      let mut stderr_lines = stderr.lines();
+      loop {
+        if let Some(Ok(line)) = stdout_lines.next() {
+          println!("Client stdout: {}", line);
+          if line.contains(PROVING_SUCCESS_MSG) {
+            return true;
+          }
         }
-      }
 
-      if let Some(Ok(line)) = stderr_lines.next() {
-        println!("Client stderr: {}", line);
-        if line.contains(PROVING_SUCCESS_MSG) {
-          return true;
+        if let Some(Ok(line)) = stderr_lines.next() {
+          println!("Client stderr: {}", line);
+          if line.contains(PROVING_SUCCESS_MSG) {
+            return true;
+          }
         }
-      }
 
-      sleep(POLL_INTERVAL).await;
+        sleep(POLL_INTERVAL).await;
+      }
+    })
+    .await;
+
+    match result {
+      Ok(found) => assert!(found, "Did not find '{}' in output", PROVING_SUCCESS_MSG),
+      Err(_) => panic!(
+        "Timed out waiting for '{}' after {} seconds",
+        PROVING_SUCCESS_MSG,
+        PROVING_TIMEOUT.as_secs()
+      ),
     }
-  })
-  .await;
-
-  match result {
-    Ok(found) => assert!(found, "Did not find '{}' in output", PROVING_SUCCESS_MSG),
-    Err(_) => panic!(
-      "Timed out waiting for '{}' after {} seconds",
-      PROVING_SUCCESS_MSG,
-      PROVING_TIMEOUT.as_secs()
-    ),
   }
 }
