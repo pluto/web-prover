@@ -7,7 +7,7 @@
   "target_url": "https://gist.githubusercontent.com/mattes/23e64faadb5fd4b5112f379903d2572e/raw/74e517a60c21a5c11d94fec8b572f68addfade39/example.json",
   "target_headers": {},
   "manifest": {
-    "manifestVersion": "1",
+    "manifestVersion": "2",
     "id": "hello-world",
     "title": "Hello World example",
     "description": "Prove that a gist contains a hello world message",
